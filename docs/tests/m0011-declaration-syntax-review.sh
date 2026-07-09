@@ -54,6 +54,6 @@ require_text "$review_dir/ADR-0022-chief-architect-decision.md" 'Accepted source
 require_text "$review_dir/ADR-0022-chief-architect-decision.md" 'M0011 declaration parser fixture and implementation tasks may proceed'
 
 require_absent_path crates/newlang/src/parser.rs
-require_absent_path tests/fixtures/parser
+require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0011-review-history: declaration syntax proposal review history validation passed"

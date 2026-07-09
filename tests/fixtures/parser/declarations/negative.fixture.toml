@@ -1,0 +1,28 @@
+kind = "parser-declaration-fixture"
+milestone = "M0011"
+source = "docs/adr/ADR-0022-declaration-syntax.md"
+category = "negative"
+
+[[cases]]
+name = "field_syntax_is_deferred"
+source_text = "struct Box { val size: Int }"
+expected_diagnostics = ["unexpected_token_in_declaration_body"]
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "unsupported_modifier_is_rejected"
+source_text = "open fun run();"
+expected_diagnostics = ["unsupported_declaration_modifier"]
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "type_parameters_are_deferred"
+source_text = "struct Box<T> {}"
+expected_diagnostics = ["malformed_declaration_header"]
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "expression_body_is_deferred"
+source_text = "fun answer() = 42"
+expected_diagnostics = ["malformed_declaration_header"]
+expected_recovery = "skip-to-declaration-boundary"

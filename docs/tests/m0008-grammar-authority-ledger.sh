@@ -69,6 +69,6 @@ require_text "$milestone" '\[x\] Blocking ambiguities are recorded'
 require_text "$milestone" '\[x\] Parser scope is defined'
 
 require_absent_path crates/newlang/src/parser.rs
-require_absent_path tests/fixtures/parser
+require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0008-ledger: grammar authority ledger validation passed"

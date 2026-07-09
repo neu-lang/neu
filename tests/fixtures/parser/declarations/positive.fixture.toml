@@ -1,0 +1,29 @@
+kind = "parser-declaration-fixture"
+milestone = "M0011"
+source = "docs/adr/ADR-0022-declaration-syntax.md"
+category = "positive"
+
+[[cases]]
+name = "package_imports_and_function"
+source_text = "package demo.core import demo.io as io public fun main();"
+expected_declarations = ["package", "import", "function"]
+expected_diagnostics = []
+
+[[cases]]
+name = "top_level_nominal_declarations"
+source_text = "internal struct Box {} public enum Option {} private interface Display {}"
+expected_declarations = ["struct", "enum", "interface"]
+expected_diagnostics = []
+
+[[cases]]
+name = "nested_declaration_body"
+source_text = "struct Module { fun build(); interface Service { fun run(); } enum State {} }"
+expected_declarations = ["struct", "function", "interface", "enum"]
+expected_diagnostics = []
+
+[[cases]]
+name = "function_with_placeholder_return_type"
+source_text = "fun size(): Int;"
+expected_declarations = ["function"]
+expected_placeholders = ["return-type-placeholder"]
+expected_diagnostics = []

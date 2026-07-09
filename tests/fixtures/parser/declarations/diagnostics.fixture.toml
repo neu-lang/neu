@@ -1,0 +1,46 @@
+kind = "parser-declaration-fixture"
+milestone = "M0011"
+source = "docs/adr/ADR-0022-declaration-syntax.md"
+category = "diagnostics"
+
+[[cases]]
+name = "package_after_declaration"
+source_text = "fun main(); package misplaced"
+expected_diagnostic = "misplaced_package_declaration"
+primary_span_token = "package"
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "import_after_declaration"
+source_text = "struct Box {} import misplaced.name"
+expected_diagnostic = "misplaced_import_declaration"
+primary_span_token = "import"
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "duplicate_visibility"
+source_text = "public private fun main();"
+expected_diagnostic = "duplicate_visibility_modifier"
+primary_span_token = "private"
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "missing_function_name"
+source_text = "fun ();"
+expected_diagnostic = "missing_declaration_name"
+primary_span_token = "fun"
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "top_level_only_package_inside_body"
+source_text = "struct Box { package nested }"
+expected_diagnostic = "invalid_member_declaration_position"
+primary_span_token = "package"
+expected_recovery = "skip-to-declaration-boundary"
+
+[[cases]]
+name = "unexpected_token_in_body"
+source_text = "interface Service { 123 }"
+expected_diagnostic = "unexpected_token_in_declaration_body"
+primary_span_token = "123"
+expected_recovery = "skip-to-declaration-boundary"

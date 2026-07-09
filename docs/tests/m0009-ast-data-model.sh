@@ -53,6 +53,6 @@ require_absent_text crates/newlang/src/ast.rs 'FunctionDecl|StructDecl|EnumDecl|
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
-require_absent_path tests/fixtures/parser
+require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0009-ast: AST data model validation passed"
