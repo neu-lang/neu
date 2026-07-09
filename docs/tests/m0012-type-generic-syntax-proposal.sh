@@ -57,15 +57,17 @@ require_text "$proposal" 'function type syntax'
 require_text "$proposal" 'type syntax diagnostics'
 require_text "$proposal" 'not rely on Kotlin, Rust, Go, or existing compiler behavior as implicit authority'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
+require_text "$ambiguity" 'docs/adr/ADR-0023-type-and-generic-syntax.md'
 require_text "$ambiguity" 'Blocking milestone: `M0012`'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path docs/adr/ADR-0023-type-and-generic-syntax.md
+require_file docs/adr/ADR-0023-type-and-generic-syntax.md
+require_text docs/adr/ADR-0023-type-and-generic-syntax.md '^Status: Accepted$'
 require_absent_path tests/fixtures/parser/types
 require_absent_path tests/fixtures/parser/generics
-require_absent_text docs/SPEC.md '^## ADR-0023: Type And Generic Syntax$'
+require_text docs/SPEC.md '^## ADR-0023: Type And Generic Syntax$'
 require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 require_absent_text crates/newlang/src/ast.rs 'TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 
-echo "m0012-proposal: type and generic syntax proposal validation passed"
+echo "m0012-proposal: historical proposal validation passed after ADR-0023 acceptance"

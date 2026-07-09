@@ -38,9 +38,9 @@ require_text "$ledger" '\| Construct \| Classification \| Authority \| Owner \| 
 require_text "$ledger" '\| Package declaration \| specified \| ADR-0022'
 require_text "$ledger" '\| Import declaration \| specified \| ADR-0022'
 require_text "$ledger" '\| Function declaration \| specified \| ADR-0022'
-require_text "$ledger" '\| Type declaration \| ambiguous \| ADR-0010'
-require_text "$ledger" '\| Generic parameter syntax \| ambiguous \| ADR-0016'
-require_text "$ledger" '\| Nullable type syntax \| ambiguous \| ADR-0006'
+require_text "$ledger" '\| Type declaration \| specified \| ADR-0023'
+require_text "$ledger" '\| Generic parameter syntax \| specified \| ADR-0023'
+require_text "$ledger" '\| Nullable type syntax \| specified \| ADR-0023'
 require_text "$ledger" '\| Expression grammar \| ambiguous \| none'
 require_text "$ledger" '\| Pattern grammar \| ambiguous \| ADR-0012'
 require_text "$ledger" '\| Token spellings \| specified \| ADR-0021'
@@ -54,15 +54,13 @@ require_text "$ledger" 'M0013'
 require_text docs/ambiguities/M0008-declaration-syntax.md 'Status: `resolved`'
 require_text docs/ambiguities/M0008-declaration-syntax.md 'docs/adr/ADR-0022-declaration-syntax.md'
 
-for report in \
-  docs/ambiguities/M0008-type-generic-syntax.md \
-  docs/ambiguities/M0008-expression-statement-pattern-syntax.md
-do
-  require_text "$report" 'Status: `open`'
-  require_text "$report" 'Required Owner: `Language Designer`'
-  require_text "$report" 'Why guessing Is Unsafe'
-  require_text "$report" 'Blocking milestone'
-done
+require_text docs/ambiguities/M0008-type-generic-syntax.md 'Status: `resolved`'
+require_text docs/ambiguities/M0008-type-generic-syntax.md 'docs/adr/ADR-0023-type-and-generic-syntax.md'
+
+require_text docs/ambiguities/M0008-expression-statement-pattern-syntax.md 'Status: `open`'
+require_text docs/ambiguities/M0008-expression-statement-pattern-syntax.md 'Required Owner: `Language Designer`'
+require_text docs/ambiguities/M0008-expression-statement-pattern-syntax.md 'Why guessing Is Unsafe'
+require_text docs/ambiguities/M0008-expression-statement-pattern-syntax.md 'Blocking milestone'
 
 require_text "$milestone" '\[x\] Syntax constructs are classified'
 require_text "$milestone" '\[x\] Blocking ambiguities are recorded'

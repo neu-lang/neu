@@ -2,7 +2,7 @@
 set -eu
 
 fail() {
-  echo "m0012-blocked: $*" >&2
+  echo "m0012-authority: $*" >&2
   exit 1
 }
 
@@ -45,17 +45,17 @@ require_text "$task" 'Status: `blocked`'
 require_text "$task" 'Milestone: `M0012`'
 require_text "$task" 'Language Designer drafts type and generic syntax ADR'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0012`'
-require_text "$ambiguity" 'No parser implementation may accept concrete type or generic syntax'
+require_text "$ambiguity" 'Parser implementation may accept only the concrete type and generic syntax defined by ADR-0023'
 
-require_text "$ledger" '\| Type declaration \| ambiguous \| ADR-0010'
-require_text "$ledger" '\| Generic parameter syntax \| ambiguous \| ADR-0016'
-require_text "$ledger" '\| Generic argument syntax \| ambiguous \| ADR-0016'
-require_text "$ledger" '\| Capability bound syntax \| ambiguous \| ADR-0016'
-require_text "$ledger" '\| Nullable type syntax \| ambiguous \| ADR-0006'
-require_text "$ledger" '\| Function type syntax \| ambiguous \| ADR-0010'
-require_text "$ledger" 'M0012 type and generic syntax parser is blocked on type and generic syntax authority'
+require_text "$ledger" '\| Type declaration \| specified \| ADR-0023'
+require_text "$ledger" '\| Generic parameter syntax \| specified \| ADR-0023'
+require_text "$ledger" '\| Generic argument syntax \| specified \| ADR-0023'
+require_text "$ledger" '\| Capability bound syntax \| specified \| ADR-0023'
+require_text "$ledger" '\| Nullable type syntax \| specified \| ADR-0023'
+require_text "$ledger" '\| Function type syntax \| specified \| ADR-0023'
+require_text "$ledger" 'M0012 type and generic parser may proceed only for ADR-0023 constructs'
 
 require_text "$milestone" 'M0012'
 require_text "$milestone" '\[x\] Ambiguities are recorded'
@@ -66,4 +66,4 @@ require_absent_text crates/newlang/src/ast.rs 'TypeRef|GenericParameter|GenericA
 require_absent_path tests/fixtures/parser/types
 require_absent_path tests/fixtures/parser/generics
 
-echo "m0012-blocked: type and generic parser correctly blocked by syntax ambiguity"
+echo "m0012-authority: type and generic syntax authority resolved while implementation remains deferred"

@@ -24,12 +24,12 @@ This ledger records whether planned parser syntax has accepted grammar authority
 | Struct declaration | specified | ADR-0022 | Chief Architect | none | Struct declaration shell is specified; constructors, fields, and properties are deferred. |
 | Enum or sealed sum declaration | specified | ADR-0022 | Chief Architect | none | Enum declaration shell is specified; variants and sealed modifier spelling are deferred. |
 | Interface declaration | specified | ADR-0022 | Chief Architect | none | Interface declaration shell is specified; default method bodies are deferred. |
-| Type declaration | ambiguous | ADR-0010 | Language Designer | M0012 | Type syntax and named type forms are not specified. |
-| Generic parameter syntax | ambiguous | ADR-0016 | Language Designer | M0012 | Generic constraints exist semantically, but grammar is missing. |
-| Generic argument syntax | ambiguous | ADR-0016 | Language Designer | M0012 | Type application grammar is missing. |
-| Capability bound syntax | ambiguous | ADR-0016 | Language Designer | M0012 | Bounds exist semantically, but surface syntax is missing. |
-| Nullable type syntax | ambiguous | ADR-0006 | Language Designer | M0012 | Kotlin-style nullable types are accepted semantically, but grammar details are missing. |
-| Function type syntax | ambiguous | ADR-0010 | Language Designer | M0012 | Callable type grammar is not specified. |
+| Type declaration | specified | ADR-0023 | Chief Architect | none | Named type references and grouped type forms are specified for the bootstrap grammar. |
+| Generic parameter syntax | specified | ADR-0023 | Chief Architect | none | Generic parameter lists and optional capability-bound clauses are specified. |
+| Generic argument syntax | specified | ADR-0023 | Chief Architect | none | Generic argument lists attach to named type references only. |
+| Capability bound syntax | specified | ADR-0023 | Chief Architect | none | Multiple bounds use `&`; comma separates generic parameters. |
+| Nullable type syntax | specified | ADR-0023 | Chief Architect | none | Nullable markers are postfix and bind to the immediately preceding primary type. |
+| Function type syntax | specified | ADR-0023 | Chief Architect | none | Parenthesized function type parameters followed by `->` and return type are specified. |
 | Expression grammar | ambiguous | none | Language Designer | M0013 | Operators have token spellings only; precedence, associativity, and expression forms are missing. |
 | Statement grammar | ambiguous | none | Language Designer | M0013 | Control-flow keywords exist lexically, but statement grammar is missing. |
 | Pattern grammar | ambiguous | ADR-0012 | Language Designer | M0013 | Exhaustive matching exists semantically, but pattern syntax is missing. |
@@ -46,10 +46,12 @@ Concrete parser fixtures may use ADR-0021 token spellings only when the expected
 
 M0011 declaration parser may proceed only for ADR-0022 constructs. Type placeholders, function body placeholders, deferred declaration forms, and all later parser milestones must continue to follow their own authority rows.
 
+M0012 type and generic parser may proceed only for ADR-0023 constructs. Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain blocked until accepted source of truth defines them.
+
 ## Parser Block List
 
 - M0011 declaration parser is unblocked only for ADR-0022 declaration syntax.
-- M0012 type and generic syntax parser is blocked on type and generic syntax authority.
+- M0012 type and generic syntax parser is unblocked only for ADR-0023 type and generic syntax.
 - M0013 expression, statement, and pattern parser is blocked on expression, statement, and pattern syntax authority.
 
 ## Required Ambiguity Reports

@@ -7,7 +7,7 @@
 - Related Milestone: `M0008`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-09`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
 - Blocking milestone: `M0012`
 
@@ -57,21 +57,22 @@ Accepted ADRs define nullable types, nominal user-defined types, interfaces or p
 
 ## Recommended Resolution Path
 
-- [ ] Language Designer drafts type and generic syntax ADR or `docs/SPEC.md` revision.
-- [ ] Language Lawyer audits consistency with nullability and generic ADRs.
-- [ ] Adversarial Engineer reviews capability-bound and variance risks.
-- [ ] Diagnostics Engineer reviews type syntax diagnostic obligations.
-- [ ] Chief Architect approves final source-of-truth update.
+- [x] Language Designer drafts type and generic syntax ADR or `docs/SPEC.md` revision.
+- [x] Language Lawyer audits consistency with nullability and generic ADRs.
+- [x] Adversarial Engineer reviews capability-bound and variance risks.
+- [x] Diagnostics Engineer reviews type syntax diagnostic obligations.
+- [x] Chief Architect approves final source-of-truth update.
 
 ## Temporary Rule
 
-No parser implementation may accept concrete type or generic syntax until accepted source of truth defines it.
+Parser implementation may accept only the concrete type and generic syntax defined by ADR-0023 until future accepted source of truth extends it.
 
 ## Resolution
 
 - Decision:
-  - unresolved
+  - Accept a small Kotlin-like custom type and generic grammar for the bootstrap compiler.
 - Source of truth updated:
-  - none
+  - `docs/adr/ADR-0023-type-and-generic-syntax.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - unresolved
+  - 2026-07-10

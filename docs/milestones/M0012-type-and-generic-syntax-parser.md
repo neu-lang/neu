@@ -86,5 +86,5 @@ ADR-0006, ADR-0010, and ADR-0016 define high-level type, nullability, and generi
 ## Completion Checklist
 
 - [ ] Approved type syntax parses.
-- [ ] Generic syntax scope is explicit.
+- [x] Generic syntax scope is explicit.
 - [x] Ambiguities are recorded.

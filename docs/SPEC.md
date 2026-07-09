@@ -131,3 +131,17 @@ structs, enums or sealed sums, interfaces, and declaration bodies. Function
 parameter contents, concrete return type syntax, fields, properties,
 constructors, enum variants, expression bodies, and statement bodies are
 deferred until future accepted ADRs or spec updates.
+
+## ADR-0023: Type And Generic Syntax
+
+The language uses a small Kotlin-like custom type grammar for the bootstrap
+compiler. The accepted type syntax covers named type references, postfix
+nullable type syntax, generic parameter syntax, generic argument syntax,
+`&`-joined capability-bound syntax, parenthesized function type syntax, explicit
+type grouping, recovery boundaries, and ADR-0015 diagnostic obligations.
+
+ADR-0023 does not define type checking, generic constraint solving, capability
+semantics, variance, wildcard types, receiver function types, type aliases,
+associated types, higher-kinded types, dependent types, intersection or union
+type syntax, inferred placeholder types, layout or effect types, coroutine
+suspension markers, expression syntax, statement syntax, or pattern syntax.

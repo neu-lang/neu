@@ -1,6 +1,6 @@
 # ADR-0023 Chief Architect Decision
 
-Decision: pending
+Decision: approved
 
 ## Reviewed Artifact
 
@@ -10,9 +10,11 @@ Decision: pending
 
 ## Current Decision
 
-No acceptance yet.
+Accept ADR-0023 as source of truth for bootstrap type and generic syntax.
 
-The draft type and generic syntax proposal is not accepted source of truth. It remains a planning artifact under `docs/adr/proposals/` and must not be used to implement parser behavior.
+Accepted source of truth: `docs/adr/ADR-0023-type-and-generic-syntax.md`
+
+M0012 type and generic parser fixture and implementation tasks may proceed only for ADR-0023 constructs.
 
 ## Completed Review Dependencies
 
@@ -21,7 +23,7 @@ The draft type and generic syntax proposal is not accepted source of truth. It r
 - Diagnostics Engineer review.
 - Simplicity Guardian review.
 
-## Remaining Acceptance Blockers
+## Resolved Acceptance Blockers
 
 - Concrete accepted type grammar.
 - Explicit nullable marker binding rules.
@@ -30,10 +32,11 @@ The draft type and generic syntax proposal is not accepted source of truth. It r
 - Explicit function type grammar.
 - Explicit type syntax diagnostics.
 - Explicit recovery boundaries.
-- Final Chief Architect approval through accepted ADR or `docs/SPEC.md` update.
+- Final Chief Architect approval through accepted ADR and `docs/SPEC.md` update.
 
 ## Consequences
 
-- `docs/ambiguities/M0008-type-generic-syntax.md` remains open.
-- M0012 type and generic parser implementation remains blocked.
-- Concrete type and generic parser fixtures remain out of scope.
+- `docs/ambiguities/M0008-type-generic-syntax.md` is resolved.
+- M0012 type and generic parser implementation may proceed for ADR-0023 constructs.
+- Concrete type and generic parser fixtures may be created by follow-on M0012 tasks.
+- Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain blocked until accepted source of truth defines them.
