@@ -28,7 +28,7 @@ ADR-0015 makes diagnostics part of the semantic design. The agent rules require 
 
 - `docs/SPEC.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
-- `AGENTS.md`
+- `docs/AGENTS.md`
 - `.codex/agents/test-engineer.md`
 - `.codex/agents/diagnostics-engineer.md`
 
@@ -83,8 +83,7 @@ ADR-0015 makes diagnostics part of the semantic design. The agent rules require 
 
 ## Completion Checklist
 
-- [ ] Positive fixture category exists.
-- [ ] Negative fixture category exists.
-- [ ] Diagnostic snapshot category exists.
-- [ ] Tests can cite source-of-truth documents.
-
+- [x] Positive fixture category exists.
+- [x] Negative fixture category exists.
+- [x] Diagnostic snapshot category exists.
+- [x] Tests can cite source-of-truth documents.

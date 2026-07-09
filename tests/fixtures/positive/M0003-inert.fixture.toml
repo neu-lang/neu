@@ -1,0 +1,6 @@
+kind = "inert"
+milestone = "M0003"
+source = "docs/milestones/M0003-test-harness-and-golden-fixture-layout.md"
+compiler_behavior = "none"
+purpose = "Proves fixture discovery without encoding language syntax or compiler expectations."
+
