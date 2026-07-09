@@ -57,7 +57,6 @@ require_text tests/fixtures/lexer/M0006-inert.fixture.toml '^lexical_grammar_sta
 
 require_absent_text tests/fixtures/lexer/M0006-inert.fixture.toml 'source_text|expected_tokens|token_stream|keyword|identifier|literal|operator|delimiter'
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/ast.rs

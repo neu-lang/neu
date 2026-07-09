@@ -33,7 +33,6 @@ require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Status: `blocked`'
 require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Language Designer'
 require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Chief Architect'
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
 
 echo "m0007: historical lexer blocker resolved by accepted lexical grammar ADR"

@@ -66,7 +66,6 @@ require_text "$decision" '^Decision: approved$'
 require_text "$decision" 'Accepted `docs/adr/ADR-0021-lexical-grammar.md` as source of truth'
 require_text "$decision" 'M0007 may proceed to concrete lexer fixtures and implementation tasks'
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
 
 echo "m0007-accepted-grammar: accepted lexical grammar validation passed"

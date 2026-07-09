@@ -81,7 +81,6 @@ The lexer depends on source spans from M0005 and test fixtures from M0006.
 
 ## Completion Checklist
 
-- [ ] Approved lexer fixtures pass.
-- [ ] Lexical errors have diagnostics.
-- [ ] No guessed syntax is accepted.
-
+- [x] Approved lexer fixtures pass.
+- [x] Lexical errors have diagnostics.
+- [x] No guessed syntax is accepted.

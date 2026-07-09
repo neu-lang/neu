@@ -65,7 +65,6 @@ require_text tests/fixtures/lexer/errors.fixture.toml 'unterminated_block_commen
 require_text tests/fixtures/lexer/errors.fixture.toml 'invalid_string_escape'
 require_text tests/fixtures/lexer/errors.fixture.toml 'malformed_integer_literal'
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/ast.rs

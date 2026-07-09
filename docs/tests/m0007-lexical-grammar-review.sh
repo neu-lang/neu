@@ -58,7 +58,6 @@ require_text "$review_dir/ADR-0021-chief-architect-decision.md" '^Decision: appr
 require_text "$review_dir/ADR-0021-chief-architect-decision.md" 'Accepted `docs/adr/ADR-0021-lexical-grammar.md` as source of truth'
 require_text docs/adr/ADR-0021-lexical-grammar.md '^Status: Accepted$'
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
 
 echo "m0007-review: lexical grammar proposal review and acceptance validation passed"

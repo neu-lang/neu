@@ -19,6 +19,14 @@ pub struct ByteSpan {
 }
 
 impl ByteSpan {
+    pub fn new(file: SourceFileId, start: usize, end: usize) -> Option<Self> {
+        if start <= end {
+            Some(Self { file, start, end })
+        } else {
+            None
+        }
+    }
+
     pub fn file(self) -> SourceFileId {
         self.file
     }

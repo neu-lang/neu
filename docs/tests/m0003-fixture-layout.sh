@@ -52,7 +52,6 @@ if grep -Eq 'source_text|expected_output|expected_error|token|parse|lexer|parser
   fail "inert fixture must not encode compiler behavior, source syntax, or expected compiler output"
 fi
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/ast.rs
 require_absent_path crates/newlang/src/hir.rs

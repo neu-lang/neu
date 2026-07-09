@@ -55,7 +55,6 @@ require_text "$decision" '^## Resolved Acceptance Blockers$'
 require_text "$decision" 'Concrete accepted lexical grammar'
 require_text "$decision" 'Accepted `docs/adr/ADR-0021-lexical-grammar.md` as source of truth'
 
-require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
 
 echo "m0007-status-sync: lexical grammar blocker resolved-state validation passed"
