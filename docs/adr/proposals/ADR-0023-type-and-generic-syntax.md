@@ -61,6 +61,203 @@ The draft direction is:
 - Use parenthesized function type parameter lists followed by `->` and a return type if accepted by review.
 - Keep variance, wildcard types, receiver function types, intersection types, union types, dependent types, and type aliases deferred unless explicitly accepted.
 
+## Concrete Draft Grammar
+
+This concrete grammar is a draft only and is not accepted source of truth.
+
+### Type Grammar Overview
+
+```text
+type = nullable-type
+nullable-type = primary-type `?`?
+primary-type = named-type | function-type | grouped-type
+```
+
+`?` is postfix and binds only to the immediately preceding primary type.
+
+There is no general type precedence table in the bootstrap grammar. Grouping is explicit.
+
+### Named Type References
+
+```text
+named-type = qualified-name generic-arguments?
+qualified-name = identifier (`.` identifier)*
+```
+
+Qualified type names use the qualified-name grammar from ADR-0022.
+
+Package and import syntax control name lookup later; this draft grammar only recognizes the syntactic shape of qualified names.
+
+### Nullable Type Syntax
+
+```text
+nullable-type = primary-type `?`?
+```
+
+Nullable syntax may apply to:
+
+- named types
+- generic type applications
+- grouped function types
+
+Draft binding examples:
+
+- `Box<T?>?` parses as nullable `Box` applied to nullable `T`.
+- `(T) -> U?` parses as a function type returning nullable `U`.
+- `((T) -> U)?` parses as a nullable function type.
+
+Repeated nullable markers such as `T??` are malformed in the bootstrap grammar.
+
+### Generic Parameter Syntax
+
+```text
+generic-parameters = `<` generic-parameter (`,` generic-parameter)* `>`
+generic-parameter = identifier generic-bound-clause?
+generic-bound-clause = `:` capability-bound-list
+```
+
+Generic parameter lists may appear after the declaration name on functions, structs, enums, and interfaces.
+
+Generic parameter names use ADR-0021 identifiers.
+
+Empty generic parameter lists are malformed.
+
+Variance annotations are deferred.
+
+### Generic Argument Syntax
+
+```text
+generic-arguments = `<` type (`,` type)* `>`
+```
+
+Generic arguments attach to named type references only.
+
+Nested generic arguments are parsed by recursively parsing `type`; `>` closes the innermost generic argument list.
+
+Because `>` is a lexer token from ADR-0021, nested generic closers are token-based rather than split from a combined token.
+
+Empty generic argument lists are malformed.
+
+### Capability-Bound Syntax
+
+```text
+capability-bound-list = capability-bound (`&` capability-bound)*
+capability-bound = qualified-name
+```
+
+`&` is the only draft conjunction operator for multiple bounds.
+
+Commas separate generic parameters, not bounds.
+
+Draft interpretation:
+
+```text
+fun f<T: Send & Share>();
+```
+
+This declares one generic parameter `T` with two bounds, `Send` and `Share`.
+
+The comma form below is malformed because it is ambiguous with a second generic parameter:
+
+```text
+fun f<T: Send, Share>();
+```
+
+The grammar does not assign semantic meaning to capability names. Later capability analysis decides whether a bound is an ordinary type/interface bound or an ownership, borrow, send, share, or coroutine-relevant capability.
+
+### Function Type Syntax
+
+```text
+function-type = `(` function-type-parameters? `)` `->` type
+function-type-parameters = type (`,` type)*
+```
+
+Function type parameters are types only. Parameter names in function types are deferred.
+
+Function type syntax does not encode coroutine suspension, effects, unsafe boundaries, or ownership behavior.
+
+Draft binding examples:
+
+- `(T) -> U?` is a function type returning nullable `U`.
+- `((T) -> U)?` is a nullable function type.
+
+### Type Grouping And Binding
+
+```text
+grouped-type = `(` type `)`
+```
+
+Parentheses group exactly one type unless followed by `->`, in which case the parser treats the parentheses as a function type parameter list.
+
+The parser should prefer `function-type` when a parenthesized type list is followed by `->`.
+
+### Recovery Boundaries
+
+Type syntax recovery boundaries are:
+
+- comma
+- right angle bracket
+- right parenthesis
+- left brace
+- right brace
+- semicolon
+- declaration-starting keyword
+- end of file
+
+Generic parameter list recovery also synchronizes at `>`, declaration-starting keywords, and end of file.
+
+Generic argument list recovery also synchronizes at `>`, declaration boundaries, and end of file.
+
+Function type recovery also synchronizes at `->`, right parenthesis, declaration boundaries, and end of file.
+
+### Type Syntax Diagnostics
+
+Accepted type syntax must define these diagnostic categories before parser implementation:
+
+| Diagnostic | Primary span | Recovery action | Safe suggestion |
+| --- | --- | --- | --- |
+| `missing_type_name` | expected type position | skip to type recovery boundary | none |
+| `malformed_nullable_type` | extra or misplaced `?` | skip to type recovery boundary | remove extra nullable marker, if unambiguous |
+| `malformed_generic_parameter_list` | malformed generic parameter list range | skip to `>` or declaration boundary | none |
+| `malformed_generic_argument_list` | malformed generic argument list range | skip to `>` or declaration boundary | none |
+| `missing_generic_bound` | `:` token | skip to generic parameter boundary | none |
+| `malformed_capability_bound` | malformed bound range | skip to generic parameter boundary | use `&` between bounds, if unambiguous |
+| `malformed_function_type` | malformed function type range | skip to type recovery boundary | none |
+| `unsupported_type_form` | unsupported type-form token | skip to type recovery boundary | none |
+| `unexpected_token_in_type` | unexpected token | skip to type recovery boundary | none |
+
+Each type syntax diagnostic must define a primary span, recovery action, source-of-truth citation, and safe suggestion policy.
+
+### Review Attack Cases
+
+`Box<T?>?` has the draft parse: nullable `Box` application with a nullable `T` argument.
+
+`fun f<T: Send & Share>();` has the draft parse: one generic parameter `T` with two capability bounds.
+
+`fun f<T: Send, Share>();` is malformed in this draft because comma separates generic parameters and `Share` lacks a parameter name/bound structure.
+
+`(T) -> U?` has the draft parse: function type returning nullable `U`.
+
+`((T) -> U)?` has the draft parse: nullable function type.
+
+### Concrete Deferrals
+
+The concrete draft grammar defers:
+
+- variance annotations
+- wildcard or star-projection types
+- receiver function types
+- parameter names in function types
+- annotation syntax on types
+- type aliases
+- associated types
+- higher-kinded types
+- dependent types
+- intersection and union type syntax
+- inferred placeholder types
+- layout or effect types
+- coroutine suspension markers in function types
+
 ## Required Accepted Content
 
 Before this proposal can become source of truth, it must define:
