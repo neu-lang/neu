@@ -1,0 +1,22 @@
+kind = "parser-type-generic-fixture"
+milestone = "M0012"
+source = "docs/adr/ADR-0023-type-and-generic-syntax.md"
+category = "negative"
+
+[[cases]]
+name = "repeated_nullable_marker_is_malformed"
+source_text = "T??"
+expected_diagnostics = ["malformed_nullable_type"]
+expected_recovery = "type recovery boundary"
+
+[[cases]]
+name = "unsupported_type_forms_are_rejected"
+source_text = "_ | A"
+expected_diagnostics = ["unsupported_type_form", "unexpected_token_in_type"]
+expected_recovery = "type recovery boundary"
+
+[[cases]]
+name = "missing_function_type_return"
+source_text = "(T) ->"
+expected_diagnostics = ["malformed_function_type", "missing_type_name"]
+expected_recovery = "type recovery boundary"

@@ -92,7 +92,4 @@ require_text "$task" 'CI passes as final gate'
 
 require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 require_absent_text crates/newlang/src/ast.rs 'TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
-require_absent_path tests/fixtures/parser/types
-require_absent_path tests/fixtures/parser/generics
-
 echo "m0012-accepted: type and generic syntax accepted and parser implementation still deferred"

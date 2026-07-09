@@ -1,0 +1,24 @@
+kind = "parser-type-generic-fixture"
+milestone = "M0012"
+source = "docs/adr/ADR-0023-type-and-generic-syntax.md"
+category = "positive"
+
+[[cases]]
+name = "generic_parameters_with_capability_bounds"
+source_text = "<T: Send & Share, U>"
+expected_parameters = ["T", "U"]
+expected_bounds = ["Send", "Share"]
+expected_diagnostics = []
+
+[[cases]]
+name = "generic_arguments_nested_types"
+source_text = "Map<String, Box<T?>>"
+expected_forms = ["named-type", "generic-arguments", "nested-generic-arguments", "nullable-type"]
+expected_diagnostics = []
+
+[[cases]]
+name = "qualified_capability_bound"
+source_text = "<T: core.concurrent.Send & core.concurrent.Share>"
+expected_parameters = ["T"]
+expected_bounds = ["core.concurrent.Send", "core.concurrent.Share"]
+expected_diagnostics = []

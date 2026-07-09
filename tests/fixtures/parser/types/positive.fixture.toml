@@ -1,0 +1,28 @@
+kind = "parser-type-generic-fixture"
+milestone = "M0012"
+source = "docs/adr/ADR-0023-type-and-generic-syntax.md"
+category = "positive"
+
+[[cases]]
+name = "named_and_qualified_type_refs"
+source_text = "Int demo.core.Box"
+expected_forms = ["named-type", "qualified-named-type"]
+expected_diagnostics = []
+
+[[cases]]
+name = "nullable_and_generic_type_binding"
+source_text = "Box<T?>?"
+expected_forms = ["nullable-type", "generic-arguments", "nested-nullable-argument"]
+expected_diagnostics = []
+
+[[cases]]
+name = "function_type_binding"
+source_text = "(T) -> U? ((T) -> U)?"
+expected_forms = ["function-type", "nullable-return-type", "nullable-function-type"]
+expected_diagnostics = []
+
+[[cases]]
+name = "grouped_type_reference"
+source_text = "(demo.core.Box<T>)"
+expected_forms = ["grouped-type", "qualified-named-type", "generic-arguments"]
+expected_diagnostics = []
