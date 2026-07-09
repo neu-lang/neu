@@ -62,5 +62,4 @@ require_text "$milestone" '\[x\] Ambiguities are recorded'
 require_text "$milestone" '\[ \] Approved type syntax parses'
 
 require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
-require_absent_text crates/newlang/src/ast.rs 'TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 echo "m0012-authority: type and generic syntax authority resolved while implementation remains deferred"

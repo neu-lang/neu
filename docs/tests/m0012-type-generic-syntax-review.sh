@@ -76,6 +76,5 @@ require_file docs/adr/ADR-0023-type-and-generic-syntax.md
 require_text docs/adr/ADR-0023-type-and-generic-syntax.md '^Status: Accepted$'
 require_text docs/SPEC.md '^## ADR-0023: Type And Generic Syntax$'
 require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
-require_absent_text crates/newlang/src/ast.rs 'TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 
 echo "m0012-review: type and generic syntax review history and approval validation passed"

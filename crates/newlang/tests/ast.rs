@@ -94,3 +94,53 @@ fn declaration_body_node_is_syntax_only() {
     assert_eq!(node.kind, AstNodeKind::DeclarationBody);
     assert_eq!(node.span, span);
 }
+
+#[test]
+fn type_and_generic_shell_nodes_preserve_kind_and_span() {
+    let file = SourceFileId::from_raw(4);
+    let mut arena = AstArena::new();
+
+    let cases = [
+        (
+            arena.add_named_type(ByteSpan::new(file, 0, 3).unwrap()),
+            AstNodeKind::NamedType,
+            0,
+        ),
+        (
+            arena.add_nullable_type(ByteSpan::new(file, 4, 6).unwrap()),
+            AstNodeKind::NullableType,
+            4,
+        ),
+        (
+            arena.add_generic_parameter(ByteSpan::new(file, 7, 8).unwrap()),
+            AstNodeKind::GenericParameter,
+            7,
+        ),
+        (
+            arena.add_generic_argument(ByteSpan::new(file, 9, 12).unwrap()),
+            AstNodeKind::GenericArgument,
+            9,
+        ),
+        (
+            arena.add_capability_bound(ByteSpan::new(file, 13, 17).unwrap()),
+            AstNodeKind::CapabilityBound,
+            13,
+        ),
+        (
+            arena.add_function_type(ByteSpan::new(file, 18, 26).unwrap()),
+            AstNodeKind::FunctionType,
+            18,
+        ),
+        (
+            arena.add_grouped_type(ByteSpan::new(file, 27, 30).unwrap()),
+            AstNodeKind::GroupedType,
+            27,
+        ),
+    ];
+
+    for (id, kind, start) in cases {
+        let node = arena.node(id).unwrap();
+        assert_eq!(node.kind, kind);
+        assert_eq!(node.span.start(), start);
+    }
+}

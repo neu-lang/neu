@@ -85,6 +85,5 @@ require_text tests/fixtures/parser/generics/diagnostics.fixture.toml 'malformed_
 require_text tests/fixtures/parser/generics/diagnostics.fixture.toml 'generic parameter boundary'
 
 require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
-require_absent_text crates/newlang/src/ast.rs 'TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 
 echo "m0012-fixtures: type and generic parser fixture validation passed"

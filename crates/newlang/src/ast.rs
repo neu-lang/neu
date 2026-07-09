@@ -23,6 +23,13 @@ pub enum AstNodeKind {
     EnumDeclaration,
     InterfaceDeclaration,
     DeclarationBody,
+    NamedType,
+    NullableType,
+    GenericParameter,
+    GenericArgument,
+    CapabilityBound,
+    FunctionType,
+    GroupedType,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -72,6 +79,34 @@ impl AstArena {
 
     pub fn add_declaration_body(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::DeclarationBody, span)
+    }
+
+    pub fn add_named_type(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::NamedType, span)
+    }
+
+    pub fn add_nullable_type(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::NullableType, span)
+    }
+
+    pub fn add_generic_parameter(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::GenericParameter, span)
+    }
+
+    pub fn add_generic_argument(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::GenericArgument, span)
+    }
+
+    pub fn add_capability_bound(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::CapabilityBound, span)
+    }
+
+    pub fn add_function_type(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::FunctionType, span)
+    }
+
+    pub fn add_grouped_type(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::GroupedType, span)
     }
 
     pub fn node(&self, id: AstNodeId) -> Option<&AstNode> {
