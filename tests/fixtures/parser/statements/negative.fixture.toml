@@ -1,0 +1,28 @@
+kind = "parser-expression-statement-pattern-fixture"
+milestone = "M0013"
+source = "docs/adr/ADR-0024-expression-statement-pattern-syntax.md"
+category = "negative"
+
+[[cases]]
+name = "malformed_variable_declaration_and_assignment"
+source_text = "val : Int = compute(); target = ;"
+expected_diagnostics = ["malformed_variable_declaration", "malformed_assignment"]
+recovery_boundary = "semicolon"
+
+[[cases]]
+name = "malformed_return_statement"
+source_text = "return + ;"
+expected_diagnostics = ["malformed_return_statement", "missing_expression"]
+recovery_boundary = "semicolon"
+
+[[cases]]
+name = "malformed_block"
+source_text = "{ val value = compute();"
+expected_diagnostics = ["malformed_block"]
+recovery_boundary = "end of file"
+
+[[cases]]
+name = "deferred_loop_coroutine_and_unsafe_forms"
+source_text = "while (ready) { run(); } async { run(); } unsafe { run(); }"
+expected_diagnostics = ["unsupported_statement_form", "malformed_coroutine_construct", "malformed_unsafe_block"]
+recovery_boundary = "statement recovery boundary"

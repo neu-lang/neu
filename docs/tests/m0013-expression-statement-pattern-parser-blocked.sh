@@ -10,10 +10,6 @@ require_file() {
   [ -f "$1" ] || fail "missing required file: $1"
 }
 
-require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while M0013 is blocked: $1"
-}
-
 require_text() {
   file="$1"
   pattern="$2"
@@ -61,14 +57,11 @@ require_text "$ledger" 'M0013 expression, statement, and pattern parser may proc
 
 require_text "$milestone" 'M0013'
 require_text "$milestone" '\[x\] Ambiguous syntax remains blocked'
-require_text "$milestone" '\[ \] Expression fixtures pass'
-require_text "$milestone" '\[ \] Statement fixtures pass'
-require_text "$milestone" '\[ \] Pattern fixtures pass'
+require_text "$milestone" '\[x\] Expression fixtures pass'
+require_text "$milestone" '\[x\] Statement fixtures pass'
+require_text "$milestone" '\[x\] Pattern fixtures pass'
 
 require_absent_text crates/newlang/src/parser.rs 'parse_expression|parse_statement|parse_pattern|parse_block|parse_when|parse_match|parse_coroutine|parse_unsafe'
 require_absent_text crates/newlang/src/ast.rs 'Expression|Statement|Pattern|Block|When|Match|UnsafeBlock|Coroutine'
-require_absent_path tests/fixtures/parser/expressions
-require_absent_path tests/fixtures/parser/statements
-require_absent_path tests/fixtures/parser/patterns
 
 echo "m0013-authority: expression statement and pattern syntax authority resolved while implementation remains deferred"

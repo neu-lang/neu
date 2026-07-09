@@ -1,0 +1,28 @@
+kind = "parser-expression-statement-pattern-fixture"
+milestone = "M0013"
+source = "docs/adr/ADR-0024-expression-statement-pattern-syntax.md"
+category = "positive"
+
+[[cases]]
+name = "literal_name_grouped_and_precedence_expressions"
+source_text = "1 + 2 * 3 (foo.bar)"
+expected_forms = ["binary-expression", "grouped-expression", "member-expression"]
+expected_diagnostics = []
+
+[[cases]]
+name = "logical_equality_and_comparison_precedence"
+source_text = "ready && count > 0 || name == fallback"
+expected_forms = ["logical-or-expression", "logical-and-expression", "comparison-expression", "equality-expression"]
+expected_diagnostics = []
+
+[[cases]]
+name = "call_member_and_if_expression"
+source_text = "if (ready) { service.run(arg, 2); } else { fallback(); }"
+expected_forms = ["if-expression", "block", "call-expression", "member-expression"]
+expected_diagnostics = []
+
+[[cases]]
+name = "unary_and_nullable_literal_expression"
+source_text = "!ready || value == null"
+expected_forms = ["unary-expression", "logical-or-expression", "null-literal"]
+expected_diagnostics = []

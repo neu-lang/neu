@@ -1,0 +1,58 @@
+kind = "parser-expression-statement-pattern-fixture"
+milestone = "M0013"
+source = "docs/adr/ADR-0024-expression-statement-pattern-syntax.md"
+category = "diagnostics"
+
+[[diagnostics]]
+name = "malformed_block"
+primary_span = "block range or opening brace"
+recovery_action = "skip to right brace or block recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "missing_statement"
+primary_span = "expected statement position"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "unexpected_token_in_statement"
+primary_span = "unexpected token"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "unsupported_statement_form"
+primary_span = "unsupported statement-form token"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "malformed_variable_declaration"
+primary_span = "declaration range"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "malformed_assignment"
+primary_span = "assignment operator or target range"
+recovery_action = "skip to semicolon or statement recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "malformed_return_statement"
+primary_span = "return keyword or statement range"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none"
+
+[[diagnostics]]
+name = "malformed_unsafe_block"
+primary_span = "unsafe keyword"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none; unsafe block syntax is deferred"
+
+[[diagnostics]]
+name = "malformed_coroutine_construct"
+primary_span = "coroutine keyword or construct range"
+recovery_action = "skip to statement recovery boundary"
+safe_suggestion = "none; coroutine syntax is deferred"

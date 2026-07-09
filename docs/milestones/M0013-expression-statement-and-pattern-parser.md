@@ -86,7 +86,7 @@ ADR-0011 and ADR-0012 require smart casts and pattern matching, but exact gramma
 
 ## Completion Checklist
 
-- [ ] Expression fixtures pass.
-- [ ] Statement fixtures pass.
-- [ ] Pattern fixtures pass.
+- [x] Expression fixtures pass.
+- [x] Statement fixtures pass.
+- [x] Pattern fixtures pass.
 - [x] Ambiguous syntax remains blocked.

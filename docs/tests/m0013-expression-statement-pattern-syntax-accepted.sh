@@ -10,10 +10,6 @@ require_file() {
   [ -f "$1" ] || fail "missing required file: $1"
 }
 
-require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists during ADR acceptance: $1"
-}
-
 require_text() {
   file="$1"
   pattern="$2"
@@ -93,9 +89,6 @@ require_text "$task" 'Status: `complete`'
 require_text "$task" 'Tests fail before implementation for the expected reason'
 require_text "$task" 'CI passes as final gate'
 
-require_absent_path tests/fixtures/parser/expressions
-require_absent_path tests/fixtures/parser/statements
-require_absent_path tests/fixtures/parser/patterns
 require_absent_text crates/newlang/src/parser.rs 'parse_expression|parse_statement|parse_pattern|parse_block|parse_when|parse_match|parse_coroutine|parse_unsafe'
 require_absent_text crates/newlang/src/ast.rs 'Expression|Statement|Pattern|Block|When|Match|UnsafeBlock|Coroutine'
 
