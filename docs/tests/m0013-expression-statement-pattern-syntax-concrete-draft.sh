@@ -65,15 +65,18 @@ require_text "$proposal" 'primary span'
 require_text "$proposal" 'recovery action'
 require_text "$proposal" 'All accepted body syntax diagnostics must cite ADR-0015 and ADR-0024'
 
-require_text "$ambiguity" 'Status: `open`'
-require_text "$decision" '^Decision: pending$'
+require_text "$ambiguity" 'Status: `resolved`'
+require_text "$ambiguity" 'docs/adr/ADR-0024-expression-statement-pattern-syntax.md'
+require_text "$decision" '^Decision: approved$'
+require_text "$decision" 'Accepted source of truth: `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path docs/adr/ADR-0024-expression-statement-pattern-syntax.md
+require_file docs/adr/ADR-0024-expression-statement-pattern-syntax.md
+require_text docs/adr/ADR-0024-expression-statement-pattern-syntax.md '^Status: Accepted$'
 require_absent_path tests/fixtures/parser/expressions
 require_absent_path tests/fixtures/parser/statements
 require_absent_path tests/fixtures/parser/patterns
-require_absent_text docs/SPEC.md '^## ADR-0024: Expression Statement And Pattern Syntax$'
+require_text docs/SPEC.md '^## ADR-0024: Expression Statement And Pattern Syntax$'
 require_absent_text crates/newlang/src/parser.rs 'parse_expression|parse_statement|parse_pattern|parse_block|parse_when|parse_match|parse_coroutine|parse_unsafe'
 require_absent_text crates/newlang/src/ast.rs 'Expression|Statement|Pattern|Block|When|Match|UnsafeBlock|Coroutine'
 

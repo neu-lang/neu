@@ -145,3 +145,19 @@ semantics, variance, wildcard types, receiver function types, type aliases,
 associated types, higher-kinded types, dependent types, intersection or union
 type syntax, inferred placeholder types, layout or effect types, coroutine
 suspension markers, expression syntax, statement syntax, or pattern syntax.
+
+## ADR-0024: Expression Statement And Pattern Syntax
+
+The language uses a small Kotlin-like custom body grammar for the bootstrap
+compiler. The accepted body syntax covers block bodies, explicit semicolon
+statement separators, local `val` and `var` declaration statements, assignment
+statements, return statements, expression statements, expression grammar,
+operator precedence and associativity, call syntax, member access, grouped
+expressions, `if` expressions, and pattern grammar for wildcards, literals,
+bindings, qualified cases, and grouped patterns.
+
+ADR-0024 defines parser recovery boundaries and parser diagnostic obligations
+for expression grammar, statement grammar, block grammar, and pattern grammar.
+Unsafe block syntax, coroutine syntax, match or `when` syntax, loops,
+`break` and `continue`, indexing, lambdas, destructuring declarations, labels,
+error propagation syntax, and advanced pattern forms remain deferred.

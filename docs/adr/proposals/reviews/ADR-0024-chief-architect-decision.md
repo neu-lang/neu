@@ -1,6 +1,6 @@
 # ADR-0024 Chief Architect Decision
 
-Decision: pending
+Decision: approved
 
 ## Reviewed Artifact
 
@@ -10,9 +10,11 @@ Decision: pending
 
 ## Current Decision
 
-No acceptance yet.
+Accept ADR-0024 as source of truth for bootstrap expression, statement, block, and pattern syntax.
 
-The draft expression, statement, and pattern syntax proposal is not accepted source of truth. It remains a planning artifact under `docs/adr/proposals/` and must not be used to implement parser behavior.
+Accepted source of truth: `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
+
+M0013 body parser fixture and implementation tasks may proceed only for ADR-0024 constructs.
 
 ## Completed Review Dependencies
 
@@ -21,22 +23,22 @@ The draft expression, statement, and pattern syntax proposal is not accepted sou
 - Diagnostics Engineer review.
 - Simplicity Guardian review.
 
-## Remaining Acceptance Blockers
+## Resolved Acceptance Blockers
 
 - Concrete expression grammar.
 - Operator precedence and associativity.
 - Concrete statement grammar.
 - Concrete block grammar.
 - Concrete pattern grammar.
-- Explicit unsafe block inclusion or deferral.
-- Explicit coroutine syntax inclusion or deferral.
+- Explicit unsafe block deferral.
+- Explicit coroutine syntax deferral.
 - Explicit parser diagnostics.
 - Explicit parser recovery boundaries.
-- Final Chief Architect approval through accepted ADR or `docs/SPEC.md` update.
+- Final Chief Architect approval through accepted ADR and `docs/SPEC.md` update.
 
 ## Consequences
 
-- `docs/ambiguities/M0008-expression-statement-pattern-syntax.md` remains open.
-- M0013 parser fixtures remain blocked.
-- M0013 parser implementation remains blocked.
-- Concrete expression, statement, and pattern AST nodes remain out of scope.
+- `docs/ambiguities/M0008-expression-statement-pattern-syntax.md` is resolved.
+- M0013 parser fixtures may be created for ADR-0024 constructs.
+- M0013 parser implementation may proceed for ADR-0024 constructs.
+- Coroutine syntax, unsafe block syntax, match or `when`, loops, and other ADR-0024 deferrals remain out of scope.

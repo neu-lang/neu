@@ -7,7 +7,7 @@
 - Related Milestone: `M0008`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-09`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
 - Blocking milestone: `M0013`
 
@@ -66,21 +66,22 @@ Accepted ADRs define high-level behavior for errors, concurrency, suspension, fl
 
 ## Recommended Resolution Path
 
-- [ ] Language Designer drafts expression, statement, and pattern syntax ADR or `docs/SPEC.md` revision.
-- [ ] Language Lawyer audits consistency with safety and diagnostics ADRs.
-- [ ] Adversarial Engineer reviews ownership scope, coroutine, and unsafe-boundary risks.
-- [ ] Diagnostics Engineer reviews parser recovery and diagnostic obligations.
-- [ ] Chief Architect approves final source-of-truth update.
+- [x] Language Designer drafts expression, statement, and pattern syntax ADR or `docs/SPEC.md` revision.
+- [x] Language Lawyer audits consistency with safety and diagnostics ADRs.
+- [x] Adversarial Engineer reviews ownership scope, coroutine, and unsafe-boundary risks.
+- [x] Diagnostics Engineer reviews parser recovery and diagnostic obligations.
+- [x] Chief Architect approves final source-of-truth update.
 
 ## Temporary Rule
 
-No parser implementation may accept concrete expression, statement, or pattern syntax until accepted source of truth defines it.
+Parser implementation may accept only the concrete expression, statement, and pattern syntax defined by ADR-0024 until future accepted source of truth extends it.
 
 ## Resolution
 
 - Decision:
-  - unresolved
+  - Accept a small Kotlin-like custom expression, statement, block, and pattern grammar for the bootstrap compiler.
 - Source of truth updated:
-  - none
+  - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - unresolved
+  - 2026-07-10

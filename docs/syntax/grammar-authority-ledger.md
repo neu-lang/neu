@@ -30,11 +30,11 @@ This ledger records whether planned parser syntax has accepted grammar authority
 | Capability bound syntax | specified | ADR-0023 | Chief Architect | none | Multiple bounds use `&`; comma separates generic parameters. |
 | Nullable type syntax | specified | ADR-0023 | Chief Architect | none | Nullable markers are postfix and bind to the immediately preceding primary type. |
 | Function type syntax | specified | ADR-0023 | Chief Architect | none | Parenthesized function type parameters followed by `->` and return type are specified. |
-| Expression grammar | ambiguous | none | Language Designer | M0013 | Operators have token spellings only; precedence, associativity, and expression forms are missing. |
-| Statement grammar | ambiguous | none | Language Designer | M0013 | Control-flow keywords exist lexically, but statement grammar is missing. |
-| Pattern grammar | ambiguous | ADR-0012 | Language Designer | M0013 | Exhaustive matching exists semantically, but pattern syntax is missing. |
-| Coroutine syntax | ambiguous | ADR-0008, ADR-0009 | Language Designer | M0013 | Structured coroutine semantics exist, but syntax is missing. |
-| Unsafe block syntax | ambiguous | ADR-0018 | Language Designer | M0013 | Unsafe boundaries exist, but surface grammar is missing. |
+| Expression grammar | specified | ADR-0024 | Chief Architect | none | Expression entry points, precedence, associativity, calls, member access, grouped expressions, and `if` expressions are specified. |
+| Statement grammar | specified | ADR-0024 | Chief Architect | none | Local declarations, assignments, returns, expression statements, blocks, and semicolon separators are specified. |
+| Pattern grammar | specified | ADR-0024 | Chief Architect | none | Wildcard, literal, binding, qualified-case, and grouped pattern syntax is specified. |
+| Coroutine syntax | deferred | ADR-0024 | Chief Architect | future | Coroutine syntax is explicitly deferred. |
+| Unsafe block syntax | deferred | ADR-0024 | Chief Architect | future | Unsafe block syntax is explicitly deferred. |
 | Macro syntax | deferred | ADR-0019 | Chief Architect | future | Macros are deferred. |
 | Compile-time evaluation syntax | deferred | ADR-0019 | Language Designer | future | Bounded compile-time evaluation exists semantically but is outside M0011-M0013 parser scope. |
 
@@ -48,11 +48,13 @@ M0011 declaration parser may proceed only for ADR-0022 constructs. Type placehol
 
 M0012 type and generic parser may proceed only for ADR-0023 constructs. Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain blocked until accepted source of truth defines them.
 
+M0013 expression, statement, and pattern parser may proceed only for ADR-0024 constructs. Coroutine syntax, unsafe block syntax, loops, match or `when`, and other ADR-0024 deferrals remain blocked until future accepted source of truth defines them.
+
 ## Parser Block List
 
 - M0011 declaration parser is unblocked only for ADR-0022 declaration syntax.
 - M0012 type and generic syntax parser is unblocked only for ADR-0023 type and generic syntax.
-- M0013 expression, statement, and pattern parser is blocked on expression, statement, and pattern syntax authority.
+- M0013 expression, statement, and pattern parser is unblocked only for ADR-0024 body syntax.
 
 ## Required Ambiguity Reports
 
