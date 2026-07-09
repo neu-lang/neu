@@ -35,9 +35,9 @@ require_text "$ledger" '^# Grammar Authority Ledger$'
 require_text "$ledger" 'Status: M0008 authority ledger'
 require_text "$ledger" 'Source of truth: `docs/SPEC.md` and accepted ADRs under `docs/adr/`'
 require_text "$ledger" '\| Construct \| Classification \| Authority \| Owner \| Blocking milestone \| Notes \|'
-require_text "$ledger" '\| Package declaration \| ambiguous \| ADR-0017'
-require_text "$ledger" '\| Import declaration \| ambiguous \| ADR-0017'
-require_text "$ledger" '\| Function declaration \| ambiguous \| ADR-0010'
+require_text "$ledger" '\| Package declaration \| specified \| ADR-0022'
+require_text "$ledger" '\| Import declaration \| specified \| ADR-0022'
+require_text "$ledger" '\| Function declaration \| specified \| ADR-0022'
 require_text "$ledger" '\| Type declaration \| ambiguous \| ADR-0010'
 require_text "$ledger" '\| Generic parameter syntax \| ambiguous \| ADR-0016'
 require_text "$ledger" '\| Nullable type syntax \| ambiguous \| ADR-0006'
@@ -51,8 +51,10 @@ require_text "$ledger" 'M0011'
 require_text "$ledger" 'M0012'
 require_text "$ledger" 'M0013'
 
+require_text docs/ambiguities/M0008-declaration-syntax.md 'Status: `resolved`'
+require_text docs/ambiguities/M0008-declaration-syntax.md 'docs/adr/ADR-0022-declaration-syntax.md'
+
 for report in \
-  docs/ambiguities/M0008-declaration-syntax.md \
   docs/ambiguities/M0008-type-generic-syntax.md \
   docs/ambiguities/M0008-expression-statement-pattern-syntax.md
 do

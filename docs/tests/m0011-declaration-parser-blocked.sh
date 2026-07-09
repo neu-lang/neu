@@ -2,7 +2,7 @@
 set -eu
 
 fail() {
-  echo "m0011-blocked: $*" >&2
+  echo "m0011-blocker-resolved: $*" >&2
   exit 1
 }
 
@@ -11,7 +11,7 @@ require_file() {
 }
 
 require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while M0011 is blocked: $1"
+  [ ! -e "$1" ] || fail "out-of-scope parser artifact exists before parser implementation task: $1"
 }
 
 require_text() {
@@ -34,14 +34,14 @@ require_text "$task" '^# Task: M0011-001 Record Declaration Parser Syntax Blocke
 require_text "$task" 'Status: `blocked`'
 require_text "$task" 'Milestone: `M0011`'
 require_text "$task" 'Language Designer drafts declaration syntax ADR'
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0011`'
-require_text "$ambiguity" 'No parser implementation may accept concrete declaration syntax'
-require_text "$ledger" '\| Package declaration \| ambiguous \| ADR-0017'
-require_text "$ledger" '\| Function declaration \| ambiguous \| ADR-0010'
-require_text "$ledger" 'M0011 declaration parser is blocked on declaration syntax authority'
+require_text "$ambiguity" 'Parser implementation may accept only the concrete declaration syntax defined by `docs/adr/ADR-0022-declaration-syntax.md`'
+require_text "$ledger" '\| Package declaration \| specified \| ADR-0022'
+require_text "$ledger" '\| Function declaration \| specified \| ADR-0022'
+require_text "$ledger" 'M0011 declaration parser is unblocked only for ADR-0022 declaration syntax'
 
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path tests/fixtures/parser
 
-echo "m0011-blocked: declaration parser correctly blocked by declaration syntax ambiguity"
+echo "m0011-blocker-resolved: declaration parser blocker resolved with parser implementation still deferred"

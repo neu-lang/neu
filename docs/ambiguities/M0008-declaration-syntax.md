@@ -7,7 +7,7 @@
 - Related Milestone: `M0008`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-09`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
 - Blocking milestone: `M0011`
 
@@ -55,21 +55,22 @@ Accepted ADRs define modules, nominal types, interfaces, sealed sums, and API vi
 
 ## Recommended Resolution Path
 
-- [ ] Language Designer drafts declaration syntax ADR or `docs/SPEC.md` revision.
-- [ ] Language Lawyer audits the draft against existing ADRs.
-- [ ] Diagnostics Engineer reviews declaration diagnostic obligations.
-- [ ] Simplicity Guardian reviews grammar complexity.
-- [ ] Chief Architect approves final source-of-truth update.
+- [x] Language Designer drafts declaration syntax ADR or `docs/SPEC.md` revision.
+- [x] Language Lawyer audits the draft against existing ADRs.
+- [x] Diagnostics Engineer reviews declaration diagnostic obligations.
+- [x] Simplicity Guardian reviews grammar complexity.
+- [x] Chief Architect approves final source-of-truth update.
 
 ## Temporary Rule
 
-No parser implementation may accept concrete declaration syntax until accepted source of truth defines it.
+Parser implementation may accept only the concrete declaration syntax defined by `docs/adr/ADR-0022-declaration-syntax.md`.
 
 ## Resolution
 
 - Decision:
-  - unresolved
+  - accept small Kotlin-like custom declaration grammar for the bootstrap compiler
 - Source of truth updated:
-  - none
+  - `docs/adr/ADR-0022-declaration-syntax.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - unresolved
+  - `2026-07-09`

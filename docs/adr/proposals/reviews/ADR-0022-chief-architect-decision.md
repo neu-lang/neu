@@ -1,6 +1,6 @@
 # ADR-0022 Chief Architect Decision
 
-Decision: pending
+Decision: approved
 
 ## Reviewed Artifact
 
@@ -10,9 +10,9 @@ Decision: pending
 
 ## Current Decision
 
-No acceptance yet.
+Accepted source of truth: `docs/adr/ADR-0022-declaration-syntax.md`
 
-The draft declaration syntax proposal is not accepted source of truth. It remains a planning artifact under `docs/adr/proposals/` and must not be used to implement parser behavior.
+The concrete declaration grammar is approved for the bootstrap compiler. The draft proposal remains historical review context under `docs/adr/proposals/`; parser behavior must cite the accepted ADR, not the draft.
 
 ## Completed Review Dependencies
 
@@ -20,18 +20,18 @@ The draft declaration syntax proposal is not accepted source of truth. It remain
 - Diagnostics Engineer review.
 - Simplicity Guardian review.
 
-## Remaining Acceptance Blockers
+## Resolved Acceptance Blockers
 
 - Concrete accepted declaration grammar.
 - Explicit package and import ordering rules.
 - Explicit visibility and modifier rules.
 - Explicit declaration header grammar.
-- Explicit member declaration rules or deferrals.
+- Explicit member declaration rules and deferrals.
 - Explicit declaration diagnostics.
-- Final Chief Architect approval through accepted ADR or `docs/SPEC.md` update.
+- Final Chief Architect approval through accepted ADR and `docs/SPEC.md` update.
 
 ## Consequences
 
-- `docs/ambiguities/M0008-declaration-syntax.md` remains open.
-- M0011 declaration parser implementation remains blocked.
-- Concrete declaration parser fixtures remain out of scope.
+- `docs/ambiguities/M0008-declaration-syntax.md` is resolved.
+- M0011 declaration parser fixture and implementation tasks may proceed for ADR-0022 constructs only.
+- Type, generic, expression, statement, and pattern parser tasks remain blocked on their own accepted syntax authority.

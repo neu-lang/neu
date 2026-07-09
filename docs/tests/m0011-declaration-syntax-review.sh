@@ -2,7 +2,7 @@
 set -eu
 
 fail() {
-  echo "m0011-review: $*" >&2
+  echo "m0011-review-history: $*" >&2
   exit 1
 }
 
@@ -11,7 +11,7 @@ require_file() {
 }
 
 require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while ADR-0022 is unaccepted: $1"
+  [ ! -e "$1" ] || fail "out-of-scope parser artifact exists during review history validation: $1"
 }
 
 require_text() {
@@ -32,8 +32,9 @@ require_file "$review_dir/ADR-0022-simplicity-review.md"
 require_file "$review_dir/ADR-0022-chief-architect-decision.md"
 
 require_text "$proposal" '^Status: Draft proposal - not accepted source of truth$'
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0011`'
+require_text "$ambiguity" 'docs/adr/ADR-0022-declaration-syntax.md'
 
 require_text "$review_dir/ADR-0022-language-lawyer-review.md" '^Decision: request-revision-before-acceptance$'
 require_text "$review_dir/ADR-0022-language-lawyer-review.md" 'package declaration ordering'
@@ -48,11 +49,11 @@ require_text "$review_dir/ADR-0022-simplicity-review.md" '^Decision: request-rev
 require_text "$review_dir/ADR-0022-simplicity-review.md" 'small Kotlin-like custom declaration grammar'
 require_text "$review_dir/ADR-0022-simplicity-review.md" 'rejects adopting Kotlin wholesale'
 
-require_text "$review_dir/ADR-0022-chief-architect-decision.md" '^Decision: pending$'
-require_text "$review_dir/ADR-0022-chief-architect-decision.md" 'not accepted source of truth'
-require_text "$review_dir/ADR-0022-chief-architect-decision.md" 'No acceptance yet'
+require_text "$review_dir/ADR-0022-chief-architect-decision.md" '^Decision: approved$'
+require_text "$review_dir/ADR-0022-chief-architect-decision.md" 'Accepted source of truth: `docs/adr/ADR-0022-declaration-syntax.md`'
+require_text "$review_dir/ADR-0022-chief-architect-decision.md" 'M0011 declaration parser fixture and implementation tasks may proceed'
 
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path tests/fixtures/parser
 
-echo "m0011-review: declaration syntax proposal review validation passed"
+echo "m0011-review-history: declaration syntax proposal review history validation passed"

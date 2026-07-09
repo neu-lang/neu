@@ -121,3 +121,13 @@ double-quoted strings with a minimal escape set, nested block comments, line
 comments, and an explicit operator and delimiter set. Unicode identifiers,
 string interpolation, raw strings, character literals, and numeric suffixes are
 deferred until future accepted ADRs or spec updates.
+
+## ADR-0022: Declaration Syntax
+
+The language uses a small Kotlin-like custom declaration grammar for the
+bootstrap compiler. The accepted declaration shell covers source-file ordering,
+package declarations, import declarations, visibility modifiers, functions,
+structs, enums or sealed sums, interfaces, and declaration bodies. Function
+parameter contents, concrete return type syntax, fields, properties,
+constructors, enum variants, expression bodies, and statement bodies are
+deferred until future accepted ADRs or spec updates.

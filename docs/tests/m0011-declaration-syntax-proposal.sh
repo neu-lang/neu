@@ -2,7 +2,7 @@
 set -eu
 
 fail() {
-  echo "m0011-proposal: $*" >&2
+  echo "m0011-proposal-history: $*" >&2
   exit 1
 }
 
@@ -11,7 +11,7 @@ require_file() {
 }
 
 require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while declaration syntax is draft: $1"
+  [ ! -e "$1" ] || fail "out-of-scope parser artifact exists during proposal history validation: $1"
 }
 
 require_text() {
@@ -47,11 +47,12 @@ require_text "$proposal" 'struct declarations'
 require_text "$proposal" 'interface declarations'
 require_text "$proposal" 'declaration diagnostics'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0011`'
+require_text "$ambiguity" 'docs/adr/ADR-0022-declaration-syntax.md'
 require_text "$task" 'Milestone: `M0011`'
 
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path tests/fixtures/parser
 
-echo "m0011-proposal: declaration syntax ADR proposal validation passed"
+echo "m0011-proposal-history: declaration syntax ADR proposal history validation passed"

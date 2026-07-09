@@ -17,13 +17,13 @@ This ledger records whether planned parser syntax has accepted grammar authority
 | Construct | Classification | Authority | Owner | Blocking milestone | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Token spellings | specified | ADR-0021 | Chief Architect | none | Lexer token spellings are accepted, but parser grammar is not. |
-| Package declaration | ambiguous | ADR-0017 | Language Designer | M0011 | Modules and packages exist, but declaration grammar is not specified. |
-| Import declaration | ambiguous | ADR-0017 | Language Designer | M0011 | Import semantics are named, but import syntax is not specified. |
-| Visibility modifier syntax | ambiguous | ADR-0017 | Language Designer | M0011 | Visibility model exists; modifier spellings and placement are missing. |
-| Function declaration | ambiguous | ADR-0010 | Language Designer | M0011 | Functions are implied by language design, but grammar is missing. |
-| Struct declaration | ambiguous | ADR-0010 | Language Designer | M0011 | Nominal types are specified semantically, not syntactically. |
-| Enum or sealed sum declaration | ambiguous | ADR-0012 | Language Designer | M0011 | Algebraic data exists, but syntax is missing. |
-| Interface declaration | ambiguous | ADR-0010 | Language Designer | M0011 | Behavior abstraction exists, but grammar is missing. |
+| Package declaration | specified | ADR-0022 | Chief Architect | none | Source-file position and qualified-name syntax are specified. |
+| Import declaration | specified | ADR-0022 | Chief Architect | none | Import position, qualified-name syntax, and alias syntax are specified; wildcard and grouped imports are deferred. |
+| Visibility modifier syntax | specified | ADR-0022 | Chief Architect | none | `public`, `private`, and `internal` placement is specified for declarations covered by ADR-0022. |
+| Function declaration | specified | ADR-0022 | Chief Architect | none | Function declaration shell is specified; parameter contents, concrete type syntax, and statement bodies are deferred. |
+| Struct declaration | specified | ADR-0022 | Chief Architect | none | Struct declaration shell is specified; constructors, fields, and properties are deferred. |
+| Enum or sealed sum declaration | specified | ADR-0022 | Chief Architect | none | Enum declaration shell is specified; variants and sealed modifier spelling are deferred. |
+| Interface declaration | specified | ADR-0022 | Chief Architect | none | Interface declaration shell is specified; default method bodies are deferred. |
 | Type declaration | ambiguous | ADR-0010 | Language Designer | M0012 | Type syntax and named type forms are not specified. |
 | Generic parameter syntax | ambiguous | ADR-0016 | Language Designer | M0012 | Generic constraints exist semantically, but grammar is missing. |
 | Generic argument syntax | ambiguous | ADR-0016 | Language Designer | M0012 | Type application grammar is missing. |
@@ -44,9 +44,11 @@ Only token-consuming parser infrastructure may proceed before syntax ADRs. This 
 
 Concrete parser fixtures may use ADR-0021 token spellings only when the expected behavior is token-stream handling rather than declaration, type, expression, statement, or pattern grammar.
 
+M0011 declaration parser may proceed only for ADR-0022 constructs. Type placeholders, function body placeholders, deferred declaration forms, and all later parser milestones must continue to follow their own authority rows.
+
 ## Parser Block List
 
-- M0011 declaration parser is blocked on declaration syntax authority.
+- M0011 declaration parser is unblocked only for ADR-0022 declaration syntax.
 - M0012 type and generic syntax parser is blocked on type and generic syntax authority.
 - M0013 expression, statement, and pattern parser is blocked on expression, statement, and pattern syntax authority.
 
