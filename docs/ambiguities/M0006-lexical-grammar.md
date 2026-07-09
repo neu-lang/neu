@@ -53,10 +53,10 @@ Detailed lexical grammar is missing. docs/SPEC.md says the language has Kotlin-l
 ## Recommended Resolution Path
 
 - [x] Language Lawyer determines whether existing text resolves it.
-- [ ] Language Designer drafts ADR or spec revision if new semantics are required.
-- [ ] Adversarial Engineer reviews soundness risk.
-- [ ] Diagnostics Engineer reviews diagnostic consequences.
-- [ ] Simplicity Guardian reviews complexity.
+- [x] Language Designer drafted non-authoritative ADR proposal and ownership review.
+- [x] Adversarial Engineer reviewed soundness risk.
+- [x] Diagnostics Engineer reviewed diagnostic consequences.
+- [x] Simplicity Guardian reviewed complexity.
 - [ ] Chief Architect approves final resolution.
 
 ## Temporary Rule

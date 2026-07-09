@@ -14,9 +14,16 @@ No acceptance yet.
 
 The draft lexical grammar proposal is not accepted source of truth. It remains a planning artifact under `docs/adr/proposals/` and must not be used to implement lexer behavior.
 
-## Required Before Acceptance
+## Completed Review Dependencies
 
 - Language Designer ownership review.
+- Adversarial Engineer soundness review.
+- Diagnostics Engineer review.
+- Simplicity Guardian review.
+
+## Remaining Acceptance Blockers
+
+- Concrete accepted lexical grammar.
 - Explicit accepted token classes.
 - Explicit accepted lexical error categories.
 - Explicit diagnostic source span rules for lexical errors.
