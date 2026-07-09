@@ -79,7 +79,6 @@ ADR-0015 requires diagnostic obligations for all core safety systems.
 
 ## Completion Checklist
 
-- [ ] Diagnostic shape is documented.
-- [ ] Snapshot harness supports required fields.
-- [ ] No specific language rule is encoded.
-
+- [x] Diagnostic shape is documented.
+- [x] Snapshot harness supports required fields.
+- [x] No specific language rule is encoded.
