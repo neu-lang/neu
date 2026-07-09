@@ -83,7 +83,6 @@ The language requires Kotlin-like syntax, but detailed lexical grammar is not ye
 
 ## Completion Checklist
 
-- [ ] Token categories are spec-backed or marked blocked.
-- [ ] Fixtures cite authority.
-- [ ] Ambiguities are recorded.
-
+- [x] Token categories are spec-backed or marked blocked.
+- [x] Fixtures cite authority.
+- [x] Ambiguities are recorded.
