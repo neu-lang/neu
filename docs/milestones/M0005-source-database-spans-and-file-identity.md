@@ -79,7 +79,6 @@ ADR-0015 requires actionable diagnostics. Later phases need spans that survive l
 
 ## Completion Checklist
 
-- [ ] File identity tests pass.
-- [ ] Span mapping tests pass.
-- [ ] Unicode or encoding ambiguity is recorded if unresolved.
-
+- [x] File identity tests pass.
+- [x] Span mapping tests pass.
+- [x] Unicode or encoding ambiguity is recorded if unresolved.
