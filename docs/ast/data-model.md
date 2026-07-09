@@ -1,6 +1,6 @@
 # AST Data Model
 
-Status: M0011 declaration AST shell
+Status: M0013 expression statement and pattern AST shell
 
 Source of truth:
 
@@ -12,7 +12,7 @@ Source of truth:
 
 The AST model defines syntax-independent node identity and span retention.
 
-ADR-0022 declaration node kinds are accepted for parser-facing declaration shells. Type, expression, statement, and pattern nodes remain deferred because `docs/syntax/grammar-authority-ledger.md` classifies those grammar areas as ambiguous.
+ADR-0022 declaration node kinds, ADR-0023 type and generic node kinds, and ADR-0024 expression, statement, block, and pattern node kinds are accepted for parser-facing syntax shells.
 
 ## Accepted Model
 
@@ -27,23 +27,52 @@ ADR-0022 declaration node kinds are accepted for parser-facing declaration shell
   - `EnumDeclaration`
   - `InterfaceDeclaration`
   - `DeclarationBody`
+- The accepted M0012 type and generic shell node kinds are:
+  - `NamedType`
+  - `NullableType`
+  - `GenericParameter`
+  - `GenericArgument`
+  - `CapabilityBound`
+  - `FunctionType`
+  - `GroupedType`
+- The accepted M0013 expression, statement, block, and pattern shell node kinds are:
+  - `Block`
+  - `LiteralExpression`
+  - `NameExpression`
+  - `GroupedExpression`
+  - `IfExpression`
+  - `BinaryExpression`
+  - `UnaryExpression`
+  - `CallExpression`
+  - `MemberExpression`
+  - `VariableDeclarationStatement`
+  - `AssignmentStatement`
+  - `ReturnStatement`
+  - `ExpressionStatement`
+  - `WildcardPattern`
+  - `LiteralPattern`
+  - `BindingPattern`
+  - `QualifiedCasePattern`
+  - `GroupedPattern`
 - The source-file root span covers the source range selected by the caller.
 - Declaration node spans cover the source range selected by the parser.
-- Declaration nodes do not yet store names, modifiers, child relationships, type placeholders, parameter placeholders, or body contents.
+- Parser-facing node spans cover the source range selected by the parser.
+- AST shell nodes do not yet store names, modifiers, child relationships, expression values, binding modes, semantic types, flow facts, or body contents.
 
 ## Deferred Nodes
 
 The following are intentionally absent until future accepted syntax authority exists:
 
-- type syntax nodes
-- generic syntax nodes
-- expression nodes
-- statement nodes
-- pattern nodes
 - parser recovery nodes
+- match or `when` nodes
+- loop nodes
+- coroutine nodes
+- unsafe block nodes
+- indexing nodes
+- lambda nodes
 
 ## Semantic Boundary
 
-The AST must not encode name resolution, type checking, ownership, borrowing, capability analysis, HIR, MIR, or backend concepts.
+The AST must not encode name resolution, type checking, ownership, borrowing, flow typing, exhaustiveness, capability analysis, coroutine analysis, unsafe analysis, HIR, MIR, or backend concepts.
 
 Future parser milestones may add concrete AST nodes only after the relevant ambiguity report is resolved by accepted source of truth.

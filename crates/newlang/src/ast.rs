@@ -30,6 +30,24 @@ pub enum AstNodeKind {
     CapabilityBound,
     FunctionType,
     GroupedType,
+    Block,
+    LiteralExpression,
+    NameExpression,
+    GroupedExpression,
+    IfExpression,
+    BinaryExpression,
+    UnaryExpression,
+    CallExpression,
+    MemberExpression,
+    VariableDeclarationStatement,
+    AssignmentStatement,
+    ReturnStatement,
+    ExpressionStatement,
+    WildcardPattern,
+    LiteralPattern,
+    BindingPattern,
+    QualifiedCasePattern,
+    GroupedPattern,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -107,6 +125,78 @@ impl AstArena {
 
     pub fn add_grouped_type(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::GroupedType, span)
+    }
+
+    pub fn add_block(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::Block, span)
+    }
+
+    pub fn add_literal_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::LiteralExpression, span)
+    }
+
+    pub fn add_name_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::NameExpression, span)
+    }
+
+    pub fn add_grouped_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::GroupedExpression, span)
+    }
+
+    pub fn add_if_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::IfExpression, span)
+    }
+
+    pub fn add_binary_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::BinaryExpression, span)
+    }
+
+    pub fn add_unary_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::UnaryExpression, span)
+    }
+
+    pub fn add_call_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::CallExpression, span)
+    }
+
+    pub fn add_member_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::MemberExpression, span)
+    }
+
+    pub fn add_variable_declaration_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::VariableDeclarationStatement, span)
+    }
+
+    pub fn add_assignment_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::AssignmentStatement, span)
+    }
+
+    pub fn add_return_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ReturnStatement, span)
+    }
+
+    pub fn add_expression_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ExpressionStatement, span)
+    }
+
+    pub fn add_wildcard_pattern(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::WildcardPattern, span)
+    }
+
+    pub fn add_literal_pattern(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::LiteralPattern, span)
+    }
+
+    pub fn add_binding_pattern(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::BindingPattern, span)
+    }
+
+    pub fn add_qualified_case_pattern(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::QualifiedCasePattern, span)
+    }
+
+    pub fn add_grouped_pattern(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::GroupedPattern, span)
     }
 
     pub fn node(&self, id: AstNodeId) -> Option<&AstNode> {

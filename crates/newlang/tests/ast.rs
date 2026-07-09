@@ -144,3 +144,108 @@ fn type_and_generic_shell_nodes_preserve_kind_and_span() {
         assert_eq!(node.span.start(), start);
     }
 }
+
+#[test]
+fn expression_statement_pattern_shell_nodes_preserve_kind_and_span() {
+    let file = SourceFileId::from_raw(5);
+    let mut arena = AstArena::new();
+
+    let cases = [
+        (
+            arena.add_block(ByteSpan::new(file, 0, 3).unwrap()),
+            AstNodeKind::Block,
+            0,
+        ),
+        (
+            arena.add_literal_expression(ByteSpan::new(file, 4, 5).unwrap()),
+            AstNodeKind::LiteralExpression,
+            4,
+        ),
+        (
+            arena.add_name_expression(ByteSpan::new(file, 6, 11).unwrap()),
+            AstNodeKind::NameExpression,
+            6,
+        ),
+        (
+            arena.add_grouped_expression(ByteSpan::new(file, 12, 17).unwrap()),
+            AstNodeKind::GroupedExpression,
+            12,
+        ),
+        (
+            arena.add_if_expression(ByteSpan::new(file, 18, 35).unwrap()),
+            AstNodeKind::IfExpression,
+            18,
+        ),
+        (
+            arena.add_binary_expression(ByteSpan::new(file, 36, 41).unwrap()),
+            AstNodeKind::BinaryExpression,
+            36,
+        ),
+        (
+            arena.add_unary_expression(ByteSpan::new(file, 42, 48).unwrap()),
+            AstNodeKind::UnaryExpression,
+            42,
+        ),
+        (
+            arena.add_call_expression(ByteSpan::new(file, 49, 56).unwrap()),
+            AstNodeKind::CallExpression,
+            49,
+        ),
+        (
+            arena.add_member_expression(ByteSpan::new(file, 57, 66).unwrap()),
+            AstNodeKind::MemberExpression,
+            57,
+        ),
+        (
+            arena.add_variable_declaration_statement(ByteSpan::new(file, 67, 80).unwrap()),
+            AstNodeKind::VariableDeclarationStatement,
+            67,
+        ),
+        (
+            arena.add_assignment_statement(ByteSpan::new(file, 81, 91).unwrap()),
+            AstNodeKind::AssignmentStatement,
+            81,
+        ),
+        (
+            arena.add_return_statement(ByteSpan::new(file, 92, 103).unwrap()),
+            AstNodeKind::ReturnStatement,
+            92,
+        ),
+        (
+            arena.add_expression_statement(ByteSpan::new(file, 104, 116).unwrap()),
+            AstNodeKind::ExpressionStatement,
+            104,
+        ),
+        (
+            arena.add_wildcard_pattern(ByteSpan::new(file, 117, 118).unwrap()),
+            AstNodeKind::WildcardPattern,
+            117,
+        ),
+        (
+            arena.add_literal_pattern(ByteSpan::new(file, 119, 123).unwrap()),
+            AstNodeKind::LiteralPattern,
+            119,
+        ),
+        (
+            arena.add_binding_pattern(ByteSpan::new(file, 124, 129).unwrap()),
+            AstNodeKind::BindingPattern,
+            124,
+        ),
+        (
+            arena.add_qualified_case_pattern(ByteSpan::new(file, 130, 143).unwrap()),
+            AstNodeKind::QualifiedCasePattern,
+            130,
+        ),
+        (
+            arena.add_grouped_pattern(ByteSpan::new(file, 144, 151).unwrap()),
+            AstNodeKind::GroupedPattern,
+            144,
+        ),
+    ];
+
+    for (id, kind, start) in cases {
+        let node = arena.node(id).unwrap();
+        assert_eq!(node.kind, kind);
+        assert_eq!(node.span.start(), start);
+    }
+}

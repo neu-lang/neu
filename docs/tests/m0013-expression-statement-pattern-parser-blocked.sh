@@ -62,6 +62,6 @@ require_text "$milestone" '\[x\] Statement fixtures pass'
 require_text "$milestone" '\[x\] Pattern fixtures pass'
 
 require_absent_text crates/newlang/src/parser.rs 'parse_expression|parse_statement|parse_pattern|parse_block|parse_when|parse_match|parse_coroutine|parse_unsafe'
-require_absent_text crates/newlang/src/ast.rs 'Expression|Statement|Pattern|Block|When|Match|UnsafeBlock|Coroutine'
+require_absent_text crates/newlang/src/ast.rs 'When|Match|UnsafeBlock|Coroutine'
 
 echo "m0013-authority: expression statement and pattern syntax authority resolved while implementation remains deferred"

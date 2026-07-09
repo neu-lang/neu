@@ -56,11 +56,11 @@ require_text "$ast" 'add_declaration_body'
 
 require_text "$tests" 'declaration_shell_nodes_preserve_kind_and_span'
 require_text "$tests" 'declaration_body_node_is_syntax_only'
-require_text "$doc" 'Status: M0011 declaration AST shell'
+require_text "$doc" 'Status: M0013 expression statement and pattern AST shell'
 require_text "$doc" 'ADR-0022 declaration node kinds'
 require_text "$task" 'Status: `complete`'
 
-require_absent_text "$ast" 'Expression|Statement|Pattern|TypeRef|Resolved|Symbol|Borrow|Ownership|NameResolution|Hir|Mir'
+require_absent_text "$ast" 'TypeRef|Resolved|Symbol|Borrow|Ownership|NameResolution|Hir|Mir|FlowFact|Exhaustive|CoroutineFrame|UnsafeBoundary'
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
 
