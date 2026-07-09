@@ -79,7 +79,6 @@ Parser work cannot safely proceed by assuming Kotlin grammar. The project needs 
 
 ## Completion Checklist
 
-- [ ] Syntax constructs are classified.
-- [ ] Blocking ambiguities are recorded.
-- [ ] Parser scope is defined.
-
+- [x] Syntax constructs are classified.
+- [x] Blocking ambiguities are recorded.
+- [x] Parser scope is defined.
