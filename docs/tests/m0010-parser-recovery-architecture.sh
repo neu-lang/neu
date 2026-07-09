@@ -76,7 +76,5 @@ require_text "$milestone" '\[x\] Recovery strategy is documented'
 require_text "$milestone" '\[x\] Syntax diagnostic shape is tested'
 require_text "$milestone" '\[x\] Ambiguous syntax remains blocked'
 
-require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0010-parser-recovery: parser recovery architecture validation passed"

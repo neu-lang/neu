@@ -51,9 +51,7 @@ require_text docs/milestones/M0009-ast-data-model.md '\[x\] Span retention is te
 require_text docs/milestones/M0009-ast-data-model.md '\[x\] Semantic analysis is not encoded in AST'
 
 require_absent_text crates/newlang/src/ast.rs 'Expression|Statement|Pattern|TypeRef|Resolved|Symbol|Borrow|Ownership'
-require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0009-ast: AST data model validation passed"

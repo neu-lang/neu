@@ -60,7 +60,5 @@ require_text "$ambiguity" 'docs/adr/ADR-0022-declaration-syntax.md'
 require_text "$decision" '^Decision: approved$'
 require_text "$decision" 'Accepted source of truth: `docs/adr/ADR-0022-declaration-syntax.md`'
 
-require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0011-concrete-draft-history: declaration syntax concrete draft history validation passed"

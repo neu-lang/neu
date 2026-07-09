@@ -78,6 +78,10 @@ impl AstArena {
         self.nodes.get(id.index())
     }
 
+    pub fn nodes(&self) -> &[AstNode] {
+        &self.nodes
+    }
+
     fn push(&mut self, kind: AstNodeKind, span: ByteSpan) -> AstNodeId {
         let id = AstNodeId(self.nodes.len());
         self.nodes.push(AstNode { id, kind, span });

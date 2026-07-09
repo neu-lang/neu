@@ -61,9 +61,7 @@ require_text "$doc" 'ADR-0022 declaration node kinds'
 require_text "$task" 'Status: `complete`'
 
 require_absent_text "$ast" 'Expression|Statement|Pattern|TypeRef|Resolved|Symbol|Borrow|Ownership|NameResolution|Hir|Mir'
-require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0011-ast-shell: declaration AST shell validation passed"

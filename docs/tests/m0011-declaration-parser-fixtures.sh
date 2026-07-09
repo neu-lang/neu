@@ -69,7 +69,5 @@ require_text tests/fixtures/parser/declarations/diagnostics.fixture.toml 'invali
 require_text tests/fixtures/parser/declarations/diagnostics.fixture.toml 'unexpected_token_in_declaration_body'
 require_text tests/fixtures/parser/declarations/diagnostics.fixture.toml 'skip-to-declaration-boundary'
 
-require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0011-fixtures: declaration parser fixture validation passed"

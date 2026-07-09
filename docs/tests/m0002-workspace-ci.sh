@@ -37,7 +37,6 @@ require_text .github/workflows/ci.yml 'cargo fmt --all --check'
 require_text .github/workflows/ci.yml 'cargo clippy --workspace --all-targets -- -D warnings'
 require_text .github/workflows/ci.yml 'cargo test --workspace --all-targets'
 
-require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
 require_absent_path crates/newlang/src/backend

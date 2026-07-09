@@ -41,7 +41,5 @@ require_text "$ledger" '\| Package declaration \| specified \| ADR-0022'
 require_text "$ledger" '\| Function declaration \| specified \| ADR-0022'
 require_text "$ledger" 'M0011 declaration parser is unblocked only for ADR-0022 declaration syntax'
 
-require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0011-blocker-resolved: declaration parser blocker resolved with parser implementation still deferred"

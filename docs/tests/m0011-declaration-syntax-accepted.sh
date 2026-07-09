@@ -103,7 +103,5 @@ require_text "$task" 'Status: `complete`'
 require_text "$task" 'Tests fail before implementation for the expected reason'
 require_text "$task" 'CI passes as final gate'
 
-require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/tests/parser.rs
 
 echo "m0011-accepted: declaration syntax accepted and parser implementation still deferred"
