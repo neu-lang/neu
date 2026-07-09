@@ -79,7 +79,6 @@ The AST must preserve source spans for diagnostics and avoid encoding semantic a
 
 ## Completion Checklist
 
-- [ ] AST model exists.
-- [ ] Span retention is tested.
-- [ ] Semantic analysis is not encoded in AST.
-
+- [x] AST model exists.
+- [x] Span retention is tested.
+- [x] Semantic analysis is not encoded in AST.

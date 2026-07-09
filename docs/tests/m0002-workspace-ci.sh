@@ -38,7 +38,6 @@ require_text .github/workflows/ci.yml 'cargo clippy --workspace --all-targets --
 require_text .github/workflows/ci.yml 'cargo test --workspace --all-targets'
 
 require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/src/ast.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
 require_absent_path crates/newlang/src/backend

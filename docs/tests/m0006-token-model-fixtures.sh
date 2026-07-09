@@ -59,6 +59,5 @@ require_absent_text tests/fixtures/lexer/M0006-inert.fixture.toml 'source_text|e
 
 require_absent_path crates/newlang/src/token.rs
 require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/src/ast.rs
 
 echo "m0006: token model and lexer fixture metadata validation passed"

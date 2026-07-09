@@ -32,7 +32,6 @@ require_text crates/newlang/src/source.rs 'LineColumn'
 require_text docs/tasks/M0005-001-source-spans.md 'Unicode column semantics are unresolved'
 
 require_absent_path crates/newlang/src/parser.rs
-require_absent_path crates/newlang/src/ast.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
 require_absent_path crates/newlang/src/backend
