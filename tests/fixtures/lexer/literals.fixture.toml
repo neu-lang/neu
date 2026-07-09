@@ -1,0 +1,20 @@
+kind = "lexer-fixture"
+milestone = "M0007"
+source = "docs/adr/ADR-0021-lexical-grammar.md"
+category = "literals"
+note = "Integer literal overflow is semantic, not lexical."
+
+[[cases]]
+name = "accepted_integer_forms"
+source_text = "0 42 0b1010 0x2A 1_000"
+expected_tokens = ["INT_DECIMAL", "INT_DECIMAL", "INT_BINARY", "INT_HEX", "INT_DECIMAL"]
+
+[[cases]]
+name = "accepted_string_escapes"
+source_text = '"a\n\t\"\\\0"'
+expected_tokens = ["STRING"]
+
+[[cases]]
+name = "integer_suffix_rejected"
+source_text = "42u32"
+expected_diagnostics = [{ diagnostic = "unsupported_integer_literal_suffix", span_text = "42u32" }]

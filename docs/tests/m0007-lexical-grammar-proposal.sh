@@ -42,8 +42,5 @@ require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `resolved`'
 
 require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
-require_absent_path tests/fixtures/lexer/keywords.fixture.toml
-require_absent_path tests/fixtures/lexer/identifiers.fixture.toml
-require_absent_path tests/fixtures/lexer/literals.fixture.toml
 
 echo "m0007-proposal: lexical grammar ADR proposal and acceptance validation passed"

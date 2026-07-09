@@ -1,0 +1,14 @@
+kind = "lexer-fixture"
+milestone = "M0007"
+source = "docs/adr/ADR-0021-lexical-grammar.md"
+category = "operators-delimiters"
+
+[[cases]]
+name = "operators_longest_match"
+source_text = "++ -- == != <= >= && || -> => .. ..< + - * / % = < > ! & | . ? :"
+expected_tokens = ["PLUS_PLUS", "MINUS_MINUS", "EQUAL_EQUAL", "BANG_EQUAL", "LESS_EQUAL", "GREATER_EQUAL", "AMP_AMP", "PIPE_PIPE", "ARROW", "FAT_ARROW", "DOT_DOT", "DOT_DOT_LESS", "PLUS", "MINUS", "STAR", "SLASH", "PERCENT", "EQUAL", "LESS", "GREATER", "BANG", "AMP", "PIPE", "DOT", "QUESTION", "COLON"]
+
+[[cases]]
+name = "delimiters"
+source_text = "( ) { } [ ] , ;"
+expected_tokens = ["LEFT_PAREN", "RIGHT_PAREN", "LEFT_BRACE", "RIGHT_BRACE", "LEFT_BRACKET", "RIGHT_BRACKET", "COMMA", "SEMICOLON"]

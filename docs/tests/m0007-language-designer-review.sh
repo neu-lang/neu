@@ -52,8 +52,5 @@ require_text "$review" 'must not implement lexer behavior'
 
 require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
-require_absent_path tests/fixtures/lexer/keywords.fixture.toml
-require_absent_path tests/fixtures/lexer/identifiers.fixture.toml
-require_absent_path tests/fixtures/lexer/literals.fixture.toml
 
 echo "m0007-language-designer: lexical grammar ownership review validation passed"

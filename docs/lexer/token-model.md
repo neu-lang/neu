@@ -1,8 +1,8 @@
 # Token Model Planning
 
-Status: Planning artifact for M0006
+Status: Planning artifact updated for M0007
 
-This document records token-model status only. It does not define lexical grammar and does not authorize lexer implementation.
+This document records token-model status only. Accepted lexical grammar is defined by `docs/adr/ADR-0021-lexical-grammar.md`.
 
 ## Source Of Truth
 
@@ -10,7 +10,7 @@ Token categories must be justified by:
 
 - `docs/SPEC.md`
 - `docs/adr/`
-- an accepted future grammar or lexical ADR
+- `docs/adr/ADR-0021-lexical-grammar.md`
 
 No token category may be implemented from Kotlin precedent alone.
 
@@ -24,21 +24,20 @@ No token category may be implemented from Kotlin precedent alone.
 
 | Category | Status | Authority | Notes |
 | --- | --- | --- | --- |
-| Whitespace handling | blocked | `docs/SPEC.md` is silent | Needed before lexer implementation. |
-| Line comments | blocked | `docs/SPEC.md` is silent | Do not assume Kotlin comment syntax. |
-| Block comments | blocked | `docs/SPEC.md` is silent | Nesting behavior is unspecified. |
-| Identifiers | blocked | `docs/SPEC.md` is silent | Unicode and keyword interaction are unspecified. |
-| Keywords | blocked | `docs/SPEC.md` names concepts but not lexical spellings | Do not infer keyword set from Kotlin or Rust. |
-| Integer literals | blocked | `docs/SPEC.md` is silent | Bases, separators, suffixes, and overflow behavior are unspecified. |
-| String literals | blocked | `docs/SPEC.md` is silent | Escape rules and raw strings are unspecified. |
-| Operators | blocked | `docs/SPEC.md` is silent | Operator spellings and precedence are unspecified. |
-| Delimiters | blocked | `docs/SPEC.md` is silent | Braces, brackets, parentheses, commas, dots, and semicolons are unspecified. |
+| Whitespace handling | specified | ADR-0021 | Whitespace separates tokens and is not emitted. |
+| Line comments | specified | ADR-0021 | `//` to line break or end of file. |
+| Block comments | specified | ADR-0021 | Nested `/* ... */` comments. |
+| Identifiers | specified | ADR-0021 | ASCII identifiers; Unicode identifiers are deferred. |
+| Keywords | specified | ADR-0021 | Fixed reserved keyword set; no contextual keywords. |
+| Integer literals | specified | ADR-0021 | Decimal, binary, hexadecimal, separators; suffixes deferred. |
+| String literals | specified | ADR-0021 | Double-quoted strings with minimal escapes. |
+| Operators | specified | ADR-0021 | Token spellings only; parser precedence is out of scope. |
+| Delimiters | specified | ADR-0021 | Parentheses, braces, brackets, comma, and semicolon. |
 | End-of-file marker | deferred | Lexer architecture detail | Can be represented after grammar authority exists. |
-| Error token | deferred | Diagnostic infrastructure exists, lexical errors do not | Add after lexical error rules exist. |
+| Error token | specified | ADR-0021 and ADR-0015 | Lexical error categories and spans are specified. |
 
 ## Fixture Policy
 
-M0006 fixtures may only be inert metadata fixtures. They must cite `docs/SPEC.md`, `docs/adr/`, or this milestone and must not include source text, expected tokens, token streams, keyword spellings, identifiers, literals, operators, or delimiters.
+M0006 fixtures remain inert metadata fixtures.
 
-Concrete lexer fixtures are blocked until detailed lexical grammar is accepted.
-
+M0007 concrete lexer fixtures may include source text, expected tokens, and expected lexical diagnostics only when they cite `docs/adr/ADR-0021-lexical-grammar.md`.

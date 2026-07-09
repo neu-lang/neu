@@ -1,0 +1,20 @@
+kind = "lexer-fixture"
+milestone = "M0007"
+source = "docs/adr/ADR-0021-lexical-grammar.md"
+category = "comments"
+
+[[cases]]
+name = "line_comment_skipped"
+source_text = "val // comment\nvar"
+expected_tokens = ["KW_VAL", "KW_VAR"]
+
+[[cases]]
+name = "nested_block_comment_skipped"
+source_text = "/* outer /* inner */ done */ val"
+expected_tokens = ["KW_VAL"]
+
+[[cases]]
+name = "unterminated_block_comment"
+source_text = "val /* open"
+expected_tokens = ["KW_VAL"]
+expected_diagnostics = [{ diagnostic = "unterminated_block_comment", span_text = "/* open" }]

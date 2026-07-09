@@ -1,0 +1,19 @@
+kind = "lexer-fixture"
+milestone = "M0007"
+source = "docs/adr/ADR-0021-lexical-grammar.md"
+category = "identifiers"
+
+[[cases]]
+name = "ascii_identifiers"
+source_text = "alpha _beta value42"
+expected_tokens = ["IDENTIFIER", "IDENTIFIER", "IDENTIFIER"]
+
+[[cases]]
+name = "keyword_prefixes_are_identifiers"
+source_text = "funny value unsafe_value"
+expected_tokens = ["IDENTIFIER", "IDENTIFIER", "IDENTIFIER"]
+
+[[cases]]
+name = "unicode_identifier_rejected"
+source_text = "café"
+expected_diagnostics = [{ diagnostic = "unsupported_identifier_character", span_text = "é" }]

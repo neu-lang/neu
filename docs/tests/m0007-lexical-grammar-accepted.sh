@@ -68,8 +68,5 @@ require_text "$decision" 'M0007 may proceed to concrete lexer fixtures and imple
 
 require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
-require_absent_path tests/fixtures/lexer/keywords.fixture.toml
-require_absent_path tests/fixtures/lexer/identifiers.fixture.toml
-require_absent_path tests/fixtures/lexer/literals.fixture.toml
 
 echo "m0007-accepted-grammar: accepted lexical grammar validation passed"

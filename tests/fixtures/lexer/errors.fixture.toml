@@ -1,0 +1,29 @@
+kind = "lexer-fixture"
+milestone = "M0007"
+source = "docs/adr/ADR-0021-lexical-grammar.md"
+category = "lexical-errors"
+
+[[cases]]
+name = "invalid_string_escape"
+source_text = '"bad\q"'
+expected_diagnostics = [{ diagnostic = "invalid_string_escape", span_text = "\\q" }]
+
+[[cases]]
+name = "unterminated_string_literal"
+source_text = '"bad'
+expected_diagnostics = [{ diagnostic = "unterminated_string_literal", span_text = '"bad' }]
+
+[[cases]]
+name = "malformed_integer_literal"
+source_text = "0x_FF"
+expected_diagnostics = [{ diagnostic = "malformed_integer_literal", span_text = "0x_FF" }]
+
+[[cases]]
+name = "unknown_character"
+source_text = "@"
+expected_diagnostics = [{ diagnostic = "unknown_character", span_text = "@" }]
+
+[[cases]]
+name = "unterminated_block_comment"
+source_text = "/* open"
+expected_diagnostics = [{ diagnostic = "unterminated_block_comment", span_text = "/* open" }]
