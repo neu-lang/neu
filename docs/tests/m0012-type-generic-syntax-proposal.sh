@@ -65,6 +65,5 @@ require_text "$task" 'Status: `complete`'
 require_file docs/adr/ADR-0023-type-and-generic-syntax.md
 require_text docs/adr/ADR-0023-type-and-generic-syntax.md '^Status: Accepted$'
 require_text docs/SPEC.md '^## ADR-0023: Type And Generic Syntax$'
-require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 
 echo "m0012-proposal: historical proposal validation passed after ADR-0023 acceptance"

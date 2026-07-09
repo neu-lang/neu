@@ -101,3 +101,45 @@ fn rejects_deferred_expression_and_field_syntax() {
     assert!(kinds.contains(&DiagnosticKind::UnexpectedTokenInDeclarationBody));
     assert!(kinds.contains(&DiagnosticKind::MalformedDeclarationHeader));
 }
+
+#[test]
+fn parses_type_and_generic_syntax() {
+    let output = parse_source(
+        SourceFileId::from_raw(6),
+        "struct Box<T: Send & Share, U> {} fun wrap<T>(value): ((Box<T?>) -> U)?;",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let kinds = output.node_kinds();
+    assert!(kinds.contains(&AstNodeKind::StructDeclaration));
+    assert!(kinds.contains(&AstNodeKind::FunctionDeclaration));
+    assert!(kinds.contains(&AstNodeKind::GenericParameter));
+    assert!(kinds.contains(&AstNodeKind::CapabilityBound));
+    assert!(kinds.contains(&AstNodeKind::NamedType));
+    assert!(kinds.contains(&AstNodeKind::GenericArgument));
+    assert!(kinds.contains(&AstNodeKind::NullableType));
+    assert!(kinds.contains(&AstNodeKind::FunctionType));
+    assert!(kinds.contains(&AstNodeKind::GroupedType));
+}
+
+#[test]
+fn reports_malformed_type_and_generic_syntax() {
+    let output = parse_source(
+        SourceFileId::from_raw(7),
+        "struct Bad<> {} fun wrong<T: Send, Share>(): T??; fun broken(): (T) ->;",
+    );
+
+    let kinds: Vec<_> = output
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.kind)
+        .collect();
+
+    assert!(kinds.contains(&DiagnosticKind::MalformedGenericParameterList));
+    assert!(kinds.contains(&DiagnosticKind::MalformedCapabilityBound));
+    assert!(kinds.contains(&DiagnosticKind::MalformedNullableType));
+    assert!(kinds.contains(&DiagnosticKind::MalformedFunctionType));
+    assert!(kinds.contains(&DiagnosticKind::MissingTypeName));
+}

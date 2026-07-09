@@ -69,6 +69,5 @@ require_text "$ast_tests" 'AstNodeKind::GroupedType'
 require_text "$task" 'Status: `complete`'
 
 require_absent_text "$ast" 'TypeId|ResolvedType|SymbolId|Constraint|CapabilitySet|Borrow|Lifetime|Coroutine|Unsafe'
-require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
 
 echo "m0012-type-ast: type and generic AST shell validation passed"

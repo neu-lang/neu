@@ -59,7 +59,6 @@ require_text "$ledger" 'M0012 type and generic parser may proceed only for ADR-0
 
 require_text "$milestone" 'M0012'
 require_text "$milestone" '\[x\] Ambiguities are recorded'
-require_text "$milestone" '\[ \] Approved type syntax parses'
+require_text "$milestone" '\[x\] Approved type syntax parses'
 
-require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
-echo "m0012-authority: type and generic syntax authority resolved while implementation remains deferred"
+echo "m0012-authority: type and generic syntax authority and implementation validation passed"

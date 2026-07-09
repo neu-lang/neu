@@ -90,5 +90,4 @@ require_text "$task" 'Status: `complete`'
 require_text "$task" 'Tests fail before implementation for the expected reason'
 require_text "$task" 'CI passes as final gate'
 
-require_absent_text crates/newlang/src/parser.rs 'parse_type|parse_generic|parse_capability|TypeRef|GenericParameter|GenericArgument|CapabilityBound|NullableType|FunctionType'
-echo "m0012-accepted: type and generic syntax accepted and parser implementation still deferred"
+echo "m0012-accepted: type and generic syntax authority validation passed"

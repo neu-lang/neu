@@ -87,6 +87,7 @@ ADR-0006, ADR-0010, and ADR-0016 define high-level type, nullability, and generi
 
 - [x] Type and generic parser fixture corpus exists.
 - [x] Type and generic AST shell exists.
-- [ ] Approved type syntax parses.
+- [x] Approved type syntax parses.
+- [x] Invalid type syntax reports source-spanned diagnostics.
 - [x] Generic syntax scope is explicit.
 - [x] Ambiguities are recorded.
