@@ -42,14 +42,15 @@ require_text crates/newlang/src/ast.rs 'ByteSpan'
 require_text crates/newlang/src/ast.rs 'pub struct AstArena'
 require_text crates/newlang/tests/ast.rs 'source_file_root_node_preserves_span'
 require_text docs/ast/data-model.md '^# AST Data Model$'
-require_text docs/ast/data-model.md 'Status: M0009 syntax-independent AST shell'
-require_text docs/ast/data-model.md 'Concrete declaration, type, expression, statement, and pattern nodes are deferred'
+require_text docs/ast/data-model.md 'Status: M0011 declaration AST shell'
+require_text docs/ast/data-model.md 'The accepted M0009 root node kind is `SourceFile`'
+require_text docs/ast/data-model.md 'Type, expression, statement, and pattern nodes remain deferred'
 require_text docs/ast/data-model.md 'docs/syntax/grammar-authority-ledger.md'
 require_text docs/milestones/M0009-ast-data-model.md '\[x\] AST model exists'
 require_text docs/milestones/M0009-ast-data-model.md '\[x\] Span retention is tested'
 require_text docs/milestones/M0009-ast-data-model.md '\[x\] Semantic analysis is not encoded in AST'
 
-require_absent_text crates/newlang/src/ast.rs 'FunctionDecl|StructDecl|EnumDecl|Expression|Statement|Pattern|TypeRef|Resolved|Symbol|Borrow|Ownership'
+require_absent_text crates/newlang/src/ast.rs 'Expression|Statement|Pattern|TypeRef|Resolved|Symbol|Borrow|Ownership'
 require_absent_path crates/newlang/src/parser.rs
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs

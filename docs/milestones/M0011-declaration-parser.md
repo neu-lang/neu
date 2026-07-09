@@ -85,6 +85,7 @@ The parser must target the AST model and grammar authority ledger.
 
 - [x] Declaration syntax source of truth is accepted.
 - [x] Declaration parser fixtures are defined.
+- [x] Declaration AST shell exists.
 - [ ] Declaration fixtures pass.
 - [ ] Invalid declarations produce diagnostics.
 - [ ] No type semantics are implemented.

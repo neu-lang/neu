@@ -16,6 +16,13 @@ impl AstNodeId {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AstNodeKind {
     SourceFile,
+    PackageDeclaration,
+    ImportDeclaration,
+    FunctionDeclaration,
+    StructDeclaration,
+    EnumDeclaration,
+    InterfaceDeclaration,
+    DeclarationBody,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,6 +44,34 @@ impl AstArena {
 
     pub fn add_source_file(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::SourceFile, span)
+    }
+
+    pub fn add_package_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::PackageDeclaration, span)
+    }
+
+    pub fn add_import_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ImportDeclaration, span)
+    }
+
+    pub fn add_function_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::FunctionDeclaration, span)
+    }
+
+    pub fn add_struct_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::StructDeclaration, span)
+    }
+
+    pub fn add_enum_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::EnumDeclaration, span)
+    }
+
+    pub fn add_interface_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::InterfaceDeclaration, span)
+    }
+
+    pub fn add_declaration_body(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::DeclarationBody, span)
     }
 
     pub fn node(&self, id: AstNodeId) -> Option<&AstNode> {

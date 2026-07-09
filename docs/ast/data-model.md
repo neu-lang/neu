@@ -1,6 +1,6 @@
 # AST Data Model
 
-Status: M0009 syntax-independent AST shell
+Status: M0011 declaration AST shell
 
 Source of truth:
 
@@ -10,22 +10,31 @@ Source of truth:
 
 ## Scope
 
-The M0009 AST model defines syntax-independent node identity and span retention only.
+The AST model defines syntax-independent node identity and span retention.
 
-Concrete declaration, type, expression, statement, and pattern nodes are deferred because `docs/syntax/grammar-authority-ledger.md` classifies those grammar areas as ambiguous.
+ADR-0022 declaration node kinds are accepted for parser-facing declaration shells. Type, expression, statement, and pattern nodes remain deferred because `docs/syntax/grammar-authority-ledger.md` classifies those grammar areas as ambiguous.
 
 ## Accepted Model
 
 - AST nodes have stable `AstNodeId` values assigned in insertion order.
 - AST nodes retain a `ByteSpan` from the source model.
-- The only accepted node kind in M0009 is `SourceFile`.
+- The accepted M0009 root node kind is `SourceFile`.
+- The accepted M0011 declaration shell node kinds are:
+  - `PackageDeclaration`
+  - `ImportDeclaration`
+  - `FunctionDeclaration`
+  - `StructDeclaration`
+  - `EnumDeclaration`
+  - `InterfaceDeclaration`
+  - `DeclarationBody`
 - The source-file root span covers the source range selected by the caller.
+- Declaration node spans cover the source range selected by the parser.
+- Declaration nodes do not yet store names, modifiers, child relationships, type placeholders, parameter placeholders, or body contents.
 
 ## Deferred Nodes
 
 The following are intentionally absent until future accepted syntax authority exists:
 
-- declaration nodes
 - type syntax nodes
 - generic syntax nodes
 - expression nodes
