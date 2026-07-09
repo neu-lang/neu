@@ -111,3 +111,13 @@ deferred until the core language proves insufficient.
 The language provides Go-like bundled target packs with explicit target triples,
 standard layout rules, platform capability declarations, and no hidden host
 dependency for ordinary builds.
+
+## ADR-0021: Lexical Grammar
+
+The language uses an accepted small Kotlin-like custom lexical grammar for the
+bootstrap compiler. The initial lexer accepts ASCII identifiers, a fixed
+reserved keyword set, decimal, binary, and hexadecimal integer literals,
+double-quoted strings with a minimal escape set, nested block comments, line
+comments, and an explicit operator and delimiter set. Unicode identifiers,
+string interpolation, raw strings, character literals, and numeric suffixes are
+deferred until future accepted ADRs or spec updates.

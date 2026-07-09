@@ -1,6 +1,6 @@
 # ADR-0021 Chief Architect Decision
 
-Decision: pending
+Decision: approved
 
 ## Reviewed Artifact
 
@@ -10,9 +10,9 @@ Decision: pending
 
 ## Current Decision
 
-No acceptance yet.
+Accepted `docs/adr/ADR-0021-lexical-grammar.md` as source of truth for the bootstrap lexical grammar.
 
-The draft lexical grammar proposal is not accepted source of truth. It remains a planning artifact under `docs/adr/proposals/` and must not be used to implement lexer behavior.
+The draft lexical grammar proposal remains historical context under `docs/adr/proposals/`. Lexer behavior must be based on the accepted ADR, not the draft proposal.
 
 ## Completed Review Dependencies
 
@@ -21,7 +21,7 @@ The draft lexical grammar proposal is not accepted source of truth. It remains a
 - Diagnostics Engineer review.
 - Simplicity Guardian review.
 
-## Remaining Acceptance Blockers
+## Resolved Acceptance Blockers
 
 - Concrete accepted lexical grammar.
 - Explicit accepted token classes.
@@ -35,7 +35,7 @@ The draft lexical grammar proposal is not accepted source of truth. It remains a
 
 ## Consequences
 
-- `docs/ambiguities/M0006-lexical-grammar.md` remains open.
-- M0007 lexer implementation remains blocked.
-- Concrete lexer source fixtures remain out of scope.
-- Parser milestones may not assume token spellings from the draft.
+- `docs/ambiguities/M0006-lexical-grammar.md` is resolved by accepted ADR-0021.
+- M0007 may proceed to concrete lexer fixtures and implementation tasks.
+- Parser milestones may reference token spellings from accepted ADR-0021.
+- Parser grammar, precedence, and recovery remain outside ADR-0021.

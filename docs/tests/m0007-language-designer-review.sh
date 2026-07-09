@@ -11,7 +11,7 @@ require_file() {
 }
 
 require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while lexical grammar is unaccepted: $1"
+  [ ! -e "$1" ] || fail "out-of-scope path exists before lexer implementation task: $1"
 }
 
 require_text() {
@@ -31,10 +31,12 @@ require_file "$ambiguity"
 require_file "$task"
 require_file "$decision"
 require_file "$review"
+require_file docs/adr/ADR-0021-lexical-grammar.md
 
 require_text "$proposal" '^Status: Draft proposal - not accepted source of truth$'
-require_text "$ambiguity" 'Status: `open`'
-require_text "$decision" '^Decision: pending$'
+require_text "$ambiguity" 'Status: `resolved`'
+require_text "$decision" '^Decision: approved$'
+require_text docs/adr/ADR-0021-lexical-grammar.md '^Status: Accepted$'
 require_text "$task" 'Milestone: `M0007`'
 require_text "$task" 'Do not treat the draft proposal as accepted semantics'
 

@@ -7,7 +7,7 @@
 - Related Milestone: `M0006`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-09`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
 
 ## Ambiguous Or Missing Authority
@@ -57,17 +57,18 @@ Detailed lexical grammar is missing. docs/SPEC.md says the language has Kotlin-l
 - [x] Adversarial Engineer reviewed soundness risk.
 - [x] Diagnostics Engineer reviewed diagnostic consequences.
 - [x] Simplicity Guardian reviewed complexity.
-- [ ] Chief Architect approves final resolution.
+- [x] Chief Architect approves final resolution.
 
 ## Temporary Rule
 
-No implementation may proceed on concrete lexical behavior until the source of truth is updated or the ambiguity is ruled non-blocking by Chief Architect. M0006 may add inert metadata fixtures only.
+No implementation may proceed on concrete lexical behavior unless it is backed by `docs/adr/ADR-0021-lexical-grammar.md` or a later accepted source-of-truth update.
 
 ## Resolution
 
 - Decision:
-  - unresolved
+  - Accepted `docs/adr/ADR-0021-lexical-grammar.md` as source of truth for bootstrap lexical grammar.
 - Source of truth updated:
-  - none
+  - `docs/adr/ADR-0021-lexical-grammar.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - unresolved
+  - 2026-07-09

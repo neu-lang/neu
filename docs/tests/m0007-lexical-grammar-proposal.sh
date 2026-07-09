@@ -17,10 +17,11 @@ require_text() {
 }
 
 require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while proposal is draft: $1"
+  [ ! -e "$1" ] || fail "out-of-scope path exists before lexer implementation task: $1"
 }
 
 require_file docs/adr/proposals/ADR-0021-lexical-grammar.md
+require_file docs/adr/ADR-0021-lexical-grammar.md
 require_file docs/tasks/M0007-002-lexical-grammar-proposal.md
 
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md '^Status: Draft proposal - not accepted source of truth$'
@@ -36,7 +37,8 @@ require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'docs/ambiguities/M0
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'Chief Architect'
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'No lexer implementation may depend on this proposal until accepted'
 
-require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `open`'
+require_text docs/adr/ADR-0021-lexical-grammar.md '^Status: Accepted$'
+require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `resolved`'
 
 require_absent_path crates/newlang/src/lexer.rs
 require_absent_path crates/newlang/src/token.rs
@@ -44,4 +46,4 @@ require_absent_path tests/fixtures/lexer/keywords.fixture.toml
 require_absent_path tests/fixtures/lexer/identifiers.fixture.toml
 require_absent_path tests/fixtures/lexer/literals.fixture.toml
 
-echo "m0007-proposal: lexical grammar ADR proposal validation passed"
+echo "m0007-proposal: lexical grammar ADR proposal and acceptance validation passed"

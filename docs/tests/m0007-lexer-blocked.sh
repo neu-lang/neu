@@ -17,16 +17,18 @@ require_text() {
 }
 
 require_absent_path() {
-  [ ! -e "$1" ] || fail "out-of-scope path exists while M0007 is blocked: $1"
+  [ ! -e "$1" ] || fail "out-of-scope path exists before lexer implementation task: $1"
 }
 
+require_file docs/adr/ADR-0021-lexical-grammar.md
 require_file docs/ambiguities/M0006-lexical-grammar.md
 require_file docs/lexer/token-model.md
 require_file docs/tasks/M0007-001-lexical-grammar-blocker.md
 
-require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `open`'
+require_text docs/adr/ADR-0021-lexical-grammar.md '^Status: Accepted$'
+require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `resolved`'
 require_text docs/ambiguities/M0006-lexical-grammar.md 'Detailed lexical grammar is missing'
-require_text docs/ambiguities/M0006-lexical-grammar.md 'No implementation may proceed on concrete lexical behavior'
+require_text docs/ambiguities/M0006-lexical-grammar.md 'Accepted `docs/adr/ADR-0021-lexical-grammar.md`'
 require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Status: `blocked`'
 require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Language Designer'
 require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Chief Architect'
@@ -37,4 +39,4 @@ require_absent_path tests/fixtures/lexer/keywords.fixture.toml
 require_absent_path tests/fixtures/lexer/identifiers.fixture.toml
 require_absent_path tests/fixtures/lexer/literals.fixture.toml
 
-echo "m0007: lexer implementation correctly blocked by lexical grammar ambiguity"
+echo "m0007: historical lexer blocker resolved by accepted lexical grammar ADR"
