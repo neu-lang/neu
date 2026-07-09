@@ -1,0 +1,89 @@
+# M0030: Object And Bundled Linker Pipeline
+
+## Title
+
+M0030: Object And Bundled Linker Pipeline
+
+## Identifier
+
+M0030
+
+## Goal
+
+Produce object files and link them through the planned bundled linker path for the initial host target.
+
+## Motivation
+
+The architecture requires object files and a bundled linker before executable production can be validated.
+
+## Background
+
+ADR-0020 requires no hidden host dependency for ordinary builds.
+
+## Prerequisites
+
+- M0029
+
+## Inputs
+
+- Cranelift backend from M0029.
+- Build system from M0002.
+- `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
+
+## Outputs
+
+- Object emission pipeline.
+- Bundled linker integration for initial host target.
+- Executable smoke test.
+
+## Scope
+
+- Initial host target object and executable path.
+- Build integration.
+
+## Out of Scope
+
+- Multi-target packs.
+- Full platform ABI matrix.
+- Release packaging.
+
+## Deliverables
+
+- Object emission command.
+- Link command through bundled linker.
+- Executable smoke test.
+
+## Acceptance Criteria
+
+- Compiler can produce an object file for the initial smoke program.
+- Compiler can produce an executable for the initial host target without hidden host linker dependency.
+- Build Engineer confirms documented toolchain inputs.
+
+## Test Strategy
+
+- Object file smoke test.
+- Executable smoke test.
+- CI build gate for host target.
+
+## Risks
+
+- Bundled linker choice may require separate toolchain decision.
+- Entry point and runtime startup semantics may be under-specified.
+
+## Estimated Effort
+
+3-5 working days.
+
+## Expected Files Changed
+
+- Backend object pipeline.
+- Linker integration files.
+- Build scripts.
+- Tests.
+
+## Completion Checklist
+
+- [ ] Object emission works.
+- [ ] Bundled linker path works for host smoke.
+- [ ] Hidden host dependencies are documented or eliminated.
+
