@@ -87,7 +87,7 @@ require_text "$ast_tests" 'AstNodeKind::QualifiedCasePattern'
 
 require_text "$task" 'Status: `complete`'
 
-require_absent_text crates/newlang/src/parser.rs 'parse_expression|parse_statement|parse_pattern|parse_block|parse_when|parse_match|parse_coroutine|parse_unsafe'
+require_absent_text crates/newlang/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
 require_absent_text "$ast" 'TypeId|ResolvedType|SymbolId|Constraint|CapabilitySet|OwnershipState|BorrowState|FlowFact|Exhaustive|CoroutineFrame|UnsafeBoundary|Hir|Mir'
 
 echo "m0013-ast-shell: expression, statement, and pattern AST shell validation passed"

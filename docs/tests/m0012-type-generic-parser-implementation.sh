@@ -65,6 +65,6 @@ require_text "$task" 'Status: `complete`'
 require_text "$milestone" '\[x\] Approved type syntax parses'
 require_text "$milestone" '\[x\] Invalid type syntax reports source-spanned diagnostics'
 
-require_absent_text "$parser" 'type_check|constraint_solving|resolve_type|CapabilitySet|Hir|Mir|parse_expression|parse_statement|parse_pattern|parse_coroutine|parse_unsafe'
+require_absent_text "$parser" 'type_check|constraint_solving|resolve_type|CapabilitySet|Hir|Mir|parse_coroutine|parse_unsafe|FlowFact|OwnershipState|BorrowState'
 
 echo "m0012-parser-impl: type and generic parser implementation validation passed"

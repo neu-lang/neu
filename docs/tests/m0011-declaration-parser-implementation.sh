@@ -49,7 +49,7 @@ require_text crates/newlang/tests/parser.rs 'reports_misplaced_package_and_impor
 require_text crates/newlang/tests/parser.rs 'rejects_deferred_expression_and_field_syntax'
 require_text docs/tasks/M0011-008-declaration-parser-implementation.md 'Status: `complete`'
 
-require_absent_text crates/newlang/src/parser.rs 'parse_expression|parse_statement|parse_pattern|TypeRef|Symbol|NameResolution|Hir|Mir|Borrow|Ownership'
+require_absent_text crates/newlang/src/parser.rs 'TypeRef|Symbol|NameResolution|Hir|Mir|Borrow|Ownership|FlowFact|OwnershipState|BorrowState'
 require_absent_path crates/newlang/src/hir.rs
 require_absent_path crates/newlang/src/mir.rs
 

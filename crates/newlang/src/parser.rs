@@ -21,6 +21,25 @@ pub enum DiagnosticKind {
     MalformedFunctionType,
     UnsupportedTypeForm,
     UnexpectedTokenInType,
+    MissingExpression,
+    UnexpectedTokenInExpression,
+    UnsupportedExpressionForm,
+    MalformedBinaryExpression,
+    MalformedCallExpression,
+    MalformedMemberAccess,
+    MalformedBlock,
+    MissingStatement,
+    UnexpectedTokenInStatement,
+    UnsupportedStatementForm,
+    MalformedVariableDeclaration,
+    MalformedAssignment,
+    MalformedReturnStatement,
+    MalformedConditional,
+    MalformedPattern,
+    UnsupportedPatternForm,
+    MissingPatternArmBody,
+    MalformedUnsafeBlock,
+    MalformedCoroutineConstruct,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -221,7 +240,7 @@ impl<'source> Parser<'source> {
                 self.arena
                     .add_function_declaration(self.span(start, body_start));
                 self.saw_top_level_declaration |= !in_body;
-                self.parse_declaration_body();
+                self.parse_body_block();
             }
             _ => {
                 self.diagnostic_current_or_span(
@@ -289,6 +308,569 @@ impl<'source> Parser<'source> {
                 return;
             }
             self.parse_declaration(true);
+        }
+    }
+
+    fn parse_body_block(&mut self) -> Option<ByteSpan> {
+        if self.current_kind() != Some(TokenKind::LeftBrace) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedBlock,
+                self.previous_span()
+                    .unwrap_or_else(|| self.span(self.text.len(), self.text.len())),
+            );
+            return None;
+        }
+
+        let start = self
+            .current()
+            .expect("block starts with left brace")
+            .span
+            .start();
+        self.advance();
+
+        while !self.is_eof() {
+            match self.current_kind() {
+                Some(TokenKind::RightBrace) => {
+                    let end = self.current().expect("right brace exists").span.end();
+                    self.advance();
+                    let span = self.span(start, end);
+                    self.arena.add_block(span);
+                    return Some(span);
+                }
+                Some(TokenKind::KwVal | TokenKind::KwVar | TokenKind::KwReturn) => {
+                    self.parse_statement();
+                }
+                Some(kind) if self.can_start_expression_kind(kind) => {
+                    let checkpoint = self.index;
+                    let expression_start = self.current().map_or(start, |token| token.span.start());
+                    let Some(expression_span) = self.parse_expression() else {
+                        self.skip_to_statement_boundary();
+                        continue;
+                    };
+                    match self.current_kind() {
+                        Some(TokenKind::Semicolon) => {
+                            let end = self.current().expect("semicolon exists").span.end();
+                            self.advance();
+                            if self.tokens.get(checkpoint).is_some_and(|token| {
+                                self.expression_start_can_be_assignment_target(token.kind)
+                            }) && self
+                                .tokens
+                                .get(self.index.saturating_sub(2))
+                                .is_some_and(|token| token.kind == TokenKind::Equal)
+                            {
+                                self.arena
+                                    .add_assignment_statement(self.span(expression_start, end));
+                            } else {
+                                self.arena.add_expression_statement(
+                                    self.span(expression_span.start(), end),
+                                );
+                            }
+                        }
+                        Some(TokenKind::Equal) => {
+                            self.advance();
+                            if self.parse_expression().is_none() {
+                                self.diagnostic_current_or_span(
+                                    DiagnosticKind::MalformedAssignment,
+                                    expression_span,
+                                );
+                            }
+                            if self.current_kind() == Some(TokenKind::Semicolon) {
+                                let end = self.current().expect("semicolon exists").span.end();
+                                self.advance();
+                                self.arena
+                                    .add_assignment_statement(self.span(expression_start, end));
+                            } else {
+                                self.diagnostic_current_or_span(
+                                    DiagnosticKind::MalformedAssignment,
+                                    expression_span,
+                                );
+                                self.skip_to_statement_boundary();
+                            }
+                        }
+                        Some(TokenKind::RightBrace) => {}
+                        _ => {
+                            self.diagnostic_current_or_span(
+                                DiagnosticKind::UnexpectedTokenInStatement,
+                                expression_span,
+                            );
+                            self.skip_to_statement_boundary();
+                        }
+                    }
+                }
+                Some(TokenKind::KwUnsafe) => {
+                    self.diagnostic_current(DiagnosticKind::MalformedUnsafeBlock);
+                    self.advance();
+                    self.skip_deferred_construct();
+                }
+                Some(TokenKind::KwFor | TokenKind::KwWhile | TokenKind::KwWhen) => {
+                    self.diagnostic_current(DiagnosticKind::UnsupportedStatementForm);
+                    self.advance();
+                    self.skip_deferred_construct();
+                }
+                Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
+                    self.diagnostic_current(DiagnosticKind::MalformedCoroutineConstruct);
+                    self.advance();
+                    self.skip_deferred_construct();
+                }
+                Some(_) => {
+                    self.diagnostic_current(DiagnosticKind::UnexpectedTokenInStatement);
+                    self.advance();
+                    self.skip_to_statement_boundary();
+                }
+                None => break,
+            }
+        }
+
+        self.diagnostic(DiagnosticKind::MalformedBlock, self.span_at(start));
+        None
+    }
+
+    fn parse_statement(&mut self) {
+        match self.current_kind() {
+            Some(TokenKind::KwVal | TokenKind::KwVar) => {
+                self.parse_variable_declaration_statement()
+            }
+            Some(TokenKind::KwReturn) => self.parse_return_statement(),
+            Some(_) => {
+                self.diagnostic_current(DiagnosticKind::MissingStatement);
+                self.skip_to_statement_boundary();
+            }
+            None => {}
+        }
+    }
+
+    fn parse_variable_declaration_statement(&mut self) {
+        let start = self
+            .current()
+            .expect("variable declaration starts with val or var")
+            .span
+            .start();
+        self.advance();
+
+        if self.current_kind() != Some(TokenKind::Identifier) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedVariableDeclaration,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+        self.advance();
+
+        if self.current_kind() == Some(TokenKind::Colon) {
+            self.advance();
+            if self.parse_type().is_none() {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedVariableDeclaration,
+                    self.span_at(start),
+                );
+                self.skip_to_statement_boundary();
+                return;
+            }
+        }
+
+        if self.current_kind() == Some(TokenKind::Equal) {
+            self.advance();
+            if self.parse_expression().is_none() {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedVariableDeclaration,
+                    self.span_at(start),
+                );
+                self.skip_to_statement_boundary();
+                return;
+            }
+        }
+
+        if self.current_kind() == Some(TokenKind::Semicolon) {
+            let end = self.current().expect("semicolon exists").span.end();
+            self.advance();
+            self.arena
+                .add_variable_declaration_statement(self.span(start, end));
+        } else {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedVariableDeclaration,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+        }
+    }
+
+    fn parse_return_statement(&mut self) {
+        let start = self.current().expect("return token exists").span.start();
+        self.advance();
+
+        if self.current_kind() != Some(TokenKind::Semicolon) && self.parse_expression().is_none() {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedReturnStatement,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+
+        if self.current_kind() == Some(TokenKind::Semicolon) {
+            let end = self.current().expect("semicolon exists").span.end();
+            self.advance();
+            self.arena.add_return_statement(self.span(start, end));
+        } else {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedReturnStatement,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+        }
+    }
+
+    fn parse_expression(&mut self) -> Option<ByteSpan> {
+        self.parse_binary_expression(1)
+    }
+
+    fn parse_binary_expression(&mut self, min_precedence: u8) -> Option<ByteSpan> {
+        let mut left = self.parse_unary_expression()?;
+        while let Some((precedence, _)) = self.binary_operator() {
+            if precedence < min_precedence {
+                break;
+            }
+            let operator_span = self.current().expect("operator token exists").span;
+            self.advance();
+            let Some(right) = self.parse_binary_expression(precedence + 1) else {
+                self.diagnostic(DiagnosticKind::MalformedBinaryExpression, operator_span);
+                return Some(left);
+            };
+            left = self.span(left.start(), right.end());
+            self.arena.add_binary_expression(left);
+        }
+        Some(left)
+    }
+
+    fn parse_unary_expression(&mut self) -> Option<ByteSpan> {
+        match self.current_kind() {
+            Some(TokenKind::Bang | TokenKind::Minus) => {
+                let start = self.current().expect("unary operator exists").span.start();
+                self.advance();
+                let operand = self.parse_unary_expression()?;
+                let span = self.span(start, operand.end());
+                self.arena.add_unary_expression(span);
+                Some(span)
+            }
+            _ => self.parse_postfix_expression(),
+        }
+    }
+
+    fn parse_postfix_expression(&mut self) -> Option<ByteSpan> {
+        let mut span = self.parse_primary_expression()?;
+        loop {
+            match self.current_kind() {
+                Some(TokenKind::LeftParen) => {
+                    let start = span.start();
+                    let Some(end) = self.parse_argument_list() else {
+                        self.diagnostic_current_or_span(
+                            DiagnosticKind::MalformedCallExpression,
+                            span,
+                        );
+                        return Some(span);
+                    };
+                    span = self.span(start, end);
+                    self.arena.add_call_expression(span);
+                }
+                Some(TokenKind::Dot) => {
+                    let start = span.start();
+                    let dot_span = self.current().expect("dot exists").span;
+                    self.advance();
+                    if self.current_kind() == Some(TokenKind::Identifier) {
+                        let end = self.current().expect("member identifier exists").span.end();
+                        self.advance();
+                        span = self.span(start, end);
+                        self.arena.add_member_expression(span);
+                    } else {
+                        self.diagnostic(DiagnosticKind::MalformedMemberAccess, dot_span);
+                        if self.current_kind() == Some(TokenKind::LeftParen) {
+                            self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
+                        }
+                        return Some(span);
+                    }
+                }
+                Some(TokenKind::LeftBracket) => {
+                    self.diagnostic_current(DiagnosticKind::UnsupportedExpressionForm);
+                    self.advance();
+                    self.skip_to_expression_boundary();
+                    return Some(span);
+                }
+                _ => return Some(span),
+            }
+        }
+    }
+
+    fn parse_argument_list(&mut self) -> Option<usize> {
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            return None;
+        }
+        self.advance();
+        if self.current_kind() == Some(TokenKind::RightParen) {
+            let end = self.current().expect("right paren exists").span.end();
+            self.advance();
+            return Some(end);
+        }
+        loop {
+            if self.parse_expression().is_none() {
+                self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
+                self.skip_to_expression_boundary();
+                return self.previous_span().map(|span| span.end());
+            }
+            match self.current_kind() {
+                Some(TokenKind::Comma) => {
+                    self.advance();
+                    if self.current_kind() == Some(TokenKind::RightParen) {
+                        self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
+                        let end = self.current().expect("right paren exists").span.end();
+                        self.advance();
+                        return Some(end);
+                    }
+                }
+                Some(TokenKind::RightParen) => {
+                    let end = self.current().expect("right paren exists").span.end();
+                    self.advance();
+                    return Some(end);
+                }
+                _ => {
+                    self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
+                    self.skip_to_expression_boundary();
+                    return self.previous_span().map(|span| span.end());
+                }
+            }
+        }
+    }
+
+    fn parse_primary_expression(&mut self) -> Option<ByteSpan> {
+        match self.current_kind() {
+            Some(
+                TokenKind::IntDecimal
+                | TokenKind::IntBinary
+                | TokenKind::IntHex
+                | TokenKind::String
+                | TokenKind::KwTrue
+                | TokenKind::KwFalse
+                | TokenKind::KwNull,
+            ) => {
+                let span = self.current().expect("literal token exists").span;
+                self.advance();
+                self.arena.add_literal_expression(span);
+                Some(span)
+            }
+            Some(TokenKind::Identifier) => self.parse_name_expression(),
+            Some(TokenKind::LeftParen) => self.parse_grouped_expression(),
+            Some(TokenKind::KwIf) => self.parse_if_expression(),
+            Some(TokenKind::Equal) => {
+                self.diagnostic_current(DiagnosticKind::UnsupportedExpressionForm);
+                None
+            }
+            Some(_) => {
+                self.diagnostic_current(DiagnosticKind::MissingExpression);
+                None
+            }
+            None => {
+                self.diagnostic(
+                    DiagnosticKind::MissingExpression,
+                    self.span(self.text.len(), self.text.len()),
+                );
+                None
+            }
+        }
+    }
+
+    fn parse_name_expression(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        let end = self.current()?.span.end();
+        self.advance();
+        let span = self.span(start, end);
+        self.arena.add_name_expression(span);
+        Some(span)
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        let inner = self.parse_expression()?;
+        if self.current_kind() != Some(TokenKind::RightParen) {
+            self.diagnostic_current_or_span(DiagnosticKind::UnexpectedTokenInExpression, inner);
+            self.skip_to_expression_boundary();
+            return None;
+        }
+        let end = self.current().expect("right paren exists").span.end();
+        self.advance();
+        let span = self.span(start, end);
+        self.arena.add_grouped_expression(span);
+        Some(span)
+    }
+
+    fn parse_if_expression(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_expression_boundary();
+            return None;
+        }
+        self.advance();
+        if self.parse_expression().is_none() {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_expression_boundary();
+            return None;
+        }
+        if self.current_kind() != Some(TokenKind::RightParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_expression_boundary();
+            return None;
+        }
+        self.advance();
+        let then_block = self.parse_body_block()?;
+        let mut end = then_block.end();
+        if self.current_kind() == Some(TokenKind::KwElse) {
+            self.advance();
+            let Some(else_block) = self.parse_body_block() else {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedConditional,
+                    self.span_at(start),
+                );
+                return Some(self.span(start, end));
+            };
+            end = else_block.end();
+        }
+        let span = self.span(start, end);
+        self.arena.add_if_expression(span);
+        Some(span)
+    }
+
+    #[allow(dead_code)]
+    fn parse_pattern(&mut self) -> Option<ByteSpan> {
+        match self.current_kind() {
+            Some(TokenKind::Identifier) if self.current_text() == Some("_") => {
+                let span = self.current().expect("wildcard exists").span;
+                self.advance();
+                self.arena.add_wildcard_pattern(span);
+                Some(span)
+            }
+            Some(
+                TokenKind::IntDecimal
+                | TokenKind::IntBinary
+                | TokenKind::IntHex
+                | TokenKind::String
+                | TokenKind::KwTrue
+                | TokenKind::KwFalse
+                | TokenKind::KwNull,
+            ) => {
+                let span = self.current().expect("literal pattern exists").span;
+                self.advance();
+                self.arena.add_literal_pattern(span);
+                Some(span)
+            }
+            Some(TokenKind::Identifier) => self.parse_named_pattern(),
+            Some(TokenKind::LeftParen) => {
+                let start = self.current()?.span.start();
+                self.advance();
+                let inner = self.parse_pattern()?;
+                if self.current_kind() != Some(TokenKind::RightParen) {
+                    self.diagnostic_current_or_span(DiagnosticKind::MalformedPattern, inner);
+                    self.skip_to_pattern_boundary();
+                    return None;
+                }
+                let end = self.current().expect("right paren exists").span.end();
+                self.advance();
+                let span = self.span(start, end);
+                self.arena.add_grouped_pattern(span);
+                Some(span)
+            }
+            Some(TokenKind::KwWhen) => {
+                self.diagnostic_current(DiagnosticKind::UnsupportedPatternForm);
+                None
+            }
+            Some(TokenKind::FatArrow) => {
+                self.diagnostic_current(DiagnosticKind::MissingPatternArmBody);
+                None
+            }
+            Some(_) => {
+                self.diagnostic_current(DiagnosticKind::UnsupportedPatternForm);
+                None
+            }
+            None => None,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn parse_named_pattern(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        let mut end = self.current()?.span.end();
+        self.advance();
+        let mut qualified = false;
+        while self.current_kind() == Some(TokenKind::Dot)
+            && self.lookahead_kind(1) == Some(TokenKind::Identifier)
+        {
+            qualified = true;
+            self.advance();
+            end = self
+                .current()
+                .expect("qualified pattern identifier exists")
+                .span
+                .end();
+            self.advance();
+        }
+        if self.current_kind() == Some(TokenKind::LeftParen) {
+            qualified = true;
+            end = self.parse_pattern_arguments().unwrap_or(end);
+        }
+        let span = self.span(start, end);
+        if qualified {
+            self.arena.add_qualified_case_pattern(span);
+        } else {
+            self.arena.add_binding_pattern(span);
+        }
+        Some(span)
+    }
+
+    #[allow(dead_code)]
+    fn parse_pattern_arguments(&mut self) -> Option<usize> {
+        self.advance();
+        if self.current_kind() == Some(TokenKind::RightParen) {
+            let end = self.current().expect("right paren exists").span.end();
+            self.advance();
+            return Some(end);
+        }
+        loop {
+            if self.parse_pattern().is_none() {
+                self.diagnostic_current(DiagnosticKind::MalformedPattern);
+                self.skip_to_pattern_boundary();
+                return self.previous_span().map(|span| span.end());
+            }
+            match self.current_kind() {
+                Some(TokenKind::Comma) => {
+                    self.advance();
+                    if self.current_kind() == Some(TokenKind::RightParen) {
+                        self.diagnostic_current(DiagnosticKind::MalformedPattern);
+                        let end = self.current().expect("right paren exists").span.end();
+                        self.advance();
+                        return Some(end);
+                    }
+                }
+                Some(TokenKind::RightParen) => {
+                    let end = self.current().expect("right paren exists").span.end();
+                    self.advance();
+                    return Some(end);
+                }
+                _ => {
+                    self.diagnostic_current(DiagnosticKind::MalformedPattern);
+                    self.skip_to_pattern_boundary();
+                    return self.previous_span().map(|span| span.end());
+                }
+            }
         }
     }
 
@@ -687,6 +1269,45 @@ impl<'source> Parser<'source> {
         self.current_kind() == Some(TokenKind::Identifier)
     }
 
+    fn can_start_expression_kind(&self, kind: TokenKind) -> bool {
+        matches!(
+            kind,
+            TokenKind::Identifier
+                | TokenKind::IntDecimal
+                | TokenKind::IntBinary
+                | TokenKind::IntHex
+                | TokenKind::String
+                | TokenKind::KwTrue
+                | TokenKind::KwFalse
+                | TokenKind::KwNull
+                | TokenKind::KwIf
+                | TokenKind::LeftParen
+                | TokenKind::Bang
+                | TokenKind::Minus
+        )
+    }
+
+    fn expression_start_can_be_assignment_target(&self, kind: TokenKind) -> bool {
+        matches!(kind, TokenKind::Identifier | TokenKind::LeftParen)
+    }
+
+    fn binary_operator(&self) -> Option<(u8, TokenKind)> {
+        let kind = self.current_kind()?;
+        let precedence = match kind {
+            TokenKind::PipePipe => 1,
+            TokenKind::AmpAmp => 2,
+            TokenKind::EqualEqual | TokenKind::BangEqual => 3,
+            TokenKind::Less
+            | TokenKind::Greater
+            | TokenKind::LessEqual
+            | TokenKind::GreaterEqual => 4,
+            TokenKind::Plus | TokenKind::Minus => 5,
+            TokenKind::Star | TokenKind::Slash | TokenKind::Percent => 6,
+            _ => return None,
+        };
+        Some((precedence, kind))
+    }
+
     fn skip_to_type_boundary(&mut self) {
         while let Some(kind) = self.current_kind() {
             if matches!(
@@ -699,6 +1320,91 @@ impl<'source> Parser<'source> {
                     | TokenKind::Semicolon
             ) || self.is_declaration_starter()
             {
+                return;
+            }
+            self.advance();
+        }
+    }
+
+    fn skip_to_expression_boundary(&mut self) {
+        while let Some(kind) = self.current_kind() {
+            if matches!(
+                kind,
+                TokenKind::Comma
+                    | TokenKind::Semicolon
+                    | TokenKind::RightParen
+                    | TokenKind::RightBrace
+            ) || self.is_declaration_starter()
+            {
+                return;
+            }
+            self.advance();
+        }
+    }
+
+    fn skip_to_statement_boundary(&mut self) {
+        while let Some(kind) = self.current_kind() {
+            if kind == TokenKind::Semicolon {
+                self.advance();
+                return;
+            }
+            if kind == TokenKind::RightBrace || self.is_declaration_starter() {
+                return;
+            }
+            self.advance();
+        }
+    }
+
+    fn skip_deferred_construct(&mut self) {
+        while let Some(kind) = self.current_kind() {
+            match kind {
+                TokenKind::LeftBrace => {
+                    self.skip_balanced_braces();
+                    return;
+                }
+                TokenKind::Semicolon => {
+                    self.advance();
+                    return;
+                }
+                TokenKind::RightBrace => return,
+                _ => self.advance(),
+            }
+        }
+    }
+
+    fn skip_balanced_braces(&mut self) {
+        if self.current_kind() != Some(TokenKind::LeftBrace) {
+            return;
+        }
+        let mut depth = 0usize;
+        while let Some(kind) = self.current_kind() {
+            match kind {
+                TokenKind::LeftBrace => {
+                    depth += 1;
+                    self.advance();
+                }
+                TokenKind::RightBrace => {
+                    depth -= 1;
+                    self.advance();
+                    if depth == 0 {
+                        return;
+                    }
+                }
+                _ => self.advance(),
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn skip_to_pattern_boundary(&mut self) {
+        while let Some(kind) = self.current_kind() {
+            if matches!(
+                kind,
+                TokenKind::Comma
+                    | TokenKind::RightParen
+                    | TokenKind::FatArrow
+                    | TokenKind::RightBrace
+            ) {
                 return;
             }
             self.advance();

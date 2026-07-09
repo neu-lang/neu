@@ -143,3 +143,86 @@ fn reports_malformed_type_and_generic_syntax() {
     assert!(kinds.contains(&DiagnosticKind::MalformedFunctionType));
     assert!(kinds.contains(&DiagnosticKind::MissingTypeName));
 }
+
+#[test]
+fn parses_adr0024_body_statements_and_expressions() {
+    let output = parse_source(
+        SourceFileId::from_raw(8),
+        "fun run(): Int { val answer: Int = compute(); var next = answer; next = next + 1; logger.info(next); return next; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let kinds = output.node_kinds();
+    assert!(kinds.contains(&AstNodeKind::Block));
+    assert!(kinds.contains(&AstNodeKind::VariableDeclarationStatement));
+    assert!(kinds.contains(&AstNodeKind::AssignmentStatement));
+    assert!(kinds.contains(&AstNodeKind::ExpressionStatement));
+    assert!(kinds.contains(&AstNodeKind::ReturnStatement));
+    assert!(kinds.contains(&AstNodeKind::CallExpression));
+    assert!(kinds.contains(&AstNodeKind::MemberExpression));
+    assert!(kinds.contains(&AstNodeKind::BinaryExpression));
+    assert!(kinds.contains(&AstNodeKind::NameExpression));
+}
+
+#[test]
+fn parses_trailing_expression_and_if_expression_body() {
+    let output = parse_source(
+        SourceFileId::from_raw(9),
+        "fun choose(): Int { val ready = check(); if (ready) { service.run(arg, 2); } else { fallback(); } }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let kinds = output.node_kinds();
+    assert!(kinds.contains(&AstNodeKind::Block));
+    assert!(kinds.contains(&AstNodeKind::IfExpression));
+    assert!(kinds.contains(&AstNodeKind::CallExpression));
+    assert!(kinds.contains(&AstNodeKind::MemberExpression));
+    assert!(kinds.contains(&AstNodeKind::ExpressionStatement));
+}
+
+#[test]
+fn reports_adr0024_body_diagnostics() {
+    let output = parse_source(
+        SourceFileId::from_raw(10),
+        "fun broken() { val : Int = compute(); target = ; return + ; service.(arg,); if ready { nope(); } }",
+    );
+
+    let kinds: Vec<_> = output
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.kind)
+        .collect();
+
+    assert!(kinds.contains(&DiagnosticKind::MalformedVariableDeclaration));
+    assert!(kinds.contains(&DiagnosticKind::MalformedAssignment));
+    assert!(kinds.contains(&DiagnosticKind::MalformedReturnStatement));
+    assert!(kinds.contains(&DiagnosticKind::MalformedCallExpression));
+    assert!(kinds.contains(&DiagnosticKind::MalformedMemberAccess));
+    assert!(kinds.contains(&DiagnosticKind::MalformedConditional));
+    assert!(output
+        .diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.span.start() <= diagnostic.span.end()));
+}
+
+#[test]
+fn rejects_deferred_body_forms() {
+    let output = parse_source(
+        SourceFileId::from_raw(11),
+        "fun deferred() { while (ready) { run(); } unsafe { run(); } when (value) { } items[0]; }",
+    );
+
+    let kinds: Vec<_> = output
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.kind)
+        .collect();
+
+    assert!(kinds.contains(&DiagnosticKind::UnsupportedStatementForm));
+    assert!(kinds.contains(&DiagnosticKind::MalformedUnsafeBlock));
+    assert!(kinds.contains(&DiagnosticKind::UnsupportedExpressionForm));
+}

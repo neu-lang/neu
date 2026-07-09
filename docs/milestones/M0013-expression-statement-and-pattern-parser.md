@@ -90,4 +90,7 @@ ADR-0011 and ADR-0012 require smart casts and pattern matching, but exact gramma
 - [x] Statement fixtures pass.
 - [x] Pattern fixtures pass.
 - [x] Expression, statement, and pattern AST shell exists.
+- [x] Parser implementation for approved body syntax exists.
+- [x] Invalid body syntax reports source-spanned diagnostics.
+- [x] Deferred body constructs remain rejected.
 - [x] Ambiguous syntax remains blocked.
