@@ -80,7 +80,6 @@ ADR-0015 requires diagnostic obligations. Parser recovery affects every later sy
 
 ## Completion Checklist
 
-- [ ] Recovery strategy is documented.
-- [ ] Syntax diagnostic shape is tested.
-- [ ] Ambiguous syntax remains blocked.
-
+- [x] Recovery strategy is documented.
+- [x] Syntax diagnostic shape is tested.
+- [x] Ambiguous syntax remains blocked.
