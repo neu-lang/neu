@@ -29,10 +29,12 @@ require_absent_text() {
 }
 
 proposal=docs/adr/proposals/ADR-0026-name-resolution-policy.md
+accepted=docs/adr/ADR-0026-name-resolution-policy.md
 ambiguity=docs/ambiguities/M0016-name-resolution-policy.md
 task=docs/tasks/M0016-002-name-resolution-policy-proposal.md
 
 require_file "$proposal"
+require_file "$accepted"
 require_file "$ambiguity"
 require_file "$task"
 
@@ -62,12 +64,12 @@ require_text "$proposal" 'duplicate_name'
 require_text "$proposal" 'ambiguous_name'
 require_text "$proposal" 'inaccessible_name'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$accepted" '^Status: Accepted$'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" '\[x\] Language Designer drafts a name-resolution policy ADR or `docs/SPEC.md` revision'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path docs/adr/ADR-0026-name-resolution-policy.md
-require_absent_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
+require_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
 require_absent_path crates/newlang/src/name_resolution.rs
 require_absent_path crates/newlang/src/resolution.rs
 require_absent_text crates/newlang/src/lib.rs 'pub mod name_resolution|pub mod resolution'

@@ -7,7 +7,7 @@
 - Related Milestone: `M0016`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-10`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
 - Blocking milestone: `M0016`
 
@@ -69,24 +69,33 @@ M0016 requires approved local, module, and declaration name resolution, duplicat
 
 ## Recommended Resolution Path
 
-- [ ] Language Lawyer determines whether existing text resolves it.
+- [x] Language Lawyer determines whether existing text resolves it.
 - [x] Language Designer drafts a name-resolution policy ADR or `docs/SPEC.md` revision.
-- [ ] Adversarial Engineer reviews soundness risk.
-- [ ] Diagnostics Engineer reviews unresolved-name and duplicate-name diagnostics.
-- [ ] Simplicity Guardian reviews the bootstrap subset for overreach.
-- [ ] Chief Architect approves final source-of-truth update.
+- [x] Adversarial Engineer reviews soundness risk.
+- [x] Diagnostics Engineer reviews unresolved-name and duplicate-name diagnostics.
+- [x] Simplicity Guardian reviews the bootstrap subset for overreach.
+- [x] Chief Architect approves final source-of-truth update.
 
 ## Temporary Rule
 
-No implementation may define name resolution, lookup order, import semantics, scope boundaries, shadowing, duplicate-name behavior, unresolved-name diagnostics, dependency lookup, or ambiguity handling until accepted source of truth resolves M0016.
+Resolved by accepted ADR-0026.
 
-Symbol interning and name table storage from M0015 may remain as infrastructure, but they must not be treated as resolution policy.
+Implementation may define name resolution only as specified by accepted ADR-0026.
+
+Symbol interning and name table storage from M0015 may remain as infrastructure, but they must not be treated as resolution policy beyond ADR-0026.
 
 ## Resolution
 
 - Decision:
-  - unresolved
+  - accepted ADR-0026 defines the M0016 bootstrap name-resolution policy
 - Source of truth updated:
-  - none
+  - `docs/adr/ADR-0026-name-resolution-policy.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - none
+  - `2026-07-10`
+
+## Resolution Source
+
+Resolution Source: `docs/adr/ADR-0026-name-resolution-policy.md`
+
+Resolved Date: `2026-07-10`

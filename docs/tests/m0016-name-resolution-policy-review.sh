@@ -25,11 +25,13 @@ require_absent_text() {
 }
 
 proposal=docs/adr/proposals/ADR-0026-name-resolution-policy.md
+accepted=docs/adr/ADR-0026-name-resolution-policy.md
 ambiguity=docs/ambiguities/M0016-name-resolution-policy.md
 review_dir=docs/adr/proposals/reviews
 task=docs/tasks/M0016-003-name-resolution-policy-proposal-review.md
 
 require_file "$proposal"
+require_file "$accepted"
 require_file "$ambiguity"
 require_file "$task"
 require_file "$review_dir/ADR-0026-language-lawyer-review.md"
@@ -40,7 +42,8 @@ require_file "$review_dir/ADR-0026-simplicity-review.md"
 require_file "$review_dir/ADR-0026-chief-architect-decision.md"
 
 require_text "$proposal" '^Status: Draft proposal - not accepted source of truth$'
-require_text "$ambiguity" 'Status: `open`'
+require_text "$accepted" '^Status: Accepted$'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0016`'
 
 require_text "$review_dir/ADR-0026-language-lawyer-review.md" '^Decision: request-revision-before-acceptance$'
@@ -66,13 +69,13 @@ require_text "$review_dir/ADR-0026-simplicity-review.md" '^Decision: request-rev
 require_text "$review_dir/ADR-0026-simplicity-review.md" 'bootstrap subset'
 require_text "$review_dir/ADR-0026-simplicity-review.md" 'defer'
 
-require_text "$review_dir/ADR-0026-chief-architect-decision.md" '^Decision: pending-revision$'
-require_text "$review_dir/ADR-0026-chief-architect-decision.md" 'ADR-0026 is not accepted'
-require_text "$review_dir/ADR-0026-chief-architect-decision.md" 'M0016 remains blocked'
+require_text "$review_dir/ADR-0026-chief-architect-decision.md" '^Decision: approved$'
+require_text "$review_dir/ADR-0026-chief-architect-decision.md" 'ADR-0026 is accepted'
+require_text "$review_dir/ADR-0026-chief-architect-decision.md" 'M0016 ambiguity is resolved'
 
 require_text "$task" 'Status: `complete`'
 
-require_absent_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
+require_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
 require_absent_text crates/newlang/src/lib.rs 'pub mod name_resolution|pub mod resolution'
 require_absent_text crates/newlang/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
 

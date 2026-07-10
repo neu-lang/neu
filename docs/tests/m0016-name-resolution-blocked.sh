@@ -2,7 +2,7 @@
 set -eu
 
 fail() {
-  echo "m0016-blocked: $*" >&2
+  echo "m0016-authority: $*" >&2
   exit 1
 }
 
@@ -45,22 +45,25 @@ require_text "$task" 'Milestone: `M0016`'
 require_text "$ambiguity" '^# Ambiguity Report: M0016 Name Resolution Policy$'
 require_text "$ambiguity" 'Report ID: `M0016-NAME-RESOLUTION-POLICY`'
 require_text "$ambiguity" 'Related Task: `M0016-001`'
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Required Owner: `Language Designer`'
+require_text "$ambiguity" 'Resolution Source: `docs/adr/ADR-0026-name-resolution-policy.md`'
 require_text "$ambiguity" 'lookup order'
 require_text "$ambiguity" 'import semantics'
 require_text "$ambiguity" 'scope boundaries'
 require_text "$ambiguity" 'duplicate-name behavior'
 require_text "$ambiguity" 'unresolved-name diagnostics'
-require_text "$ambiguity" 'No implementation may define name resolution'
+require_text "$ambiguity" 'Implementation may define name resolution only as specified by accepted ADR-0026'
 
 require_text "$milestone" 'M0016'
+require_text "$milestone" '\[x\] Name resolution source of truth is accepted'
 require_text "$milestone" '\[ \] Approved names resolve'
 require_text "$milestone" '\[ \] Unresolved names diagnose'
 require_text "$milestone" '\[x\] Ambiguous resolution cases are not guessed'
 
 require_text "$spec" '^## ADR-0025: Module Package And Visibility Model$'
 require_text "$spec" 'later dependency and name resolution rules'
+require_text "$spec" '^## ADR-0026: Name Resolution Policy$'
 
 require_absent_path crates/newlang/src/name_resolution.rs
 require_absent_path crates/newlang/src/resolution.rs
@@ -69,4 +72,4 @@ require_absent_text crates/newlang/src/lib.rs 'pub mod name_resolution|pub mod r
 require_absent_text crates/newlang/src/symbol.rs 'ImportResolver|VisibilityEnforcement|LookupDiagnostic|ScopeStack|ResolutionPolicy'
 require_absent_text crates/newlang/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
 
-echo "m0016-blocked: name resolution policy ambiguity validation passed"
+echo "m0016-authority: name resolution policy authority validation passed"
