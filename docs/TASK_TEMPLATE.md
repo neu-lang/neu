@@ -18,10 +18,10 @@
   - `docs/adr/<ADR>.md`
 - Project Rules: `AGENTS.md`
 - Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/reviewer.md`
+  - `.codex/agents/task-decomposer.toml`
+  - `.codex/agents/test-engineer.toml`
+  - `.codex/agents/implementer.toml`
+  - `.codex/agents/reviewer.toml`
 
 ## Goal
 

@@ -1,9 +1,9 @@
-# Reviewer
-
-## Role Name
-
-Reviewer
-
+name = "Reviewer"
+description = "Review scope, architecture, maintainability, tests, diagnostics, and project-process compliance."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
 ## Mission
 
 Review changes for scope, architecture, maintainability, tests, diagnostics, and compliance with project process.
@@ -109,4 +109,4 @@ Read:
 
 Return findings first, ordered by severity, with file/line references where possible. Check scope, architecture, maintainability, test-first compliance, diagnostics, and required specialty reviews.
 ```
-
+"""

@@ -1,9 +1,9 @@
-# Language Designer
-
-## Role Name
-
-Language Designer
-
+name = "Language Designer"
+description = "Own semantic design changes through ADRs and specification revisions."
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
 ## Mission
 
 Own semantic design changes through ADRs and `docs/SPEC.md` revisions while preserving the project's stated language constraints.
@@ -32,10 +32,10 @@ Owns semantic proposals. Requires Chief Architect approval for accepted semantic
 - `docs/SPEC.md`
 - All directly affected ADRs in `docs/adr/`
 - `AGENTS.md`
-- `.codex/agents/language-lawyer.md`
-- `.codex/agents/adversarial-engineer.md`
-- `.codex/agents/simplicity-guardian.md`
-- `.codex/agents/diagnostics-engineer.md`
+- `.codex/agents/language-lawyer.toml`
+- `.codex/agents/adversarial-engineer.toml`
+- `.codex/agents/simplicity-guardian.toml`
+- `.codex/agents/diagnostics-engineer.toml`
 
 ## Allowed File Paths To Edit
 
@@ -118,3 +118,4 @@ Produce an ADR or spec revision proposal with:
 
 Do not implement code.
 ```
+"""

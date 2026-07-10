@@ -1,9 +1,9 @@
-# Implementer
-
-## Role Name
-
-Implementer
-
+name = "Implementer"
+description = "Implement accepted compiler and tooling tasks in Rust after tests exist."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = """
 ## Mission
 
 Implement accepted compiler and tooling tasks in Rust after tests exist, staying strictly within task scope and source-of-truth semantics.
@@ -32,7 +32,7 @@ May edit implementation files for accepted tasks after tests exist. Blocked by s
 - `docs/SPEC.md`
 - Relevant `docs/adr/*.md`
 - `AGENTS.md`
-- `.codex/agents/implementer.md`
+- `.codex/agents/implementer.toml`
 - Accepted task file
 - Tests written by Test Engineer
 - Relevant implementation files
@@ -111,3 +111,4 @@ Read:
 
 Implement only the accepted task. Do not weaken or delete tests. If behavior is ambiguous, file an ambiguity report and stop.
 ```
+"""

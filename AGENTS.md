@@ -8,19 +8,19 @@ No agent may invent language semantics. `docs/SPEC.md` and `docs/adr/` are the s
 
 | Agent | File | Primary ownership |
 | --- | --- | --- |
-| Chief Architect | `.codex/agents/chief-architect.md` | Final architecture authority and conflict resolution |
-| Language Designer | `.codex/agents/language-designer.md` | Semantic design changes and ADR drafting |
-| Language Lawyer | `.codex/agents/language-lawyer.md` | Precise interpretation of accepted semantics |
-| Roadmap Planner | `.codex/agents/roadmap-planner.md` | Milestone sequencing |
-| Task Decomposer | `.codex/agents/task-decomposer.md` | Task breakdown and dependency mapping |
-| Implementer | `.codex/agents/implementer.md` | Compiler and tooling implementation after tests exist |
-| Test Engineer | `.codex/agents/test-engineer.md` | Tests before implementation |
-| Adversarial Engineer | `.codex/agents/adversarial-engineer.md` | Attempts to break soundness, safety, and diagnostics |
-| Reviewer | `.codex/agents/reviewer.md` | Scope, architecture, maintainability, and review sign-off |
-| Spec Compliance Auditor | `.codex/agents/spec-compliance-auditor.md` | Compliance against `docs/SPEC.md` and accepted ADRs |
-| Simplicity Guardian | `.codex/agents/simplicity-guardian.md` | Rejection of unnecessary abstraction and accidental complexity |
-| Diagnostics Engineer | `.codex/agents/diagnostics-engineer.md` | Diagnostic quality, spans, messages, and explainability |
-| Build Engineer | `.codex/agents/build-engineer.md` | Build, CI, target packs, and release mechanics |
+| Chief Architect | `.codex/agents/chief-architect.toml` | Final architecture authority and conflict resolution |
+| Language Designer | `.codex/agents/language-designer.toml` | Semantic design changes and ADR drafting |
+| Language Lawyer | `.codex/agents/language-lawyer.toml` | Precise interpretation of accepted semantics |
+| Roadmap Planner | `.codex/agents/roadmap-planner.toml` | Milestone sequencing |
+| Task Decomposer | `.codex/agents/task-decomposer.toml` | Task breakdown and dependency mapping |
+| Implementer | `.codex/agents/implementer.toml` | Compiler and tooling implementation after tests exist |
+| Test Engineer | `.codex/agents/test-engineer.toml` | Tests before implementation |
+| Adversarial Engineer | `.codex/agents/adversarial-engineer.toml` | Attempts to break soundness, safety, and diagnostics |
+| Reviewer | `.codex/agents/reviewer.toml` | Scope, architecture, maintainability, and review sign-off |
+| Spec Compliance Auditor | `.codex/agents/spec-compliance-auditor.toml` | Compliance against `docs/SPEC.md` and accepted ADRs |
+| Simplicity Guardian | `.codex/agents/simplicity-guardian.toml` | Rejection of unnecessary abstraction and accidental complexity |
+| Diagnostics Engineer | `.codex/agents/diagnostics-engineer.toml` | Diagnostic quality, spans, messages, and explainability |
+| Build Engineer | `.codex/agents/build-engineer.toml` | Build, CI, target packs, and release mechanics |
 
 ## Authority Hierarchy
 
@@ -116,7 +116,7 @@ Build Engineer:
 
 All agents may:
 
-- Read `docs/SPEC.md`, `docs/adr/`, `AGENTS.md`, relevant `.codex/agents/*.md`, roadmap files, task files, tests, and implementation files needed for their role.
+- Read `docs/SPEC.md`, `docs/adr/`, `AGENTS.md`, relevant `.codex/agents/*.toml`, roadmap files, task files, tests, and implementation files needed for their role.
 - Produce written findings, ambiguity reports, task reports, test plans, or review comments.
 - Propose changes within their allowed file paths.
 - Request escalation when required inputs are missing.
@@ -320,6 +320,7 @@ Minimum CI gates for implementation changes:
 - Negative tests for rejected programs.
 - Build smoke test for the compiler.
 - Cross-target smoke test when target packs, code generation, ABI, layout, or build tooling is touched.
+- `sh docs/tests/agent-configs.sh` when agent definitions or Codex agent configuration changes.
 
 CI may not be bypassed because tests expose an implementation defect. A failing test that contradicts `docs/SPEC.md` must be resolved by Test Engineer and Spec Compliance Auditor, not silently weakened.
 
