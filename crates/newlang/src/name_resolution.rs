@@ -113,9 +113,53 @@ impl DeclarationIndex {
             .and_then(|index| self.declarations.get(*index))
     }
 
+    pub fn lookup_top_level(&self, lookup: TopLevelLookup) -> TopLevelLookupResult {
+        let key = DeclarationKey::new(lookup.module, lookup.package, lookup.name, lookup.kind);
+        match self.get(&key) {
+            Some(declaration) => TopLevelLookupResult::Found(declaration.clone()),
+            None => TopLevelLookupResult::Unresolved(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::UnresolvedName,
+                lookup.primary_span,
+            )),
+        }
+    }
+
     pub fn declarations(&self) -> &[DeclaredName] {
         &self.declarations
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TopLevelLookup {
+    module: ModuleName,
+    package: PackageNamespace,
+    name: SymbolId,
+    kind: DeclarationKind,
+    primary_span: ByteSpan,
+}
+
+impl TopLevelLookup {
+    pub fn new(
+        module: ModuleName,
+        package: PackageNamespace,
+        name: SymbolId,
+        kind: DeclarationKind,
+        primary_span: ByteSpan,
+    ) -> Self {
+        Self {
+            module,
+            package,
+            name,
+            kind,
+            primary_span,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TopLevelLookupResult {
+    Found(DeclaredName),
+    Unresolved(ResolutionDiagnostic),
 }
 
 #[derive(Debug)]

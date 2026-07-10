@@ -3,7 +3,7 @@ use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
     build_declaration_index, DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind,
     DeclaredName, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
-    ResolutionTable, ResolvedName,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -334,4 +334,91 @@ fn duplicate_declaration_diagnostics_do_not_replace_existing_declaration() {
         built.diagnostics()[0].primary_span(),
         second.declaration_names[0].name_span
     );
+}
+
+#[test]
+fn top_level_lookup_finds_exact_declaration_key() {
+    let module = ModuleName::parse("demo").unwrap();
+    let package = PackageNamespace::parse("pkg").unwrap();
+    let name = SymbolId::from_raw(1);
+    let declaration = DeclaredName::new(
+        DeclarationKey::new(
+            module.clone(),
+            package.clone(),
+            name,
+            DeclarationKind::Function,
+        ),
+        AstNodeId::from_raw(9),
+    );
+    let mut index = DeclarationIndex::new();
+    index.insert(declaration.clone());
+    let span = ByteSpan::new(SourceFileId::from_raw(30), 4, 8).unwrap();
+
+    let result = index.lookup_top_level(TopLevelLookup::new(
+        module,
+        package,
+        name,
+        DeclarationKind::Function,
+        span,
+    ));
+
+    assert_eq!(result, TopLevelLookupResult::Found(declaration));
+}
+
+#[test]
+fn top_level_lookup_requires_exact_package_and_kind() {
+    let module = ModuleName::parse("demo").unwrap();
+    let name = SymbolId::from_raw(1);
+    let declaration = DeclaredName::new(
+        DeclarationKey::new(
+            module.clone(),
+            PackageNamespace::parse("one").unwrap(),
+            name,
+            DeclarationKind::Function,
+        ),
+        AstNodeId::from_raw(9),
+    );
+    let mut index = DeclarationIndex::new();
+    index.insert(declaration);
+    let span = ByteSpan::new(SourceFileId::from_raw(31), 0, 4).unwrap();
+
+    let wrong_package = index.lookup_top_level(TopLevelLookup::new(
+        module.clone(),
+        PackageNamespace::parse("two").unwrap(),
+        name,
+        DeclarationKind::Function,
+        span,
+    ));
+    let wrong_kind = index.lookup_top_level(TopLevelLookup::new(
+        module,
+        PackageNamespace::parse("one").unwrap(),
+        name,
+        DeclarationKind::Type,
+        span,
+    ));
+
+    assert!(matches!(wrong_package, TopLevelLookupResult::Unresolved(_)));
+    assert!(matches!(wrong_kind, TopLevelLookupResult::Unresolved(_)));
+}
+
+#[test]
+fn missing_top_level_lookup_returns_unresolved_name_diagnostic() {
+    let index = DeclarationIndex::new();
+    let span = ByteSpan::new(SourceFileId::from_raw(32), 12, 18).unwrap();
+
+    let result = index.lookup_top_level(TopLevelLookup::new(
+        ModuleName::parse("demo").unwrap(),
+        PackageNamespace::root(),
+        SymbolId::from_raw(99),
+        DeclarationKind::Function,
+        span,
+    ));
+
+    match result {
+        TopLevelLookupResult::Unresolved(diagnostic) => {
+            assert_eq!(diagnostic.kind(), ResolutionDiagnosticKind::UnresolvedName);
+            assert_eq!(diagnostic.primary_span(), span);
+        }
+        TopLevelLookupResult::Found(_) => panic!("missing top-level lookup should be unresolved"),
+    }
 }
