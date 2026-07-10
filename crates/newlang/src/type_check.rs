@@ -480,6 +480,41 @@ pub struct GenericParameterTypeRecord {
     ty: TypeId,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CapabilityBoundRecord {
+    parameter: AstNodeId,
+    ty: TypeId,
+    bound: AstNodeId,
+    symbol: SymbolId,
+}
+
+impl CapabilityBoundRecord {
+    pub fn new(parameter: AstNodeId, ty: TypeId, bound: AstNodeId, symbol: SymbolId) -> Self {
+        Self {
+            parameter,
+            ty,
+            bound,
+            symbol,
+        }
+    }
+
+    pub fn parameter(self) -> AstNodeId {
+        self.parameter
+    }
+
+    pub fn ty(self) -> TypeId {
+        self.ty
+    }
+
+    pub fn bound(self) -> AstNodeId {
+        self.bound
+    }
+
+    pub fn symbol(self) -> SymbolId {
+        self.symbol
+    }
+}
+
 impl GenericParameterTypeRecord {
     pub fn new(parameter: AstNodeId, ty: TypeId) -> Self {
         Self { parameter, ty }
@@ -524,6 +559,34 @@ pub fn build_m0020_generic_parameter_types(
             GenericParameterTypeRecord::new(parameter.parameter, ty)
         })
         .collect()
+}
+
+pub fn build_m0020_capability_bound_records(
+    parameters: &[ParsedGenericParameter],
+    parameter_types: &[GenericParameterTypeRecord],
+    symbols: &mut SymbolInterner,
+) -> Vec<CapabilityBoundRecord> {
+    let mut records = Vec::new();
+
+    for parameter in parameters {
+        let Some(parameter_type) = parameter_types
+            .iter()
+            .find(|record| record.parameter() == parameter.parameter)
+        else {
+            continue;
+        };
+
+        for bound in &parameter.capability_bounds {
+            records.push(CapabilityBoundRecord::new(
+                parameter.parameter,
+                parameter_type.ty(),
+                bound.bound,
+                symbols.intern(&bound.name),
+            ));
+        }
+    }
+
+    records
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

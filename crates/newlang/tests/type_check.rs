@@ -13,10 +13,11 @@ use newlang::{
     source::SourceFileId,
     symbol::{SymbolId, SymbolInterner},
     type_check::{
-        build_m0020_generic_parameter_types, known_local_symbol_types, recognize_m0019_null_tests,
-        record_m0019_branch_refinements, record_m0019_refined_expression_types,
-        select_m0019_eligible_null_tests, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
+        build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
+        known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
+        record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
+        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
+        type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_parser_literals, type_primitive_local_declarations,
@@ -303,6 +304,48 @@ fn m0020_generic_parameter_types_preserve_parameter_identity_and_source_order() 
     assert!(empty.is_empty());
     assert_eq!(types.records().len(), 3);
     assert_eq!(symbols.symbols(), &["T".to_owned(), "U".to_owned()]);
+}
+
+#[test]
+fn m0020_capability_bound_records_preserve_occurrences_without_interpretation() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(501),
+        "struct Pair<T: Send & Share, U: Send> {}",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let parameter_types =
+        build_m0020_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds = build_m0020_capability_bound_records(
+        &parsed.generic_parameters,
+        &parameter_types,
+        &mut symbols,
+    );
+
+    assert_eq!(bounds.len(), 3);
+    assert_eq!(
+        bounds[0].parameter(),
+        parsed.generic_parameters[0].parameter
+    );
+    assert_eq!(bounds[0].ty(), parameter_types[0].ty());
+    assert_eq!(
+        bounds[0].bound(),
+        parsed.generic_parameters[0].capability_bounds[0].bound
+    );
+    assert_eq!(symbols.resolve(bounds[0].symbol()), Some("Send"));
+    assert_eq!(symbols.resolve(bounds[1].symbol()), Some("Share"));
+    assert_eq!(
+        bounds[2].parameter(),
+        parsed.generic_parameters[1].parameter
+    );
+    assert_eq!(bounds[2].ty(), parameter_types[1].ty());
+    assert_eq!(bounds[2].symbol(), bounds[0].symbol());
+
+    let missing =
+        build_m0020_capability_bound_records(&parsed.generic_parameters, &[], &mut symbols);
+    assert!(missing.is_empty());
 }
 
 #[test]
