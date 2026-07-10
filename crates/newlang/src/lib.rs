@@ -8,3 +8,4 @@ pub mod name_resolution;
 pub mod parser;
 pub mod source;
 pub mod symbol;
+pub mod types;

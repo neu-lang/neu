@@ -83,7 +83,6 @@ ADR-0010 selects nominal types and interfaces or protocols. ADR-0006 defines nul
 
 ## Completion Checklist
 
-- [ ] Type identity is represented.
+- [x] Type identity is represented.
 - [ ] Nullable types are represented.
 - [ ] Unsupported type forms are blocked.
-
