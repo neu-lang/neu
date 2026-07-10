@@ -114,6 +114,7 @@ pub struct ParsedFunctionDeclaration {
 pub struct ParsedReturnStatement {
     pub statement: AstNodeId,
     pub function: AstNodeId,
+    pub block: AstNodeId,
     pub value: Option<AstNodeId>,
 }
 
@@ -362,6 +363,7 @@ struct Parser<'source> {
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
     qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
+    block_return_indices: Vec<Vec<usize>>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
     current_function: Option<AstNodeId>,
@@ -387,6 +389,7 @@ impl<'source> Parser<'source> {
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
             qualified_case_patterns: Vec::new(),
+            block_return_indices: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
@@ -899,6 +902,7 @@ impl<'source> Parser<'source> {
             .span
             .start();
         self.advance();
+        self.block_return_indices.push(Vec::new());
 
         while !self.is_eof() {
             match self.current_kind() {
@@ -906,7 +910,14 @@ impl<'source> Parser<'source> {
                     let end = self.current().expect("right brace exists").span.end();
                     self.advance();
                     let span = self.span(start, end);
-                    self.arena.add_block(span);
+                    let block = self.arena.add_block(span);
+                    let return_indices = self
+                        .block_return_indices
+                        .pop()
+                        .expect("each parsed body block has a return frame");
+                    for return_index in return_indices {
+                        self.return_statements[return_index].block = block;
+                    }
                     return Some(span);
                 }
                 Some(TokenKind::KwConst | TokenKind::KwVar | TokenKind::KwReturn) => {
@@ -1006,6 +1017,9 @@ impl<'source> Parser<'source> {
         }
 
         self.diagnostic(DiagnosticKind::MalformedBlock, self.span_at(start));
+        self.block_return_indices
+            .pop()
+            .expect("each parsed body block has a return frame");
         None
     }
 
@@ -1136,11 +1150,16 @@ impl<'source> Parser<'source> {
             self.advance();
             let statement = self.arena.add_return_statement(self.span(start, end));
             if let Some(function) = self.current_function {
+                let return_index = self.return_statements.len();
                 self.return_statements.push(ParsedReturnStatement {
                     statement,
                     function,
+                    block: AstNodeId::from_raw(usize::MAX),
                     value,
                 });
+                if let Some(indices) = self.block_return_indices.last_mut() {
+                    indices.push(return_index);
+                }
             }
         } else {
             self.diagnostic_current_or_span(

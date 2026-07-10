@@ -1261,3 +1261,22 @@ fn m0028_executable_metadata_excludes_malformed_function_and_call_records() {
     assert!(output.function_declarations.len() <= 1);
     assert!(output.call_expressions.is_empty());
 }
+
+#[test]
+fn m0028_records_return_statement_enclosing_blocks_in_source_order() {
+    let output = parse_source(
+        SourceFileId::from_raw(111),
+        "fun main(): Int { return 1; if (true) { return 2; }; return 3; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    let function = &output.function_declarations[0];
+    let function_body = function.body.unwrap();
+    let branch_body = output.if_expressions[0].then_block;
+
+    assert_eq!(output.return_statements.len(), 3);
+    assert_eq!(output.return_statements[0].block, function_body);
+    assert_eq!(output.return_statements[1].block, branch_body);
+    assert_eq!(output.return_statements[2].block, function_body);
+}
