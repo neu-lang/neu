@@ -1,0 +1,90 @@
+# Soundness Report: M0018-007
+
+## Metadata
+
+- Task ID: `M0018-007`
+- Milestone: `M0018`
+- Filed By: `Adversarial Engineer`
+- Date: `2026-07-10`
+- Decision: `pass`
+
+## Inputs Read
+
+- Task file: `docs/tasks/M0018-007-literal-expression-typing.md`
+- Milestone file: `docs/milestones/M0018-type-checking-core.md`
+- Specification: `docs/SPEC.md`
+- ADRs:
+  - `docs/adr/ADR-0027-type-checking-core.md`
+  - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
+- Changed files:
+  - `crates/newlang/src/type_check.rs`
+  - `crates/newlang/tests/type_check.rs`
+  - `docs/tasks/M0018-007-literal-expression-typing.md`
+- Ordinary test results:
+  - `cargo fmt --all --check`: pass
+  - `cargo test --workspace --all-targets`: pass, 133 tests
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass
+  - `sh docs/tests/m0018-type-checking-core-accepted.sh`: pass
+  - `sh docs/tests/m0002-workspace-ci.sh`: pass
+
+## Safety Invariants Checked
+
+- [x] Ownership cannot be bypassed.
+- [x] Moved values cannot be reused.
+- [x] Shared and exclusive borrows cannot conflict.
+- [x] Borrowed data cannot outlive its owner.
+- [x] Nullability refinements cannot be used after invalidation.
+- [x] Thread send/share capabilities are enforced.
+- [x] Coroutine scopes cannot outlive allowed ownership or borrow lifetimes.
+- [x] Borrows across suspension are rejected unless proven safe by accepted semantics.
+- [x] Unsafe and FFI boundaries do not weaken safe-code guarantees.
+- [x] Diagnostics do not hide or misstate safety failures.
+
+## Attacks Attempted
+
+Attack: Treat accepted integer literals as a concrete width, signedness, layout, or ABI type.
+Expected result: Literal typing maps accepted integer literals only to the bootstrap `Int` type-checking identity.
+Actual result: `LiteralKind::AcceptedInteger` maps to `PrimitiveType::Int`; no width, signedness, layout, ABI, or backend metadata was added.
+Source of truth: `docs/adr/ADR-0027-type-checking-core.md` Primitive Type Identity and Included Expression Forms sections.
+Outcome: pass
+
+Attack: Use literal typing to infer unrelated AST nodes.
+Expected result: Only provided `LiteralExpressionInput` records receive expression type entries.
+Actual result: Tests assert missing expression lookups return `None`.
+Source of truth: `docs/adr/ADR-0027-type-checking-core.md` Typed Output Shape section.
+Outcome: pass
+
+Attack: Smuggle assignment compatibility or type mismatch checking into the literal pass.
+Expected result: Literal typing does not create assignment checks, declaration signatures, or mismatch diagnostics.
+Actual result: Tests assert declaration signature and assignment check side tables remain empty for literal typing.
+Source of truth: `docs/tasks/M0018-007-literal-expression-typing.md` Out Of Scope.
+Outcome: pass
+
+Attack: Enable direct calls, function type application, ownership, borrow checking, HIR, MIR, or backend behavior.
+Expected result: No implementation entry points or data structures for those deferred behaviors are introduced.
+Actual result: Changes are limited to classified literal input records and primitive expression type entries.
+Source of truth: `docs/adr/ADR-0027-type-checking-core.md` Explicit Deferrals.
+Outcome: pass
+
+## Adversarial Tests
+
+- Tests added:
+  - No separate adversarial Rust tests were needed beyond the literal typing unit tests.
+- Tests run:
+  - `docs/scripts/adversarial-check.sh docs/tasks/M0018-007-literal-expression-typing.md`
+  - `cargo test --workspace --all-targets`
+  - `sh docs/tests/m0018-type-checking-core-accepted.sh`
+- Result:
+  - pass
+
+## Findings
+
+No findings.
+
+## Ambiguities
+
+No new ambiguity found. Parser integration and assignment compatibility remain later M0018 tasks.
+
+## Decision
+
+Pass.

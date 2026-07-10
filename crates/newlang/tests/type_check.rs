@@ -1,10 +1,11 @@
 use newlang::{
     ast::AstNodeId,
     type_check::{
-        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType,
-        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
+        type_literal_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
+        ExpressionType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport,
     },
-    types::TypeId,
+    types::{PrimitiveType, TypeId, TypeKind},
 };
 
 #[test]
@@ -101,4 +102,67 @@ fn type_check_report_records_assignment_checks_by_statement_node() {
         Some(accepted)
     );
     assert_eq!(report.assignment_check(AstNodeId::from_raw(31)), None);
+}
+
+#[test]
+fn literal_expression_typing_records_adr0027_primitive_types() {
+    let inputs = [
+        LiteralExpressionInput::new(AstNodeId::from_raw(40), LiteralKind::BoolTrue),
+        LiteralExpressionInput::new(AstNodeId::from_raw(41), LiteralKind::BoolFalse),
+        LiteralExpressionInput::new(AstNodeId::from_raw(42), LiteralKind::AcceptedInteger),
+        LiteralExpressionInput::new(AstNodeId::from_raw(43), LiteralKind::AcceptedString),
+        LiteralExpressionInput::new(AstNodeId::from_raw(44), LiteralKind::Null),
+    ];
+
+    let (arena, report) = type_literal_expressions(&inputs);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(
+        report.expression_types(),
+        &[
+            ExpressionType::new(AstNodeId::from_raw(40), TypeId::from_raw(0)),
+            ExpressionType::new(AstNodeId::from_raw(41), TypeId::from_raw(0)),
+            ExpressionType::new(AstNodeId::from_raw(42), TypeId::from_raw(1)),
+            ExpressionType::new(AstNodeId::from_raw(43), TypeId::from_raw(2)),
+            ExpressionType::new(AstNodeId::from_raw(44), TypeId::from_raw(4)),
+        ]
+    );
+
+    assert_eq!(arena.records().len(), 5);
+    assert_eq!(
+        arena.get(TypeId::from_raw(0)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Bool)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(1)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Int)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(2)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::String)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(3)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Unit)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(4)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Null)
+    );
+}
+
+#[test]
+fn literal_expression_typing_does_not_synthesize_missing_expression_types() {
+    let (_arena, report) = type_literal_expressions(&[LiteralExpressionInput::new(
+        AstNodeId::from_raw(50),
+        LiteralKind::AcceptedString,
+    )]);
+
+    assert_eq!(
+        report.expression_type(AstNodeId::from_raw(50)),
+        Some(TypeId::from_raw(2))
+    );
+    assert_eq!(report.expression_type(AstNodeId::from_raw(51)), None);
 }

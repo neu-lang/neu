@@ -1,4 +1,7 @@
-use crate::{ast::AstNodeId, types::TypeId};
+use crate::{
+    ast::AstNodeId,
+    types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AmbiguousTypeRule {
@@ -112,6 +115,35 @@ impl AssignmentCheck {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LiteralKind {
+    BoolTrue,
+    BoolFalse,
+    AcceptedInteger,
+    AcceptedString,
+    Null,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LiteralExpressionInput {
+    expression: AstNodeId,
+    kind: LiteralKind,
+}
+
+impl LiteralExpressionInput {
+    pub fn new(expression: AstNodeId, kind: LiteralKind) -> Self {
+        Self { expression, kind }
+    }
+
+    pub fn expression(self) -> AstNodeId {
+        self.expression
+    }
+
+    pub fn kind(self) -> LiteralKind {
+        self.kind
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeCheckReport {
     expression_types: Vec<ExpressionType>,
@@ -195,4 +227,49 @@ impl Default for TypeCheckReport {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PrimitiveTypeIds {
+    bool_id: TypeId,
+    int_id: TypeId,
+    string_id: TypeId,
+    unit_id: TypeId,
+    null_id: TypeId,
+}
+
+impl PrimitiveTypeIds {
+    fn insert_into(arena: &mut TypeArena) -> Self {
+        Self {
+            bool_id: arena.insert(TypeRecord::primitive(PrimitiveType::Bool)),
+            int_id: arena.insert(TypeRecord::primitive(PrimitiveType::Int)),
+            string_id: arena.insert(TypeRecord::primitive(PrimitiveType::String)),
+            unit_id: arena.insert(TypeRecord::primitive(PrimitiveType::Unit)),
+            null_id: arena.insert(TypeRecord::primitive(PrimitiveType::Null)),
+        }
+    }
+
+    fn type_for_literal(self, kind: LiteralKind) -> TypeId {
+        match kind {
+            LiteralKind::BoolTrue | LiteralKind::BoolFalse => self.bool_id,
+            LiteralKind::AcceptedInteger => self.int_id,
+            LiteralKind::AcceptedString => self.string_id,
+            LiteralKind::Null => self.null_id,
+        }
+    }
+}
+
+pub fn type_literal_expressions(inputs: &[LiteralExpressionInput]) -> (TypeArena, TypeCheckReport) {
+    let mut arena = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut arena);
+    let mut report = TypeCheckReport::new();
+
+    for input in inputs {
+        report.record_expression_type(ExpressionType::new(
+            input.expression(),
+            primitives.type_for_literal(input.kind()),
+        ));
+    }
+
+    (arena, report)
 }
