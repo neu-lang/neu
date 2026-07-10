@@ -1,13 +1,13 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    bind_local_name_references, bind_package_qualified_type_references,
-    bind_unqualified_function_references, bind_unqualified_type_references,
-    build_declaration_index, build_local_binding_index, build_local_scope_tree,
-    build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
-    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
-    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
-    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    bind_accepted_name_references, bind_local_name_references,
+    bind_package_qualified_type_references, bind_unqualified_function_references,
+    bind_unqualified_type_references, build_declaration_index, build_local_binding_index,
+    build_local_scope_tree, build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert,
+    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
+    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult,
+    LocalScopeId, LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
     ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
@@ -1477,4 +1477,140 @@ fn package_qualified_type_reference_binding_rejects_missing_and_function_candida
         bound.diagnostics()[0].primary_span(),
         parsed.type_name_references[0].name_span
     );
+}
+
+#[test]
+fn accepted_name_reference_binding_combines_expression_and_type_bindings() {
+    let box_file = SourceFileId::from_raw(120);
+    let run_file = SourceFileId::from_raw(121);
+    let box_source = parse_source(box_file, "struct Box {}");
+    let run = parse_source(
+        run_file,
+        "struct Item {} fun helper(); fun run(): lib.Box { val local: Item = helper(); local; }",
+    );
+    assert!(box_source.diagnostics.is_empty());
+    assert!(run.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (box_file, PackageNamespace::parse("lib").unwrap()),
+            (run_file, PackageNamespace::parse("app").unwrap()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = box_source.declaration_names.clone();
+    declarations.extend(run.declaration_names.clone());
+    let scopes = build_local_scope_tree(&run.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &declarations, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &run.arena,
+        &run.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_accepted_name_references(
+        &metadata,
+        &run.arena,
+        &run.name_references,
+        &run.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.inserts().len(), 4);
+    assert_eq!(bound.table().resolved_names().len(), 4);
+    let resolved: Vec<_> = bound
+        .table()
+        .resolved_names()
+        .iter()
+        .map(|resolved| interner.resolve(resolved.symbol()).unwrap())
+        .collect();
+    assert_eq!(resolved, ["helper", "local", "Item", "Box"]);
+}
+
+#[test]
+fn accepted_name_reference_binding_does_not_duplicate_package_qualified_type_diagnostics() {
+    let file = SourceFileId::from_raw(122);
+    let parsed = parse_source(file, "fun run(): missing.Box;");
+    assert!(parsed.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::root())],
+    )
+    .unwrap();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_accepted_name_references(
+        &metadata,
+        &parsed.arena,
+        &parsed.name_references,
+        &parsed.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+    assert_eq!(
+        bound.diagnostics()[0].primary_span(),
+        parsed.type_name_references[0].name_span
+    );
+}
+
+#[test]
+fn accepted_name_reference_binding_collects_expression_and_type_unresolved_diagnostics() {
+    let file = SourceFileId::from_raw(123);
+    let parsed = parse_source(file, "fun run(): Missing { missing; }");
+    assert!(parsed.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::root())],
+    )
+    .unwrap();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_accepted_name_references(
+        &metadata,
+        &parsed.arena,
+        &parsed.name_references,
+        &parsed.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert_eq!(bound.diagnostics().len(), 2);
+    assert!(bound
+        .diagnostics()
+        .iter()
+        .all(|diagnostic| diagnostic.kind() == ResolutionDiagnosticKind::UnresolvedName));
 }

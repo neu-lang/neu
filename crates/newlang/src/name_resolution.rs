@@ -714,6 +714,120 @@ pub fn bind_package_qualified_type_references(
     }
 }
 
+#[derive(Debug)]
+pub struct AcceptedNameReferenceBind {
+    table: ResolutionTable,
+    inserts: Vec<ResolutionInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
+}
+
+impl AcceptedNameReferenceBind {
+    pub fn table(&self) -> &ResolutionTable {
+        &self.table
+    }
+
+    pub fn inserts(&self) -> &[ResolutionInsert] {
+        &self.inserts
+    }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn bind_accepted_name_references(
+    metadata: &ModuleMetadata,
+    arena: &AstArena,
+    name_references: &[ParsedNameReference],
+    type_name_references: &[ParsedTypeNameReference],
+    scopes: &LocalScopeTree,
+    local_bindings: &LocalBindingIndex,
+    declarations: &DeclarationIndex,
+    interner: &mut SymbolInterner,
+) -> AcceptedNameReferenceBind {
+    let mut table = ResolutionTable::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    let function_bind = bind_unqualified_function_references(
+        metadata,
+        arena,
+        name_references,
+        scopes,
+        local_bindings,
+        declarations,
+        interner,
+    );
+    merge_resolution_bind(
+        &mut table,
+        &mut inserts,
+        &mut diagnostics,
+        function_bind.table(),
+        function_bind.diagnostics(),
+    );
+
+    let mut unqualified_type_references = Vec::new();
+    let mut package_qualified_type_references = Vec::new();
+    for reference in type_name_references {
+        if reference.name.contains('.') {
+            package_qualified_type_references.push(reference.clone());
+        } else {
+            unqualified_type_references.push(reference.clone());
+        }
+    }
+
+    let type_bind = bind_unqualified_type_references(
+        metadata,
+        arena,
+        &unqualified_type_references,
+        scopes,
+        local_bindings,
+        declarations,
+        interner,
+    );
+    merge_resolution_bind(
+        &mut table,
+        &mut inserts,
+        &mut diagnostics,
+        type_bind.table(),
+        type_bind.diagnostics(),
+    );
+
+    let package_type_bind = bind_package_qualified_type_references(
+        metadata,
+        &package_qualified_type_references,
+        declarations,
+        interner,
+    );
+    merge_resolution_bind(
+        &mut table,
+        &mut inserts,
+        &mut diagnostics,
+        package_type_bind.table(),
+        package_type_bind.diagnostics(),
+    );
+
+    AcceptedNameReferenceBind {
+        table,
+        inserts,
+        diagnostics,
+    }
+}
+
+fn merge_resolution_bind(
+    table: &mut ResolutionTable,
+    inserts: &mut Vec<ResolutionInsert>,
+    diagnostics: &mut Vec<ResolutionDiagnostic>,
+    source_table: &ResolutionTable,
+    source_diagnostics: &[ResolutionDiagnostic],
+) {
+    for resolved_name in source_table.resolved_names() {
+        inserts.push(table.insert(*resolved_name));
+    }
+    diagnostics.extend_from_slice(source_diagnostics);
+}
+
 fn local_binding_is_visible(
     arena: &AstArena,
     binding: &LocalBinding,
