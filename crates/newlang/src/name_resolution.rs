@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
-use crate::parser::{ParsedDeclarationName, ParsedLocalBindingName, ParsedNameReference};
+use crate::parser::{
+    ParsedDeclarationName, ParsedLocalBindingName, ParsedNameReference, ParsedTypeNameReference,
+};
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
 
@@ -545,6 +547,95 @@ pub fn bind_unqualified_function_references(
     }
 
     FunctionReferenceBind {
+        table,
+        inserts,
+        diagnostics,
+    }
+}
+
+#[derive(Debug)]
+pub struct TypeReferenceBind {
+    table: ResolutionTable,
+    inserts: Vec<ResolutionInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
+}
+
+impl TypeReferenceBind {
+    pub fn table(&self) -> &ResolutionTable {
+        &self.table
+    }
+
+    pub fn inserts(&self) -> &[ResolutionInsert] {
+        &self.inserts
+    }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn bind_unqualified_type_references(
+    metadata: &ModuleMetadata,
+    arena: &AstArena,
+    references: &[ParsedTypeNameReference],
+    scopes: &LocalScopeTree,
+    local_bindings: &LocalBindingIndex,
+    declarations: &DeclarationIndex,
+    interner: &mut SymbolInterner,
+) -> TypeReferenceBind {
+    let mut table = ResolutionTable::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for reference in references {
+        let name = interner.intern(&reference.name);
+        let local_result = containing_block_scope(arena, scopes, reference.reference)
+            .map(|scope| {
+                local_bindings.lookup_local(
+                    scopes,
+                    arena,
+                    LocalNameLookup::new(scope, name, reference.name_span),
+                )
+            })
+            .unwrap_or_else(|| {
+                LocalNameLookupResult::Unresolved(ResolutionDiagnostic::new(
+                    ResolutionDiagnosticKind::UnresolvedName,
+                    reference.name_span,
+                ))
+            });
+
+        if let LocalNameLookupResult::Found(binding) = local_result {
+            let insert = table.insert(ResolvedName::new(reference.reference, binding.key().name()));
+            inserts.push(insert);
+            continue;
+        }
+
+        let package = metadata
+            .packages()
+            .iter()
+            .find(|package| package.source_file() == reference.name_span.file())
+            .map(|package| package.namespace().clone())
+            .unwrap_or_else(PackageNamespace::root);
+
+        match declarations.lookup_top_level(TopLevelLookup::new(
+            metadata.name().clone(),
+            package,
+            name,
+            DeclarationKind::Type,
+            reference.name_span,
+        )) {
+            TopLevelLookupResult::Found(declaration) => {
+                let insert = table.insert(ResolvedName::new(
+                    reference.reference,
+                    declaration.key().name(),
+                ));
+                inserts.push(insert);
+            }
+            TopLevelLookupResult::Unresolved(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+
+    TypeReferenceBind {
         table,
         inserts,
         diagnostics,

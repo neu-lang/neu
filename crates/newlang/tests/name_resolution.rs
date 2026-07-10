@@ -1,13 +1,13 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    bind_local_name_references, bind_unqualified_function_references, build_declaration_index,
-    build_local_binding_index, build_local_scope_tree, build_scoped_local_binding_index,
-    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
-    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
-    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
-    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
-    TopLevelLookupResult,
+    bind_local_name_references, bind_unqualified_function_references,
+    bind_unqualified_type_references, build_declaration_index, build_local_binding_index,
+    build_local_scope_tree, build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert,
+    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
+    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult,
+    LocalScopeId, LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -1156,6 +1156,184 @@ fn unqualified_function_reference_binding_does_not_treat_types_as_function_fallb
         &metadata,
         &parsed.arena,
         &parsed.name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+}
+
+#[test]
+fn unqualified_type_reference_binding_uses_same_package_top_level_fallback() {
+    let file = SourceFileId::from_raw(100);
+    let parsed = parse_source(file, "struct Box {} fun run(): Box;");
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.type_name_references.len(), 1);
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::parse("app").unwrap())],
+    )
+    .unwrap();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_unqualified_type_references(
+        &metadata,
+        &parsed.arena,
+        &parsed.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.inserts().len(), 1);
+    assert_eq!(bound.table().resolved_names().len(), 1);
+    let resolved = bound.table().resolved_names()[0];
+    assert_eq!(
+        resolved.reference(),
+        parsed.type_name_references[0].reference
+    );
+    assert_eq!(interner.resolve(resolved.symbol()), Some("Box"));
+}
+
+#[test]
+fn unqualified_type_reference_binding_keeps_local_lookup_before_top_level() {
+    let file = SourceFileId::from_raw(101);
+    let parsed = parse_source(
+        file,
+        "struct Box {} fun run() { val Box = make(); val item: Box = make(); }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.type_name_references.len(), 1);
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::root())],
+    )
+    .unwrap();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_unqualified_type_references(
+        &metadata,
+        &parsed.arena,
+        &parsed.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.table().resolved_names().len(), 1);
+    assert_eq!(
+        bound.table().resolved_names()[0].reference(),
+        parsed.type_name_references[0].reference
+    );
+    assert_eq!(
+        interner.resolve(bound.table().resolved_names()[0].symbol()),
+        Some("Box")
+    );
+}
+
+#[test]
+fn unqualified_type_reference_binding_rejects_other_package_top_level() {
+    let type_file = SourceFileId::from_raw(102);
+    let run_file = SourceFileId::from_raw(103);
+    let type_source = parse_source(type_file, "struct Box {}");
+    let run = parse_source(run_file, "fun run(): Box;");
+    assert!(type_source.diagnostics.is_empty());
+    assert!(run.diagnostics.is_empty());
+    assert_eq!(run.type_name_references.len(), 1);
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (type_file, PackageNamespace::parse("lib").unwrap()),
+            (run_file, PackageNamespace::parse("app").unwrap()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = type_source.declaration_names.clone();
+    declarations.extend(run.declaration_names.clone());
+    let scopes = build_local_scope_tree(&run.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &declarations, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &run.arena,
+        &run.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_unqualified_type_references(
+        &metadata,
+        &run.arena,
+        &run.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+    assert_eq!(
+        bound.diagnostics()[0].primary_span(),
+        run.type_name_references[0].name_span
+    );
+}
+
+#[test]
+fn unqualified_type_reference_binding_does_not_treat_functions_as_type_fallback() {
+    let file = SourceFileId::from_raw(104);
+    let parsed = parse_source(file, "fun Box(); fun run(): Box;");
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.type_name_references.len(), 1);
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::root())],
+    )
+    .unwrap();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_unqualified_type_references(
+        &metadata,
+        &parsed.arena,
+        &parsed.type_name_references,
         &scopes,
         locals.index(),
         declarations.index(),
