@@ -7,15 +7,15 @@ use newlang::{
     },
     parser::{
         parse_source, ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
-        ParsedLiteralExpression, ParsedLiteralKind,
+        ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind,
     },
     source::ByteSpan,
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
-        known_local_symbol_types, recognize_m0019_null_tests, select_m0019_eligible_null_tests,
-        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
-        type_m0018_accepted_expressions, type_m0018_core,
+        known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
+        select_m0019_eligible_null_tests, type_assignment_statements, type_grouped_expressions,
+        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
@@ -301,6 +301,141 @@ fn m0019_null_test_eligibility_reports_ambiguous_local_binding_match() {
         TypeRuleDiagnostic::AmbiguousLocalBindingFlow
     );
     assert_eq!(report.diagnostics()[0].node(), null_test.name_expression());
+}
+
+#[test]
+fn m0019_branch_refinement_records_then_branch_for_not_equal_tests() {
+    let null_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(300),
+        AstNodeId::from_raw(301),
+        AstNodeId::from_raw(302),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(300)),
+        AstNodeId::from_raw(303),
+        LocalBindingKind::Val,
+    );
+    let eligible = EligibleNullTestRefinement::new(
+        null_test,
+        binding.clone(),
+        TypeId::from_raw(10),
+        TypeId::from_raw(11),
+    );
+    let if_expression = ParsedIfExpression {
+        expression: AstNodeId::from_raw(304),
+        condition: null_test.expression(),
+        then_block: AstNodeId::from_raw(305),
+        else_block: Some(AstNodeId::from_raw(306)),
+        span: ByteSpan::new(SourceFileId::from_raw(300), 0, 10).unwrap(),
+    };
+    let then_block = if_expression.then_block;
+
+    let report = record_m0019_branch_refinements(&[eligible], &[if_expression]);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.refinements().len(), 1);
+    let refinement = &report.refinements()[0];
+    assert_eq!(refinement.region(), then_block);
+    assert_eq!(refinement.binding_use(), null_test.name_expression());
+    assert_eq!(refinement.originating_null_test(), null_test.expression());
+    assert_eq!(refinement.binding(), &binding);
+    assert_eq!(refinement.original_nullable_type(), TypeId::from_raw(10));
+    assert_eq!(refinement.refined_non_null_type(), TypeId::from_raw(11));
+    assert!(report.refined_expression_types().is_empty());
+}
+
+#[test]
+fn m0019_branch_refinement_records_else_branch_for_equal_tests() {
+    let null_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(310),
+        AstNodeId::from_raw(311),
+        AstNodeId::from_raw(312),
+        ParsedBinaryOperator::Equal,
+        NullTestRefinedBranch::Else,
+    );
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(310)),
+        AstNodeId::from_raw(313),
+        LocalBindingKind::Val,
+    );
+    let eligible = EligibleNullTestRefinement::new(
+        null_test,
+        binding.clone(),
+        TypeId::from_raw(20),
+        TypeId::from_raw(21),
+    );
+    let if_expression = ParsedIfExpression {
+        expression: AstNodeId::from_raw(314),
+        condition: null_test.expression(),
+        then_block: AstNodeId::from_raw(315),
+        else_block: Some(AstNodeId::from_raw(316)),
+        span: ByteSpan::new(SourceFileId::from_raw(310), 0, 10).unwrap(),
+    };
+    let else_block = if_expression.else_block.unwrap();
+
+    let report = record_m0019_branch_refinements(&[eligible], &[if_expression]);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.refinements().len(), 1);
+    let refinement = &report.refinements()[0];
+    assert_eq!(refinement.region(), else_block);
+    assert_eq!(refinement.binding_use(), null_test.name_expression());
+    assert_eq!(refinement.originating_null_test(), null_test.expression());
+    assert_eq!(refinement.binding(), &binding);
+    assert_eq!(refinement.original_nullable_type(), TypeId::from_raw(20));
+    assert_eq!(refinement.refined_non_null_type(), TypeId::from_raw(21));
+}
+
+#[test]
+fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
+    let equal_without_else = RecognizedNullTest::new(
+        AstNodeId::from_raw(320),
+        AstNodeId::from_raw(321),
+        AstNodeId::from_raw(322),
+        ParsedBinaryOperator::Equal,
+        NullTestRefinedBranch::Else,
+    );
+    let non_condition = RecognizedNullTest::new(
+        AstNodeId::from_raw(323),
+        AstNodeId::from_raw(324),
+        AstNodeId::from_raw(325),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(320)),
+        AstNodeId::from_raw(326),
+        LocalBindingKind::Val,
+    );
+    let eligible = [
+        EligibleNullTestRefinement::new(
+            equal_without_else,
+            binding.clone(),
+            TypeId::from_raw(30),
+            TypeId::from_raw(31),
+        ),
+        EligibleNullTestRefinement::new(
+            non_condition,
+            binding,
+            TypeId::from_raw(32),
+            TypeId::from_raw(33),
+        ),
+    ];
+    let if_expression = ParsedIfExpression {
+        expression: AstNodeId::from_raw(327),
+        condition: equal_without_else.expression(),
+        then_block: AstNodeId::from_raw(328),
+        else_block: None,
+        span: ByteSpan::new(SourceFileId::from_raw(320), 0, 10).unwrap(),
+    };
+
+    let report = record_m0019_branch_refinements(&eligible, &[if_expression]);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert!(report.refinements().is_empty());
+    assert!(report.refined_expression_types().is_empty());
 }
 
 #[test]

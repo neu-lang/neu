@@ -3,7 +3,7 @@ use crate::{
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable},
     parser::{
         ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
-        ParsedGroupedExpression, ParsedLiteralExpression, ParsedLiteralKind,
+        ParsedGroupedExpression, ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind,
         ParsedLocalDeclaration, ParsedTypeNameReference,
     },
     symbol::SymbolId,
@@ -717,6 +717,47 @@ pub fn select_m0019_eligible_null_tests(
     }
 
     (eligible, report)
+}
+
+pub fn record_m0019_branch_refinements(
+    eligible_refinements: &[EligibleNullTestRefinement],
+    if_expressions: &[ParsedIfExpression],
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+
+    for eligible in eligible_refinements {
+        let Some(if_expression) = if_expressions
+            .iter()
+            .find(|if_expression| if_expression.condition == eligible.null_test().expression())
+        else {
+            continue;
+        };
+
+        let Some(region) = m0019_refined_branch_region(eligible.null_test(), if_expression) else {
+            continue;
+        };
+
+        report.record_refinement(RefinementRecord::new(
+            region,
+            eligible.null_test().name_expression(),
+            eligible.null_test().expression(),
+            eligible.binding().clone(),
+            eligible.original_nullable_type(),
+            eligible.refined_non_null_type(),
+        ));
+    }
+
+    report
+}
+
+fn m0019_refined_branch_region(
+    null_test: RecognizedNullTest,
+    if_expression: &ParsedIfExpression,
+) -> Option<AstNodeId> {
+    match null_test.refined_branch() {
+        NullTestRefinedBranch::Then => Some(if_expression.then_block),
+        NullTestRefinedBranch::Else => if_expression.else_block,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
