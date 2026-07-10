@@ -2,8 +2,9 @@ use newlang::ast::AstNodeId;
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
     build_declaration_index, DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind,
-    DeclaredName, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
-    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey,
+    LocalBindingKind, LocalScopeId, ResolutionDiagnostic, ResolutionDiagnosticKind,
+    ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -421,4 +422,86 @@ fn missing_top_level_lookup_returns_unresolved_name_diagnostic() {
         }
         TopLevelLookupResult::Found(_) => panic!("missing top-level lookup should be unresolved"),
     }
+}
+
+#[test]
+fn local_binding_key_preserves_scope_and_symbol() {
+    let scope = LocalScopeId::from_raw(2);
+    let symbol = SymbolId::from_raw(7);
+    let key = LocalBindingKey::new(scope, symbol);
+
+    assert_eq!(scope.index(), 2);
+    assert_eq!(key.scope(), scope);
+    assert_eq!(key.name(), symbol);
+}
+
+#[test]
+fn local_binding_index_preserves_insertion_order_and_lookup_by_key() {
+    let scope = LocalScopeId::from_raw(1);
+    let first_key = LocalBindingKey::new(scope, SymbolId::from_raw(10));
+    let second_key = LocalBindingKey::new(scope, SymbolId::from_raw(11));
+    let first = LocalBinding::new(first_key, AstNodeId::from_raw(40), LocalBindingKind::Val);
+    let second = LocalBinding::new(second_key, AstNodeId::from_raw(41), LocalBindingKind::Var);
+    let mut index = LocalBindingIndex::new();
+
+    assert_eq!(
+        index.insert(first.clone()),
+        LocalBindingInsert::Inserted(first.clone())
+    );
+    assert_eq!(
+        index.insert(second.clone()),
+        LocalBindingInsert::Inserted(second.clone())
+    );
+
+    assert_eq!(index.bindings(), [first.clone(), second]);
+    assert_eq!(index.get(&first_key), Some(&first));
+    assert_eq!(first.kind(), LocalBindingKind::Val);
+}
+
+#[test]
+fn local_binding_index_allows_same_name_in_distinct_scopes() {
+    let name = SymbolId::from_raw(12);
+    let outer = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(1), name),
+        AstNodeId::from_raw(50),
+        LocalBindingKind::Val,
+    );
+    let inner = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(2), name),
+        AstNodeId::from_raw(51),
+        LocalBindingKind::Var,
+    );
+    let mut index = LocalBindingIndex::new();
+
+    assert!(matches!(
+        index.insert(outer),
+        LocalBindingInsert::Inserted(_)
+    ));
+    assert!(matches!(
+        index.insert(inner),
+        LocalBindingInsert::Inserted(_)
+    ));
+    assert_eq!(index.bindings().len(), 2);
+}
+
+#[test]
+fn duplicate_local_binding_key_preserves_existing_binding() {
+    let key = LocalBindingKey::new(LocalScopeId::from_raw(3), SymbolId::from_raw(13));
+    let existing = LocalBinding::new(key, AstNodeId::from_raw(60), LocalBindingKind::Val);
+    let attempted = LocalBinding::new(key, AstNodeId::from_raw(61), LocalBindingKind::Var);
+    let mut index = LocalBindingIndex::new();
+
+    assert_eq!(
+        index.insert(existing.clone()),
+        LocalBindingInsert::Inserted(existing.clone())
+    );
+    assert_eq!(
+        index.insert(attempted.clone()),
+        LocalBindingInsert::Duplicate {
+            existing: existing.clone(),
+            attempted
+        }
+    );
+    assert_eq!(index.get(&key), Some(&existing));
+    assert_eq!(index.bindings().len(), 1);
 }

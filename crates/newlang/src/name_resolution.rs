@@ -162,6 +162,115 @@ pub enum TopLevelLookupResult {
     Unresolved(ResolutionDiagnostic),
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct LocalScopeId(usize);
+
+impl LocalScopeId {
+    pub fn from_raw(raw: usize) -> Self {
+        Self(raw)
+    }
+
+    pub fn index(self) -> usize {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalBindingKind {
+    Val,
+    Var,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct LocalBindingKey {
+    scope: LocalScopeId,
+    name: SymbolId,
+}
+
+impl LocalBindingKey {
+    pub fn new(scope: LocalScopeId, name: SymbolId) -> Self {
+        Self { scope, name }
+    }
+
+    pub fn scope(self) -> LocalScopeId {
+        self.scope
+    }
+
+    pub fn name(self) -> SymbolId {
+        self.name
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LocalBinding {
+    key: LocalBindingKey,
+    binding: AstNodeId,
+    kind: LocalBindingKind,
+}
+
+impl LocalBinding {
+    pub fn new(key: LocalBindingKey, binding: AstNodeId, kind: LocalBindingKind) -> Self {
+        Self { key, binding, kind }
+    }
+
+    pub fn key(&self) -> &LocalBindingKey {
+        &self.key
+    }
+
+    pub fn binding(&self) -> AstNodeId {
+        self.binding
+    }
+
+    pub fn kind(&self) -> LocalBindingKind {
+        self.kind
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LocalBindingInsert {
+    Inserted(LocalBinding),
+    Duplicate {
+        existing: LocalBinding,
+        attempted: LocalBinding,
+    },
+}
+
+#[derive(Debug, Default)]
+pub struct LocalBindingIndex {
+    bindings: Vec<LocalBinding>,
+    indices_by_key: HashMap<LocalBindingKey, usize>,
+}
+
+impl LocalBindingIndex {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, binding: LocalBinding) -> LocalBindingInsert {
+        if let Some(index) = self.indices_by_key.get(binding.key()) {
+            return LocalBindingInsert::Duplicate {
+                existing: self.bindings[*index].clone(),
+                attempted: binding,
+            };
+        }
+
+        let index = self.bindings.len();
+        self.indices_by_key.insert(*binding.key(), index);
+        self.bindings.push(binding.clone());
+        LocalBindingInsert::Inserted(binding)
+    }
+
+    pub fn get(&self, key: &LocalBindingKey) -> Option<&LocalBinding> {
+        self.indices_by_key
+            .get(key)
+            .and_then(|index| self.bindings.get(*index))
+    }
+
+    pub fn bindings(&self) -> &[LocalBinding] {
+        &self.bindings
+    }
+}
+
 #[derive(Debug)]
 pub struct DeclarationIndexBuild {
     index: DeclarationIndex,
