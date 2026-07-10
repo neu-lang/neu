@@ -28,11 +28,12 @@ use compiler::{
         type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
-        type_m0028_executable_core, type_m0028_executable_int_operators,
-        type_m0028_function_signatures, type_m0028_function_signatures_in,
-        type_m0028_static_integer_diagnostics, type_parser_literals,
-        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, type_unsupported_m0018_expressions,
+        type_m0028_executable_core, type_m0028_executable_core_in,
+        type_m0028_executable_int_operators, type_m0028_function_signatures,
+        type_m0028_function_signatures_in, type_m0028_static_integer_diagnostics,
+        type_parser_literals, type_primitive_local_declarations,
+        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
+        type_unsupported_m0018_expressions,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -3945,5 +3946,52 @@ fn m0028_function_signatures_share_the_caller_owned_module_arena() {
     assert_eq!(
         first_signatures[0].return_type(),
         second_signatures[0].return_type()
+    );
+}
+
+#[test]
+fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
+    let first = parse_source(
+        SourceFileId::from_raw(116),
+        "fun first() { const value: Int = 1; }",
+    );
+    let second = parse_source(
+        SourceFileId::from_raw(117),
+        "fun second() { const value: Int = 2; }",
+    );
+    let mut types = TypeArena::new();
+    let first_report = type_m0028_executable_core_in(
+        &mut types,
+        &first.arena,
+        &first.local_declarations,
+        &first.type_name_references,
+        &first.literal_expressions,
+        &first.integer_literals,
+        &first.grouped_expressions,
+        &first.unary_expressions,
+        &first.binary_expressions,
+        &first.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let second_report = type_m0028_executable_core_in(
+        &mut types,
+        &second.arena,
+        &second.local_declarations,
+        &second.type_name_references,
+        &second.literal_expressions,
+        &second.integer_literals,
+        &second.grouped_expressions,
+        &second.unary_expressions,
+        &second.binary_expressions,
+        &second.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    assert_eq!(types.records().len(), 5);
+    assert_eq!(
+        first_report.expression_types()[0].ty(),
+        second_report.expression_types()[0].ty()
     );
 }
