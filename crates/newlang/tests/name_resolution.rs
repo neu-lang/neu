@@ -1,11 +1,11 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    build_declaration_index, build_local_binding_index, build_local_scope_tree,
-    build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
-    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
-    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
-    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    bind_local_name_references, build_declaration_index, build_local_binding_index,
+    build_local_scope_tree, build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert,
+    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
+    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult,
+    LocalScopeId, LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
     ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
@@ -890,4 +890,109 @@ fn missing_local_binding_lookup_returns_unresolved_name_diagnostic() {
         }
         LocalNameLookupResult::Found(_) => panic!("missing local lookup should be unresolved"),
     }
+}
+
+#[test]
+fn local_reference_binding_records_visible_local_resolution() {
+    let source = "fun run() { val value = 1; value; }";
+    let file = SourceFileId::from_raw(80);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.name_references.len(), 1);
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.inserts().len(), 1);
+    assert_eq!(bound.table().resolved_names().len(), 1);
+    let resolved = bound.table().resolved_names()[0];
+    assert_eq!(resolved.reference(), parsed.name_references[0].reference);
+    assert_eq!(interner.resolve(resolved.symbol()), Some("value"));
+}
+
+#[test]
+fn local_reference_binding_reports_reference_before_declaration() {
+    let source = "fun run() { value; val value = 1; }";
+    let file = SourceFileId::from_raw(81);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.name_references.len(), 1);
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert!(bound.inserts().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+    assert_eq!(
+        bound.diagnostics()[0].primary_span(),
+        parsed.name_references[0].name_span
+    );
+}
+
+#[test]
+fn local_reference_binding_does_not_use_top_level_fallback() {
+    let source = "fun top(); fun run() { top; }";
+    let file = SourceFileId::from_raw(82);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.name_references.len(), 1);
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+    assert_eq!(
+        bound.diagnostics()[0].primary_span(),
+        parsed.name_references[0].name_span
+    );
 }

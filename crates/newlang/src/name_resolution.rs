@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
-use crate::parser::{ParsedDeclarationName, ParsedLocalBindingName};
+use crate::parser::{ParsedDeclarationName, ParsedLocalBindingName, ParsedNameReference};
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
 
@@ -399,6 +399,69 @@ pub enum LocalNameLookupResult {
     Unresolved(ResolutionDiagnostic),
 }
 
+#[derive(Debug)]
+pub struct LocalReferenceBind {
+    table: ResolutionTable,
+    inserts: Vec<ResolutionInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
+}
+
+impl LocalReferenceBind {
+    pub fn table(&self) -> &ResolutionTable {
+        &self.table
+    }
+
+    pub fn inserts(&self) -> &[ResolutionInsert] {
+        &self.inserts
+    }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn bind_local_name_references(
+    arena: &AstArena,
+    references: &[ParsedNameReference],
+    scopes: &LocalScopeTree,
+    local_bindings: &LocalBindingIndex,
+    interner: &mut SymbolInterner,
+) -> LocalReferenceBind {
+    let mut table = ResolutionTable::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for reference in references {
+        let name = interner.intern(&reference.name);
+        let Some(scope) = containing_block_scope(arena, scopes, reference.reference) else {
+            diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::UnresolvedName,
+                reference.name_span,
+            ));
+            continue;
+        };
+
+        match local_bindings.lookup_local(
+            scopes,
+            arena,
+            LocalNameLookup::new(scope, name, reference.name_span),
+        ) {
+            LocalNameLookupResult::Found(binding) => {
+                let insert =
+                    table.insert(ResolvedName::new(reference.reference, binding.key().name()));
+                inserts.push(insert);
+            }
+            LocalNameLookupResult::Unresolved(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+
+    LocalReferenceBind {
+        table,
+        inserts,
+        diagnostics,
+    }
+}
+
 fn local_binding_is_visible(
     arena: &AstArena,
     binding: &LocalBinding,
@@ -495,9 +558,9 @@ pub fn build_scoped_local_binding_index(
 fn containing_block_scope(
     arena: &AstArena,
     scopes: &LocalScopeTree,
-    binding: AstNodeId,
+    node: AstNodeId,
 ) -> Option<LocalScopeId> {
-    let binding_span = arena.node(binding)?.span;
+    let node_span = arena.node(node)?.span;
     scopes
         .scopes()
         .iter()
@@ -506,8 +569,8 @@ fn containing_block_scope(
                 return false;
             };
             owner.kind == AstNodeKind::Block
-                && owner.span.start() <= binding_span.start()
-                && binding_span.end() <= owner.span.end()
+                && owner.span.start() <= node_span.start()
+                && node_span.end() <= owner.span.end()
         })
         .min_by_key(|scope| {
             let owner = arena
