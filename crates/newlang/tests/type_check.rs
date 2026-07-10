@@ -7,7 +7,7 @@ use newlang::{
     },
     parser::{
         parse_source, ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
-        ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind,
+        ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
     },
     source::ByteSpan,
     source::SourceFileId,
@@ -18,13 +18,13 @@ use newlang::{
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
         type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
-        type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        type_unsupported_m0018_expressions, AmbiguousTypeRule, AssignmentCheck,
-        DeclarationSignature, EligibleNullTestRefinement, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
-        RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport, TypeRuleDiagnostic,
+        type_m0019_local_declaration_initializers, type_parser_literals,
+        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
+        type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
+        AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement, ExpressionType,
+        KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
+        RecognizedNullTest, RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -2152,6 +2152,598 @@ fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
     assert_eq!(
         report.diagnostics()[0].kind(),
         TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_accepts_exact_active_view_and_preserves_original_records(
+) {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let file = SourceFileId::from_raw(390);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let region = ast.add_block(ByteSpan::new(file, 10, 90).unwrap());
+    let initializer = ast.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let declaration = AstNodeId::from_raw(391);
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(390)),
+        AstNodeId::from_raw(392),
+        LocalBindingKind::Immutable,
+    );
+    let declarations = [ParsedLocalDeclaration {
+        declaration,
+        annotation: Some(annotation),
+        initializer: Some(initializer),
+    }];
+    let signatures = [DeclarationSignature::new(declaration, int)];
+    let expression_types = [ExpressionType::new(initializer, nullable_int)];
+    let resolved = [ResolvedLocalBinding::new(initializer, binding.clone())];
+    let mut flow = TypeCheckReport::new();
+    flow.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(393),
+        AstNodeId::from_raw(394),
+        binding,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        initializer,
+        region,
+        nullable_int,
+        int,
+    ));
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &flow,
+        &resolved,
+        &ast,
+        &types,
+    );
+
+    assert!(report.diagnostics().is_empty());
+    assert_eq!(report.declaration_signatures(), &signatures);
+    assert_eq!(report.expression_types(), &expression_types);
+    assert_eq!(
+        report.assignment_checks(),
+        &[AssignmentCheck::new(declaration, int, int)]
+    );
+    assert_eq!(
+        flow.refined_expression_types()[0].original_nullable_type(),
+        nullable_int
+    );
+    assert_eq!(flow.refinements()[0].original_nullable_type(), nullable_int);
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_diagnoses_exact_unrefined_name_only() {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let null = types.insert(TypeRecord::primitive(PrimitiveType::Null));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let nullable_string = types.insert(TypeRecord::nullable(NullableType::new(string)));
+    let file = SourceFileId::from_raw(395);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let nullable_name = ast.add_name_expression(ByteSpan::new(file, 10, 15).unwrap());
+    let null_literal = ast.add_literal_expression(ByteSpan::new(file, 20, 24).unwrap());
+    let unrelated_name = ast.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(396),
+            annotation: Some(annotation),
+            initializer: Some(nullable_name),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(397),
+            annotation: Some(annotation),
+            initializer: Some(null_literal),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(398),
+            annotation: Some(annotation),
+            initializer: Some(unrelated_name),
+        },
+    ];
+    let signatures = [
+        DeclarationSignature::new(declarations[0].declaration, int),
+        DeclarationSignature::new(declarations[1].declaration, int),
+        DeclarationSignature::new(declarations[2].declaration, int),
+    ];
+    let expression_types = [
+        ExpressionType::new(nullable_name, nullable_int),
+        ExpressionType::new(null_literal, null),
+        ExpressionType::new(unrelated_name, nullable_string),
+    ];
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(395)),
+        AstNodeId::from_raw(399),
+        LocalBindingKind::Immutable,
+    );
+    let resolved = [
+        ResolvedLocalBinding::new(nullable_name, binding.clone()),
+        ResolvedLocalBinding::new(unrelated_name, binding),
+    ];
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &TypeCheckReport::new(),
+        &resolved,
+        &ast,
+        &types,
+    );
+
+    assert_eq!(report.diagnostics().len(), 3);
+    let nullable = &report.diagnostics()[0];
+    assert_eq!(nullable.kind(), TypeCheckDiagnosticKind::InvalidNullableUse);
+    assert_eq!(
+        nullable.rule(),
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    );
+    assert_eq!(nullable.node(), nullable_name);
+    assert_eq!(nullable.expected_type(), Some(int));
+    assert_eq!(nullable.actual_type(), Some(nullable_int));
+    assert!(report.diagnostics()[1..].iter().all(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch
+            && diagnostic.rule()
+                == TypeRuleDiagnostic::Ambiguous(AmbiguousTypeRule::AssignmentCompatibility)
+    }));
+    assert_eq!(report.diagnostics()[1].node(), null_literal);
+    assert_eq!(report.diagnostics()[2].node(), unrelated_name);
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_preserves_nullable_compatibility() {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let null = types.insert(TypeRecord::primitive(PrimitiveType::Null));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let file = SourceFileId::from_raw(409);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let null_initializer = ast.add_literal_expression(ByteSpan::new(file, 10, 14).unwrap());
+    let base_initializer = ast.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(409),
+            annotation: Some(annotation),
+            initializer: Some(null_initializer),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(410),
+            annotation: Some(annotation),
+            initializer: Some(base_initializer),
+        },
+    ];
+    let signatures = [
+        DeclarationSignature::new(declarations[0].declaration, nullable_int),
+        DeclarationSignature::new(declarations[1].declaration, nullable_int),
+    ];
+    let expression_types = [
+        ExpressionType::new(null_initializer, null),
+        ExpressionType::new(base_initializer, int),
+    ];
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &TypeCheckReport::new(),
+        &[],
+        &ast,
+        &types,
+    );
+
+    assert!(report.diagnostics().is_empty());
+    assert_eq!(
+        report.assignment_checks(),
+        &[
+            AssignmentCheck::new(declarations[0].declaration, nullable_int, null),
+            AssignmentCheck::new(declarations[1].declaration, nullable_int, int),
+        ]
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_rejects_invalid_or_cross_use_views() {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let file = SourceFileId::from_raw(400);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 200).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let region = ast.add_block(ByteSpan::new(file, 10, 100).unwrap());
+    let first = ast.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let second = ast.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let outside = ast.add_name_expression(ByteSpan::new(file, 120, 125).unwrap());
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(401),
+            annotation: Some(annotation),
+            initializer: Some(first),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(402),
+            annotation: Some(annotation),
+            initializer: Some(second),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(403),
+            annotation: Some(annotation),
+            initializer: Some(outside),
+        },
+    ];
+    let signatures = declarations
+        .each_ref()
+        .map(|declaration| DeclarationSignature::new(declaration.declaration, int));
+    let expression_types = [
+        ExpressionType::new(first, nullable_int),
+        ExpressionType::new(second, nullable_int),
+        ExpressionType::new(outside, nullable_int),
+    ];
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(400)),
+        AstNodeId::from_raw(404),
+        LocalBindingKind::Immutable,
+    );
+    let wrong_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(401)),
+        AstNodeId::from_raw(405),
+        LocalBindingKind::Immutable,
+    );
+    let mut flow = TypeCheckReport::new();
+    flow.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(406),
+        AstNodeId::from_raw(407),
+        binding.clone(),
+        nullable_int,
+        int,
+    ));
+    // Duplicate first, forged second, and out-of-region third must all be ignored.
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        first,
+        region,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        first,
+        region,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        second,
+        region,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        outside,
+        region,
+        nullable_int,
+        int,
+    ));
+    let resolved = [
+        ResolvedLocalBinding::new(first, binding),
+        ResolvedLocalBinding::new(second, wrong_binding),
+        ResolvedLocalBinding::new(
+            outside,
+            LocalBinding::new(
+                LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(402)),
+                AstNodeId::from_raw(408),
+                LocalBindingKind::Immutable,
+            ),
+        ),
+    ];
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &flow,
+        &resolved,
+        &ast,
+        &types,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 3);
+    assert!(report.diagnostics().iter().all(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::InvalidNullableUse
+            && diagnostic.rule() == TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    }));
+    assert_eq!(
+        report
+            .diagnostics()
+            .iter()
+            .map(TypeCheckDiagnostic::node)
+            .collect::<Vec<_>>(),
+        vec![first, second, outside]
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_rejects_after_sibling_shadowed_and_inconsistent_views()
+{
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let nullable_string = types.insert(TypeRecord::nullable(NullableType::new(string)));
+    let file = SourceFileId::from_raw(420);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 200).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let then_region = ast.add_block(ByteSpan::new(file, 10, 50).unwrap());
+    let _sibling_else_region = ast.add_block(ByteSpan::new(file, 60, 100).unwrap());
+    let after_branch = ast.add_name_expression(ByteSpan::new(file, 110, 115).unwrap());
+    let sibling_branch = ast.add_name_expression(ByteSpan::new(file, 70, 75).unwrap());
+    let shadowed = ast.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let inconsistent = ast.add_name_expression(ByteSpan::new(file, 40, 45).unwrap());
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(421),
+            annotation: Some(annotation),
+            initializer: Some(after_branch),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(422),
+            annotation: Some(annotation),
+            initializer: Some(sibling_branch),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(423),
+            annotation: Some(annotation),
+            initializer: Some(shadowed),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(424),
+            annotation: Some(annotation),
+            initializer: Some(inconsistent),
+        },
+    ];
+    let signatures = declarations
+        .each_ref()
+        .map(|declaration| DeclarationSignature::new(declaration.declaration, int));
+    let expression_types = [
+        ExpressionType::new(after_branch, nullable_int),
+        ExpressionType::new(sibling_branch, nullable_int),
+        ExpressionType::new(shadowed, nullable_int),
+        ExpressionType::new(inconsistent, nullable_int),
+    ];
+    let outer_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(420)),
+        AstNodeId::from_raw(425),
+        LocalBindingKind::Immutable,
+    );
+    let shadow_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(1), SymbolId::from_raw(420)),
+        AstNodeId::from_raw(426),
+        LocalBindingKind::Immutable,
+    );
+    let mut flow = TypeCheckReport::new();
+    flow.record_refinement(RefinementRecord::new(
+        then_region,
+        AstNodeId::from_raw(427),
+        AstNodeId::from_raw(428),
+        outer_binding.clone(),
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        after_branch,
+        then_region,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        sibling_branch,
+        then_region,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        shadowed,
+        then_region,
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        inconsistent,
+        then_region,
+        nullable_string,
+        string,
+    ));
+    let resolved = [
+        ResolvedLocalBinding::new(after_branch, outer_binding.clone()),
+        ResolvedLocalBinding::new(sibling_branch, outer_binding.clone()),
+        ResolvedLocalBinding::new(shadowed, shadow_binding),
+        ResolvedLocalBinding::new(inconsistent, outer_binding),
+    ];
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &flow,
+        &resolved,
+        &ast,
+        &types,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 4);
+    assert!(report.diagnostics().iter().all(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::InvalidNullableUse
+            && diagnostic.rule() == TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    }));
+    assert_eq!(
+        report
+            .diagnostics()
+            .iter()
+            .map(TypeCheckDiagnostic::node)
+            .collect::<Vec<_>>(),
+        vec![after_branch, sibling_branch, shadowed, inconsistent]
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_rejects_forged_mutable_binding_view() {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let file = SourceFileId::from_raw(411);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let region = ast.add_block(ByteSpan::new(file, 10, 90).unwrap());
+    let initializer = ast.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let declaration = AstNodeId::from_raw(414);
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(411)),
+        AstNodeId::from_raw(412),
+        LocalBindingKind::Var,
+    );
+    let declarations = [ParsedLocalDeclaration {
+        declaration,
+        annotation: Some(annotation),
+        initializer: Some(initializer),
+    }];
+    let signatures = [DeclarationSignature::new(declaration, int)];
+    let expression_types = [ExpressionType::new(initializer, nullable_int)];
+    let mut flow = TypeCheckReport::new();
+    flow.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(413),
+        AstNodeId::from_raw(415),
+        binding.clone(),
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        initializer,
+        region,
+        nullable_int,
+        int,
+    ));
+    let resolved = [ResolvedLocalBinding::new(initializer, binding)];
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &flow,
+        &resolved,
+        &ast,
+        &types,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_local_initializer_does_not_consume_another_use_view() {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let file = SourceFileId::from_raw(410);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 5, 8).unwrap());
+    let region = ast.add_block(ByteSpan::new(file, 10, 90).unwrap());
+    let refined_use = ast.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let other_use = ast.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(410)),
+        AstNodeId::from_raw(411),
+        LocalBindingKind::Immutable,
+    );
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(412),
+            annotation: Some(annotation),
+            initializer: Some(refined_use),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(413),
+            annotation: Some(annotation),
+            initializer: Some(other_use),
+        },
+    ];
+    let signatures = [
+        DeclarationSignature::new(declarations[0].declaration, int),
+        DeclarationSignature::new(declarations[1].declaration, int),
+    ];
+    let expression_types = [
+        ExpressionType::new(refined_use, nullable_int),
+        ExpressionType::new(other_use, nullable_int),
+    ];
+    let mut flow = TypeCheckReport::new();
+    flow.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(414),
+        AstNodeId::from_raw(415),
+        binding.clone(),
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        refined_use,
+        region,
+        nullable_int,
+        int,
+    ));
+    let resolved = [
+        ResolvedLocalBinding::new(refined_use, binding.clone()),
+        ResolvedLocalBinding::new(other_use, binding),
+    ];
+
+    let report = type_m0019_local_declaration_initializers(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &flow,
+        &resolved,
+        &ast,
+        &types,
+    );
+
+    assert_eq!(
+        report.assignment_checks(),
+        &[AssignmentCheck::new(declarations[0].declaration, int, int)]
+    );
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(report.diagnostics()[0].node(), other_use);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
     );
 }
 

@@ -1102,6 +1102,86 @@ pub fn type_m0019_assignment_statements(
     )
 }
 
+pub fn type_m0019_local_declaration_initializers(
+    declarations: &[ParsedLocalDeclaration],
+    declaration_signatures: &[DeclarationSignature],
+    known_expression_types: &[ExpressionType],
+    flow_report: &TypeCheckReport,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    ast_arena: &AstArena,
+    type_arena: &TypeArena,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+
+    for signature in declaration_signatures {
+        report.record_declaration_signature(*signature);
+    }
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+
+    for declaration in declarations {
+        if declaration.annotation.is_none() {
+            continue;
+        }
+        let Some(target_type) = declaration_signatures
+            .iter()
+            .find(|signature| signature.declaration() == declaration.declaration)
+            .map(|signature| signature.ty())
+        else {
+            continue;
+        };
+        let Some(initializer) = declaration.initializer else {
+            continue;
+        };
+        let Some(original_initializer_type) =
+            expression_type_in(known_expression_types, initializer)
+        else {
+            continue;
+        };
+        let refined_initializer_type = valid_m0019_refined_value_type(
+            initializer,
+            original_initializer_type,
+            Some((flow_report, resolved_local_bindings, ast_arena)),
+            type_arena,
+        );
+        let effective_initializer_type =
+            refined_initializer_type.unwrap_or(original_initializer_type);
+
+        if assignment_compatible(target_type, effective_initializer_type, type_arena) {
+            report.record_assignment_check(AssignmentCheck::new(
+                declaration.declaration,
+                target_type,
+                effective_initializer_type,
+            ));
+        } else if refined_initializer_type.is_none()
+            && exact_m0019_nullable_name_initializer(
+                initializer,
+                original_initializer_type,
+                target_type,
+                resolved_local_bindings,
+                ast_arena,
+                type_arena,
+            )
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::invalid_nullable_use(
+                TypeRuleDiagnostic::NullableAssignmentWithoutRefinement,
+                initializer,
+                target_type,
+                original_initializer_type,
+            ));
+        } else {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                initializer,
+                target_type,
+                effective_initializer_type,
+            ));
+        }
+    }
+
+    report
+}
+
 fn type_assignment_statements_with_refinements(
     assignments: &[ParsedAssignmentStatement],
     known_expression_types: &[ExpressionType],
@@ -1181,6 +1261,7 @@ fn valid_m0019_refined_value_type(
     if matching_refinements.next().is_some()
         || provenance.original_nullable_type() != refined.original_nullable_type()
         || provenance.refined_non_null_type() != refined.refined_non_null_type()
+        || provenance.binding().kind() != LocalBindingKind::Immutable
         || !m0019_expression_is_inside_refinement_region(ast_arena, expression, provenance.region())
     {
         return None;
@@ -1196,6 +1277,26 @@ fn valid_m0019_refined_value_type(
 
     let base = nullable_base_type(original_type, type_arena)?;
     (refined.refined_non_null_type() == base).then_some(base)
+}
+
+fn exact_m0019_nullable_name_initializer(
+    initializer: AstNodeId,
+    original_type: TypeId,
+    target_type: TypeId,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    ast_arena: &AstArena,
+    type_arena: &TypeArena,
+) -> bool {
+    if ast_arena.node(initializer).map(|node| node.kind) != Some(AstNodeKind::NameExpression)
+        || nullable_base_type(original_type, type_arena) != Some(target_type)
+    {
+        return false;
+    }
+
+    let mut matching = resolved_local_bindings
+        .iter()
+        .filter(|resolved| resolved.reference() == initializer);
+    matching.next().is_some() && matching.next().is_none()
 }
 
 fn nullable_base_type(ty: TypeId, arena: &TypeArena) -> Option<TypeId> {

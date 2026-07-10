@@ -5,7 +5,7 @@
 - Task ID: `M0019-015`
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
-- Status: `paused`
+- Status: `complete`
 - Owner Agent: `Implementer`
 - Created By: `Task Decomposer`
 - Created Date: `2026-07-10`
@@ -18,12 +18,21 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
   - `docs/adr/ADR-0029-immutable-local-const-keyword.md`
+  - `docs/adr/ADR-0030-local-initializer-nullable-diagnostic.md`
 - Project Rules: `AGENTS.md`
 - Agent Prompts: `.codex/agents/task-decomposer.toml`, `.codex/agents/test-engineer.toml`, `.codex/agents/implementer.toml`, `.codex/agents/diagnostics-engineer.toml`, `.codex/agents/adversarial-engineer.toml`, `.codex/agents/reviewer.toml`, `.codex/agents/spec-compliance-auditor.toml`, `.codex/agents/build-engineer.toml`
 
 ## Goal
 
 Check annotated local `const` declaration initializers using valid per-use flow refinements, allowing a refined `T?` initializer to satisfy `T` while diagnosing an unrefined nullable initializer.
+
+## Authority Extract
+
+- `docs/SPEC.md`, “ADR-0027: Type Checking Core”: exact assignment compatibility; declaration annotation mismatches use the initializer span.
+- `docs/SPEC.md`, “ADR-0028: Nullability And Flow Typing”: immutable-local refinements are per-use views; active branch refinements permit `T?` as `T`, while unrefined uses report `invalid_nullable_use`.
+- `docs/SPEC.md`, “ADR-0029: Immutable Local `const` Keyword”: `const` is the immutable-local spelling and retains existing initializer semantics.
+- `docs/adr/ADR-0030-local-initializer-nullable-diagnostic.md`, “Decision” and “Consequences And Limits”: only an exact bare resolved `T?` name initializer for annotated `T` uses `nullable_assignment_without_refinement`; `Null -> T` and unrelated mismatches remain `type_mismatch`.
+- Validation: focused type-check test, task validator, adversarial check, review-task check, formatting, clippy, and workspace tests.
 
 ## Motivation
 
@@ -60,9 +69,8 @@ Tests must be created before implementation.
 
 ## Dependencies And Blockers
 
-- Hard dependency: M0019-014 must complete its ADR-0029 migration gates and be revalidated by Task Decomposer and Roadmap Planner.
-- Blocked ambiguity: the diagnostic identifier for this initializer path must be confirmed against accepted ADR-0028/diagnostic authority before tests encode it. Do not guess or add a new identifier in this task.
-- Until both conditions are resolved, this task remains paused and no implementation or tests should proceed.
+- Revalidated dependency: M0019-014 is complete (commit `4d2a3ae`), including the ADR-0029 `const` migration gates.
+- Resolved diagnostic mapping: accepted ADR-0030 (commit `2128abc`) requires `invalid_nullable_use` with stable rule identifier `nullable_assignment_without_refinement` for an exact bare resolved `T?` initializer assigned to annotated `T`. The primary span is the initializer; expected is `T`, actual is `T?`, with ADR-0028 recovery and suggestion policy. `Null -> T` and unrelated mismatches remain ordinary `type_mismatch`.
 
 ## Implementation Plan
 
@@ -77,17 +85,17 @@ Reuse the validated exact-expression compatibility path established by M0019-013
 
 ## Acceptance Criteria
 
-- [ ] M0019-014 migration gates pass and task is revalidated.
-- [ ] Diagnostic-identifier ambiguity is resolved by accepted authority before tests.
-- [ ] Tests are written and fail before implementation.
-- [ ] Refined initializer succeeds without mutating original nullable records.
-- [ ] Negative, diagnostic, and adversarial tests pass.
-- [ ] Required reviews and CI pass.
+- [x] M0019-014 migration gates pass and task is revalidated.
+- [x] Diagnostic-identifier ambiguity is resolved by accepted authority before tests.
+- [x] Tests are written and fail before implementation.
+- [x] Refined initializer succeeds without mutating original nullable records.
+- [x] Negative, diagnostic, and adversarial tests pass.
+- [x] Required reviews and CI pass.
 
 ## Execution Commands
 
-- Generate tests: `blocked: M0019-014 migration and diagnostic-identifier ambiguity must be resolved`
-- Verify tests fail: `blocked: M0019-014 migration and diagnostic-identifier ambiguity must be resolved`
+- Generate tests: `cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer`
+- Verify tests fail: `cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` (expected pre-implementation failure)
 - Ordinary tests: `cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer && sh docs/tests/m0019-refinement-aware-local-initializers.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md`
@@ -102,11 +110,25 @@ Reuse the validated exact-expression compatibility path established by M0019-013
 ## Forbidden Changes
 
 - Do not edit `docs/SPEC.md`, `docs/adr/`, milestones, examples, or build files.
-- Do not proceed while M0019-014 or the diagnostic-identifier ambiguity is unresolved.
+- Do not expand beyond the exact ADR-0030 initializer case or change accepted semantics.
 - Do not weaken or delete failing tests without reviewer approval.
+
+## Revalidation Log
+
+- `Task Decomposer` — after `4d2a3ae` and `2128abc`, dependency and diagnostic blocker cleared; authority extract and test-first commands refreshed; handoff to `Test Engineer`.
+
+## Execution Log
+
+- 2026-07-10 agent=Test-Engineer phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` fails only because `type_m0019_local_declaration_initializers` is not implemented; `sh docs/tests/m0019-refinement-aware-local-initializers.sh` fails on the same missing API. next=Implementer
+- 2026-07-10 agent=Task-Decomposer phase=ordinary-tests result=pass evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` passed (7); `sh docs/tests/m0019-refinement-aware-local-initializers.sh` passed; `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check`, and `cargo test --workspace --all-targets` passed (214 tests). next=Reviewer
+- 2026-07-10 agent=Adversarial-Engineer phase=adversarial result=pass evidence=`docs/scripts/adversarial-check.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md` passed; cross-use and invalid-provenance checks hold. next=Reviewer
+- 2026-07-10 agent=Reviewer phase=final-review result=approve evidence=Diagnostics, Test, Spec Compliance, and Adversarial reviews approved; no findings. next=Build-Engineer
+- 2026-07-10 agent=Build-Engineer phase=final-ci result=pass evidence=CI passed 5/5: formatting, clippy, workspace tests (214), task validator, and diff check. next=Roadmap-Planner
+
+This remains one M0019 milestone task for one problem: consuming an exact initializer use’s accepted refinement while preserving original nullable data.
 
 ## Handoff
 
-- Next Agent: `Task Decomposer` then `Test Engineer`
-- Reason: revalidate the task after M0019-014 and diagnostic authority unblock it, then create tests first.
-- Required Context: this task, M0019-014, `AGENTS.md`, `docs/SPEC.md`, ADR-0027, ADR-0028, ADR-0029, M0019 milestone, and M0019-013.
+- Next Agent: `Roadmap-Planner`
+- Reason: M0019-015 evidence is complete; continue with the next accepted M0019 work item according to milestone sequencing.
+- Required Context: the accepted M0019 roadmap/task records and their stated Authority Extracts.
