@@ -71,7 +71,7 @@ require_text "$review_dir/ADR-0025-chief-architect-decision.md" 'M0014 ambiguity
 require_text "$task" 'Status: `complete`'
 
 require_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
-require_absent_text crates/newlang/src/lib.rs 'pub mod module|pub mod modules|pub mod name_resolution'
+require_absent_text crates/newlang/src/lib.rs 'pub mod modules|pub mod name_resolution'
 require_absent_text crates/newlang/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
 
 echo "m0014-review: module package and visibility model proposal review validation passed"

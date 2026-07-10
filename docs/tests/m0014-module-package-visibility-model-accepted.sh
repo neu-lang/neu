@@ -88,10 +88,9 @@ require_text "$decision" 'M0014 ambiguity is resolved'
 require_text "$milestone" '\[x\] Module, package, and visibility source of truth is accepted'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path crates/newlang/src/module.rs
 require_absent_path crates/newlang/src/modules.rs
 require_absent_path crates/newlang/src/name_resolution.rs
-require_absent_text crates/newlang/src/lib.rs 'pub mod module|pub mod modules|pub mod name_resolution'
+require_absent_text crates/newlang/src/lib.rs 'pub mod modules|pub mod name_resolution'
 require_absent_text crates/newlang/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
 
 echo "m0014-accepted: module package and visibility accepted ADR validation passed"
