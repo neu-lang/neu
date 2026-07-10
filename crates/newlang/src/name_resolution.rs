@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::AstNodeId;
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
-use crate::parser::ParsedDeclarationName;
+use crate::parser::{ParsedDeclarationName, ParsedLocalBindingName};
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
 
@@ -268,6 +268,56 @@ impl LocalBindingIndex {
 
     pub fn bindings(&self) -> &[LocalBinding] {
         &self.bindings
+    }
+}
+
+#[derive(Debug)]
+pub struct LocalBindingIndexBuild {
+    index: LocalBindingIndex,
+    inserts: Vec<LocalBindingInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
+}
+
+impl LocalBindingIndexBuild {
+    pub fn index(&self) -> &LocalBindingIndex {
+        &self.index
+    }
+
+    pub fn inserts(&self) -> &[LocalBindingInsert] {
+        &self.inserts
+    }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn build_local_binding_index(
+    bindings: &[ParsedLocalBindingName],
+    scope: LocalScopeId,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut index = LocalBindingIndex::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for binding in bindings {
+        let name = interner.intern(&binding.name);
+        let key = LocalBindingKey::new(scope, name);
+        let insert = index.insert(LocalBinding::new(key, binding.binding, binding.kind));
+        if matches!(insert, LocalBindingInsert::Duplicate { .. }) {
+            diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::DuplicateName,
+                binding.name_span,
+            ));
+        }
+        inserts.push(insert);
+    }
+
+    LocalBindingIndexBuild {
+        index,
+        inserts,
+        diagnostics,
     }
 }
 

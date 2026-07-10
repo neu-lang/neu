@@ -1,10 +1,11 @@
 use newlang::ast::AstNodeId;
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    build_declaration_index, DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind,
-    DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey,
-    LocalBindingKind, LocalScopeId, ResolutionDiagnostic, ResolutionDiagnosticKind,
-    ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    build_declaration_index, build_local_binding_index, DeclarationIndex, DeclarationInsert,
+    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
+    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionDiagnostic,
+    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
+    TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -504,4 +505,60 @@ fn duplicate_local_binding_key_preserves_existing_binding() {
     );
     assert_eq!(index.get(&key), Some(&existing));
     assert_eq!(index.bindings().len(), 1);
+}
+
+#[test]
+fn builds_local_binding_index_from_parser_metadata() {
+    let file = SourceFileId::from_raw(40);
+    let parsed = parse_source(file, "fun run() { val first = one(); var second = first; }");
+    assert!(parsed.diagnostics.is_empty());
+    let scope = LocalScopeId::from_raw(4);
+    let mut interner = SymbolInterner::new();
+
+    let built = build_local_binding_index(&parsed.local_binding_names, scope, &mut interner);
+
+    assert_eq!(interner.symbols(), ["first", "second"]);
+    assert_eq!(built.index().bindings().len(), 2);
+    assert_eq!(built.inserts().len(), 2);
+    assert!(built.diagnostics().is_empty());
+    assert!(built
+        .inserts()
+        .iter()
+        .all(|insert| matches!(insert, LocalBindingInsert::Inserted(_))));
+    assert_eq!(built.index().bindings()[0].key().scope(), scope);
+    assert_eq!(built.index().bindings()[0].kind(), LocalBindingKind::Val);
+    assert_eq!(built.index().bindings()[1].kind(), LocalBindingKind::Var);
+}
+
+#[test]
+fn local_binding_index_builder_reports_same_scope_duplicates() {
+    let file = SourceFileId::from_raw(41);
+    let parsed = parse_source(file, "fun run() { val same = one(); var same = two(); }");
+    assert!(parsed.diagnostics.is_empty());
+    let mut interner = SymbolInterner::new();
+
+    let built = build_local_binding_index(
+        &parsed.local_binding_names,
+        LocalScopeId::from_raw(5),
+        &mut interner,
+    );
+
+    assert_eq!(built.index().bindings().len(), 1);
+    assert!(matches!(
+        built.inserts()[0],
+        LocalBindingInsert::Inserted(_)
+    ));
+    assert!(matches!(
+        built.inserts()[1],
+        LocalBindingInsert::Duplicate { .. }
+    ));
+    assert_eq!(built.diagnostics().len(), 1);
+    assert_eq!(
+        built.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::DuplicateName
+    );
+    assert_eq!(
+        built.diagnostics()[0].primary_span(),
+        parsed.local_binding_names[1].name_span
+    );
 }
