@@ -5,7 +5,7 @@ use crate::{
         ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
         ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression,
         ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
-        ParsedTypeNameReference,
+        ParsedTypeNameReference, ParsedUnaryExpression,
     },
     symbol::{SymbolId, SymbolInterner},
     types::{GenericParameterType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
@@ -1171,6 +1171,113 @@ pub fn type_grouped_expressions(
     }
 
     report
+}
+
+pub fn type_m0028_executable_int_operators(
+    unary_expressions: &[ParsedUnaryExpression],
+    binary_expressions: &[ParsedBinaryExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    known_expression_types: &[ExpressionType],
+    int_type: TypeId,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+
+    let mut completed = Vec::new();
+    loop {
+        let mut changed = false;
+
+        for unary in unary_expressions {
+            if completed.contains(&unary.expression) {
+                continue;
+            }
+            let Some(operand_type) = report.expression_type(unary.operand) else {
+                continue;
+            };
+
+            completed.push(unary.expression);
+            changed = true;
+            if operand_type == int_type {
+                report.record_expression_type(ExpressionType::new(unary.expression, int_type));
+            } else {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    unary.operand,
+                    int_type,
+                    operand_type,
+                ));
+            }
+        }
+
+        for binary in binary_expressions {
+            if completed.contains(&binary.expression)
+                || !is_m0028_executable_int_operator(binary.operator)
+            {
+                continue;
+            }
+            let (Some(left_type), Some(right_type)) = (
+                report.expression_type(binary.left),
+                report.expression_type(binary.right),
+            ) else {
+                continue;
+            };
+
+            completed.push(binary.expression);
+            changed = true;
+            if left_type != int_type {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    binary.left,
+                    int_type,
+                    left_type,
+                ));
+            } else if right_type != int_type {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    binary.right,
+                    int_type,
+                    right_type,
+                ));
+            } else {
+                report.record_expression_type(ExpressionType::new(binary.expression, int_type));
+            }
+        }
+
+        for grouped in grouped_expressions {
+            if completed.contains(&grouped.expression) {
+                continue;
+            }
+            let Some(inner_type) = report.expression_type(grouped.inner) else {
+                continue;
+            };
+
+            completed.push(grouped.expression);
+            changed = true;
+            report.record_expression_type(ExpressionType::new(grouped.expression, inner_type));
+        }
+
+        if !changed {
+            break;
+        }
+    }
+
+    report
+}
+
+fn is_m0028_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
+    matches!(
+        operator,
+        ParsedBinaryOperator::Plus
+            | ParsedBinaryOperator::Minus
+            | ParsedBinaryOperator::Star
+            | ParsedBinaryOperator::Slash
+            | ParsedBinaryOperator::Percent
+            | ParsedBinaryOperator::Exponent
+            | ParsedBinaryOperator::BitwiseAnd
+            | ParsedBinaryOperator::BitwiseOr
+            | ParsedBinaryOperator::BitwiseXor
+            | ParsedBinaryOperator::ShiftLeft
+            | ParsedBinaryOperator::ShiftRight
+    )
 }
 
 pub fn type_assignment_statements(

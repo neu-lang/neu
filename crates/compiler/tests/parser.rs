@@ -1,7 +1,7 @@
 use compiler::ast::AstNodeKind;
 use compiler::name_resolution::{DeclarationKind, LocalBindingKind};
-use compiler::parser::ParsedBinaryOperator;
 use compiler::parser::{DiagnosticKind, ParsedLiteralKind, parse_source};
+use compiler::parser::{ParsedBinaryOperator, ParsedUnaryOperator};
 use compiler::source::{ByteSpan, SourceFileId};
 
 #[test]
@@ -411,6 +411,36 @@ fn m0028_parses_executable_unary_operators() {
         .filter(|node| node.kind == AstNodeKind::UnaryExpression)
         .count();
     assert_eq!(unary_count, 3);
+}
+
+#[test]
+fn m0028_records_executable_unary_operator_metadata() {
+    let output = parse_source(
+        SourceFileId::from_raw(69),
+        "fun run() { const a = +value; const b = -value; const c = ~value; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.unary_expressions.len(), 3);
+    assert_eq!(
+        output
+            .unary_expressions
+            .iter()
+            .map(|expression| expression.operator)
+            .collect::<Vec<_>>(),
+        vec![
+            ParsedUnaryOperator::Plus,
+            ParsedUnaryOperator::Minus,
+            ParsedUnaryOperator::BitwiseNot,
+        ]
+    );
+    assert!(
+        output
+            .unary_expressions
+            .iter()
+            .all(|expression| output.arena.node(expression.operand).is_some())
+    );
 }
 
 #[test]

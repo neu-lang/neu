@@ -60,6 +60,7 @@ pub struct ParseOutput {
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub grouped_expressions: Vec<ParsedGroupedExpression>,
+    pub unary_expressions: Vec<ParsedUnaryExpression>,
     pub binary_expressions: Vec<ParsedBinaryExpression>,
     pub if_expressions: Vec<ParsedIfExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
@@ -184,6 +185,21 @@ pub struct ParsedGroupedExpression {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParsedUnaryOperator {
+    Plus,
+    Minus,
+    BitwiseNot,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedUnaryExpression {
+    pub expression: AstNodeId,
+    pub operator: ParsedUnaryOperator,
+    pub operand: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParsedBinaryOperator {
     LogicalOr,
     LogicalAnd,
@@ -265,6 +281,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
         grouped_expressions: parser.grouped_expressions,
+        unary_expressions: parser.unary_expressions,
         binary_expressions: parser.binary_expressions,
         if_expressions: parser.if_expressions,
         local_declarations: parser.local_declarations,
@@ -291,6 +308,7 @@ struct Parser<'source> {
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
     grouped_expressions: Vec<ParsedGroupedExpression>,
+    unary_expressions: Vec<ParsedUnaryExpression>,
     binary_expressions: Vec<ParsedBinaryExpression>,
     if_expressions: Vec<ParsedIfExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
@@ -326,6 +344,7 @@ impl<'source> Parser<'source> {
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
             grouped_expressions: Vec::new(),
+            unary_expressions: Vec::new(),
             binary_expressions: Vec::new(),
             if_expressions: Vec::new(),
             local_declarations: Vec::new(),
@@ -1088,11 +1107,23 @@ impl<'source> Parser<'source> {
     fn parse_unary_expression(&mut self) -> Option<ByteSpan> {
         match self.current_kind() {
             Some(TokenKind::Bang | TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
+                let operator = self.current_kind().expect("unary operator exists");
                 let start = self.current().expect("unary operator exists").span.start();
                 self.advance();
                 let operand = self.parse_unary_expression()?;
                 let span = self.span(start, operand.end());
-                self.arena.add_unary_expression(span);
+                let expression = self.arena.add_unary_expression(span);
+                if let (Some(operator), Some(operand)) = (
+                    parsed_unary_operator(operator),
+                    self.latest_expression_node_for_span(operand),
+                ) {
+                    self.record_unary_expression(ParsedUnaryExpression {
+                        expression,
+                        operator,
+                        operand,
+                        span,
+                    });
+                }
                 Some(span)
             }
             _ => self.parse_postfix_expression(),
@@ -1323,6 +1354,13 @@ impl<'source> Parser<'source> {
             .binary_expressions
             .partition_point(|existing| existing.span.start() <= binary.span.start());
         self.binary_expressions.insert(index, binary);
+    }
+
+    fn record_unary_expression(&mut self, unary: ParsedUnaryExpression) {
+        let index = self
+            .unary_expressions
+            .partition_point(|existing| existing.span.start() <= unary.span.start());
+        self.unary_expressions.insert(index, unary);
     }
 
     fn record_if_expression(&mut self, if_expression: ParsedIfExpression) {
@@ -2396,6 +2434,15 @@ fn parsed_binary_operator(kind: TokenKind) -> Option<ParsedBinaryOperator> {
         _ => return None,
     };
     Some(operator)
+}
+
+fn parsed_unary_operator(kind: TokenKind) -> Option<ParsedUnaryOperator> {
+    match kind {
+        TokenKind::Plus => Some(ParsedUnaryOperator::Plus),
+        TokenKind::Minus => Some(ParsedUnaryOperator::Minus),
+        TokenKind::Tilde => Some(ParsedUnaryOperator::BitwiseNot),
+        _ => None,
+    }
 }
 
 fn type_node_kind(kind: AstNodeKind) -> bool {

@@ -25,9 +25,9 @@ use compiler::{
         type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
-        type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        type_unsupported_m0018_expressions,
+        type_m0028_executable_int_operators, type_parser_literals,
+        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
+        type_resolved_name_expressions, type_unsupported_m0018_expressions,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -3444,6 +3444,109 @@ fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
     );
     assert_eq!(
         report.assignment_check(parsed.local_declarations[3].declaration),
+        None
+    );
+}
+
+#[test]
+fn m0028_executable_int_operators_type_every_supported_operator() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(90),
+        "fun run() { const plus = +1; const minus = -1; const not = ~1; const add = 1 + 2; const subtract = 1 - 2; const multiply = 1 * 2; const divide = 1 / 2; const modulo = 1 % 2; const exponent = 1 ** 2; const and = 1 & 2; const or = 1 | 2; const xor = 1 ^ 2; const left = 1 << 2; const right = 1 >> 2; const nested = (1 + 2) * 3; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, base_report) = type_m0018_accepted_expressions(
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let report = type_m0028_executable_int_operators(
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.grouped_expressions,
+        base_report.expression_types(),
+        TypeId::from_raw(1),
+    );
+
+    assert_eq!(report.diagnostics(), &[]);
+    for unary in &parsed.unary_expressions {
+        assert_eq!(
+            report.expression_type(unary.expression),
+            Some(TypeId::from_raw(1))
+        );
+    }
+    for binary in &parsed.binary_expressions {
+        assert_eq!(
+            report.expression_type(binary.expression),
+            Some(TypeId::from_raw(1))
+        );
+    }
+}
+
+#[test]
+fn m0028_executable_int_operators_reject_known_non_int_operands() {
+    let parsed = parse_source(SourceFileId::from_raw(91), "fun run() { true + 1; }");
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, base_report) = type_m0018_accepted_expressions(
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let report = type_m0028_executable_int_operators(
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.grouped_expressions,
+        base_report.expression_types(),
+        TypeId::from_raw(1),
+    );
+
+    let binary = &parsed.binary_expressions[0];
+    assert_eq!(report.expression_type(binary.expression), None);
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::TypeMismatch
+    );
+    assert_eq!(report.diagnostics()[0].node(), binary.left);
+    assert_eq!(
+        report.diagnostics()[0].expected_type(),
+        Some(TypeId::from_raw(1))
+    );
+    assert_eq!(
+        report.diagnostics()[0].actual_type(),
+        Some(TypeId::from_raw(0))
+    );
+}
+
+#[test]
+fn m0028_executable_int_operators_do_not_type_unknown_operands() {
+    let parsed = parse_source(SourceFileId::from_raw(92), "fun run() { unknown + 1; }");
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, base_report) = type_m0018_accepted_expressions(
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let report = type_m0028_executable_int_operators(
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.grouped_expressions,
+        base_report.expression_types(),
+        TypeId::from_raw(1),
+    );
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(
+        report.expression_type(parsed.binary_expressions[0].expression),
         None
     );
 }
