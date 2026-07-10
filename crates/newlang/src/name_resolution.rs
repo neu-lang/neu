@@ -348,9 +348,65 @@ impl LocalBindingIndex {
             .and_then(|index| self.bindings.get(*index))
     }
 
+    pub fn lookup_local(
+        &self,
+        scopes: &LocalScopeTree,
+        arena: &AstArena,
+        lookup: LocalNameLookup,
+    ) -> LocalNameLookupResult {
+        let mut current_scope = Some(lookup.start_scope);
+        while let Some(scope) = current_scope {
+            let key = LocalBindingKey::new(scope, lookup.name);
+            if let Some(binding) = self.get(&key) {
+                if local_binding_is_visible(arena, binding, lookup.reference_span) {
+                    return LocalNameLookupResult::Found(binding.clone());
+                }
+            }
+            current_scope = scopes.get(scope).and_then(|scope| scope.parent());
+        }
+
+        LocalNameLookupResult::Unresolved(ResolutionDiagnostic::new(
+            ResolutionDiagnosticKind::UnresolvedName,
+            lookup.reference_span,
+        ))
+    }
+
     pub fn bindings(&self) -> &[LocalBinding] {
         &self.bindings
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LocalNameLookup {
+    start_scope: LocalScopeId,
+    name: SymbolId,
+    reference_span: ByteSpan,
+}
+
+impl LocalNameLookup {
+    pub fn new(start_scope: LocalScopeId, name: SymbolId, reference_span: ByteSpan) -> Self {
+        Self {
+            start_scope,
+            name,
+            reference_span,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LocalNameLookupResult {
+    Found(LocalBinding),
+    Unresolved(ResolutionDiagnostic),
+}
+
+fn local_binding_is_visible(
+    arena: &AstArena,
+    binding: &LocalBinding,
+    reference_span: ByteSpan,
+) -> bool {
+    arena
+        .node(binding.binding())
+        .is_some_and(|node| node.span.end() <= reference_span.start())
 }
 
 #[derive(Debug)]

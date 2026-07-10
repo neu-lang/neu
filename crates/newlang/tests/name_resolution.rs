@@ -4,9 +4,9 @@ use newlang::name_resolution::{
     build_declaration_index, build_local_binding_index, build_local_scope_tree,
     build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
     DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
-    LocalBindingKey, LocalBindingKind, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
-    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
-    TopLevelLookupResult,
+    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
+    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -737,4 +737,157 @@ fn scoped_local_binding_builder_reports_same_block_duplicates() {
         built.diagnostics()[0].primary_span(),
         parsed.local_binding_names[1].name_span
     );
+}
+
+#[test]
+fn local_binding_lookup_finds_visible_binding_after_declaration() {
+    let source = "fun run() { val value = one(); value; }";
+    let file = SourceFileId::from_raw(70);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let value = interner.intern("value");
+    let reference_start = source.rfind("value").unwrap();
+    let reference_span =
+        ByteSpan::new(file, reference_start, reference_start + "value".len()).unwrap();
+
+    let result = built.index().lookup_local(
+        &scopes,
+        &parsed.arena,
+        LocalNameLookup::new(LocalScopeId::from_raw(0), value, reference_span),
+    );
+
+    assert_eq!(
+        result,
+        LocalNameLookupResult::Found(built.index().bindings()[0].clone())
+    );
+}
+
+#[test]
+fn local_binding_lookup_rejects_reference_before_declaration() {
+    let source = "fun run() { value; val value = one(); }";
+    let file = SourceFileId::from_raw(71);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let value = interner.intern("value");
+    let reference_start = source.find("value").unwrap();
+    let reference_span =
+        ByteSpan::new(file, reference_start, reference_start + "value".len()).unwrap();
+
+    let result = built.index().lookup_local(
+        &scopes,
+        &parsed.arena,
+        LocalNameLookup::new(LocalScopeId::from_raw(0), value, reference_span),
+    );
+
+    assert!(matches!(result, LocalNameLookupResult::Unresolved(_)));
+}
+
+#[test]
+fn local_binding_lookup_uses_nearest_visible_scope() {
+    let source = "fun run() { val same = one(); if (ready) { var same = two(); same; } }";
+    let file = SourceFileId::from_raw(72);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let same = interner.intern("same");
+    let reference_start = source.rfind("same").unwrap();
+    let reference_span =
+        ByteSpan::new(file, reference_start, reference_start + "same".len()).unwrap();
+
+    let result = built.index().lookup_local(
+        &scopes,
+        &parsed.arena,
+        LocalNameLookup::new(LocalScopeId::from_raw(1), same, reference_span),
+    );
+
+    assert_eq!(
+        result,
+        LocalNameLookupResult::Found(built.index().bindings()[1].clone())
+    );
+}
+
+#[test]
+fn local_binding_lookup_continues_past_not_yet_visible_inner_binding() {
+    let source = "fun run() { val same = one(); if (ready) { same; var same = two(); } }";
+    let file = SourceFileId::from_raw(73);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let same = interner.intern("same");
+    let reference_start = source.find("same;").unwrap();
+    let reference_span =
+        ByteSpan::new(file, reference_start, reference_start + "same".len()).unwrap();
+
+    let result = built.index().lookup_local(
+        &scopes,
+        &parsed.arena,
+        LocalNameLookup::new(LocalScopeId::from_raw(1), same, reference_span),
+    );
+
+    assert_eq!(
+        result,
+        LocalNameLookupResult::Found(built.index().bindings()[0].clone())
+    );
+}
+
+#[test]
+fn missing_local_binding_lookup_returns_unresolved_name_diagnostic() {
+    let source = "fun run() { missing; }";
+    let file = SourceFileId::from_raw(74);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let interner = SymbolInterner::new();
+    let index = LocalBindingIndex::new();
+    let reference_start = source.find("missing").unwrap();
+    let reference_span =
+        ByteSpan::new(file, reference_start, reference_start + "missing".len()).unwrap();
+
+    let result = index.lookup_local(
+        &scopes,
+        &parsed.arena,
+        LocalNameLookup::new(
+            LocalScopeId::from_raw(0),
+            SymbolId::from_raw(interner.symbols().len()),
+            reference_span,
+        ),
+    );
+
+    match result {
+        LocalNameLookupResult::Unresolved(diagnostic) => {
+            assert_eq!(diagnostic.kind(), ResolutionDiagnosticKind::UnresolvedName);
+            assert_eq!(diagnostic.primary_span(), reference_span);
+        }
+        LocalNameLookupResult::Found(_) => panic!("missing local lookup should be unresolved"),
+    }
 }
