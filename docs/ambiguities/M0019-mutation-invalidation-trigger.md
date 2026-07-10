@@ -5,7 +5,7 @@
 - Report ID: `M0019-mutation-invalidation-trigger`
 - Related Task: `M0019-016`
 - Related Milestone: `M0019`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-10`
 - Status: `resolved`
 - Resolved By: `ADR-0031`

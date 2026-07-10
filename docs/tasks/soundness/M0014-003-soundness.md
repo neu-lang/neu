@@ -4,7 +4,7 @@
 
 - Task ID: `M0014-003`
 - Milestone: `M0014`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -40,7 +40,7 @@
 
 ```text
 Attack: Accept ADR-0025 during review.
-Expected result: Chief Architect decision remains pending revision.
+Expected result: main task decision remains pending revision.
 Actual result: decision artifact says ADR-0025 is not accepted and M0014 remains blocked.
 Source of truth: docs/adr/proposals/reviews/ADR-0025-chief-architect-decision.md
 Outcome: pass

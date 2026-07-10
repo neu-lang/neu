@@ -4,7 +4,7 @@
 
 - Task ID: `M0012-004`
 - Milestone: `M0012`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -81,7 +81,7 @@ None.
 
 ## Ambiguities
 
-- ADR-0023 remains draft-only until Chief Architect acceptance.
+- ADR-0023 remains draft-only until main task acceptance.
 - M0012 parser implementation remains blocked until accepted source of truth exists.
 
 ## Decision

@@ -6,8 +6,8 @@
 - Milestone: `M0012`
 - Milestone File: `docs/milestones/M0012-type-and-generic-syntax-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0012-004-type-generic-syntax-concrete-draft`
 
@@ -19,13 +19,13 @@
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
   - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -40,7 +40,7 @@ ADR-0023 reviews request revision before acceptance because the proposal lacks c
 - Add concrete draft grammar sections to `docs/adr/proposals/ADR-0023-type-and-generic-syntax.md`.
 - Specify nullable binding, generic parameter placement, generic argument grammar, capability-bound syntax, function type grammar, grouping, recovery, diagnostics, and deferrals.
 - Resolve the review attack examples in draft form.
-- Keep M0012 ambiguity open and Chief Architect decision pending.
+- Keep M0012 ambiguity open and main task decision pending.
 
 ## Out Of Scope
 
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0023 does not yet contain `## Concrete Draft Grammar`.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Revise the draft proposal only. Do not move the draft into accepted ADRs or modi
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0012 remains blocked pending accepted syntax authority.
 
@@ -130,25 +130,25 @@ Revise the draft proposal only. Do not move the draft into accepted ADRs or modi
 
 ## Ambiguities And Dependencies
 
-- ADR-0023 remains draft-only until accepted by Chief Architect.
+- ADR-0023 remains draft-only until accepted by main task.
 - M0012 remains blocked by `docs/ambiguities/M0008-type-generic-syntax.md`.
 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0023 concrete draft revision task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created concrete draft validator before revising proposal.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-syntax-concrete-draft.sh failed because ADR-0023 lacked Concrete Draft Grammar.
-2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Revised ADR-0023 with concrete draft grammar, binding examples, recovery boundaries, diagnostics, and deferrals.
-2026-07-10 agent=Language-Designer phase=ordinary-tests result=pass notes=M0012 concrete draft, review, proposal, and blocker validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-004-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0012-004-review.md approves concrete draft and preserves M0012 blocker.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0023 concrete draft revision task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created concrete draft validator before revising proposal.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-syntax-concrete-draft.sh failed because ADR-0023 lacked Concrete Draft Grammar.
+2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Revised ADR-0023 with concrete draft grammar, binding examples, recovery boundaries, diagnostics, and deferrals.
+2026-07-10 main_task=Language-Designer phase=ordinary-tests result=pass notes=M0012 concrete draft, review, proposal, and blocker validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-004-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0012-004-review.md approves concrete draft and preserves M0012 blocker.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Consider whether concrete ADR-0023 draft can be accepted after validation.`
 - Required Context:
   - This task file

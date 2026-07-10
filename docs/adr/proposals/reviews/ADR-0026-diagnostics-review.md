@@ -1,4 +1,4 @@
-# ADR-0026 Diagnostics Engineer Review
+# ADR-0026 main-task diagnostics check Review
 
 Decision: request-revision-before-acceptance
 

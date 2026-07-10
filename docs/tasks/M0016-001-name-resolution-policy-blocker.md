@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-001-name-resolution-policy-blocker`
 
@@ -20,11 +20,11 @@
   - `docs/adr/ADR-0022-declaration-syntax.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0016 ambiguity report does not yet exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Add an ambiguity report and blocked-state validator only. Do not add name-resolu
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -125,7 +125,7 @@ Add an ambiguity report and blocked-state validator only. Do not add name-resolu
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement name resolution.
 - Do not implement import resolution.
 - Do not implement duplicate-name diagnostics.
@@ -135,24 +135,24 @@ Add an ambiguity report and blocked-state validator only. Do not add name-resolu
 ## Ambiguities And Dependencies
 
 - M0016 is blocked by `docs/ambiguities/M0016-name-resolution-policy.md`.
-- The next safe task is for Language Designer to draft a non-authoritative name-resolution policy proposal.
+- The next safe task is for main-task semantic design to draft a non-authoritative name-resolution policy proposal.
 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0016 name resolution policy blocker task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0016-name-resolution-blocked.sh before filing the ambiguity report.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-blocked.sh failed before implementation because docs/ambiguities/M0016-name-resolution-policy.md was missing.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Filed M0016 name resolution policy ambiguity report without adding name-resolution implementation.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0016 blocker, M0015 name table, and M0015 symbol interner validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-001-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0016-001-review.md approves blocked scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0016/M0015/M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 name resolution policy blocker task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0016-name-resolution-blocked.sh before filing the ambiguity report.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-blocked.sh failed before implementation because docs/ambiguities/M0016-name-resolution-policy.md was missing.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Filed M0016 name resolution policy ambiguity report without adding name-resolution implementation.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0016 blocker, M0015 name table, and M0015 symbol interner validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-001-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0016-001-review.md approves blocked scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0016/M0015/M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Lawyer`
+- Next main task: `main-task language review`
 - Reason: `File the M0016 name resolution policy ambiguity report.`
 - Required Context:
   - This task file

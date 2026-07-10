@@ -4,7 +4,7 @@
 
 - Proposal: `ADR-0028`
 - Milestone: `M0019`
-- Reviewer: `Simplicity Guardian`
+- main-task review: `main-task simplicity check`
 - Date: `2026-07-10`
 - Decision: `approve direction, request revision before acceptance`
 

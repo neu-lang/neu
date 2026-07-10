@@ -6,8 +6,8 @@
 - Milestone: `M0010`
 - Milestone File: `docs/milestones/M0010-parser-recovery-architecture.md`
 - Status: `complete`
-- Owner Agent: `Diagnostics Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task diagnostics check`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0010-001-parser-recovery-architecture`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
   - `docs/adr/ADR-0021-lexical-grammar.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -83,7 +83,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `docs/parser/recovery.md` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -98,7 +98,7 @@ Add documentation and synthetic fixture artifacts only. Use synthetic token name
 - [x] Implementation is the smallest passing architecture artifact.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0010 milestone checklist is updated.
 
@@ -143,18 +143,18 @@ Add documentation and synthetic fixture artifacts only. Use synthetic token name
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0010 parser recovery architecture task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created M0010 validator before adding recovery docs and synthetic diagnostics.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/parser/recovery.md.
-2026-07-09 agent=Diagnostics-Engineer phase=ordinary-tests result=pass notes=M0010 parser recovery architecture validation passed after adding recovery docs and synthetic diagnostics.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no concrete grammar fixture, parser code, or semantic diagnostics were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved parser recovery architecture and synthetic diagnostic shape.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0010 parser recovery architecture task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created M0010 validator before adding recovery docs and synthetic diagnostics.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/parser/recovery.md.
+2026-07-09 main_task=Diagnostics-Engineer phase=ordinary-tests result=pass notes=M0010 parser recovery architecture validation passed after adding recovery docs and synthetic diagnostics.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no concrete grammar fixture, parser code, or semantic diagnostics were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved parser recovery architecture and synthetic diagnostic shape.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Diagnostics Engineer`
+- Next main task: `main-task diagnostics check`
 - Reason: `Define parser recovery and diagnostic shape without parsing ambiguous syntax.`
 - Required Context:
   - This task file

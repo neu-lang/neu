@@ -6,8 +6,8 @@
 - Milestone: `M0012`
 - Milestone File: `docs/milestones/M0012-type-and-generic-syntax-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0012-002-type-generic-syntax-proposal`
 
@@ -18,12 +18,12 @@
   - `docs/adr/ADR-0006-nullability-and-absence.md`
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -89,7 +89,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `docs/adr/proposals/ADR-0023-type-and-generic-syntax.md` does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -104,7 +104,7 @@ Add a draft proposal only. Do not move the draft into accepted ADRs or modify pa
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0012 remains blocked pending accepted syntax authority.
 
@@ -138,24 +138,24 @@ Add a draft proposal only. Do not move the draft into accepted ADRs or modify pa
 ## Ambiguities And Dependencies
 
 - M0012 remains blocked by `docs/ambiguities/M0008-type-generic-syntax.md`.
-- Required follow-up reviews: Language Lawyer, Adversarial Engineer, Diagnostics Engineer, Simplicity Guardian, Chief Architect.
+- Required follow-up reviews: main-task language review, main-task adversarial check, main-task diagnostics check, main-task simplicity check, main task.
 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0012 type/generic syntax proposal task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created proposal validator before adding proposal file.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-syntax-proposal.sh failed because ADR-0023 proposal file was missing.
-2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Added non-authoritative ADR-0023 type and generic syntax draft proposal.
-2026-07-10 agent=Language-Designer phase=ordinary-tests result=pass notes=docs/tests/m0012-type-generic-syntax-proposal.sh and docs/tests/m0012-type-generic-parser-blocked.sh passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-002-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0012-002-review.md approves the non-authoritative proposal and preserves M0012 blocker.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0012 type/generic syntax proposal task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created proposal validator before adding proposal file.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-syntax-proposal.sh failed because ADR-0023 proposal file was missing.
+2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Added non-authoritative ADR-0023 type and generic syntax draft proposal.
+2026-07-10 main_task=Language-Designer phase=ordinary-tests result=pass notes=docs/tests/m0012-type-generic-syntax-proposal.sh and docs/tests/m0012-type-generic-parser-blocked.sh passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-002-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0012-002-review.md approves the non-authoritative proposal and preserves M0012 blocker.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Lawyer`
+- Next main task: `main-task language review`
 - Reason: `Audit the draft before acceptance.`
 - Required Context:
   - This task file

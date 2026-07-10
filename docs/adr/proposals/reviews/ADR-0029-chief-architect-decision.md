@@ -1,12 +1,12 @@
-# ADR-0029 Chief Architect Decision
+# ADR-0029 main task Decision
 
-Role: Chief Architect
+Role: main task
 
 Inputs read:
 
-- `AGENTS.md`
-- `.codex/agents/chief-architect.toml`
-- `.codex/agents/roadmap-planner.toml`
+- `main task rules`
+- `main task rules`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - `docs/adr/proposals/reviews/ADR-0029-language-lawyer-review.md`, including its revised-round verdict
@@ -36,7 +36,7 @@ Rationale:
 - ADR-0019 treats bounded compile-time evaluation as a separate direction, while ADR-0024 defers compile-time-evaluation syntax. The proposal therefore correctly requires explicit future supersession before local `const` could acquire compile-time meaning (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:141-149`).
 - ADR-0024 supplies the existing local-declaration initializer grammar; ADR-0026 supplies binding identity, scope, declaration order, shadowing, duplicate handling, and lookup; ADR-0028 predicates flow refinement on immutable local-binding identity. The proposal preserves those rules and changes only the relevant lexical spelling and spelling-dependent parser dispatch/recovery boundaries (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:151-193`, `375-388`).
 - The revised Simplicity, Diagnostics, and Adversarial verdicts approve. Their former blockers are closed by removal of contextual legacy recovery, preservation of ordinary diagnostics, the one-category cross-phase invariant, and the categorical exclusion of const-specific semantic metadata.
-- The Language Lawyer's revised-round `revise` verdict identified one remaining risk: an overbroad statement that could reject `val` even in a valid binding-name position. The final proposal corrects that issue exactly. It limits exclusion to the immutable-local declaration-introducer position, explicitly accepts `const val: Int = 1;` and `var val = 1;`, repeats the positional restriction in the cross-phase invariant, and preserves ordinary identifier treatment in the diagnostics and migration rules (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:98-113`, `228-250`, `273-288`). All other downstream references to removed `val` syntax are likewise qualified by declaration-introducer or binding-position context. The Language Lawyer's sole remaining blocker is therefore resolved; no semantic choice remains open.
+- The main-task language review's revised-round `revise` verdict identified one remaining risk: an overbroad statement that could reject `val` even in a valid binding-name position. The final proposal corrects that issue exactly. It limits exclusion to the immutable-local declaration-introducer position, explicitly accepts `const val: Int = 1;` and `var val = 1;`, repeats the positional restriction in the cross-phase invariant, and preserves ordinary identifier treatment in the diagnostics and migration rules (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:98-113`, `228-250`, `273-288`). All other downstream references to removed `val` syntax are likewise qualified by declaration-introducer or binding-position context. The main-task language review's sole remaining blocker is therefore resolved; no semantic choice remains open.
 - The design preserves memory safety and thread safety because every phase must consume the existing immutable-local category and may not derive ownership, borrowing, destruction, or concurrency capabilities from `const` (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:215-250`).
 - One canonical spelling, ordinary parser recovery, and no alias or migration subsystem are the minimum complexity needed for the owner's selected hard replacement.
 
@@ -64,14 +64,14 @@ Affected files:
 
 Required follow-up:
 
-1. Language Designer prepares the atomic acceptance bundle exactly as approved; Spec Compliance Auditor verifies that the accepted ADR, all four SPEC targets, and ledger records agree before the bundle becomes authoritative.
-2. Roadmap Planner keeps `M0019-014` paused and enforces these ordered gates from the proposal (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:337-359`):
+1. main-task semantic design prepares the atomic acceptance bundle exactly as approved; main-task specification check verifies that the accepted ADR, all four SPEC targets, and ledger records agree before the bundle becomes authoritative.
+2. main-task roadmap planning keeps `M0019-014` paused and enforces these ordered gates from the proposal (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:337-359`):
    1. the complete atomic authority bundle becomes authoritative;
-   2. Test Engineer performs the lexical, parser, binding-category, diagnostic, name-resolution, type-check, and flow tests-first migration and records the expected pre-implementation failures;
-   3. Implementer performs one coherent frontend migration of lexing, parsing, syntax metadata, and local-binding classification;
-   4. Test Engineer and required specialty reviewers verify semantic fixtures across name resolution, type checking, nullability, flow typing, and ownership-facing behavior, including proof that no const-specific semantics or metadata were introduced;
+   2. main-task test work performs the lexical, parser, binding-category, diagnostic, name-resolution, type-check, and flow tests-first migration and records the expected pre-implementation failures;
+   3. main-task implementation performs one coherent frontend migration of lexing, parsing, syntax metadata, and local-binding classification;
+   4. main-task test work and required specialty reviewers verify semantic fixtures across name resolution, type checking, nullability, flow typing, and ownership-facing behavior, including proof that no const-specific semantics or metadata were introduced;
    5. examples and related documentation migrate only after the semantic fixtures pass.
-3. After all five gates pass, Task Decomposer and Roadmap Planner revalidate `M0019-014` against the new authority before returning it to the Test Engineer/Implementer workflow.
+3. After all five gates pass, main-task task planning and main-task roadmap planning revalidate `M0019-014` against the new authority before returning it to the main-task test work/main-task implementation workflow.
 
 Open questions:
 
@@ -85,4 +85,4 @@ Blocked work:
 
 Handoff:
 
-Language Designer for the exact atomic acceptance bundle, with Spec Compliance Auditor verification; Roadmap Planner owns enforcement of the downstream gate sequence.
+main-task semantic design for the exact atomic acceptance bundle, with main-task specification check verification; main-task roadmap planning owns enforcement of the downstream gate sequence.

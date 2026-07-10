@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-003-expression-statement-pattern-syntax-proposal-review`
 
@@ -24,13 +24,13 @@
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
   - `docs/adr/ADR-0018-unsafe-ffi-and-trust-boundaries.md`
   - `docs/adr/ADR-0021-lexical-grammar.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -42,11 +42,11 @@ ADR-0024 currently defines a direction and acceptance checklist, not concrete gr
 
 ## Scope
 
-- Add Language Lawyer review for semantic consistency and missing grammar authority.
-- Add Adversarial Engineer review for ownership scope, coroutine, unsafe, pattern, and soundness risks.
-- Add Diagnostics Engineer review for diagnostic and recovery obligations.
-- Add Simplicity Guardian review for scope and abstraction control.
-- Add Chief Architect decision artifact preserving pending status.
+- Add main-task language review review for semantic consistency and missing grammar authority.
+- Add main-task adversarial check review for ownership scope, coroutine, unsafe, pattern, and soundness risks.
+- Add main-task diagnostics check review for diagnostic and recovery obligations.
+- Add main-task simplicity check review for scope and abstraction control.
+- Add main task decision artifact preserving pending status.
 
 ## Out Of Scope
 
@@ -84,7 +84,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0024 review artifacts do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -99,7 +99,7 @@ Create review artifacts only. Keep ADR-0024 as a draft proposal and leave the am
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -130,7 +130,7 @@ Create review artifacts only. Keep ADR-0024 as a draft proposal and leave the am
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs under `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not accept ADR-0024.
 - Do not add expression, statement, pattern, coroutine, or unsafe parser APIs.
@@ -146,19 +146,19 @@ Create review artifacts only. Keep ADR-0024 as a draft proposal and leave the am
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0013 ADR-0024 review task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-syntax-review.sh before adding review artifacts.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Review validator failed before implementation because ADR-0024 review artifacts did not exist.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Added required review artifacts and kept ADR-0024 pending.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0013 review, proposal, and blocker validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-003-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-003-review.md approves review-only scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0013 ADR-0024 review task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-syntax-review.sh before adding review artifacts.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Review validator failed before implementation because ADR-0024 review artifacts did not exist.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Added required review artifacts and kept ADR-0024 pending.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0013 review, proposal, and blocker validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-003-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-003-review.md approves review-only scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Revise ADR-0024 into concrete draft grammar after reviews.`
 - Required Context:
   - This task file

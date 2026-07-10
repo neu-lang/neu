@@ -6,8 +6,8 @@
 - Milestone: `M0014`
 - Milestone File: `docs/milestones/M0014-module-package-and-visibility-model.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0014-006-module-identity-model`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/ADR-0021-lexical-grammar.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -84,7 +84,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `crates/newlang/src/module.rs` and `newlang::module` do not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -99,7 +99,7 @@ Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module m
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -129,7 +129,7 @@ Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module m
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement package namespaces or visibility metadata in this task.
 - Do not add name resolution, symbol tables, module dependencies, manifests, target triples, or target-pack behavior.
 - Do not derive module identity from host paths, source roots, output paths, package names, current directories, or source file ordering.
@@ -142,19 +142,19 @@ Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module m
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0014 module identity model task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0014-module-identity-model.sh and Rust module tests before implementation.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-identity-model.sh failed before implementation because crates/newlang/src/module.rs was missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Added explicit ModuleName validation and ModuleMetadata source-file assignment model without package, visibility, or name-resolution behavior.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets module -- --nocapture plus M0014 module identity and accepted ADR validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-006-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0014-006-review.md approves module identity scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0014-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0014 module identity model task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0014-module-identity-model.sh and Rust module tests before implementation.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-identity-model.sh failed before implementation because crates/newlang/src/module.rs was missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added explicit ModuleName validation and ModuleMetadata source-file assignment model without package, visibility, or name-resolution behavior.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets module -- --nocapture plus M0014 module identity and accepted ADR validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-006-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0014-006-review.md approves module identity scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0014-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add failing tests for explicit module identity model.`
 - Required Context:
   - This task file

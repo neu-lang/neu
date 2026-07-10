@@ -4,7 +4,7 @@
 
 - Task ID: `M0012-003`
 - Milestone: `M0012`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -43,7 +43,7 @@
 
 ```text
 Attack: Treat reviews as acceptance of ADR-0023.
-Expected result: Rejected by Chief Architect decision remaining pending and accepted ADR path absent.
+Expected result: Rejected by main task decision remaining pending and accepted ADR path absent.
 Actual result: Validator requires Decision: pending and accepted ADR-0023 absence.
 Source of truth: docs/adr/proposals/reviews/ADR-0023-chief-architect-decision.md
 Outcome: pass

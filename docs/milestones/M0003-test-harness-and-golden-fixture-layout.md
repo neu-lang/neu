@@ -14,11 +14,11 @@ Define the test harness and fixture layout used by all later compiler stages.
 
 ## Motivation
 
-The project requires tests before implementation. Later agents need a consistent way to express positive, negative, and diagnostic expectations.
+The project requires tests before implementation. Later main tasks need a consistent way to express positive, negative, and diagnostic expectations.
 
 ## Background
 
-ADR-0015 makes diagnostics part of the semantic design. The agent rules require Test Engineer work before Implementer work.
+ADR-0015 makes diagnostics part of the semantic design. The main task rules require main-task test work work before main-task implementation work.
 
 ## Prerequisites
 
@@ -28,9 +28,9 @@ ADR-0015 makes diagnostics part of the semantic design. The agent rules require 
 
 - `docs/SPEC.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
-- `docs/AGENTS.md`
-- `.codex/agents/test-engineer.md`
-- `.codex/agents/diagnostics-engineer.md`
+- `docs/main task rules`
+- `main task rules`
+- `main task rules`
 
 ## Outputs
 

@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-021-bind-unqualified-function-references`
 
@@ -17,12 +17,12 @@
 - ADRs:
   - `docs/adr/ADR-0026-name-resolution-policy.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -83,7 +83,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Unqualified function reference binding APIs do not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -98,7 +98,7 @@ Add `FunctionReferenceBind` and `bind_unqualified_function_references`, reusing 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 
 ## Execution Commands
@@ -140,19 +140,19 @@ Add `FunctionReferenceBind` and `bind_unqualified_function_references`, reusing 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0016 unqualified function reference binding task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Updated name-resolution tests and M0016 data-model validator before adding unqualified function binder API.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=cargo test -p newlang --test name_resolution failed before implementation because bind_unqualified_function_references was missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Added FunctionReferenceBind and bind_unqualified_function_references with local-first then same-package function fallback.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test -p newlang --test name_resolution, M0016 data-model validator, and M0016 accepted-state validator passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found no import, cross-module, member, type, or broader resolver behavior.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 unqualified function reference binding task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated name-resolution tests and M0016 data-model validator before adding unqualified function binder API.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test -p newlang --test name_resolution failed before implementation because bind_unqualified_function_references was missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added FunctionReferenceBind and bind_unqualified_function_references with local-first then same-package function fallback.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test -p newlang --test name_resolution, M0016 data-model validator, and M0016 accepted-state validator passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found no import, cross-module, member, type, or broader resolver behavior.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Task Decomposer`
+- Next main task: `main-task task planning`
 - Reason: `Select the next M0016 task after unqualified function reference binding.`
 - Required Context:
   - This task file

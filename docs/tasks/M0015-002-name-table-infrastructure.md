@@ -6,8 +6,8 @@
 - Milestone: `M0015`
 - Milestone File: `docs/milestones/M0015-symbol-interning-and-name-tables.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0015-002-name-table-infrastructure`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `NameTable`, `NameTableKey`, and `NameTableEntry` do not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Extend `crates/newlang/src/symbol.rs` with a small insertion-ordered name table 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -125,7 +125,7 @@ Extend `crates/newlang/src/symbol.rs` with a small insertion-ordered name table 
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement import resolution.
 - Do not implement visibility enforcement.
 - Do not implement type checking.
@@ -141,19 +141,19 @@ Extend `crates/newlang/src/symbol.rs` with a small insertion-ordered name table 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0015 name table infrastructure task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0015-name-table-infrastructure.sh and Rust name table tests before implementation.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0015-name-table-infrastructure.sh failed before implementation because NameTable was missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Added NameTable keyed by module and symbol with duplicate insertion hook, without lookup policy or resolution semantics.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets symbol -- --nocapture plus M0015 name table and symbol interner validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0015-002-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0015-002-review.md approves name table infrastructure scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0015/M0014/M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0015 name table infrastructure task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0015-name-table-infrastructure.sh and Rust name table tests before implementation.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0015-name-table-infrastructure.sh failed before implementation because NameTable was missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added NameTable keyed by module and symbol with duplicate insertion hook, without lookup policy or resolution semantics.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets symbol -- --nocapture plus M0015 name table and symbol interner validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0015-002-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0015-002-review.md approves name table infrastructure scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0015/M0014/M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add failing tests for name table infrastructure.`
 - Required Context:
   - This task file

@@ -1,4 +1,4 @@
-# ADR-0026 Spec Compliance Auditor Review
+# ADR-0026 main-task specification check Review
 
 Decision: request-revision-before-acceptance
 

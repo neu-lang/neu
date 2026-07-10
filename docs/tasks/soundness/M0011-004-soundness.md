@@ -4,7 +4,7 @@
 
 - Task ID: `M0011-004`
 - Milestone: `M0011`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -39,7 +39,7 @@
 ```text
 Attack: Treat concrete draft grammar as accepted declaration syntax.
 Expected result: Rejected.
-Actual result: ADR-0022 status remains Draft proposal - not accepted source of truth, Chief Architect decision remains pending.
+Actual result: ADR-0022 status remains Draft proposal - not accepted source of truth, main task decision remains pending.
 Source of truth: docs/adr/proposals/ADR-0022-declaration-syntax.md
 Outcome: pass
 

@@ -1,6 +1,6 @@
 # Soundness Report: M0019-014
 
-Role: Adversarial Engineer
+Role: main-task adversarial check
 
 Target: `M0019-014` immutable-local spelling migration from `val` to `const`.
 
@@ -8,15 +8,15 @@ Target: `M0019-014` immutable-local spelling migration from `val` to `const`.
 
 - Task ID: `M0019-014`
 - Milestone: `M0019`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
 ## Inputs Read
 
-- `AGENTS.md`
-- `.codex/agents/adversarial-engineer.toml`
-- `.codex/agents/language-lawyer.toml`
+- `main task rules`
+- `main task rules`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/ADR-0019-compile-time-evaluation-and-metaprogramming.md`
 - `docs/adr/ADR-0021-lexical-grammar.md`
@@ -34,7 +34,7 @@ Target: `M0019-014` immutable-local spelling migration from `val` to `const`.
 - Relevant lexer, parser, name-resolution, type-check, and flow implementation
   and tests
 
-The task records that the Test Engineer changed tests first and observed 33
+The task records that the main-task test work changed tests first and observed 33
 missing-variant compilation errors for `KwConst` and `Immutable`, followed by a
 failure of the new migration validator before implementation. That is specific,
 plausible tests-first evidence. Because tests and implementation remain in one
@@ -196,10 +196,10 @@ requires ordinary diagnostics for the actual token sequence. Pointing at a
 valid following identifier or an empty location misstates which token made the
 source invalid.
 
-Required fix: Implementer must correct only the existing ordinary parser
+Required fix: main-task implementation must correct only the existing ordinary parser
 primary-span selection. Do not add a legacy-`val` diagnostic, rule identifier,
 recognizer, alias, fix-it, or recovery-as-success path. Retain the adversarial
-span assertions and return to Diagnostics Engineer and Adversarial Engineer.
+span assertions and return to main-task diagnostics check and main-task adversarial check.
 
 ### 2. High: two pre-existing phase validators retain the superseded category
 
@@ -215,7 +215,7 @@ Evidence:
 - The new `docs/tests/m0019-immutable-local-const-migration.sh` passes, so its
   selected textual scan does not detect these older broken gates.
 
-Required fix: Test Engineer must migrate those validator expectations to the
+Required fix: main-task test work must migrate those validator expectations to the
 source-independent `Immutable` category while retaining their mutable `Var`
 controls. Do not restore `Val` to satisfy the scripts.
 
@@ -235,7 +235,7 @@ Evidence:
 - The existing M0013 shell validator still passes because it only searches for
   selected text and never parses the fixture.
 
-Required fix: Test Engineer must restore one complete expectation set per case
+Required fix: main-task test work must restore one complete expectation set per case
 and validate the fixture with a strict TOML parser.
 
 ### 4. High: a lexer fixture still claims `const` produces `KW_VAL`
@@ -247,7 +247,7 @@ Evidence: `tests/fixtures/lexer/comments.fixture.toml:17-20` uses source
 `const /* open` but expects `KW_VAL`. The current M0007 fixture validator passes
 because it does not inspect that expected token.
 
-Required fix: Test Engineer must change the expected token to `KW_CONST` and
+Required fix: main-task test work must change the expected token to `KW_CONST` and
 strengthen the fixture validation enough to catch this contradiction.
 
 ## Negative Tests Added Or Proposed
@@ -294,12 +294,12 @@ and two changed fixtures are contradictory or invalid.
 
 Handoff:
 
-1. Test Engineer repairs the validators and fixtures without restoring any
+1. main-task test work repairs the validators and fixtures without restoring any
    spelling-specific semantic category.
-2. Implementer fixes only ordinary parser span selection for the two failing
+2. main-task implementation fixes only ordinary parser span selection for the two failing
    adversarial assertions.
-3. Diagnostics Engineer, Spec Compliance Auditor, Reviewer, Build Engineer, and
-   Adversarial Engineer re-run their gates.
+3. main-task diagnostics check, main-task specification check, main-task review, main-task build check, and
+   main-task adversarial check re-run their gates.
 4. Examples may migrate only after these semantic fixtures and specialty gates
    pass, as required by ADR-0029; current example deferral is not treated as a
    finding in this review.
@@ -363,10 +363,10 @@ not complete while the pre-existing M0016 data-model validator still encodes
 and requires the removed `Val` category and fails against
 `LocalBindingKind::Immutable`.
 
-Required final fix: Test Engineer must change only that stale validator
+Required final fix: main-task test work must change only that stale validator
 expectation to the source-independent immutable category, retain the `Var`
 control, and rerun the validator. Do not restore `Val` in compiler metadata.
-After that validator passes, Adversarial Engineer can change the final decision
+After that validator passes, main-task adversarial check can change the final decision
 to pass without reopening the already closed findings.
 
 Files changed by this re-review:
@@ -384,7 +384,7 @@ decisions while retaining their attack history.
   `docs/tests/m0016-name-resolution-data-model.sh` now requires the exact
   source-independent enum member `Immutable` and passes while retaining its
   `Var` control.
-- The Language Lawyer-confirmed ordinary function-name diagnostic span is
+- The main-task language review-confirmed ordinary function-name diagnostic span is
   implemented and protected by the passing `fun const();` assertion.
 - Removed-introducer recovery selects `val`, creates no immutable alias or
   binding, and recovers to the following `var` declaration.
@@ -426,7 +426,7 @@ cancellation, unsafe/FFI, lowering, and thread-capability behavior that remains
 explicitly deferred and unchanged by this spelling migration. No open question
 or blocker remains for M0019-014.
 
-Handoff: Reviewer for final task closure.
+Handoff: main-task review for final task closure.
 
 Files changed by this final re-review:
 

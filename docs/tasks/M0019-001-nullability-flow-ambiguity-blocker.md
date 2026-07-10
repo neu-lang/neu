@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-001-nullability-flow-ambiguity-blocker`
 
@@ -81,11 +81,11 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `docs/ambiguities/M0019-nullability-and-flow-typing.md` does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Create a documentation-only ambiguity report and no compiler behavior. The report must direct semantic resolution to Language Designer and Chief Architect before M0019 implementation continues.
+Create a documentation-only ambiguity report and no compiler behavior. The report must direct semantic resolution to main-task semantic design and main task before M0019 implementation continues.
 
 ## Acceptance Criteria
 
@@ -96,7 +96,7 @@ Create a documentation-only ambiguity report and no compiler behavior. The repor
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is reviewed.
 
@@ -129,7 +129,7 @@ Create a documentation-only ambiguity report and no compiler behavior. The repor
 - Do not implement flow tracking.
 - Do not implement smart casts.
 - Do not implement mutation invalidation.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
 ## Ambiguities And Dependencies
@@ -142,17 +142,17 @@ Create a documentation-only ambiguity report and no compiler behavior. The repor
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Task references only M0019 and blocks ambiguous nullability and flow typing rules before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`sh docs/tests/m0019-nullability-flow-blocked.sh` failed because `docs/ambiguities/M0019-nullability-and-flow-typing.md` did not exist.
-- 2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Filed open ambiguity report for M0019 nullability and flow typing; no compiler behavior changed.
-- 2026-07-10 agent=Language-Lawyer phase=ordinary-tests result=pass notes=`sh docs/tests/m0019-nullability-flow-blocked.sh` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-001-nullability-flow-ambiguity-blocker.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0019-001-nullability-flow-ambiguity-blocker.md` created review report; concrete review approved blocker after source-of-truth comparison.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0019-nullability-flow-blocked.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0019 and blocks ambiguous nullability and flow typing rules before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`sh docs/tests/m0019-nullability-flow-blocked.sh` failed because `docs/ambiguities/M0019-nullability-and-flow-typing.md` did not exist.
+- 2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Filed open ambiguity report for M0019 nullability and flow typing; no compiler behavior changed.
+- 2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=`sh docs/tests/m0019-nullability-flow-blocked.sh` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-001-nullability-flow-ambiguity-blocker.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0019-001-nullability-flow-ambiguity-blocker.md` created review report; concrete review approved blocker after source-of-truth comparison.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0019-nullability-flow-blocked.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Create and run the blocker validator before filing the ambiguity report.`
 - Required Context:
   - This task file

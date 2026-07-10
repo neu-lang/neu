@@ -18,7 +18,7 @@ Before declaring a milestone release, the compiler must be audited against the s
 
 ## Background
 
-`AGENTS.md` defines release workflow and CI gate requirements. Spec Compliance Auditor compares implementation against `docs/SPEC.md` and accepted ADRs.
+`main task rules` defines release workflow and CI gate requirements. main-task specification check compares implementation against `docs/SPEC.md` and accepted ADRs.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ Before declaring a milestone release, the compiler must be audited against the s
 - All completed milestones M0001-M0031.
 - `docs/SPEC.md`
 - `docs/adr/`
-- `AGENTS.md`
+- `main task rules`
 - CI results.
 
 ## Outputs
@@ -61,10 +61,10 @@ Before declaring a milestone release, the compiler must be audited against the s
 
 ## Acceptance Criteria
 
-- CI gates from `AGENTS.md` pass for implemented areas.
-- Spec Compliance Auditor signs off or lists blocking non-compliance.
-- Diagnostics Engineer signs off on implemented diagnostic areas.
-- Build Engineer signs off on host and cross-target smoke gates.
+- CI gates from `main task rules` pass for implemented areas.
+- main-task specification check signs off or lists blocking non-compliance.
+- main-task diagnostics check signs off on implemented diagnostic areas.
+- main-task build check signs off on host and cross-target smoke gates.
 - Known limitations do not contradict `docs/SPEC.md`.
 
 ## Test Strategy

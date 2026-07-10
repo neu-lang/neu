@@ -6,8 +6,8 @@
 - Milestone: `M0012`
 - Milestone File: `docs/milestones/M0012-type-and-generic-syntax-parser.md`
 - Status: `blocked`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0012-001-type-generic-syntax-blocker`
 
@@ -18,11 +18,11 @@
   - `docs/adr/ADR-0006-nullability-and-absence.md`
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -85,7 +85,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0012 blocker task is not yet recorded as blocked.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -100,7 +100,7 @@ Add blocker validation only. Do not implement parser code or create syntax fixtu
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -127,7 +127,7 @@ Add blocker validation only. Do not implement parser code or create syntax fixtu
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 - Do not add type AST nodes.
@@ -137,24 +137,24 @@ Add blocker validation only. Do not implement parser code or create syntax fixtu
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity: `docs/ambiguities/M0008-type-generic-syntax.md`
-- Required next step: Language Designer drafts type and generic syntax ADR or `docs/SPEC.md` revision.
+- Required next step: main-task semantic design drafts type and generic syntax ADR or `docs/SPEC.md` revision.
 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0012 type and generic syntax blocker task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created M0012 blocker validator.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-parser-blocked.sh failed before blocker status was recorded as blocked.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Recorded existing M0008 type/generic syntax ambiguity as blocking M0012 parser implementation.
-2026-07-10 agent=Language-Lawyer phase=ordinary-tests result=pass notes=docs/tests/m0012-type-generic-parser-blocked.sh passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-001-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=blocked notes=docs/tasks/reviews/M0012-001-review.md blocks implementation pending type/generic syntax ambiguity resolution.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0012 type and generic syntax blocker task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created M0012 blocker validator.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-parser-blocked.sh failed before blocker status was recorded as blocked.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Recorded existing M0008 type/generic syntax ambiguity as blocking M0012 parser implementation.
+2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=docs/tests/m0012-type-generic-parser-blocked.sh passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-001-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=blocked notes=docs/tasks/reviews/M0012-001-review.md blocks implementation pending type/generic syntax ambiguity resolution.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Draft type and generic syntax source-of-truth proposal before M0012 parser implementation.`
 - Required Context:
   - This task file

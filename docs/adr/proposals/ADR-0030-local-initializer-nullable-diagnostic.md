@@ -5,7 +5,7 @@ Status: Draft proposal — non-authoritative
 ## Non-Authority Notice
 
 This proposal is not accepted source of truth and must not drive implementation,
-tests, or `docs/SPEC.md` changes until Chief Architect approval.
+tests, or `docs/SPEC.md` changes until main task approval.
 
 ## Question
 
@@ -62,7 +62,7 @@ compatibility check.
 This proposal supersedes no accepted authority. If accepted, ADR-0030 clarifies
 only ADR-0028's `invalid_nullable_use` stable-identifier examples for annotated
 local initializers; ADR-0027's initializer-span rule and ADR-0029's spelling
-rule remain unchanged. Acceptance requires Diagnostics Engineer, Adversarial
-Engineer, Simplicity Guardian, and Chief Architect review. Afterwards, the
+rule remain unchanged. Acceptance requires main-task diagnostics check, Adversarial
+Engineer, main-task simplicity check, and main task review. Afterwards, the
 ADR-0028 summary in `docs/SPEC.md` and M0019-015 diagnostic expectation may be
 updated through their stated workflows.

@@ -6,8 +6,8 @@
 - Milestone: `<MILESTONE_ID>`
 - Milestone File: `docs/milestones/<MILESTONE_FILE>.md`
 - Status: `draft`
-- Owner Agent: `Test Engineer | Implementer | Diagnostics Engineer | Build Engineer | other`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task test work | main-task implementation | main-task diagnostics check | main-task build check | other`
+- Created By: `main-task task planning`
 - Created Date: `YYYY-MM-DD`
 - Branch: `task/<TASK_ID>-<slug>`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/<ADR>.md`
-- Project Rules: `AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.toml`
-  - `.codex/agents/test-engineer.toml`
-  - `.codex/agents/implementer.toml`
-  - `.codex/agents/reviewer.toml`
+- Project Rules: `main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -53,7 +53,7 @@
 
 ## Authority Extract
 
-This is the bounded context for the next agent. List exact sections, ADR
+This is the bounded context for the next main task. List exact sections, ADR
 headings, paths, and commands. Do not require whole documents unless the task
 is a semantic or architectural decision.
 
@@ -86,7 +86,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - <The missing behavior this task will implement.>
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -101,19 +101,19 @@ Tests must be created before implementation.
 - [ ] Implementation is the smallest passing change.
 - [ ] Ordinary tests pass.
 - [ ] Adversarial tests pass after ordinary tests.
-- [ ] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [ ] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [ ] CI passes as final gate.
 - [ ] Milestone checklist is updated.
 
 ## Review Routing
 
-- Base review: `Reviewer`
-- Test Engineer: `<required only when tests changed | not required>`
-- Spec Compliance Auditor: `<required only when semantic accept/reject behavior changes | not required>`
-- Diagnostics Engineer: `<required only when diagnostics change | not required>`
-- Build Engineer: `<required only when build/release files change | not required>`
-- Simplicity Guardian: `<required only when a new abstraction or boundary is introduced | not required>`
-- Adversarial Engineer: `<required only when a soundness boundary changes | not required>`
+- Base review: `main-task review`
+- main-task test work: `<required only when tests changed | not required>`
+- main-task specification check: `<required only when semantic accept/reject behavior changes | not required>`
+- main-task diagnostics check: `<required only when diagnostics change | not required>`
+- main-task build check: `<required only when build/release files change | not required>`
+- main-task simplicity check: `<required only when a new abstraction or boundary is introduced | not required>`
+- main-task adversarial check: `<required only when a soundness boundary changes | not required>`
 
 ## Execution Commands
 
@@ -139,7 +139,7 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
@@ -153,13 +153,13 @@ Append one concise entry per phase. Do not repeat the task, prior entries, or
 full command output.
 
 ```text
-YYYY-MM-DD agent=<agent> phase=<phase> result=<pass|fail|blocked> evidence=<command or finding> handoff=<next role|none>
+YYYY-MM-DD main_task=<main task> phase=<phase> result=<pass|fail|blocked> evidence=<command or finding> handoff=<next role|none>
 ```
 
 ## Handoff
 
-- Next Agent: `<agent>`
-- Reason: `<why this agent receives the task next>`
+- Next main task: `<main task>`
+- Reason: `<why this main task receives the task next>`
 - Required Context:
   - This task's Authority Extract
   - `<only additional path required for the handoff>`

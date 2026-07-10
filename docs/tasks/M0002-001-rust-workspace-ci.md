@@ -6,8 +6,8 @@
 - Milestone: `M0002`
 - Milestone File: `docs/milestones/M0002-rust-workspace-and-ci-skeleton.md`
 - Status: `complete`
-- Owner Agent: `Build Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task build check`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0002-001-rust-workspace-ci`
 
@@ -16,13 +16,13 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/build-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -57,8 +57,8 @@ M0002 requires repeatable validation commands before lexer, parser, semantic ana
   - `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
 - Existing files:
   - `docs/ROADMAP.md`
-  - `docs/AGENTS.md`
-  - `.codex/agents/build-engineer.md`
+  - `docs/main task rules`
+  - `main task rules`
 
 ## Required Tests
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - The Rust workspace manifest and CI skeleton do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Add the minimum workspace, placeholder crate, CI workflow, and build documentati
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -128,33 +128,33 @@ Add the minimum workspace, placeholder crate, CI workflow, and build documentati
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
 ## Ambiguities And Dependencies
 
 - No semantic ambiguity blocks this task because it intentionally creates no compiler behavior.
-- Build command details are owned by Build Engineer and do not define language semantics.
+- Build command details are owned by main-task build check and do not define language semantics.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created first M0002 task and narrowed it to workspace plus CI skeleton.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0002-workspace-ci.sh before implementation.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing required file Cargo.toml.
-2026-07-09 agent=Implementer phase=ordinary-tests result=pass notes=docs/tests/m0002-workspace-ci.sh passed after adding the minimal Rust workspace and CI skeleton.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; no compiler-feature paths or unsafe code introduced.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved against docs/SPEC.md and M0002.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Final CI-equivalent gate docs/tests/m0002-workspace-ci.sh passed.
-2026-07-09 agent=Build-Engineer phase=commit result=blocked notes=Repo root is /Users/c16a/projects with unrelated untracked directories; no scoped commit attempted.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created first M0002 task and narrowed it to workspace plus CI skeleton.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0002-workspace-ci.sh before implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing required file Cargo.toml.
+2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=docs/tests/m0002-workspace-ci.sh passed after adding the minimal Rust workspace and CI skeleton.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; no compiler-feature paths or unsafe code introduced.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved against docs/SPEC.md and M0002.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Final CI-equivalent gate docs/tests/m0002-workspace-ci.sh passed.
+2026-07-09 main_task=Build-Engineer phase=commit result=blocked notes=Repo root is /Users/c16a/projects with unrelated untracked directories; no scoped commit attempted.
 ```
 
 ## Handoff
 
-- Next Agent: `Roadmap Planner`
+- Next main task: `main-task roadmap planning`
 - Reason: `M0002 is complete; select M0003 next.`
 - Required Context:
   - This task file

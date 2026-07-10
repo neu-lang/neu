@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Test Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task test work`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-007-concrete-lexer-fixtures`
 
@@ -16,11 +16,11 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0021-lexical-grammar.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Concrete lexer fixture files do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -93,7 +93,7 @@ Add fixture metadata and expected token/diagnostic examples only. Do not add com
 - [x] Implementation is the smallest passing fixture addition.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Lexer implementation remains a separate task.
 
@@ -143,18 +143,18 @@ Add fixture metadata and expected token/diagnostic examples only. Do not add com
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 concrete lexer fixture task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0007-lexer-fixtures.sh before adding concrete fixture files.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected before token model and concrete fixture files were added.
-2026-07-09 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0007 concrete lexer fixture validation passed after adding ADR-0021-backed fixtures.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms fixtures cite ADR-0021 and no lexer or parser implementation was added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved fixture coverage for ADR-0021 token categories and lexical diagnostics.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 concrete lexer fixture task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0007-lexer-fixtures.sh before adding concrete fixture files.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected before token model and concrete fixture files were added.
+2026-07-09 main_task=main-task test work phase=ordinary-tests result=pass notes=M0007 concrete lexer fixture validation passed after adding ADR-0021-backed fixtures.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms fixtures cite ADR-0021 and no lexer or parser implementation was added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved fixture coverage for ADR-0021 token categories and lexical diagnostics.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add concrete lexer fixtures before lexer implementation.`
 - Required Context:
   - This task file

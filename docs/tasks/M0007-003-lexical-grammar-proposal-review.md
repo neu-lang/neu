@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Reviewer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-003-lexical-grammar-proposal-review`
 
@@ -16,13 +16,13 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -30,13 +30,13 @@ Review the draft lexical grammar ADR proposal and record the review findings req
 
 ## Motivation
 
-M0007 lexer implementation remains blocked because the project has no accepted lexical grammar. The draft proposal must be reviewed for soundness, diagnostic quality, and simplicity before the Chief Architect can decide whether to accept it or request revisions.
+M0007 lexer implementation remains blocked because the project has no accepted lexical grammar. The draft proposal must be reviewed for soundness, diagnostic quality, and simplicity before the main task can decide whether to accept it or request revisions.
 
 ## Scope
 
 - Add review artifacts for the draft lexical grammar proposal.
 - Add validation that required reviews exist and keep the proposal non-authoritative.
-- Record a pending Chief Architect decision.
+- Record a pending main task decision.
 - Keep the lexical grammar ambiguity open.
 - Keep M0007 implementation blocked until accepted source of truth exists.
 
@@ -72,7 +72,7 @@ Tests must be created before implementation.
 - Diagnostic tests:
   - Diagnostics review must cite lexical error categories, source spans, and ADR-0015.
 - Adversarial tests:
-  - Confirm the Chief Architect decision remains pending.
+  - Confirm the main task decision remains pending.
   - Confirm the proposal remains draft and non-authoritative.
   - Confirm the ambiguity report remains open.
   - Confirm no lexer implementation or concrete lexer fixtures are introduced.
@@ -84,11 +84,11 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Required proposal review artifacts do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Add review documents under `docs/adr/proposals/reviews/` for adversarial, diagnostics, simplicity, and Chief Architect decision tracking. The Chief Architect decision must remain pending and must not accept the draft as source of truth.
+Add review documents under `docs/adr/proposals/reviews/` for adversarial, diagnostics, simplicity, and main task decision tracking. The main task decision must remain pending and must not accept the draft as source of truth.
 
 ## Acceptance Criteria
 
@@ -99,7 +99,7 @@ Add review documents under `docs/adr/proposals/reviews/` for adversarial, diagno
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is not marked complete because M0007 remains blocked.
 
@@ -137,26 +137,26 @@ Add review documents under `docs/adr/proposals/reviews/` for adversarial, diagno
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity remains `docs/ambiguities/M0006-lexical-grammar.md`.
-- Chief Architect approval is required before the proposal can become accepted source of truth.
-- Language Designer ownership review is still required before acceptance.
+- main task approval is required before the proposal can become accepted source of truth.
+- main-task semantic design ownership review is still required before acceptance.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexical grammar proposal review task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0007-lexical-grammar-review.sh before adding review artifacts.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/reviews/ADR-0021-adversarial-review.md.
-2026-07-09 agent=Reviewer phase=ordinary-tests result=pass notes=M0007 review validation passed after review artifacts were added.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms proposal remains non-authoritative, ambiguity remains open, and no lexer code or concrete fixtures were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review package records required blockers without accepting lexical semantics.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexical grammar proposal review task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0007-lexical-grammar-review.sh before adding review artifacts.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/reviews/ADR-0021-adversarial-review.md.
+2026-07-09 main_task=main-task review phase=ordinary-tests result=pass notes=M0007 review validation passed after review artifacts were added.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms proposal remains non-authoritative, ambiguity remains open, and no lexer code or concrete fixtures were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review package records required blockers without accepting lexical semantics.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Reviewer`
+- Next main task: `main-task review`
 - Reason: `Review the draft lexical grammar proposal without accepting it as source of truth.`
 - Required Context:
   - This task file

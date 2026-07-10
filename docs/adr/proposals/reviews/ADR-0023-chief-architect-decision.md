@@ -1,4 +1,4 @@
-# ADR-0023 Chief Architect Decision
+# ADR-0023 main task Decision
 
 Decision: approved
 
@@ -18,10 +18,10 @@ M0012 type and generic parser fixture and implementation tasks may proceed only 
 
 ## Completed Review Dependencies
 
-- Language Lawyer review.
-- Adversarial Engineer review.
-- Diagnostics Engineer review.
-- Simplicity Guardian review.
+- main-task language review review.
+- main-task adversarial check review.
+- main-task diagnostics check review.
+- main-task simplicity check review.
 
 ## Resolved Acceptance Blockers
 
@@ -32,7 +32,7 @@ M0012 type and generic parser fixture and implementation tasks may proceed only 
 - Explicit function type grammar.
 - Explicit type syntax diagnostics.
 - Explicit recovery boundaries.
-- Final Chief Architect approval through accepted ADR and `docs/SPEC.md` update.
+- Final main task approval through accepted ADR and `docs/SPEC.md` update.
 
 ## Consequences
 

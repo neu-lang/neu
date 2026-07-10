@@ -4,7 +4,7 @@
 
 - ADR: `ADR-0027`
 - Milestone: `M0018`
-- Reviewer: `Adversarial Engineer`
+- main-task review: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `request revision before acceptance`
 

@@ -4,7 +4,7 @@
 
 - Task ID: `M0011-003`
 - Milestone: `M0011`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -39,7 +39,7 @@
 ```text
 Attack: Treat ADR-0022 reviews as source-of-truth acceptance.
 Expected result: Rejected.
-Actual result: Chief Architect decision says pending and not accepted source of truth.
+Actual result: main task decision says pending and not accepted source of truth.
 Source of truth: docs/adr/proposals/reviews/ADR-0022-chief-architect-decision.md
 Outcome: pass
 

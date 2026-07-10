@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-005-accept-name-resolution-policy-adr`
 
@@ -23,12 +23,12 @@
   - `docs/adr/ADR-0022-declaration-syntax.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/chief-architect.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -72,7 +72,7 @@ Tests must be created before implementation.
   - Accepted ADR-0026 exists and has `Status: Accepted`.
   - `docs/SPEC.md` contains ADR-0026 semantics.
   - Ambiguity report is resolved.
-  - Chief Architect decision is approved.
+  - main task decision is approved.
   - Milestone records accepted source-of-truth readiness.
 - Negative tests:
   - Compiler name-resolution implementation remains absent.
@@ -89,11 +89,11 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted `docs/adr/ADR-0026-name-resolution-policy.md` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Promote the reviewed concrete proposal into an accepted ADR, add the corresponding SPEC summary, resolve the ambiguity, approve the Chief Architect decision, update milestone readiness, and leave implementation for later tasks.
+Promote the reviewed concrete proposal into an accepted ADR, add the corresponding SPEC summary, resolve the ambiguity, approve the main task decision, update milestone readiness, and leave implementation for later tasks.
 
 ## Acceptance Criteria
 
@@ -104,7 +104,7 @@ Promote the reviewed concrete proposal into an accepted ADR, add the correspondi
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0016 ambiguity is resolved by accepted source of truth.
 
@@ -153,19 +153,19 @@ Promote the reviewed concrete proposal into an accepted ADR, add the correspondi
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0026 acceptance task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created accepted-state validator before accepting ADR-0026.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Accepted-state validator failed before implementation because docs/adr/ADR-0026-name-resolution-policy.md was missing.
-2026-07-10 agent=Chief-Architect phase=implementation result=pass notes=Accepted ADR-0026, updated SPEC, resolved M0016 ambiguity, approved Chief Architect decision, and updated milestone source-of-truth readiness.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0016 accepted, concrete draft, review, proposal, and authority validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-005-soundness.md after ordinary tests were recorded.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0016-005-review.md approved source-of-truth acceptance scope pending final CI gate.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 accepted/concrete/review/proposal/authority validators, M0015 validator, and M0002 validator passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0026 acceptance task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created accepted-state validator before accepting ADR-0026.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Accepted-state validator failed before implementation because docs/adr/ADR-0026-name-resolution-policy.md was missing.
+2026-07-10 main_task=Chief-Architect phase=implementation result=pass notes=Accepted ADR-0026, updated SPEC, resolved M0016 ambiguity, approved main task decision, and updated milestone source-of-truth readiness.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0016 accepted, concrete draft, review, proposal, and authority validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-005-soundness.md after ordinary tests were recorded.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0016-005-review.md approved source-of-truth acceptance scope pending final CI gate.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 accepted/concrete/review/proposal/authority validators, M0015 validator, and M0002 validator passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Accept ADR-0026 and resolve M0016 ambiguity.`
 - Required Context:
   - This task file

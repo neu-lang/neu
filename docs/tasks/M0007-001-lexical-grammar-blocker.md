@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `blocked`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-001-lexical-grammar-blocker`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -36,7 +36,7 @@ M0007 requires lexer fixtures from M0006 and spec-backed tokenization rules. M00
 - Record the M0007 blocker.
 - Add a validation script proving the ambiguity report is open.
 - Confirm no lexer implementation files exist.
-- Define the handoff to Language Designer and Chief Architect.
+- Define the handoff to main-task semantic design and main task.
 
 ## Out Of Scope
 
@@ -78,11 +78,11 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `pass`
 - Failure reason expected before implementation:
   - Not applicable. This is a blocker-record task, not implementation.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Do not implement lexer code. Add only the validation script and blocker record, then hand off to Language Designer for lexical grammar ADR/spec work.
+Do not implement lexer code. Add only the validation script and blocker record, then hand off to main-task semantic design for lexical grammar ADR/spec work.
 
 ## Acceptance Criteria
 
@@ -93,7 +93,7 @@ Do not implement lexer code. Add only the validation script and blocker record, 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [ ] Milestone checklist is updated.
 
@@ -127,22 +127,22 @@ Do not implement lexer code. Add only the validation script and blocker record, 
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity: `docs/ambiguities/M0006-lexical-grammar.md`.
-- Required next owner: `Language Designer`.
-- Required final resolver: `Chief Architect`.
+- Required next owner: `main-task semantic design`.
+- Required final resolver: `main task`.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 blocker task because lexical grammar is unresolved.
-2026-07-09 agent=Language-Lawyer phase=ordinary-tests result=pass notes=docs/tests/m0007-lexer-blocked.sh and prior milestone gates passed.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Blocked-state validation confirms no lexer implementation or concrete lexer fixtures exist.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 blocker task because lexical grammar is unresolved.
+2026-07-09 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=docs/tests/m0007-lexer-blocked.sh and prior milestone gates passed.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Blocked-state validation confirms no lexer implementation or concrete lexer fixtures exist.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `M0007 implementation is blocked until lexical grammar is specified through ADR/spec workflow.`
 - Required Context:
   - This task file

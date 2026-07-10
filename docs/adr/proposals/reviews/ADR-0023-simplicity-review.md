@@ -30,4 +30,4 @@ The accepted bootstrap grammar should be the smallest grammar that unblocks M001
 
 ## Non-Authority Finding
 
-This review does not accept the proposal. It requests a concrete minimal grammar before Chief Architect approval.
+This review does not accept the proposal. It requests a concrete minimal grammar before main task approval.

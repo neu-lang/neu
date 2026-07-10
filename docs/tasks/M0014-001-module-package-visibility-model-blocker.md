@@ -6,8 +6,8 @@
 - Milestone: `M0014`
 - Milestone File: `docs/milestones/M0014-module-package-and-visibility-model.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0014-001-module-package-visibility-model-blocker`
 
@@ -17,12 +17,12 @@
 - ADRs:
   - `docs/adr/ADR-0017-modules-visibility-and-api-evolution.md`
   - `docs/adr/ADR-0022-declaration-syntax.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `pass`
 - Failure reason expected before implementation:
   - Not applicable; blocker-state validator should pass when M0014 is correctly blocked.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -93,7 +93,7 @@ Add an ambiguity report and blocked-state validator only. Do not add module mode
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -121,7 +121,7 @@ Add an ambiguity report and blocked-state validator only. Do not add module mode
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement module model code.
 - Do not introduce module identity, package mapping, default visibility, or `internal` semantics.
 - Do not add name resolution.
@@ -129,25 +129,25 @@ Add an ambiguity report and blocked-state validator only. Do not add module mode
 ## Ambiguities And Dependencies
 
 - M0014 is blocked by `docs/ambiguities/M0014-module-package-visibility-model.md`.
-- The next safe task is for Language Designer to draft a non-authoritative module, package, namespace, and visibility model proposal.
+- The next safe task is for main-task semantic design to draft a non-authoritative module, package, namespace, and visibility model proposal.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0014 module/package/visibility model blocker task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0014-module-package-visibility-model-blocked.sh to enforce blocked state.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Filed M0014 ambiguity report without adding module model implementation.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=docs/tests/m0014-module-package-visibility-model-blocked.sh passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-001-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0014-001-review.md approves blocked scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Focused M0014-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0014 module/package/visibility model blocker task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0014-module-package-visibility-model-blocked.sh to enforce blocked state.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Filed M0014 ambiguity report without adding module model implementation.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=docs/tests/m0014-module-package-visibility-model-blocked.sh passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-001-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0014-001-review.md approves blocked scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Focused M0014-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Draft module, package, namespace, and visibility semantics proposal without accepting it as source of truth.`
 - Required Context:
   - This task file

@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-011-local-binding-resolution-identity`
 
@@ -71,7 +71,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Resolved local binding identity output does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -86,7 +86,7 @@ Extend the existing local reference binding result with passive records captured
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Examples decision is recorded.
 
@@ -115,7 +115,7 @@ Extend the existing local reference binding result with passive records captured
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not change local lookup or shadowing behavior.
 - Do not add per-use refined expression types or nullable diagnostics.
 
@@ -125,21 +125,21 @@ Extend the existing local reference binding result with passive records captured
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created prerequisite task for shadowing-safe local binding identity output.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added exact-binding, nested-shadowing, unresolved-use tests and a docs validator before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity` failed because resolved-local identity output was absent; docs validator failed for the missing record type.
-- 2026-07-10 agent=Test-Engineer phase=fixture-correction result=pass notes=Replaced unsupported boolean-literal condition text with an accepted name-expression condition; identity assertions and tested behavior were unchanged.
-- 2026-07-10 agent=Implementer phase=implement result=pass notes=Added passive resolved-local records captured directly from successful local lookup results without changing lookup or general resolution behavior.
-- 2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=Focused M0019 identity tests, the 57-test name-resolution suite, docs validator, and `git diff --check` passed; `cargo fmt --all` normalized the new fixture.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-check result=pass notes=Harness ran after ordinary tests; shadowing, scope exit, unresolved-name, and source-order attacks passed with a concrete soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Compared implementation with SPEC lexical scope rules, ADR-0028, and M0019; approved the fixture terminator correction and implementation pending final CI.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, workspace clippy with warnings denied, all 191 workspace tests, all listed M0019 validators, and the M0002 workspace CI gate passed.
-- 2026-07-10 agent=Task-Decomposer phase=milestone-checklist result=pass notes=No M0019 completion item changed; binding identity is a prerequisite and does not yet complete nullable checks, smart casts, or mutation invalidation.
-- 2026-07-10 agent=Implementer phase=examples-decision result=pass notes=No examples update; this task adds internal name-resolution identity metadata without changing source-language syntax or semantics.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created prerequisite task for shadowing-safe local binding identity output.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added exact-binding, nested-shadowing, unresolved-use tests and a docs validator before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity` failed because resolved-local identity output was absent; docs validator failed for the missing record type.
+- 2026-07-10 main_task=main-task test work phase=fixture-correction result=pass notes=Replaced unsupported boolean-literal condition text with an accepted name-expression condition; identity assertions and tested behavior were unchanged.
+- 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added passive resolved-local records captured directly from successful local lookup results without changing lookup or general resolution behavior.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=Focused M0019 identity tests, the 57-test name-resolution suite, docs validator, and `git diff --check` passed; `cargo fmt --all` normalized the new fixture.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=Harness ran after ordinary tests; shadowing, scope exit, unresolved-name, and source-order attacks passed with a concrete soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared implementation with SPEC lexical scope rules, ADR-0028, and M0019; approved the fixture terminator correction and implementation pending final CI.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, workspace clippy with warnings denied, all 191 workspace tests, all listed M0019 validators, and the M0002 workspace CI gate passed.
+- 2026-07-10 main_task=Task-Decomposer phase=milestone-checklist result=pass notes=No M0019 completion item changed; binding identity is a prerequisite and does not yet complete nullable checks, smart casts, or mutation invalidation.
+- 2026-07-10 main_task=main-task implementation phase=examples-decision result=pass notes=No examples update; this task adds internal name-resolution identity metadata without changing source-language syntax or semantics.
 
 ## Handoff
 
-- Next Agent: `Task Decomposer`
+- Next main task: `main-task task planning`
 - Reason: `Create the next M0019 task for per-use refined expression type records.`
 - Required Context:
   - This task file

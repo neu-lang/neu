@@ -6,8 +6,8 @@
 - Milestone: `M0012`
 - Milestone File: `docs/milestones/M0012-type-and-generic-syntax-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer | Adversarial Engineer | Diagnostics Engineer | Simplicity Guardian | Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review | main-task adversarial check | main-task diagnostics check | main-task simplicity check | main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0012-003-type-generic-syntax-proposal-review`
 
@@ -19,13 +19,13 @@
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
   - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -37,11 +37,11 @@ The draft ADR-0023 proposal identifies the right decision surface, but M0012 can
 
 ## Scope
 
-- Add Language Lawyer review for ADR-0023.
-- Add Adversarial Engineer review for capability-bound and soundness risks.
-- Add Diagnostics Engineer review for type syntax diagnostic obligations.
-- Add Simplicity Guardian review for grammar complexity.
-- Add Chief Architect decision artifact recording whether the proposal is accepted or needs revision.
+- Add main-task language review review for ADR-0023.
+- Add main-task adversarial check review for capability-bound and soundness risks.
+- Add main-task diagnostics check review for type syntax diagnostic obligations.
+- Add main-task simplicity check review for grammar complexity.
+- Add main task decision artifact recording whether the proposal is accepted or needs revision.
 - Keep ADR-0023 draft and M0012 ambiguity non-authoritative and open.
 
 ## Out Of Scope
@@ -75,9 +75,9 @@ The draft ADR-0023 proposal identifies the right decision surface, but M0012 can
 Tests must be created before implementation.
 
 - Positive tests:
-  - Review artifacts exist for Language Lawyer, Adversarial Engineer, Diagnostics Engineer, Simplicity Guardian, and Chief Architect.
+  - Review artifacts exist for main-task language review, main-task adversarial check, main-task diagnostics check, main-task simplicity check, and main task.
 - Negative tests:
-  - Chief Architect decision remains pending and proposal remains non-authoritative.
+  - main task decision remains pending and proposal remains non-authoritative.
   - Accepted ADR-0023, parser type APIs, type AST nodes, and type/generic fixtures remain absent.
 - Diagnostic tests:
   - Diagnostics review lists required diagnostic fields and categories before acceptance.
@@ -91,7 +91,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0023 review files do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -106,7 +106,7 @@ Create review documents only. Do not modify the proposal grammar or accept it as
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0012 remains blocked pending accepted syntax authority.
 
@@ -149,19 +149,19 @@ Create review documents only. Do not modify the proposal grammar or accept it as
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0023 proposal review task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created review validator before adding review files.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-syntax-review.sh failed because ADR-0023 review files were missing.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Added Language Lawyer, Adversarial, Diagnostics, Simplicity, and Chief Architect review artifacts requesting revision before acceptance.
-2026-07-10 agent=Language-Lawyer phase=ordinary-tests result=pass notes=docs/tests/m0012-type-generic-syntax-review.sh, proposal validator, and blocker validator passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-003-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0012-003-review.md approves review artifacts and preserves M0012 blocker.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0023 proposal review task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created review validator before adding review files.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0012-type-generic-syntax-review.sh failed because ADR-0023 review files were missing.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Added main-task language review, Adversarial, Diagnostics, Simplicity, and main task review artifacts requesting revision before acceptance.
+2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=docs/tests/m0012-type-generic-syntax-review.sh, proposal validator, and blocker validator passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-003-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0012-003-review.md approves review artifacts and preserves M0012 blocker.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Revise ADR-0023 into concrete grammar after review findings.`
 - Required Context:
   - This task file

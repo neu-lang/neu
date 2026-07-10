@@ -6,8 +6,8 @@
 - Milestone: `M0011`
 - Milestone File: `docs/milestones/M0011-declaration-parser.md`
 - Status: `complete`
-- Owner Agent: `Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0011-005-<slug>`
 
@@ -18,12 +18,12 @@
   - `docs/adr/ADR-0022-declaration-syntax.md`
   - `docs/adr/proposals/ADR-0022-declaration-syntax.md`
   - `docs/adr/proposals/reviews/ADR-0022-chief-architect-decision.md`
-- Project Rules: `AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -31,7 +31,7 @@ Accept ADR-0022 as declaration syntax source of truth, resolve the M0011 declara
 
 ## Motivation
 
-M0011 cannot safely parse concrete declaration syntax while package, import, visibility, and declaration forms are only described in a draft proposal. The concrete draft and reviews now provide enough reviewed material for the Chief Architect to either accept or reject a source-of-truth update.
+M0011 cannot safely parse concrete declaration syntax while package, import, visibility, and declaration forms are only described in a draft proposal. The concrete draft and reviews now provide enough reviewed material for the main task to either accept or reject a source-of-truth update.
 
 ## Scope
 
@@ -39,7 +39,7 @@ M0011 cannot safely parse concrete declaration syntax while package, import, vis
 - Add an ADR-0022 summary to `docs/SPEC.md`.
 - Resolve `docs/ambiguities/M0008-declaration-syntax.md`.
 - Update `docs/syntax/grammar-authority-ledger.md` for the declaration constructs covered by ADR-0022.
-- Update the Chief Architect decision artifact to record final approval.
+- Update the main task decision artifact to record final approval.
 - Update M0011 validation scripts so they distinguish historical draft/review evidence from accepted source of truth.
 
 ## Out Of Scope
@@ -75,7 +75,7 @@ Tests must be created before implementation.
 
 - Positive tests:
   - Accepted ADR-0022 exists, is marked accepted, and contains concrete declaration grammar sections.
-  - `docs/SPEC.md`, the ambiguity report, Chief Architect decision, and grammar authority ledger all point to accepted ADR-0022.
+  - `docs/SPEC.md`, the ambiguity report, main task decision, and grammar authority ledger all point to accepted ADR-0022.
 - Negative tests:
   - Parser implementation and parser fixture paths remain absent during this source-of-truth acceptance task.
 - Diagnostic tests:
@@ -90,7 +90,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted `docs/adr/ADR-0022-declaration-syntax.md` does not exist yet and the ambiguity remains open.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -105,7 +105,7 @@ Create an accepted ADR from the reviewed concrete draft, update only the source-
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -140,7 +140,7 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 
 - Do not modify compiler source files.
 - Do not add parser fixtures.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
@@ -156,19 +156,19 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=<agent> phase=<phase> result=<result> notes=<notes>
-2026-07-09 agent=Chief-Architect phase=task-created result=pass notes=Created acceptance task for ADR-0022 without parser implementation.
-2026-07-09 agent=Test-Engineer phase=pre-implementation-test result=fail notes=docs/tests/m0011-declaration-syntax-accepted.sh failed because docs/adr/ADR-0022-declaration-syntax.md was missing.
-2026-07-09 agent=Chief-Architect phase=implementation result=pass notes=Accepted ADR-0022, updated SPEC, resolved ambiguity, updated ledger and M0011 validators.
-2026-07-09 agent=Build-Engineer phase=ordinary-tests result=pass notes=Focused M0011 source-of-truth validators reached only task-completion guard before task status update; no source-of-truth mismatches remained.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0011-005-soundness.md after ordinary-tests evidence.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0011-M0002 validation scripts passed.
-2026-07-09 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0011-005-review.md approves scope, spec compliance, and milestone alignment.
+2026-07-09 main_task=<main task> phase=<phase> result=<result> notes=<notes>
+2026-07-09 main_task=Chief-Architect phase=task-created result=pass notes=Created acceptance task for ADR-0022 without parser implementation.
+2026-07-09 main_task=main-task test work phase=pre-implementation-test result=fail notes=docs/tests/m0011-declaration-syntax-accepted.sh failed because docs/adr/ADR-0022-declaration-syntax.md was missing.
+2026-07-09 main_task=Chief-Architect phase=implementation result=pass notes=Accepted ADR-0022, updated SPEC, resolved ambiguity, updated ledger and M0011 validators.
+2026-07-09 main_task=Build-Engineer phase=ordinary-tests result=pass notes=Focused M0011 source-of-truth validators reached only task-completion guard before task status update; no source-of-truth mismatches remained.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0011-005-soundness.md after ordinary-tests evidence.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0011-M0002 validation scripts passed.
+2026-07-09 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0011-005-review.md approves scope, spec compliance, and milestone alignment.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Final ADR acceptance and source-of-truth alignment.`
 - Required Context:
   - This task file

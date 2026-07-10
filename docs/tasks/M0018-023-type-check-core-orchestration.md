@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-023-type-check-core-orchestration`
 
@@ -26,7 +26,7 @@ Compose existing M0018 type-checking pieces into one core report helper for acce
 
 ## Motivation
 
-M0018 now has separate helpers for primitive declaration signatures, literal/name/grouped expression typing, local initializer checks, assignment checks, unresolved diagnostics, and unsupported diagnostics. The milestone deliverable is a type checker core with positive and negative fixtures, so implementation agents need one orchestration helper that produces the M0018 side-table report from accepted inputs without running earlier phases.
+M0018 now has separate helpers for primitive declaration signatures, literal/name/grouped expression typing, local initializer checks, assignment checks, unresolved diagnostics, and unsupported diagnostics. The milestone deliverable is a type checker core with positive and negative fixtures, so implementation main tasks need one orchestration helper that produces the M0018 side-table report from accepted inputs without running earlier phases.
 
 ## Scope
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0018 orchestration helper does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Add a helper that creates primitive type identities once, builds declaration sig
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] No compiler behavior beyond M0018 orchestration is introduced.
 - [x] Examples update is explicitly skipped because no language-level source forms changed.
@@ -135,12 +135,12 @@ Add a helper that creates primitive type identities once, builds declaration sig
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 type-check core orchestration task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added orchestration tests before implementation for well-typed accepted fixtures and mixed mismatch, unresolved, and unsupported diagnostics.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `type_m0018_core`.
-- 2026-07-10 agent=Implementer phase=implementation result=pass notes=Added `type_m0018_core` orchestration helper that composes existing M0018 report pieces without running parsing or name resolution.
-- 2026-07-10 agent=Implementer phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 171 tests.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-023-type-check-core-orchestration.md` passed after ordinary tests.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, ADR-0026, ADR-0024, and `docs/milestones/M0018-type-checking-core.md`.
-- 2026-07-10 agent=Examples-Curator phase=examples result=skip notes=No example update required because this task composes existing supported behavior and diagnostics without changing source forms users can write.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 type-check core orchestration task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added orchestration tests before implementation for well-typed accepted fixtures and mixed mismatch, unresolved, and unsupported diagnostics.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `type_m0018_core`.
+- 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added `type_m0018_core` orchestration helper that composes existing M0018 report pieces without running parsing or name resolution.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 171 tests.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-023-type-check-core-orchestration.md` passed after ordinary tests.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, ADR-0026, ADR-0024, and `docs/milestones/M0018-type-checking-core.md`.
+- 2026-07-10 main_task=Examples-Curator phase=examples result=skip notes=No example update required because this task composes existing supported behavior and diagnostics without changing source forms users can write.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

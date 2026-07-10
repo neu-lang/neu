@@ -256,8 +256,8 @@ The bootstrap type grammar defers:
 - `docs/adr/ADR-0022-declaration-syntax.md`
 - `docs/ambiguities/M0008-type-generic-syntax.md`
 - `docs/syntax/grammar-authority-ledger.md`
-- Language Lawyer audit
-- Adversarial Engineer review
-- Diagnostics Engineer review
-- Simplicity Guardian review
-- Chief Architect approval
+- main-task language review audit
+- main-task adversarial check review
+- main-task diagnostics check review
+- main-task simplicity check review
+- main task approval

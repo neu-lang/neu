@@ -6,8 +6,8 @@
 - Milestone: `M0014`
 - Milestone File: `docs/milestones/M0014-module-package-and-visibility-model.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0014-004-module-package-visibility-concrete-draft`
 
@@ -21,12 +21,12 @@
   - `docs/adr/proposals/reviews/ADR-0025-spec-compliance-review.md`
   - `docs/adr/proposals/reviews/ADR-0025-simplicity-review.md`
   - `docs/adr/proposals/reviews/ADR-0025-chief-architect-decision.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/build-engineer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -34,7 +34,7 @@ Revise the non-authoritative ADR-0025 proposal with concrete draft module identi
 
 ## Motivation
 
-The ADR-0025 reviews identify concrete blockers: private visibility, default visibility, bootstrap module identity input, source-file assignment, package absence, minimal metadata, and diagnostics. These must be resolved in the draft before Chief Architect can accept the model.
+The ADR-0025 reviews identify concrete blockers: private visibility, default visibility, bootstrap module identity input, source-file assignment, package absence, minimal metadata, and diagnostics. These must be resolved in the draft before main task can accept the model.
 
 ## Scope
 
@@ -81,7 +81,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0025 proposal does not yet contain concrete draft model sections and diagnostic table.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -96,7 +96,7 @@ Revise the proposal only. Do not move the draft into accepted ADRs or modify com
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0014 remains blocked pending accepted model authority.
 
@@ -134,19 +134,19 @@ Revise the proposal only. Do not move the draft into accepted ADRs or modify com
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0014 concrete draft revision task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created concrete draft validator before revising ADR-0025 proposal.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-package-visibility-model-concrete-draft.sh failed before implementation because concrete draft model sections were missing.
-2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Revised ADR-0025 proposal with concrete draft module identity, package namespace, visibility metadata, module metadata, and diagnostics.
-2026-07-10 agent=Language-Designer phase=ordinary-tests result=pass notes=M0014 concrete draft, review, proposal, and blocker validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-004-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0014-004-review.md approves concrete draft scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Focused M0014 concrete draft validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0014 concrete draft revision task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created concrete draft validator before revising ADR-0025 proposal.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-package-visibility-model-concrete-draft.sh failed before implementation because concrete draft model sections were missing.
+2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Revised ADR-0025 proposal with concrete draft module identity, package namespace, visibility metadata, module metadata, and diagnostics.
+2026-07-10 main_task=Language-Designer phase=ordinary-tests result=pass notes=M0014 concrete draft, review, proposal, and blocker validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-004-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0014-004-review.md approves concrete draft scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Focused M0014 concrete draft validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Review revised ADR-0025 for possible acceptance.`
 - Required Context:
   - This task file

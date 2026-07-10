@@ -6,8 +6,8 @@
 - Milestone: `M0005`
 - Milestone File: `docs/milestones/M0005-source-database-spans-and-file-identity.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0005-001-source-spans`
 
@@ -16,13 +16,13 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Source database and span types are not implemented yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Add the smallest source module that stores files in insertion order, returns sta
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -124,7 +124,7 @@ Add the smallest source module that stores files in insertion order, returns sta
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
@@ -138,18 +138,18 @@ Add the smallest source module that stores files in insertion order, returns sta
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created first M0005 task for source database and span mapping.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created source module tests and docs/tests/m0005-source-spans.sh before implementation.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=cargo test source::tests failed as expected because SourceDatabase, SourceFileId, and LineColumn were missing.
-2026-07-09 agent=Implementer phase=ordinary-tests result=pass notes=Focused source tests and full ordinary M0005 gate chain passed.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; invalid spans and out-of-scope compiler files checked.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved against docs/SPEC.md and M0005.
-2026-07-09 agent=Implementer phase=ci result=pass notes=Final CI-equivalent M0005 gate chain passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created first M0005 task for source database and span mapping.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created source module tests and docs/tests/m0005-source-spans.sh before implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test source::tests failed as expected because SourceDatabase, SourceFileId, and LineColumn were missing.
+2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=Focused source tests and full ordinary M0005 gate chain passed.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; invalid spans and out-of-scope compiler files checked.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved against docs/SPEC.md and M0005.
+2026-07-09 main_task=main-task implementation phase=ci result=pass notes=Final CI-equivalent M0005 gate chain passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Roadmap Planner`
+- Next main task: `main-task roadmap planning`
 - Reason: `M0005 is complete; select M0006 next.`
 - Required Context:
   - This task file

@@ -1,4 +1,4 @@
-# ADR-0025 Language Lawyer Review
+# ADR-0025 main-task language review Review
 
 Decision: request-revision-before-acceptance
 

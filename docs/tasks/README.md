@@ -17,10 +17,10 @@ Tasks are the executable unit of milestone work. One milestone becomes many smal
 - `docs/adr/`
 - `docs/ROADMAP.md`
 - `docs/milestones/`
+- `main task rules`
 - `AGENTS.md`
-- `.codex/agents/`
 
-If the spec or ADRs are ambiguous, agents must file an ambiguity report instead of guessing.
+If the spec or ADRs are ambiguous, main tasks must file an ambiguity report instead of guessing.
 
 ## Exact Execution Loop
 
@@ -32,7 +32,7 @@ If the spec or ADRs are ambiguous, agents must file an ambiguity report instead 
 6. implement smallest passing change
 7. run ordinary tests
 8. run adversarial tests
-9. run reviewer
+9. run main-task review
 10. update milestone checklist
 11. commit
 
@@ -40,10 +40,10 @@ If the spec or ADRs are ambiguous, agents must file an ambiguity report instead 
 
 - Tests must be generated before implementation.
 - Verification must record that tests fail before implementation for the expected reason.
-- Implementation may not modify or delete failing tests unless reviewer approval is recorded.
+- Implementation may not modify or delete failing tests unless main-task review approval is recorded.
 - Ordinary tests must pass before adversarial tests run.
 - Adversarial check must run after ordinary tests.
-- Reviewer must compare task output against `docs/SPEC.md` and the milestone.
+- main-task review must compare task output against `docs/SPEC.md` and the milestone.
 - CI is the final gate.
 
 ## Creating A Task

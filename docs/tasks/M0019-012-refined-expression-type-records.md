@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-012-refined-expression-type-records`
 
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Per-use M0019 refined expression type recording API does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -92,7 +92,7 @@ Add a focused flow-report enrichment function that evaluates resolved local name
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Examples decision is recorded.
 
@@ -120,7 +120,7 @@ Add a focused flow-report enrichment function that evaluates resolved local name
 ## Forbidden Changes
 
 - Do not modify `docs/SPEC.md` or `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not match refinements by textual name or symbol alone.
 - Do not refine uses outside the recorded branch region.
 - Do not mutate original declaration signatures or expression types.
@@ -132,21 +132,21 @@ Add a focused flow-report enrichment function that evaluates resolved local name
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created task for binding-identity-aware per-use refined expression type records.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added active-region, nested-shadowing, region-boundary, overlap-ambiguity tests and a docs validator before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Focused Rust tests failed on the missing `record_m0019_refined_expression_types` import and the validator failed on the absent function.
-- 2026-07-10 agent=Implementer phase=implement result=pass notes=Added report enrichment using exact local binding identity, AST name/block containment, source-order output, and overlap ambiguity diagnostics.
-- 2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=Focused tests, all 55 type-check tests, docs validator, formatting, and `git diff --check` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=add-attacks result=pass notes=Added forged non-name resolution and cross-source-file containment attacks after ordinary tests.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-check result=pass notes=All four focused attacks passed and the harness produced a concrete soundness report after ordinary tests.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Compared implementation against SPEC, ADR-0028, and M0019; no scope, compliance, architecture, or maintainability findings; approved pending final CI.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Formatting, workspace clippy with warnings denied, all 195 workspace tests, all listed M0019 validators, and the M0002 baseline CI gate passed.
-- 2026-07-10 agent=Task-Decomposer phase=milestone-checklist result=pass notes=No M0019 completion item changed; per-use views are now recorded, but nullable-use integration and mutation invalidation remain incomplete.
-- 2026-07-10 agent=Implementer phase=examples-decision result=pass notes=No examples update; this task adds internal type-check side-table output without changing accepted source forms or compiler accept/reject behavior.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created task for binding-identity-aware per-use refined expression type records.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added active-region, nested-shadowing, region-boundary, overlap-ambiguity tests and a docs validator before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Focused Rust tests failed on the missing `record_m0019_refined_expression_types` import and the validator failed on the absent function.
+- 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added report enrichment using exact local binding identity, AST name/block containment, source-order output, and overlap ambiguity diagnostics.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=Focused tests, all 55 type-check tests, docs validator, formatting, and `git diff --check` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=add-attacks result=pass notes=Added forged non-name resolution and cross-source-file containment attacks after ordinary tests.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=All four focused attacks passed and the harness produced a concrete soundness report after ordinary tests.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared implementation against SPEC, ADR-0028, and M0019; no scope, compliance, architecture, or maintainability findings; approved pending final CI.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Formatting, workspace clippy with warnings denied, all 195 workspace tests, all listed M0019 validators, and the M0002 baseline CI gate passed.
+- 2026-07-10 main_task=Task-Decomposer phase=milestone-checklist result=pass notes=No M0019 completion item changed; per-use views are now recorded, but nullable-use integration and mutation invalidation remain incomplete.
+- 2026-07-10 main_task=main-task implementation phase=examples-decision result=pass notes=No examples update; this task adds internal type-check side-table output without changing accepted source forms or compiler accept/reject behavior.
 
 ## Handoff
 
-- Next Agent: `Task Decomposer`
+- Next main task: `main-task task planning`
 - Reason: `Create the next M0019 task for nullable-use checking with active refinements.`
 - Required Context:
   - This task file

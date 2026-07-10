@@ -1,14 +1,14 @@
 # ADR-0029 Diagnostics Review
 
-Role: Diagnostics Engineer
+Role: main-task diagnostics check
 
 Diagnostic area: Hard migration from the immutable-local `val` spelling to
 `const`, including parser recovery and source-level suggestions.
 
 Inputs read:
 
-- `AGENTS.md`
-- `.codex/agents/diagnostics-engineer.toml`
+- `main task rules`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
@@ -135,9 +135,9 @@ parser recovery path is not defined tightly enough to coexist with
 contract blockers for acceptance; no semantic accept/reject rule is changed by
 this review.
 
-Handoff: Language Designer to revise ADR-0029's diagnostic section; then
-Diagnostics Engineer to verify the revised recognition predicate, recovery
-matrix, and fixture/snapshot contract before Chief Architect approval.
+Handoff: main-task semantic design to revise ADR-0029's diagnostic section; then
+main-task diagnostics check to verify the revised recognition predicate, recovery
+matrix, and fixture/snapshot contract before main task approval.
 
 ## Revised Review Round
 
@@ -190,6 +190,6 @@ not snapshot a special legacy diagnostic or semantic recovery artifact.
 
 Final verdict: **approve**
 
-Handoff: Chief Architect for proposal decision. Test Engineer should define the
+Handoff: main task for proposal decision. main-task test work should define the
 ordinary keyword and parser expectations during the separately authorized,
 tests-first migration.

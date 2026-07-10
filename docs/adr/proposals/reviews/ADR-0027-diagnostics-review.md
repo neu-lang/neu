@@ -4,7 +4,7 @@
 
 - ADR: `ADR-0027`
 - Milestone: `M0018`
-- Reviewer: `Diagnostics Engineer`
+- main-task review: `main-task diagnostics check`
 - Date: `2026-07-10`
 - Decision: `request revision before acceptance`
 
@@ -14,7 +14,7 @@ The proposed diagnostic categories are directionally sound, but acceptance needs
 
 `type_mismatch` needs separate span guidance for expression mismatch, assignment mismatch, call argument mismatch, and declaration annotation mismatch. These contexts should not all be collapsed if that would obscure the user-facing error.
 
-`unresolved_type_rule`, `unsupported_type_rule`, and `ambiguous_type_rule` need machine-stable rule identifiers so implementation agents can test that unsupported behavior is blocked for the right reason.
+`unresolved_type_rule`, `unsupported_type_rule`, and `ambiguous_type_rule` need machine-stable rule identifiers so implementation main tasks can test that unsupported behavior is blocked for the right reason.
 
 Recovery must describe what downstream phases receive. If typed output is blocked, the accepted ADR must say whether later phases stop entirely or receive error markers that cannot satisfy safety checks.
 

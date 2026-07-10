@@ -4,7 +4,7 @@
 
 - Proposal: `ADR-0028`
 - Milestone: `M0019`
-- Reviewer: `Spec Compliance Auditor`
+- main-task review: `main-task specification check`
 - Date: `2026-07-10`
 - Decision: `request revision before acceptance`
 

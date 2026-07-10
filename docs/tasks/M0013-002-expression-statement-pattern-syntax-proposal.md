@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-002-expression-statement-pattern-syntax-proposal`
 
@@ -22,11 +22,11 @@
   - `docs/adr/ADR-0012-pattern-matching-and-algebraic-data.md`
   - `docs/adr/ADR-0018-unsafe-ffi-and-trust-boundaries.md`
   - `docs/adr/ADR-0021-lexical-grammar.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Proposal file does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Create a planning proposal only. Do not move it into accepted ADRs, update `docs
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -122,7 +122,7 @@ Create a planning proposal only. Do not move it into accepted ADRs, update `docs
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs under `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce accepted language semantics.
 - Do not add expression, statement, pattern, coroutine, or unsafe parser APIs.
@@ -130,27 +130,27 @@ Create a planning proposal only. Do not move it into accepted ADRs, update `docs
 
 ## Ambiguities And Dependencies
 
-- M0013 remains blocked until Chief Architect accepts a future ADR or `docs/SPEC.md` revision.
-- This proposal must be reviewed by Language Lawyer, Adversarial Engineer, Diagnostics Engineer, and Simplicity Guardian before acceptance.
+- M0013 remains blocked until main task accepts a future ADR or `docs/SPEC.md` revision.
+- This proposal must be reviewed by main-task language review, main-task adversarial check, main-task diagnostics check, and main-task simplicity check before acceptance.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0013 expression/statement/pattern syntax proposal task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-syntax-proposal.sh before drafting proposal.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Proposal validator failed before implementation because ADR-0024 proposal did not exist.
-2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Drafted non-authoritative ADR-0024 proposal without changing accepted source of truth.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0013 proposal and blocker validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-002-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-002-review.md approves proposal-only scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0013 expression/statement/pattern syntax proposal task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-syntax-proposal.sh before drafting proposal.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Proposal validator failed before implementation because ADR-0024 proposal did not exist.
+2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Drafted non-authoritative ADR-0024 proposal without changing accepted source of truth.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0013 proposal and blocker validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-002-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-002-review.md approves proposal-only scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Lawyer`
+- Next main task: `main-task language review`
 - Reason: `Review the non-authoritative ADR-0024 proposal before concrete grammar drafting or acceptance.`
 - Required Context:
   - This task file

@@ -6,7 +6,7 @@ Status: Draft proposal - not accepted source of truth
 
 This file is a draft proposal only. It is not accepted language syntax, not an accepted ADR, and not a valid basis for parser implementation.
 
-No parser implementation may depend on this proposal until accepted by Chief Architect and moved into the accepted ADR set or incorporated into `docs/SPEC.md`.
+No parser implementation may depend on this proposal until accepted by main task and moved into the accepted ADR set or incorporated into `docs/SPEC.md`.
 
 The active blocker remains `docs/ambiguities/M0008-type-generic-syntax.md`.
 
@@ -334,8 +334,8 @@ This draft expects the bootstrap type grammar to defer:
 - `docs/adr/ADR-0022-declaration-syntax.md`
 - `docs/ambiguities/M0008-type-generic-syntax.md`
 - `docs/syntax/grammar-authority-ledger.md`
-- Language Lawyer audit
-- Adversarial Engineer review
-- Diagnostics Engineer review
-- Simplicity Guardian review
-- Chief Architect approval
+- main-task language review audit
+- main-task adversarial check review
+- main-task diagnostics check review
+- main-task simplicity check review
+- main task approval

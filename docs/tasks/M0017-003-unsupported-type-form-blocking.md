@@ -6,8 +6,8 @@
 - Milestone: `M0017`
 - Milestone File: `docs/milestones/M0017-type-representation.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0017-003-unsupported-type-form-blocking`
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `UnsupportedTypeForm`, `TypeDiagnostic`, and `TypeDiagnosticKind` do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -93,7 +93,7 @@ Add a small diagnostic-only model in `types.rs`. Do not create `TypeKind::Unsupp
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone unsupported-form checklist is updated.
 
@@ -126,7 +126,7 @@ Add a small diagnostic-only model in `types.rs`. Do not create `TypeKind::Unsupp
 - Do not modify parser behavior.
 - Do not add `TypeKind::Unsupported`.
 - Do not implement type lowering or type checking.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
 ## Ambiguities And Dependencies
@@ -136,9 +136,9 @@ Add a small diagnostic-only model in `types.rs`. Do not create `TypeKind::Unsupp
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and blocks deferred type forms as diagnostics.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `UnsupportedTypeForm`, `TypeDiagnostic`, and `TypeDiagnosticKind` did not exist.
-- 2026-07-10 agent=Implementer phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` passed after adding diagnostic-only unsupported type-form blocking; validator initially failed only because the milestone checklist had not yet been updated.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md` created review and concrete review approved after source-of-truth comparison.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, `sh docs/tests/m0017-nullable-type-representation.sh`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and blocks deferred type forms as diagnostics.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `UnsupportedTypeForm`, `TypeDiagnostic`, and `TypeDiagnosticKind` did not exist.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` passed after adding diagnostic-only unsupported type-form blocking; validator initially failed only because the milestone checklist had not yet been updated.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md` created review and concrete review approved after source-of-truth comparison.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, `sh docs/tests/m0017-nullable-type-representation.sh`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

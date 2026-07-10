@@ -60,7 +60,7 @@ Parser work cannot safely proceed by assuming Kotlin grammar. The project needs 
 
 ## Test Strategy
 
-- Manual audit by Language Lawyer and Language Designer.
+- Manual audit by main-task language review and main-task semantic design.
 - Text check that parser fixture metadata references the ledger.
 
 ## Risks

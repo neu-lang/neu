@@ -1,10 +1,10 @@
-# ADR-0027 Chief Architect Decision
+# ADR-0027 main task Decision
 
 ## Metadata
 
 - ADR: `ADR-0027`
 - Milestone: `M0018`
-- Decider: `Chief Architect`
+- Decider: `main task`
 - Date: `2026-07-10`
 - Decision: approved
 

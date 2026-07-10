@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-009-local-declaration-type-metadata`
 
@@ -79,7 +79,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `ParseOutput::local_declarations` and local declaration metadata records do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -94,7 +94,7 @@ Track the `AstNodeId` returned by `parse_type` and `parse_expression` for variab
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] No compiler behavior beyond parser local declaration metadata is introduced.
 
@@ -134,10 +134,10 @@ Track the `AstNodeId` returned by `parse_type` and `parse_expression` for variab
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 local declaration metadata task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added parser tests for local declaration annotation and initializer metadata before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed because `ParseOutput::local_declarations` does not exist yet.
-- 2026-07-10 agent=Implementer phase=ordinary-tests result=pass notes=Added parser local declaration metadata only; `cargo fmt --all --check`, `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-009-local-declaration-type-metadata.md` created a passing soundness report; concrete adversarial review found no scope expansion.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-009-local-declaration-type-metadata.md` created review artifact; concrete review approved against SPEC, ADR-0027, and M0018.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Final CI gate passed after review and soundness reports.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 local declaration metadata task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added parser tests for local declaration annotation and initializer metadata before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed because `ParseOutput::local_declarations` does not exist yet.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=Added parser local declaration metadata only; `cargo fmt --all --check`, `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-009-local-declaration-type-metadata.md` created a passing soundness report; concrete adversarial review found no scope expansion.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-009-local-declaration-type-metadata.md` created review artifact; concrete review approved against SPEC, ADR-0027, and M0018.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Final CI gate passed after review and soundness reports.

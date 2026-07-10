@@ -6,7 +6,7 @@ Status: Draft proposal - not accepted source of truth
 
 This file is a draft proposal only. It is not accepted language semantics, not an accepted ADR, and not a valid basis for lexer implementation.
 
-No lexer implementation may depend on this proposal until accepted by Chief Architect and moved into the accepted ADR set or incorporated into `docs/SPEC.md`.
+No lexer implementation may depend on this proposal until accepted by main task and moved into the accepted ADR set or incorporated into `docs/SPEC.md`.
 
 The active blocker remains `docs/ambiguities/M0006-lexical-grammar.md`.
 
@@ -63,9 +63,9 @@ The accepted version should not rely on Kotlin, Rust, Go, Cranelift, or LLVM def
 - `docs/SPEC.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - `docs/ambiguities/M0006-lexical-grammar.md`
-- Chief Architect approval
-- Language Designer ownership review
-- Adversarial Engineer soundness review
-- Diagnostics Engineer review
-- Simplicity Guardian review
+- main task approval
+- main-task semantic design ownership review
+- main-task adversarial check soundness review
+- main-task diagnostics check review
+- main-task simplicity check review
 

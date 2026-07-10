@@ -4,7 +4,7 @@
 
 - Task ID: `M0011-005`
 - Milestone: `M0011`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -62,8 +62,8 @@ Outcome: pass
 
 Attack: Use draft proposal as authority after acceptance.
 Expected result: Current source-of-truth documents cite accepted ADR-0022.
-Actual result: SPEC, ambiguity report, ledger, and Chief Architect decision cite docs/adr/ADR-0022-declaration-syntax.md.
-Source of truth: docs/AGENTS.md; docs/SPEC.md
+Actual result: SPEC, ambiguity report, ledger, and main task decision cite docs/adr/ADR-0022-declaration-syntax.md.
+Source of truth: docs/main task rules; docs/SPEC.md
 Outcome: pass
 ```
 

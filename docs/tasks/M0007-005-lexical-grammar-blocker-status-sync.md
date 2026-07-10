@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-005-lexical-grammar-blocker-status-sync`
 
@@ -16,10 +16,10 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -27,7 +27,7 @@ Synchronize lexical grammar blocker tracking documents with completed review art
 
 ## Motivation
 
-M0007 cannot proceed until lexical grammar is accepted. Several required reviews now exist, but the ambiguity report and Chief Architect decision still read as if no review progress has occurred.
+M0007 cannot proceed until lexical grammar is accepted. Several required reviews now exist, but the ambiguity report and main task decision still read as if no review progress has occurred.
 
 ## Scope
 
@@ -72,7 +72,7 @@ Tests must be created before implementation.
   - Not applicable beyond preserving diagnostics review status.
 - Adversarial tests:
   - Confirm the ambiguity remains open.
-  - Confirm the Chief Architect decision remains pending.
+  - Confirm the main task decision remains pending.
   - Confirm no lexer implementation or concrete lexer fixtures are introduced.
 
 ## Test-First Gate
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Blocker tracking documents have not been synchronized with completed reviews.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Update only status-tracking documentation to reflect completed review artifacts.
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is not marked complete because M0007 remains blocked.
 
@@ -133,7 +133,7 @@ Update only status-tracking documentation to reflect completed review artifacts.
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity remains `docs/ambiguities/M0006-lexical-grammar.md`.
-- Chief Architect approval is still required before the proposal can become accepted source of truth.
+- main task approval is still required before the proposal can become accepted source of truth.
 - A concrete lexical grammar is still missing from source of truth.
 
 ## Execution Log
@@ -141,18 +141,18 @@ Update only status-tracking documentation to reflect completed review artifacts.
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 blocker status synchronization task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0007-blocker-status-sync.sh before synchronizing blocker documents.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected because blocker tracking documents were not synchronized with completed reviews.
-2026-07-09 agent=Language-Lawyer phase=ordinary-tests result=pass notes=M0007 blocker status synchronization validation passed after updating tracking documents.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms status sync does not accept semantics, close ambiguity, or add lexer code.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved status synchronization as scoped governance work.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 blocker status synchronization task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0007-blocker-status-sync.sh before synchronizing blocker documents.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected because blocker tracking documents were not synchronized with completed reviews.
+2026-07-09 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=M0007 blocker status synchronization validation passed after updating tracking documents.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms status sync does not accept semantics, close ambiguity, or add lexer code.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved status synchronization as scoped governance work.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Lawyer`
+- Next main task: `main-task language review`
 - Reason: `Synchronize blocker status without resolving the ambiguity.`
 - Required Context:
   - This task file

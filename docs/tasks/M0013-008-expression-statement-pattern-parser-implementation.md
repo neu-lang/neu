@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-008-expression-statement-pattern-parser-implementation`
 
@@ -16,13 +16,13 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -94,7 +94,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `crates/newlang/src/parser.rs` does not yet define ADR-0024 parser diagnostics or parse body syntax into AST nodes.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -109,7 +109,7 @@ Extend the existing parser with syntax-only recursive descent routines for ADR-0
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -138,7 +138,7 @@ Extend the existing parser with syntax-only recursive descent routines for ADR-0
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`.
 - Do not accept `when`, `match`, loop, coroutine, unsafe block, indexing, lambda, receiver, or destructuring syntax.
@@ -155,19 +155,19 @@ Extend the existing parser with syntax-only recursive descent routines for ADR-0
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0013 body parser implementation task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-parser-implementation.sh and Rust parser test additions before implementation.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0013-expression-statement-pattern-parser-implementation.sh failed before implementation because ADR-0024 parser diagnostics were missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Implemented syntax-only ADR-0024 function body parsing, statement parsing, expression parsing, reusable pattern parsing, and parser diagnostics without semantic analysis.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test --workspace --test parser -- --nocapture and docs/tests/m0013-expression-statement-pattern-parser-implementation.sh passed.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-008-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-008-review.md approves ADR-0024 parser implementation scope.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0013 body parser implementation task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-parser-implementation.sh and Rust parser test additions before implementation.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0013-expression-statement-pattern-parser-implementation.sh failed before implementation because ADR-0024 parser diagnostics were missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Implemented syntax-only ADR-0024 function body parsing, statement parsing, expression parsing, reusable pattern parsing, and parser diagnostics without semantic analysis.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --test parser -- --nocapture and docs/tests/m0013-expression-statement-pattern-parser-implementation.sh passed.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-008-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-008-review.md approves ADR-0024 parser implementation scope.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add failing parser implementation tests before body parser implementation.`
 - Required Context:
   - This task file

@@ -1,4 +1,4 @@
-# ADR-0026 Adversarial Engineer Review
+# ADR-0026 main-task adversarial check Review
 
 Decision: request-revision-before-acceptance
 

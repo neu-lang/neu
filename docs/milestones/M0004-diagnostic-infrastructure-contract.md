@@ -28,7 +28,7 @@ ADR-0015 requires diagnostic obligations for all core safety systems.
 
 - `docs/SPEC.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
-- `.codex/agents/diagnostics-engineer.md`
+- `main task rules`
 
 ## Outputs
 
@@ -60,7 +60,7 @@ ADR-0015 requires diagnostic obligations for all core safety systems.
 ## Test Strategy
 
 - Harness-level diagnostic snapshot smoke test.
-- Manual review by Diagnostics Engineer.
+- Manual review by main-task diagnostics check.
 
 ## Risks
 

@@ -1,11 +1,11 @@
 # ADR-0029 Simplicity Review
 
-Role: Simplicity Guardian
+Role: main-task simplicity check
 Target: `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 
 Inputs read:
 
-- `AGENTS.md`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - `docs/adr/ADR-0013-mutability-model.md`
@@ -126,8 +126,8 @@ Blockers:
 
 Handoff:
 
-Return to the Language Designer for proposal revision, then to the Chief
-Architect for the acceptance decision. Diagnostics Engineer should separately
+Return to the main-task semantic design for proposal revision, then to the Chief
+Architect for the acceptance decision. main-task diagnostics check should separately
 decide whether the migration hint justifies its bounded parser integration.
 
 ## Revised-Round Review
@@ -136,8 +136,8 @@ Date: `2026-07-10`
 
 Inputs read for revised round:
 
-- `AGENTS.md`
-- `.codex/agents/simplicity-guardian.toml`
+- `main task rules`
+- `main task rules`
 - `docs/SPEC.md`
 - revised `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - this prior simplicity review
@@ -190,7 +190,7 @@ evaluator implications, storage semantics, and speculative extension points.
 
 Required changes after revised round:
 
-- None from Simplicity Guardian.
+- None from main-task simplicity check.
 
 Open questions after revised round:
 
@@ -206,5 +206,5 @@ Files changed:
 
 Handoff after revised round:
 
-Chief Architect for the final acceptance decision after the remaining required
+main task for the final acceptance decision after the remaining required
 role reviews and atomic authority-update requirements are satisfied.

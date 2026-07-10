@@ -1,4 +1,4 @@
-# ADR-0026 Simplicity Guardian Review
+# ADR-0026 main-task simplicity check Review
 
 Decision: request-revision-before-acceptance
 

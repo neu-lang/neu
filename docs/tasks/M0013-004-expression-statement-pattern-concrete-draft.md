@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-004-expression-statement-pattern-concrete-draft`
 
@@ -17,12 +17,12 @@
 - ADRs:
   - `docs/adr/proposals/ADR-0024-expression-statement-pattern-syntax.md`
   - `docs/adr/proposals/reviews/ADR-0024-*.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0024 does not yet contain concrete draft grammar.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -93,7 +93,7 @@ Edit only the ADR-0024 proposal and task metadata. Do not create accepted source
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -120,14 +120,14 @@ Edit only the ADR-0024 proposal and task metadata. Do not create accepted source
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs under `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not accept ADR-0024.
 - Do not add parser fixtures, AST nodes, or parser implementation.
 - Do not resolve the M0013 ambiguity.
 
 ## Ambiguities And Dependencies
 
-- M0013 remains blocked until Chief Architect accepts ADR-0024 or a `docs/SPEC.md` revision.
+- M0013 remains blocked until main task accepts ADR-0024 or a `docs/SPEC.md` revision.
 - Concrete draft grammar will still need review before acceptance.
 
 ## Execution Log
@@ -135,19 +135,19 @@ Edit only the ADR-0024 proposal and task metadata. Do not create accepted source
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0013 concrete draft grammar task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-syntax-concrete-draft.sh before revising proposal.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Concrete draft validator failed before implementation because ADR-0024 lacked concrete draft grammar.
-2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Revised ADR-0024 with concrete draft grammar, precedence, diagnostics, recovery, attack cases, and deferrals.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0013 concrete draft, review, proposal, and blocker validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-004-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-004-review.md approves concrete draft-only scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0013 concrete draft grammar task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-syntax-concrete-draft.sh before revising proposal.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Concrete draft validator failed before implementation because ADR-0024 lacked concrete draft grammar.
+2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Revised ADR-0024 with concrete draft grammar, precedence, diagnostics, recovery, attack cases, and deferrals.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0013 concrete draft, review, proposal, and blocker validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-004-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-004-review.md approves concrete draft-only scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Decide whether concrete ADR-0024 draft is ready for acceptance or needs another review cycle.`
 - Required Context:
   - This task file

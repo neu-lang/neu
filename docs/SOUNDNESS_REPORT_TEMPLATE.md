@@ -4,7 +4,7 @@
 
 - Task ID: `<TASK_ID>`
 - Milestone: `<MILESTONE_ID>`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `YYYY-MM-DD`
 - Decision: `pass | fail | block pending ambiguity`
 

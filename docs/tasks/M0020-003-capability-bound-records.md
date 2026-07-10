@@ -62,6 +62,6 @@ linked to its generic parameter type.
 - 2026-07-10 main_task=Main phase=create-task result=pass evidence=opaque bound-record task created from accepted generic syntax and M0020-002 type records. handoff=main task
 - 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0020_capability_bound_records` failed only because `build_m0020_capability_bound_records` was absent. handoff=main task
 - 2026-07-10 main_task=Main phase=implementation result=pass evidence=opaque bound occurrence records preserve parameter/type/node identity and interned names; focused test passed. handoff=main task
-- 2026-07-10 agent=Main phase=ordinary-tests result=pass evidence=focused bound-record test, validator, formatting, strict clippy, and 218 workspace tests passed. handoff=Reviewer
-- 2026-07-10 agent=Main phase=adversarial result=pass evidence=missing mappings and opaque capability-bound behavior verified; `docs/tasks/soundness/M0020-003-soundness.md`. handoff=Reviewer
-- 2026-07-10 agent=Main phase=review result=approve evidence=scope and ADR-0014/0016/0023 compliance verified; `docs/tasks/reviews/M0020-003-review.md`. handoff=none
+- 2026-07-10 main_task=Main phase=ordinary-tests result=pass evidence=focused bound-record test, validator, formatting, strict clippy, and 218 workspace tests passed. handoff=main task
+- 2026-07-10 main_task=Main phase=adversarial result=pass evidence=missing mappings and opaque capability-bound behavior verified; `docs/tasks/soundness/M0020-003-soundness.md`. handoff=main task
+- 2026-07-10 main_task=Main phase=review result=approve evidence=scope and ADR-0014/0016/0023 compliance verified; `docs/tasks/reviews/M0020-003-review.md`. handoff=none

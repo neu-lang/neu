@@ -4,7 +4,7 @@
 
 - Task ID: `M0011-006`
 - Milestone: `M0011`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -56,7 +56,7 @@ Outcome: pass
 Attack: Fixtures cite ecosystem precedent instead of accepted language authority.
 Expected result: Fixtures cite docs/adr/ADR-0022-declaration-syntax.md and do not cite Kotlin, Rust, or Go.
 Actual result: Fixture metadata cites accepted ADR-0022 only.
-Source of truth: docs/AGENTS.md; docs/adr/ADR-0022-declaration-syntax.md
+Source of truth: docs/main task rules; docs/adr/ADR-0022-declaration-syntax.md
 Outcome: pass
 ```
 

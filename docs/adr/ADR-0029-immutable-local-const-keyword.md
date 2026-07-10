@@ -242,21 +242,21 @@ immutable-binding category.
 Task `M0019-014` remains paused through all of these ordered gates:
 
 1. The complete ADR-0029 authority bundle becomes authoritative.
-2. Test Engineer performs the lexical, parser, binding-category, diagnostic,
+2. main-task test work performs the lexical, parser, binding-category, diagnostic,
    name-resolution, type-check, and flow tests-first migration and records the
    expected pre-implementation failures.
-3. Implementer performs one coherent frontend migration of lexing, parsing,
+3. main-task implementation performs one coherent frontend migration of lexing, parsing,
    syntax metadata, and local-binding classification.
-4. Test Engineer and required specialty reviewers verify semantic fixtures
+4. main-task test work and required specialty reviewers verify semantic fixtures
    across name resolution, type checking, nullability, flow typing, and
    ownership-facing behavior, including proof that no const-specific semantics
    or metadata were introduced.
 5. Examples and related documentation migrate only after the semantic fixtures
    pass.
 
-After all five gates pass, Task Decomposer and Roadmap Planner must revalidate
-`M0019-014` against this authority before returning it to the Test Engineer and
-Implementer workflow. Existing task text, implementation, fixtures, or examples
+After all five gates pass, main-task task planning and main-task roadmap planning must revalidate
+`M0019-014` against this authority before returning it to the main-task test work and
+main-task implementation workflow. Existing task text, implementation, fixtures, or examples
 are not semantic precedent.
 
 ## Supersession

@@ -10,7 +10,7 @@ tests, tasks, milestones, examples, or `docs/SPEC.md` changes.
 
 The project owner has selected the intended direction, but the change remains
 non-authoritative until the required semantic-change reviews are complete and
-the Chief Architect approves an accepted ADR. The existing accepted ADRs and
+the main task approves an accepted ADR. The existing accepted ADRs and
 `docs/SPEC.md` remain authoritative in the meantime.
 
 ## Semantic Question
@@ -249,7 +249,7 @@ record is authorized. Source spelling may be retained only as ordinary source
 or syntax metadata where diagnostics require it; semantic phases must consume
 the existing immutable-local category.
 
-Required Adversarial Engineer review should attack at least:
+Required main-task adversarial check review should attack at least:
 
 - runtime-only and effectful initializers under `const`
 - move-only and deterministically destroyed values bound by `const`
@@ -340,7 +340,7 @@ Task `M0019-014` must remain paused through all of the following ordered gates:
 
 1. Authority gate: the accepted ADR-0029 and conforming `docs/SPEC.md` revision
    become authoritative atomically.
-2. Tests-first migration gate: Test Engineer updates or adds the required
+2. Tests-first migration gate: main-task test work updates or adds the required
    lexical, parser, binding-category, diagnostic, name-resolution, type-check,
    and flow expectations before implementation changes, with failures showing
    the intended authority transition.
@@ -390,7 +390,7 @@ semantics.
 ### Atomic Acceptance And Exact Specification Targets
 
 ADR-0029 must not become accepted before or separately from its conforming
-`docs/SPEC.md` revision. Chief Architect approval must make the accepted ADR and
+`docs/SPEC.md` revision. main task approval must make the accepted ADR and
 the specification changes authoritative in one semantic-change step.
 
 That atomic specification revision must update these exact targets:
@@ -422,16 +422,16 @@ blocked, and `M0019-014` remains paused.
 
 Before this proposal can become authoritative:
 
-1. Language Lawyer must verify the preserved deferrals, exact supersession
+1. main-task language review must verify the preserved deferrals, exact supersession
    boundaries, and atomic authority update.
-2. Adversarial Engineer must verify the cross-phase invariant and absence of
+2. main-task adversarial check must verify the cross-phase invariant and absence of
    compile-time, evaluator, storage, ownership, and capability leakage.
-3. Diagnostics Engineer must verify that ordinary existing diagnostics and
+3. main-task diagnostics check must verify that ordinary existing diagnostics and
    recovery are sufficient and that no legacy recognition path remains.
-4. Simplicity Guardian must verify that no alias, compatibility mode, legacy
+4. main-task simplicity check must verify that no alias, compatibility mode, legacy
    syntax mechanism, or const-specific semantic metadata is introduced.
-5. Roadmap Planner must enforce the ordered `M0019-014` hard gates above.
-6. Chief Architect must approve, reject, or request revision.
+5. main-task roadmap planning must enforce the ordered `M0019-014` hard gates above.
+6. main task must approve, reject, or request revision.
 7. On approval, the accepted ADR, exact `docs/SPEC.md` targets, and authority
    ledger maintenance must become authoritative atomically. No partial
    acceptance or stale-authority interval is permitted.

@@ -1,4 +1,4 @@
-# ADR-0021 Chief Architect Decision
+# ADR-0021 main task Decision
 
 Decision: approved
 
@@ -16,10 +16,10 @@ The draft lexical grammar proposal remains historical context under `docs/adr/pr
 
 ## Completed Review Dependencies
 
-- Language Designer ownership review.
-- Adversarial Engineer soundness review.
-- Diagnostics Engineer review.
-- Simplicity Guardian review.
+- main-task semantic design ownership review.
+- main-task adversarial check soundness review.
+- main-task diagnostics check review.
+- main-task simplicity check review.
 
 ## Resolved Acceptance Blockers
 
@@ -31,7 +31,7 @@ The draft lexical grammar proposal remains historical context under `docs/adr/pr
 - Explicit comment nesting behavior.
 - Explicit string literal and escape behavior.
 - Explicit numeric literal and overflow responsibility.
-- Final Chief Architect approval through accepted ADR or `docs/SPEC.md` update.
+- Final main task approval through accepted ADR or `docs/SPEC.md` update.
 
 ## Consequences
 

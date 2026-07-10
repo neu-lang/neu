@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-008-null-test-recognition`
 
@@ -74,7 +74,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Null-test recognizer API does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -89,7 +89,7 @@ Implement a passive recognizer over `ParsedBinaryExpression` and `ParsedLiteralE
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Examples decision is recorded.
 
@@ -129,19 +129,19 @@ Implement a passive recognizer over `ParsedBinaryExpression` and `ParsedLiteralE
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0019 null-test recognition task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added focused null-test recognition tests and docs validator before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check m0019_null_test` failed before implementation due to unresolved recognizer imports.
-- 2026-07-10 agent=Implementer phase=implement result=pass notes=Added passive null-test records and recognizer over parser binary/literal metadata only.
-- 2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check m0019_null_test`, `cargo test -p newlang --test type_check`, and `sh docs/tests/m0019-null-test-recognition.sh` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-check result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-008-null-test-recognition.md` passed and concrete soundness report recorded.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Compared changes against `docs/SPEC.md`, ADR-0028, and M0019; approved pending final CI.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, and listed docs validators passed.
-- 2026-07-10 agent=Implementer phase=examples-decision result=pass notes=No examples update; this task adds internal recognizer metadata and does not change source-language surface semantics.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 null-test recognition task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added focused null-test recognition tests and docs validator before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check m0019_null_test` failed before implementation due to unresolved recognizer imports.
+- 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added passive null-test records and recognizer over parser binary/literal metadata only.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check m0019_null_test`, `cargo test -p newlang --test type_check`, and `sh docs/tests/m0019-null-test-recognition.sh` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-008-null-test-recognition.md` passed and concrete soundness report recorded.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared changes against `docs/SPEC.md`, ADR-0028, and M0019; approved pending final CI.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, and listed docs validators passed.
+- 2026-07-10 main_task=main-task implementation phase=examples-decision result=pass notes=No examples update; this task adds internal recognizer metadata and does not change source-language surface semantics.
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Verify tests fail before implementation.`
 - Required Context:
   - This task file

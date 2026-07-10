@@ -5,10 +5,10 @@
 - Report ID: `M0008-EXPRESSION-STATEMENT-PATTERN-SYNTAX`
 - Related Task: `M0008-001`
 - Related Milestone: `M0008`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-09`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 - Blocking milestone: `M0013`
 
 ## Ambiguous Or Missing Authority
@@ -66,11 +66,11 @@ Accepted ADRs define high-level behavior for errors, concurrency, suspension, fl
 
 ## Recommended Resolution Path
 
-- [x] Language Designer drafts expression, statement, and pattern syntax ADR or `docs/SPEC.md` revision.
-- [x] Language Lawyer audits consistency with safety and diagnostics ADRs.
-- [x] Adversarial Engineer reviews ownership scope, coroutine, and unsafe-boundary risks.
-- [x] Diagnostics Engineer reviews parser recovery and diagnostic obligations.
-- [x] Chief Architect approves final source-of-truth update.
+- [x] main-task semantic design drafts expression, statement, and pattern syntax ADR or `docs/SPEC.md` revision.
+- [x] main-task language review audits consistency with safety and diagnostics ADRs.
+- [x] main-task adversarial check reviews ownership scope, coroutine, and unsafe-boundary risks.
+- [x] main-task diagnostics check reviews parser recovery and diagnostic obligations.
+- [x] main task approves final source-of-truth update.
 
 ## Temporary Rule
 

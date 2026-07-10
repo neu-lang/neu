@@ -1,10 +1,10 @@
 # ADR-0029 Acceptance Review
 
-Role: Reviewer
+Role: main-task review
 
 Inputs read:
 
-- `AGENTS.md` and `.codex/agents/reviewer.toml`
+- `main task rules` and `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/ADR-0013-mutability-model.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
@@ -16,8 +16,8 @@ Inputs read:
 - `docs/adr/ADR-0029-immutable-local-const-keyword.md`
 - `docs/syntax/grammar-authority-ledger.md`
 - `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
-- ADR-0029 Language Lawyer, Adversarial, Diagnostics, Simplicity, Spec
-  Compliance, and Chief Architect reviews
+- ADR-0029 main-task language review, Adversarial, Diagnostics, Simplicity, Spec
+  Compliance, and main task reviews
 - `docs/tasks/M0019-014-refinement-aware-local-initializers.md` solely to
   verify the stated pause; its current `val` spelling was not treated as
   authority
@@ -25,32 +25,32 @@ Inputs read:
 
 Findings:
 
-1. **Medium — required Language Lawyer approval is not recorded after the
+1. **Medium — required main-task language review approval is not recorded after the
    final positional correction.**
    [`ADR-0029-language-lawyer-review.md:191`](/Users/c16a/projects/newlang/docs/adr/proposals/reviews/ADR-0029-language-lawyer-review.md:191)
    still concludes “Revise before acceptance” and
    [`ADR-0029-language-lawyer-review.md:199`](/Users/c16a/projects/newlang/docs/adr/proposals/reviews/ADR-0029-language-lawyer-review.md:199)
-   still declares acceptance blocked. The Chief Architect correctly identifies
+   still declares acceptance blocked. The main task correctly identifies
    that the correction is present in the final proposal
    ([`ADR-0029-chief-architect-decision.md:39`](/Users/c16a/projects/newlang/docs/adr/proposals/reviews/ADR-0029-chief-architect-decision.md:39)), and the accepted ADR preserves it
    ([`ADR-0029-immutable-local-const-keyword.md:70`](/Users/c16a/projects/newlang/docs/adr/ADR-0029-immutable-local-const-keyword.md:70)).
-   Nonetheless, the semantic-change workflow requires Language Lawyer
+   Nonetheless, the semantic-change workflow requires main-task language review
    verification, and the review protocol requires required specialty blockers
-   to be resolved before approval. Record a short final Language Lawyer
+   to be resolved before approval. Record a short final main-task language review
    re-review against the final accepted text, changing the terminal verdict to
    approve or raising a remaining precise objection.
 
 Required fixes:
 
-- Obtain and record the final Language Lawyer disposition described above.
+- Obtain and record the final main-task language review disposition described above.
   No semantic or implementation change is indicated by this review.
 
 Specialty reviews required:
 
-- Language Lawyer re-review: required to close the still-recorded acceptance
+- main-task language review re-review: required to close the still-recorded acceptance
   blocker.
 - Completed and sufficient pending that re-review: Adversarial, Diagnostics,
-  Simplicity, and Spec Compliance. The Chief Architect decision is present.
+  Simplicity, and Spec Compliance. The main task decision is present.
 
 Non-blocking suggestions:
 
@@ -77,7 +77,7 @@ Re-opened input:
 
 Finding disposition:
 
-- **Resolved.** The Language Lawyer now classifies the final authority bundle
+- **Resolved.** The main-task language review now classifies the final authority bundle
   as specified, records a final `approve` verdict, confirms that the positional
   `val` correction is consistent across the proposal, accepted ADR, SPEC, and
   grammar authority ledger, and reports no remaining blocker

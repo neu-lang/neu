@@ -1,10 +1,10 @@
-# ADR-0028 Language Lawyer Review
+# ADR-0028 main-task language review Review
 
 ## Metadata
 
 - Proposal: `ADR-0028`
 - Milestone: `M0019`
-- Reviewer: `Language Lawyer`
+- main-task review: `main-task language review`
 - Date: `2026-07-10`
 - Decision: `request revision before acceptance`
 

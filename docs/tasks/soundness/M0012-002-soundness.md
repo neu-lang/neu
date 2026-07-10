@@ -4,7 +4,7 @@
 
 - Task ID: `M0012-002`
 - Milestone: `M0012`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -44,7 +44,7 @@
 Attack: Treat ADR-0023 proposal as accepted parser authority.
 Expected result: Rejected; accepted ADR path must remain absent and ambiguity remains open.
 Actual result: Validator requires accepted docs/adr/ADR-0023-type-and-generic-syntax.md to be absent and M0008 type/generic ambiguity to remain open.
-Source of truth: docs/AGENTS.md; docs/ambiguities/M0008-type-generic-syntax.md
+Source of truth: docs/main task rules; docs/ambiguities/M0008-type-generic-syntax.md
 Outcome: pass
 
 Attack: Smuggle concrete type parser implementation or fixtures into proposal task.

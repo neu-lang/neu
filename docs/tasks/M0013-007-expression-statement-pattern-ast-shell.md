@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-007-expression-statement-pattern-ast-shell`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -84,7 +84,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `crates/newlang/src/ast.rs` does not yet define ADR-0024 body AST node kinds or arena constructors.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -99,7 +99,7 @@ Add syntax-only `AstNodeKind` variants and `AstArena` constructor methods for AD
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -128,7 +128,7 @@ Add syntax-only `AstNodeKind` variants and `AstArena` constructor methods for AD
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`.
 - Do not add expression, statement, block, or pattern parser APIs to `crates/newlang/src/parser.rs`.
@@ -148,19 +148,19 @@ Add syntax-only `AstNodeKind` variants and `AstArena` constructor methods for AD
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0013 body AST shell task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-ast-shell.sh and Rust AST test additions before implementation.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0013-expression-statement-pattern-ast-shell.sh failed before implementation because body AST node kinds were missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Added syntax-only ADR-0024 AST node kinds and arena constructors without parser or semantic changes.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets ast -- --nocapture passed; M0013 AST-shell and affected historical validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-007-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-007-review.md approves syntax-only AST shell scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0013 body AST shell task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-ast-shell.sh and Rust AST test additions before implementation.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0013-expression-statement-pattern-ast-shell.sh failed before implementation because body AST node kinds were missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added syntax-only ADR-0024 AST node kinds and arena constructors without parser or semantic changes.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets ast -- --nocapture passed; M0013 AST-shell and affected historical validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-007-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-007-review.md approves syntax-only AST shell scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Implementer`
+- Next main task: `main-task implementation`
 - Reason: `Add syntax-only ADR-0024 AST shell nodes before parser implementation.`
 - Required Context:
   - This task file

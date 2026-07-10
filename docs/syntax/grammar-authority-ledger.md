@@ -16,27 +16,27 @@ This ledger records whether planned parser syntax has accepted grammar authority
 
 | Construct | Classification | Authority | Owner | Blocking milestone | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Token spellings | specified | ADR-0021, ADR-0029 | Chief Architect | none | Lexer token spellings are accepted, but parser grammar is not; ADR-0029 replaces reserved `val` with reserved `const`. |
-| Package declaration | specified | ADR-0022 | Chief Architect | none | Source-file position and qualified-name syntax are specified. |
-| Import declaration | specified | ADR-0022 | Chief Architect | none | Import position, qualified-name syntax, and alias syntax are specified; wildcard and grouped imports are deferred. |
-| Visibility modifier syntax | specified | ADR-0022 | Chief Architect | none | `public`, `private`, and `internal` placement is specified for declarations covered by ADR-0022. |
-| Function declaration | specified | ADR-0022 | Chief Architect | none | Function declaration shell is specified; parameter contents, concrete type syntax, and statement bodies are deferred. |
-| Struct declaration | specified | ADR-0022 | Chief Architect | none | Struct declaration shell is specified; constructors, fields, and properties are deferred. |
-| Enum or sealed sum declaration | specified | ADR-0022 | Chief Architect | none | Enum declaration shell is specified; variants and sealed modifier spelling are deferred. |
-| Interface declaration | specified | ADR-0022 | Chief Architect | none | Interface declaration shell is specified; default method bodies are deferred. |
-| Type declaration | specified | ADR-0023 | Chief Architect | none | Named type references and grouped type forms are specified for the bootstrap grammar. |
-| Generic parameter syntax | specified | ADR-0023 | Chief Architect | none | Generic parameter lists and optional capability-bound clauses are specified. |
-| Generic argument syntax | specified | ADR-0023 | Chief Architect | none | Generic argument lists attach to named type references only. |
-| Capability bound syntax | specified | ADR-0023 | Chief Architect | none | Multiple bounds use `&`; comma separates generic parameters. |
-| Nullable type syntax | specified | ADR-0023 | Chief Architect | none | Nullable markers are postfix and bind to the immediately preceding primary type. |
-| Function type syntax | specified | ADR-0023 | Chief Architect | none | Parenthesized function type parameters followed by `->` and return type are specified. |
-| Expression grammar | specified | ADR-0024 | Chief Architect | none | Expression entry points, precedence, associativity, calls, member access, grouped expressions, and `if` expressions are specified. |
-| Statement grammar | specified | ADR-0024, ADR-0029 | Chief Architect | none | `const` is the immutable-local introducer; `var` and the remaining statement grammar are unchanged. |
-| Pattern grammar | specified | ADR-0024 | Chief Architect | none | Wildcard, literal, binding, qualified-case, and grouped pattern syntax is specified. |
-| Coroutine syntax | deferred | ADR-0024 | Chief Architect | future | Coroutine syntax is explicitly deferred. |
-| Unsafe block syntax | deferred | ADR-0024 | Chief Architect | future | Unsafe block syntax is explicitly deferred. |
-| Macro syntax | deferred | ADR-0019 | Chief Architect | future | Macros are deferred. |
-| Compile-time evaluation syntax | deferred | ADR-0019, ADR-0029 | Language Designer | future | Bounded compile-time evaluation exists semantically but is outside M0011-M0013 parser scope; local `const` is not compile-time-evaluation syntax and gains no such semantics from ADR-0029. |
+| Token spellings | specified | ADR-0021, ADR-0029 | main task | none | Lexer token spellings are accepted, but parser grammar is not; ADR-0029 replaces reserved `val` with reserved `const`. |
+| Package declaration | specified | ADR-0022 | main task | none | Source-file position and qualified-name syntax are specified. |
+| Import declaration | specified | ADR-0022 | main task | none | Import position, qualified-name syntax, and alias syntax are specified; wildcard and grouped imports are deferred. |
+| Visibility modifier syntax | specified | ADR-0022 | main task | none | `public`, `private`, and `internal` placement is specified for declarations covered by ADR-0022. |
+| Function declaration | specified | ADR-0022 | main task | none | Function declaration shell is specified; parameter contents, concrete type syntax, and statement bodies are deferred. |
+| Struct declaration | specified | ADR-0022 | main task | none | Struct declaration shell is specified; constructors, fields, and properties are deferred. |
+| Enum or sealed sum declaration | specified | ADR-0022 | main task | none | Enum declaration shell is specified; variants and sealed modifier spelling are deferred. |
+| Interface declaration | specified | ADR-0022 | main task | none | Interface declaration shell is specified; default method bodies are deferred. |
+| Type declaration | specified | ADR-0023 | main task | none | Named type references and grouped type forms are specified for the bootstrap grammar. |
+| Generic parameter syntax | specified | ADR-0023 | main task | none | Generic parameter lists and optional capability-bound clauses are specified. |
+| Generic argument syntax | specified | ADR-0023 | main task | none | Generic argument lists attach to named type references only. |
+| Capability bound syntax | specified | ADR-0023 | main task | none | Multiple bounds use `&`; comma separates generic parameters. |
+| Nullable type syntax | specified | ADR-0023 | main task | none | Nullable markers are postfix and bind to the immediately preceding primary type. |
+| Function type syntax | specified | ADR-0023 | main task | none | Parenthesized function type parameters followed by `->` and return type are specified. |
+| Expression grammar | specified | ADR-0024 | main task | none | Expression entry points, precedence, associativity, calls, member access, grouped expressions, and `if` expressions are specified. |
+| Statement grammar | specified | ADR-0024, ADR-0029 | main task | none | `const` is the immutable-local introducer; `var` and the remaining statement grammar are unchanged. |
+| Pattern grammar | specified | ADR-0024 | main task | none | Wildcard, literal, binding, qualified-case, and grouped pattern syntax is specified. |
+| Coroutine syntax | deferred | ADR-0024 | main task | future | Coroutine syntax is explicitly deferred. |
+| Unsafe block syntax | deferred | ADR-0024 | main task | future | Unsafe block syntax is explicitly deferred. |
+| Macro syntax | deferred | ADR-0019 | main task | future | Macros are deferred. |
+| Compile-time evaluation syntax | deferred | ADR-0019, ADR-0029 | main-task semantic design | future | Bounded compile-time evaluation exists semantically but is outside M0011-M0013 parser scope; local `const` is not compile-time-evaluation syntax and gains no such semantics from ADR-0029. |
 
 ## Parser Unblock List
 

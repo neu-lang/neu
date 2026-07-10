@@ -6,8 +6,8 @@
 - Milestone: `M0014`
 - Milestone File: `docs/milestones/M0014-module-package-and-visibility-model.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0014-008-visibility-metadata`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/ADR-0022-declaration-syntax.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -81,7 +81,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `VisibilityCategory`, `VisibilityOrigin`, and declaration visibility metadata do not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -96,7 +96,7 @@ Extend `crates/newlang/src/module.rs` with visibility metadata types and a const
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -124,7 +124,7 @@ Extend `crates/newlang/src/module.rs` with visibility metadata types and a const
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify accepted ADRs.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not modify parser behavior in this task.
 - Do not implement name resolution, access checking, dependency lookup, manifests, target triples, or target-pack behavior.
 - Do not add visibility categories beyond `public`, `internal`, and `private`.
@@ -138,19 +138,19 @@ Extend `crates/newlang/src/module.rs` with visibility metadata types and a const
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0014 visibility metadata representation task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0014-visibility-metadata.sh and Rust visibility metadata tests before implementation.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0014-visibility-metadata.sh failed before implementation because VisibilityCategory was missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Added visibility category, origin, declaration metadata, module storage, and diagnostic variants without parser extraction or access checking.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets module -- --nocapture plus M0014 visibility, package namespace, and module identity validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-008-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0014-008-review.md approves visibility metadata scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0014-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0014 visibility metadata representation task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0014-visibility-metadata.sh and Rust visibility metadata tests before implementation.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0014-visibility-metadata.sh failed before implementation because VisibilityCategory was missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added visibility category, origin, declaration metadata, module storage, and diagnostic variants without parser extraction or access checking.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets module -- --nocapture plus M0014 visibility, package namespace, and module identity validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-008-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0014-008-review.md approves visibility metadata scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0014-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add failing tests for visibility metadata representation.`
 - Required Context:
   - This task file

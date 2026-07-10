@@ -4,7 +4,7 @@
 
 - Task ID: `M0007-003`
 - Milestone: `M0007`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -42,8 +42,8 @@
 ```text
 Attack: Treat draft lexical grammar as accepted source of truth.
 Expected result: Rejected by validation and review text.
-Actual result: Proposal and Chief Architect decision state not accepted source of truth.
-Source of truth: docs/AGENTS.md, docs/ambiguities/M0006-lexical-grammar.md
+Actual result: Proposal and main task decision state not accepted source of truth.
+Source of truth: docs/main task rules, docs/ambiguities/M0006-lexical-grammar.md
 Outcome: pass
 
 Attack: Close the lexical grammar ambiguity without accepted source update.

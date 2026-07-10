@@ -1,16 +1,16 @@
 # ADR-0029 Spec Compliance Review
 
-Role: Spec Compliance Auditor
+Role: main-task specification check
 
 Target: The accepted ADR-0029 authority bundle: accepted ADR, `docs/SPEC.md`,
 and grammar-authority-ledger updates, checked against the final ADR-0029
-proposal, specialty reviews, Chief Architect decision, and accepted surrounding
+proposal, specialty reviews, main task decision, and accepted surrounding
 ADRs. Current compiler, fixtures, tasks, and examples were deliberately not
 treated as authority.
 
 Inputs read:
 
-- `AGENTS.md` and `.codex/agents/spec-compliance-auditor.toml`
+- `main task rules` and `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/ADR-0013-mutability-model.md`
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
@@ -40,7 +40,7 @@ None.
 | No `const`-specific compile-time, storage, ownership, capability, or layout meaning | ADR-0029 §§Decision, Cross-Phase Invariant, and Soundness Impact; SPEC ADR-0029; ledger keeps compile-time-evaluation syntax deferred. | Compliant |
 | Preserve initializer, binding identity, scope, lookup, and flow semantics | ADR-0029 §Preserved Semantics And Deferrals; SPEC ADR-0026; ADR-0024, ADR-0026, and ADR-0028 remain otherwise unsuperseded. | Compliant |
 | Ordinary diagnostics and recovery for old introducer-shaped `val` source | ADR-0029 §Diagnostics And Source Compatibility; SPEC ADR-0024; aligns with the final Diagnostics and Adversarial reviews. | Compliant |
-| M0019-014 remains test-first and gated | ADR-0029 §Roadmap Hard Gate For M0019-014; matches the Chief Architect’s ordered gates. | Compliant |
+| M0019-014 remains test-first and gated | ADR-0029 §Roadmap Hard Gate For M0019-014; matches the main task’s ordered gates. | Compliant |
 
 ## Non-compliance findings
 
@@ -63,5 +63,5 @@ resolved by the `const` spelling change.
 
 Decision: approve
 
-Handoff target: Test Engineer for the required tests-first migration, then
-Implementer, subject to ADR-0029’s ordered M0019-014 gates.
+Handoff target: main-task test work for the required tests-first migration, then
+main-task implementation, subject to ADR-0029’s ordered M0019-014 gates.

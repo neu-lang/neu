@@ -5,10 +5,10 @@
 - Report ID: `M0014-MODULE-PACKAGE-VISIBILITY-MODEL`
 - Related Task: `M0014-001`
 - Related Milestone: `M0014`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-10`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 - Blocking milestone: `M0014`
 - Resolution Source: `docs/adr/ADR-0025-module-package-visibility-model.md`
 - Resolved Date: `2026-07-10`
@@ -63,11 +63,11 @@ ADR-0017 states that modules are explicit compilation and visibility units and t
 
 ## Recommended Resolution Path
 
-- [x] Language Designer drafts a module, package, namespace, and visibility semantics ADR or `docs/SPEC.md` revision.
-- [x] Language Lawyer audits consistency with ADR-0017, ADR-0022, and future name resolution.
-- [x] Build Engineer reviews module identity compatibility with target packs and cross compilation.
-- [x] Spec Compliance Auditor confirms tests compare against accepted source of truth.
-- [x] Chief Architect approves final source-of-truth update.
+- [x] main-task semantic design drafts a module, package, namespace, and visibility semantics ADR or `docs/SPEC.md` revision.
+- [x] main-task language review audits consistency with ADR-0017, ADR-0022, and future name resolution.
+- [x] main-task build check reviews module identity compatibility with target packs and cross compilation.
+- [x] main-task specification check confirms tests compare against accepted source of truth.
+- [x] main task approves final source-of-truth update.
 
 ## Temporary Rule
 

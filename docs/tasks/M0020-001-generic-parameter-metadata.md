@@ -7,7 +7,7 @@
 - Milestone File: `docs/milestones/M0020-generic-constraints-and-capability-bounds.md`
 - Specification: `docs/SPEC.md`
 - Status: `complete`
-- Owner: `Test Engineer`, then `Implementer`
+- Owner: `main-task test work`, then `main-task implementation`
 
 ## Objective
 
@@ -61,20 +61,20 @@ parameter and each of its explicitly parsed capability bounds.
 - [x] Metadata is syntax-only and preserves accepted parser behavior.
 - [x] Parameters and bounds are source ordered with exact spans.
 - [x] No generic semantics, resolution, or diagnostics are added.
-- [x] Focused tests, formatter, reviewer, adversarial check, and CI pass.
+- [x] Focused tests, formatter, main-task review, adversarial check, and CI pass.
 
 ## Review Routing
 
-- Base review: `Reviewer`.
-- Additional review: `Test Engineer` for test-first integrity.
+- Base review: `main-task review`.
+- Additional review: `main-task test work` for test-first integrity.
 - No semantic, diagnostics, build, or soundness specialty review unless the
   diff widens this syntax-only task.
 
 ## Execution Log
 
-- 2026-07-10 agent=Main phase=create-task result=pass evidence=bounded task created from ADR-0016 and ADR-0023. handoff=Test-Engineer
-- 2026-07-10 agent=Main phase=test-first result=fail evidence=`cargo test -p newlang --test parser m0020_generic_parameter_metadata` failed because `ParseOutput.generic_parameters` did not exist. handoff=Implementer
-- 2026-07-10 agent=Main phase=implementation result=pass evidence=added syntax-only generic parameter and capability-bound metadata; focused parser tests passed. handoff=Reviewer
-- 2026-07-10 agent=Main phase=ordinary-tests result=pass evidence=focused metadata tests, validator, formatting, strict clippy, and 216 workspace tests passed. handoff=Reviewer
-- 2026-07-10 agent=Main phase=adversarial result=pass evidence=syntax-only metadata and malformed-input boundaries verified; `docs/tasks/soundness/M0020-001-soundness.md`. handoff=Reviewer
-- 2026-07-10 agent=Main phase=review result=approve evidence=scope and ADR-0016/0023 compliance verified; `docs/tasks/reviews/M0020-001-review.md`. handoff=none
+- 2026-07-10 main_task=Main phase=create-task result=pass evidence=bounded task created from ADR-0016 and ADR-0023. handoff=main-task test work
+- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p newlang --test parser m0020_generic_parameter_metadata` failed because `ParseOutput.generic_parameters` did not exist. handoff=main-task implementation
+- 2026-07-10 main_task=Main phase=implementation result=pass evidence=added syntax-only generic parameter and capability-bound metadata; focused parser tests passed. handoff=main-task review
+- 2026-07-10 main_task=Main phase=ordinary-tests result=pass evidence=focused metadata tests, validator, formatting, strict clippy, and 216 workspace tests passed. handoff=main-task review
+- 2026-07-10 main_task=Main phase=adversarial result=pass evidence=syntax-only metadata and malformed-input boundaries verified; `docs/tasks/soundness/M0020-001-soundness.md`. handoff=main-task review
+- 2026-07-10 main_task=Main phase=review result=approve evidence=scope and ADR-0016/0023 compliance verified; `docs/tasks/reviews/M0020-001-review.md`. handoff=none

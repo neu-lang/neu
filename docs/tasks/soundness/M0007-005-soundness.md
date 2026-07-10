@@ -4,7 +4,7 @@
 
 - Task ID: `M0007-005`
 - Milestone: `M0007`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -40,7 +40,7 @@
 ```text
 Attack: Treat completed reviews as final language acceptance.
 Expected result: Rejected.
-Actual result: Chief Architect decision remains pending and requires concrete accepted lexical grammar.
+Actual result: main task decision remains pending and requires concrete accepted lexical grammar.
 Source of truth: docs/adr/proposals/reviews/ADR-0021-chief-architect-decision.md
 Outcome: pass
 

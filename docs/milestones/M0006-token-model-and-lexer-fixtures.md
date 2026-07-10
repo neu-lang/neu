@@ -64,12 +64,12 @@ The language requires Kotlin-like syntax, but detailed lexical grammar is not ye
 ## Test Strategy
 
 - Fixture metadata validation.
-- Manual review by Language Lawyer.
+- Manual review by main-task language review.
 
 ## Risks
 
 - Current spec may be too high-level for meaningful lexer fixtures.
-- Kotlin-like syntax may tempt agents to assume Kotlin tokens.
+- Kotlin-like syntax may tempt main tasks to assume Kotlin tokens.
 
 ## Estimated Effort
 

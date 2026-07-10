@@ -1,7 +1,7 @@
-Role: Diagnostics Engineer
+Role: main-task diagnostics check
 Diagnostic area: M0019-014 immutable-local `const` migration.
 
-Inputs read: Language Lawyer ruling; task Authority Extract and log; `docs/SPEC.md` ADR-0022/ADR-0029 sections; accepted ADR-0022 and ADR-0029 diagnostic sections; parser diff and tests; agent instructions.
+Inputs read: main-task language review ruling; task Authority Extract and log; `docs/SPEC.md` ADR-0022/ADR-0029 sections; accepted ADR-0022 and ADR-0029 diagnostic sections; parser diff and tests; main task instructions.
 
 Expected error condition: `fun const();` receives ordinary `MissingDeclarationName`; removed-introducer `val removed = 1;` receives ordinary `UnexpectedTokenInStatement` and no binding or compatibility recovery.
 
@@ -13,4 +13,4 @@ Findings: Prior lower-authority conclusion requiring the `const` span is withdra
 
 Decision: APPROVE.
 
-Files changed: `docs/tasks/reviews/M0019-014-diagnostics.md` only. Open questions: none. Blockers: none. Handoff: Reviewer for final task closure.
+Files changed: `docs/tasks/reviews/M0019-014-diagnostics.md` only. Open questions: none. Blockers: none. Handoff: main-task review for final task closure.

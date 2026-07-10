@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Diagnostics Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task diagnostics check`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-022-unsupported-expression-diagnostics`
 
@@ -70,7 +70,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Unsupported expression diagnostic helper does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -85,7 +85,7 @@ Add a helper that scans the existing AST arena and records unsupported type-rule
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] No compiler behavior beyond unsupported expression diagnostic emission is introduced.
 - [x] Examples update is explicitly skipped because no language-level source forms changed.
@@ -124,12 +124,12 @@ Add a helper that scans the existing AST arena and records unsupported type-rule
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 unsupported expression diagnostics task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added unsupported expression diagnostic tests before implementation for call, member, binary, unary, and if expression nodes.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `type_unsupported_m0018_expressions`.
-- 2026-07-10 agent=Diagnostics-Engineer phase=implementation result=pass notes=Added AST-scanning helper that reports ADR-0027 unsupported expression diagnostics without producing successful type entries.
-- 2026-07-10 agent=Diagnostics-Engineer phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 169 tests.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-022-unsupported-expression-diagnostics.md` passed after ordinary tests.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, ADR-0024, and `docs/milestones/M0018-type-checking-core.md`.
-- 2026-07-10 agent=Examples-Curator phase=examples result=skip notes=No example update required because this task changes diagnostics for already parsed source forms, not language-level source forms.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 unsupported expression diagnostics task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added unsupported expression diagnostic tests before implementation for call, member, binary, unary, and if expression nodes.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `type_unsupported_m0018_expressions`.
+- 2026-07-10 main_task=Diagnostics-Engineer phase=implementation result=pass notes=Added AST-scanning helper that reports ADR-0027 unsupported expression diagnostics without producing successful type entries.
+- 2026-07-10 main_task=Diagnostics-Engineer phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 169 tests.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-022-unsupported-expression-diagnostics.md` passed after ordinary tests.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, ADR-0024, and `docs/milestones/M0018-type-checking-core.md`.
+- 2026-07-10 main_task=Examples-Curator phase=examples result=skip notes=No example update required because this task changes diagnostics for already parsed source forms, not language-level source forms.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

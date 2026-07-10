@@ -6,8 +6,8 @@
 - Milestone: `M0011`
 - Milestone File: `docs/milestones/M0011-declaration-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0011-002-declaration-syntax-proposal`
 
@@ -16,11 +16,11 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Draft declaration syntax ADR proposal does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Add `docs/adr/proposals/ADR-0022-declaration-syntax.md` as a draft planning arti
 - [x] Implementation is the smallest passing proposal artifact.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0011 milestone checklist is not marked complete because parser implementation remains blocked.
 
@@ -132,23 +132,23 @@ Add `docs/adr/proposals/ADR-0022-declaration-syntax.md` as a draft planning arti
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity remains `docs/ambiguities/M0008-declaration-syntax.md`.
-- Chief Architect approval is required before the proposal can become accepted source of truth.
+- main task approval is required before the proposal can become accepted source of truth.
 
 ## Execution Log
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration syntax proposal task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0011-declaration-syntax-proposal.sh before adding proposal.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/ADR-0022-declaration-syntax.md.
-2026-07-09 agent=Language-Designer phase=ordinary-tests result=pass notes=M0011 declaration syntax proposal validation passed after adding draft proposal.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms proposal remains non-authoritative and no parser code or fixtures were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved draft proposal as scoped blocker-resolution progress.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration syntax proposal task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0011-declaration-syntax-proposal.sh before adding proposal.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/ADR-0022-declaration-syntax.md.
+2026-07-09 main_task=Language-Designer phase=ordinary-tests result=pass notes=M0011 declaration syntax proposal validation passed after adding draft proposal.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms proposal remains non-authoritative and no parser code or fixtures were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved draft proposal as scoped blocker-resolution progress.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Draft non-authoritative declaration syntax proposal for review.`
 - Required Context:
   - This task file

@@ -57,7 +57,7 @@ ADR-0020 requires no hidden host dependency for ordinary builds.
 
 - Compiler can produce an object file for the initial smoke program.
 - Compiler can produce an executable for the initial host target without hidden host linker dependency.
-- Build Engineer confirms documented toolchain inputs.
+- main-task build check confirms documented toolchain inputs.
 
 ## Test Strategy
 

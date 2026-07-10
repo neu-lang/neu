@@ -4,7 +4,7 @@
 
 - Task ID: `M0010-001`
 - Milestone: `M0010`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 

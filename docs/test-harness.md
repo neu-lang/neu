@@ -17,7 +17,7 @@ Every non-inert fixture must cite one of:
 - a specific file under `docs/adr/`
 - a milestone file that explicitly authorizes non-semantic harness behavior
 
-Fixtures must not encode guessed language syntax, semantics, or compiler behavior. If the source of truth is ambiguous, the agent must file an ambiguity report instead of adding the fixture.
+Fixtures must not encode guessed language syntax, semantics, or compiler behavior. If the source of truth is ambiguous, the main task must file an ambiguity report instead of adding the fixture.
 
 ## Inert Fixtures
 
@@ -29,5 +29,5 @@ Diagnostic fixtures are governed by ADR-0015. They must eventually identify the 
 
 ## Golden Files
 
-Golden files are expected outputs reviewed by Test Engineer and Diagnostics Engineer. Golden diagnostics must be updated only when the expected diagnostic behavior is intentionally changed and reviewed against `docs/SPEC.md` and relevant ADRs.
+Golden files are expected outputs reviewed by main-task test work and main-task diagnostics check. Golden diagnostics must be updated only when the expected diagnostic behavior is intentionally changed and reviewed against `docs/SPEC.md` and relevant ADRs.
 

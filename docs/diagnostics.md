@@ -10,7 +10,7 @@ Diagnostic behavior must cite:
 - the relevant file under `docs/adr/`
 - the task or milestone that authorizes harness-only behavior
 
-If the source of truth is ambiguous, agents must file an ambiguity report instead of creating a diagnostic expectation.
+If the source of truth is ambiguous, main tasks must file an ambiguity report instead of creating a diagnostic expectation.
 
 ## Required Diagnostic Shape
 

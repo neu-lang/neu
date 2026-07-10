@@ -1,4 +1,4 @@
-# Task: M0007-004 Language Designer Ownership Review For Draft Lexical Grammar
+# Task: M0007-004 main-task semantic design Ownership Review For Draft Lexical Grammar
 
 ## Task Metadata
 
@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-004-lexical-grammar-language-designer-review`
 
@@ -16,23 +16,23 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
-Record Language Designer ownership review for the draft lexical grammar proposal and identify the concrete semantic content still required before acceptance.
+Record main-task semantic design ownership review for the draft lexical grammar proposal and identify the concrete semantic content still required before acceptance.
 
 ## Motivation
 
-The Chief Architect pending decision for ADR-0021 lists Language Designer ownership review as required before acceptance. Completing that review advances M0007's blocker resolution path without accepting semantics or implementing the lexer.
+The main task pending decision for ADR-0021 lists main-task semantic design ownership review as required before acceptance. Completing that review advances M0007's blocker resolution path without accepting semantics or implementing the lexer.
 
 ## Scope
 
-- Add Language Designer review for `docs/adr/proposals/ADR-0021-lexical-grammar.md`.
+- Add main-task semantic design review for `docs/adr/proposals/ADR-0021-lexical-grammar.md`.
 - Confirm the proposal direction is compatible with Kotlin-like ergonomics.
 - Identify required semantic specifics that must be added before acceptance.
 - Keep the proposal non-authoritative.
@@ -64,7 +64,7 @@ The Chief Architect pending decision for ADR-0021 lists Language Designer owners
 Tests must be created before implementation.
 
 - Positive tests:
-  - `docs/tests/m0007-language-designer-review.sh` verifies the Language Designer review exists and records required acceptance content.
+  - `docs/tests/m0007-language-designer-review.sh` verifies the main-task semantic design review exists and records required acceptance content.
 - Negative tests:
   - The validation script must fail before the review artifact is added.
 - Diagnostic tests:
@@ -80,12 +80,12 @@ Tests must be created before implementation.
   - `docs/tests/m0007-language-designer-review.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - Language Designer review artifact does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+  - main-task semantic design review artifact does not exist yet.
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Add `docs/adr/proposals/reviews/ADR-0021-language-designer-review.md` documenting Language Designer ownership review and required revisions before acceptance. Do not update source of truth files.
+Add `docs/adr/proposals/reviews/ADR-0021-language-designer-review.md` documenting main-task semantic design ownership review and required revisions before acceptance. Do not update source of truth files.
 
 ## Acceptance Criteria
 
@@ -96,7 +96,7 @@ Add `docs/adr/proposals/reviews/ADR-0021-language-designer-review.md` documentin
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is not marked complete because M0007 remains blocked.
 
@@ -131,7 +131,7 @@ Add `docs/adr/proposals/reviews/ADR-0021-language-designer-review.md` documentin
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity remains `docs/ambiguities/M0006-lexical-grammar.md`.
-- Chief Architect approval is required before the proposal can become accepted source of truth.
+- main task approval is required before the proposal can become accepted source of truth.
 - The review may identify required semantic content, but must not define accepted semantics.
 
 ## Execution Log
@@ -139,18 +139,18 @@ Add `docs/adr/proposals/reviews/ADR-0021-language-designer-review.md` documentin
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 Language Designer ownership review task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0007-language-designer-review.sh before adding Language Designer review.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/reviews/ADR-0021-language-designer-review.md.
-2026-07-09 agent=Language-Designer phase=ordinary-tests result=pass notes=M0007 Language Designer ownership review validation passed after review artifact was added.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms ownership review remains non-authoritative, ambiguity remains open, and no lexer code or concrete fixtures were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved ownership-review artifact as scoped governance progress.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 main-task semantic design ownership review task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0007-language-designer-review.sh before adding main-task semantic design review.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/reviews/ADR-0021-language-designer-review.md.
+2026-07-09 main_task=Language-Designer phase=ordinary-tests result=pass notes=M0007 main-task semantic design ownership review validation passed after review artifact was added.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms ownership review remains non-authoritative, ambiguity remains open, and no lexer code or concrete fixtures were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved ownership-review artifact as scoped governance progress.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Record ownership review for the draft lexical grammar proposal without accepting semantics.`
 - Required Context:
   - This task file

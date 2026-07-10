@@ -6,8 +6,8 @@
 - Milestone: `M0009`
 - Milestone File: `docs/milestones/M0009-ast-data-model.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0009-001-ast-span-shell`
 
@@ -16,11 +16,11 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `newlang::ast` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Add `crates/newlang/src/ast.rs`, export it from `lib.rs`, and document the AST s
 - [x] Implementation is the smallest passing AST shell.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0009 milestone checklist is updated.
 
@@ -141,18 +141,18 @@ Add `crates/newlang/src/ast.rs`, export it from `lib.rs`, and document the AST s
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0009 AST span shell task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created AST tests and M0009 validator before adding ast module.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Rust tests failed as expected because newlang::ast did not exist.
-2026-07-09 agent=Implementer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets and M0009 AST validator passed after adding syntax-independent AST shell.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code, no concrete syntax nodes, and no semantic analysis concepts were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved AST shell against M0008 grammar constraints and M0009 acceptance criteria.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0009 AST span shell task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created AST tests and M0009 validator before adding ast module.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Rust tests failed as expected because newlang::ast did not exist.
+2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets and M0009 AST validator passed after adding syntax-independent AST shell.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code, no concrete syntax nodes, and no semantic analysis concepts were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved AST shell against M0008 grammar constraints and M0009 acceptance criteria.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Implementer`
+- Next main task: `main-task implementation`
 - Reason: `Implement syntax-independent AST span shell.`
 - Required Context:
   - This task file

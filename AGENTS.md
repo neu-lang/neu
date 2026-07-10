@@ -1,472 +1,103 @@
-# Project Agent System
+# Main Task Operating Rules
 
-This document defines the autonomous agent operating system for this compiler project. The project is a new systems programming language with Kotlin-like syntax, compile-time memory safety, compile-time thread safety, Rust-inspired ownership and borrowing, Kotlin-inspired structured coroutines, Go-like cross compilation, a Rust compiler implementation, Cranelift as the initial backend, and LLVM as an optional later backend.
+This compiler project is executed in the main task. Do not delegate repository
+work or rely on role-specific configuration.
 
-No agent may invent language semantics. `docs/SPEC.md` and `docs/adr/` are the source of truth. If the specification is ambiguous, missing, or internally inconsistent, agents must file an ambiguity report instead of guessing.
-
-## Agent Roster
-
-| Agent | File | Primary ownership |
-| --- | --- | --- |
-| Chief Architect | `.codex/agents/chief-architect.toml` | Final architecture authority and conflict resolution |
-| Language Designer | `.codex/agents/language-designer.toml` | Semantic design changes and ADR drafting |
-| Language Lawyer | `.codex/agents/language-lawyer.toml` | Precise interpretation of accepted semantics |
-| Roadmap Planner | `.codex/agents/roadmap-planner.toml` | Milestone sequencing |
-| Task Decomposer | `.codex/agents/task-decomposer.toml` | Task breakdown and dependency mapping |
-| Implementer | `.codex/agents/implementer.toml` | Compiler and tooling implementation after tests exist |
-| Test Engineer | `.codex/agents/test-engineer.toml` | Tests before implementation |
-| Adversarial Engineer | `.codex/agents/adversarial-engineer.toml` | Attempts to break soundness, safety, and diagnostics |
-| Reviewer | `.codex/agents/reviewer.toml` | Scope, architecture, maintainability, and review sign-off |
-| Spec Compliance Auditor | `.codex/agents/spec-compliance-auditor.toml` | Compliance against `docs/SPEC.md` and accepted ADRs |
-| Simplicity Guardian | `.codex/agents/simplicity-guardian.toml` | Rejection of unnecessary abstraction and accidental complexity |
-| Diagnostics Engineer | `.codex/agents/diagnostics-engineer.toml` | Diagnostic quality, spans, messages, and explainability |
-| Build Engineer | `.codex/agents/build-engineer.toml` | Build, CI, target packs, and release mechanics |
-
-## Authority Hierarchy
+## Authority
 
 1. Project owner instructions.
 2. `docs/SPEC.md`.
 3. Accepted ADRs under `docs/adr/`.
-4. `AGENTS.md`.
-5. Individual agent files under `.codex/agents/`.
-6. Roadmap and task files.
-7. Existing implementation behavior.
+4. This file.
+5. Roadmap, milestone, and task files.
+6. Existing implementation behavior.
 
-Existing behavior never overrides `docs/SPEC.md` or accepted ADRs.
+Existing behavior never overrides the specification or accepted ADRs. Do not
+invent language semantics. When accepted authority is ambiguous, missing, or
+contradictory, file an ambiguity report and stop the affected implementation.
 
-Conflict authority:
+## Main Task Workflow
 
-1. Chief Architect resolves cross-role and architectural conflicts.
-2. Language Designer owns semantic changes, subject to Chief Architect approval.
-3. Roadmap Planner owns milestone order.
-4. Task Decomposer owns task structure.
-5. Reviewer may block implementation changes on scope, architecture, or maintainability.
-6. Spec Compliance Auditor may block implementation changes that conflict with `docs/SPEC.md`.
-7. Simplicity Guardian may block abstractions that are not justified by accepted requirements.
-
-## Role Boundaries
-
-Chief Architect:
-
-- Decides unresolved architectural conflicts.
-- Approves major subsystem boundaries.
-- Does not bypass accepted semantics.
-
-Language Designer:
-
-- Proposes semantic changes through ADRs and `docs/SPEC.md` revisions.
-- Does not implement compiler code.
-
-Language Lawyer:
-
-- Interprets exact meaning of existing spec text.
-- Does not create new semantics.
-
-Roadmap Planner:
-
-- Orders milestones.
-- Does not decompose implementation tasks in detail.
-
-Task Decomposer:
-
-- Converts accepted milestones into executable tasks.
-- Does not change milestones or language semantics.
-
-Test Engineer:
-
-- Writes tests before implementation.
-- Does not weaken tests to accommodate implementation.
-
-Implementer:
-
-- Implements only against accepted tasks and tests.
-- Does not weaken or delete tests to pass CI.
-
-Adversarial Engineer:
-
-- Designs negative tests and soundness attacks.
-- Does not redefine intended behavior.
-
-Reviewer:
-
-- Reviews scope, architecture, maintainability, and test adequacy.
-- Does not approve semantic changes without Language Designer and Chief Architect involvement.
-
-Spec Compliance Auditor:
-
-- Compares implementation against `docs/SPEC.md` and `docs/adr/`.
-- Does not treat current behavior as authoritative.
-
-Simplicity Guardian:
-
-- Rejects unnecessary abstraction, premature generality, and speculative mechanisms.
-- Does not block required complexity that follows from accepted semantics.
-
-Diagnostics Engineer:
-
-- Owns diagnostic standards, wording, spans, and explainability.
-- Does not change semantic accept/reject rules.
-
-Build Engineer:
-
-- Owns build, CI, reproducibility, cross-target packaging, and release mechanics.
-- Does not introduce language semantics through build configuration.
-
-## Allowed Actions
-
-All agents may:
-
-- Read `docs/SPEC.md`, `docs/adr/`, `AGENTS.md`, relevant `.codex/agents/*.toml`, roadmap files, task files, tests, and implementation files needed for their role.
-- Produce written findings, ambiguity reports, task reports, test plans, or review comments.
-- Propose changes within their allowed file paths.
-- Request escalation when required inputs are missing.
-
-Role-specific file edits are defined in each agent file.
-
-## Forbidden Actions
-
-No agent may:
-
-- Invent language semantics.
-- Treat implementation behavior as source of truth when it conflicts with `docs/SPEC.md`.
-- Modify `docs/SPEC.md` without the semantic-change workflow.
-- Modify accepted ADRs without creating a superseding ADR or explicitly marked revision.
-- Weaken, delete, or skip tests to pass CI.
-- Expand task scope silently.
-- Introduce compiler code from an agent-system task.
-- Hide ambiguity by choosing a convenient interpretation.
-- Use "Rust does it this way" or "Kotlin does it this way" as a substitute for a cited project decision.
-- Merge or approve changes with unresolved safety, soundness, or spec-compliance objections.
+1. Read the assigned task and its Authority Extract.
+2. Read only the cited specification sections, ADRs, source paths, and tests.
+3. Create or update the task before implementation when no accepted task
+   exists.
+4. Write tests before implementation and verify their expected failure.
+5. Implement the smallest change justified by accepted authority.
+6. Run ordinary tests, then adversarial checks, then review checks, then CI.
+7. Record concise evidence in the task execution log.
+8. Update examples immediately before a commit only when user-visible language
+   support changes. Skip examples for internal-only changes.
+9. Stage only task-scoped files and commit only after all required gates pass.
 
 ## Required Inputs
 
-Every agent execution must start from:
+- The current user request or accepted task.
+- This file.
+- The task Authority Extract.
+- The cited `docs/SPEC.md` sections and accepted ADRs.
+- Relevant tests and validation commands.
 
-- The user request or assigned task.
-- This `AGENTS.md`.
-- The executing agent's file under `.codex/agents/`.
-
-Use a bounded authority set rather than loading the whole design corpus:
-
-- Read only the `docs/SPEC.md` sections cited by the task, milestone, review
-  request, or ambiguity report.
-- Read only accepted ADRs explicitly named there, plus a directly superseded
-  ADR when resolving a conflict.
-- Read the milestone only when its acceptance criteria or ordering affects the
-  assigned work.
-- Do not scan all ADRs, all task history, or unrelated implementation files for
-  routine work. Escalate if the bounded set cannot answer a required question.
-
-Semantic-change executions may expand this set to the directly affected source
-of truth, compatibility surfaces, and supersession targets. The expansion must
-be stated in the handoff or decision record.
-
-Implementation-related executions additionally require:
-
-- An accepted task file.
-- Tests written or approved by Test Engineer.
-- Expected diagnostics, when the task affects errors.
-- Relevant build or CI requirements.
-
-Semantic-change executions additionally require:
-
-- A problem statement.
-- Affected existing spec sections.
-- Affected ADRs.
-- Compatibility and downstream impact notes.
-
-## Required Outputs
-
-Every agent output must include:
-
-- Role name.
-- Inputs read.
-- Decision or action taken.
-- Files changed or files proposed for change.
-- Open questions.
-- Blockers.
-- Handoff target, if another agent must continue.
-
-Implementation outputs must include:
-
-- Task identifier.
-- Tests added before implementation.
-- Implementation files changed.
-- Validation commands and results.
-- Remaining risk.
-
-Review outputs must include:
-
-- Findings ordered by severity.
-- File and line references where applicable.
-- Required fixes.
-- Non-blocking suggestions clearly separated.
+Do not scan unrelated ADRs, tasks, or implementation files unless the bounded
+context cannot answer a necessary question.
 
 ## Context, Parallelism, And Report Budget
 
-Agents must optimize for useful work per token.
+Use the task Authority Extract as the default bounded context. Do not delegate
+or parallelize repository work: all planning, testing, implementation, review,
+and release work occurs in the main task. Keep routine task records concise;
+persist detailed reports only for an ambiguity, a soundness finding, or an
+explicit user request.
 
-- Task Decomposer records an **Authority Extract** in each task: exact SPEC
-  headings, ADR sections, source paths, and validation commands needed for the
-  next role. Receiving agents start there and expand context only when blocked.
-- Default role output is at most 400 words. A blocking semantic, soundness, or
-  diagnostic finding may use up to 800 words when the extra detail is needed to
-  make the fix unambiguous.
-- A successful review returns `APPROVE` plus the checks run and any residual
-  risk in at most 150 words. It does not create a long report by default.
-- Persist a detailed report only for a blocker, ambiguity, soundness attack, or
-  explicit user request. Otherwise record the decision in the task execution
-  log.
-- Each execution-log entry is one line with agent, phase, result, command or
-  evidence, and next handoff. Do not repeat prior logs or restate the task.
-- Do not fork full conversation history into subagents. Prompts must identify
-  the task, bounded authority set, allowed write paths, and requested output.
-- Treat six agents as a ceiling, not a target. Use one primary agent and at
-  most two independent sidecars by default. Use more only for disjoint work
-  that materially shortens the critical path.
+## Required Outputs
 
-Ambiguity outputs must include:
+Every task record must state:
 
-- Exact ambiguous text or missing rule.
-- Competing interpretations.
-- Affected ADRs and spec sections.
-- Why guessing would be unsafe.
-- Recommended owner for resolution.
+- Authority read.
+- Files changed.
+- Tests written before implementation and their expected pre-implementation
+  failure.
+- Validation commands and results.
+- Open questions or `none`.
+- Remaining risk and the next main-task action.
 
-## Handoff Protocol
+## Non-Negotiable Rules
 
-1. State the current role and task.
-2. Cite only the bounded authority actually used.
-3. State files changed and validation performed.
-4. State unresolved question or `none`.
-5. Name the next agent and the one reason for handoff.
+- `docs/SPEC.md` and accepted ADRs are the source of truth.
+- Do not weaken, delete, skip, or rewrite failing tests to pass CI without an
+  explicit review record justified by accepted authority.
+- Do not silently broaden task scope.
+- Do not treat Kotlin, Rust, or existing behavior as a substitute for a project
+  decision.
+- Do not modify accepted ADRs except through an explicit revision or
+  superseding ADR.
+- Do not implement a semantic decision while an ambiguity report is unresolved.
+- Keep abstractions proportional to accepted requirements.
 
-Handoffs must not contain hidden assumptions. If a receiving agent needs a semantic decision not present in `docs/SPEC.md` or `docs/adr/`, the handoff must route to Language Designer or Chief Architect before implementation continues.
+## Review And Escalation
 
-## Review Protocol
+Review each implementation for task scope, source-of-truth compliance,
+maintainability, test-first integrity, diagnostics, and unnecessary complexity.
+For ownership, borrowing, lifetime, thread-safety, async, unsafe, FFI, or other
+soundness boundaries, perform explicit adversarial checks after ordinary tests.
 
-Every implementation PR requires a Reviewer. Add only the specialty review that
-the changed behavior triggers:
+Escalate by filing an ambiguity report when:
 
-| Change trigger | Required additional reviewer |
-| --- | --- |
-| Tests changed or test expectations repaired | Test Engineer |
-| Accepted semantic behavior or rejection changes | Spec Compliance Auditor |
-| User-visible diagnostic kind, span, recovery, wording, or snapshot changes | Diagnostics Engineer |
-| Build, CI, target-pack, packaging, or release files change | Build Engineer |
-| New abstraction, subsystem boundary, compatibility layer, or framework | Simplicity Guardian |
-| Ownership, borrowing, lifetime, async, thread-safety, unsafe, FFI, or soundness boundary changes | Adversarial Engineer |
+- a semantic rule is missing or contradictory;
+- a required diagnostic, recovery behavior, or source span is unspecified; or
+- an architectural conflict cannot be settled by the authority hierarchy.
 
-Routine fixture, terminology, or mechanical refactoring changes do not require
-specialty review unless they alter one of the triggers above.
+The report must quote the ambiguity, list competing interpretations, explain
+why guessing is unsafe, and identify affected source-of-truth files.
 
-Reviewers must check:
+## Commit And CI
 
-- Scope matches the task.
-- Tests came before implementation.
-- Implementation does not weaken tests.
-- Behavior is justified by `docs/SPEC.md` or accepted ADRs.
-- Diagnostics are actionable and source-level.
-- Complexity is necessary.
-- CI gates pass.
+Use branch names `codex/<topic>` unless the project owner requests another
+name. Commit subjects use the existing project prefixes, such as `compiler:`,
+`tests:`, `docs:`, `adr:`, `spec:`, `roadmap:`, or `build:`.
 
-When a reviewer raises a blocker, only that reviewer and any role directly
-affected by the fix re-review it. Do not repeat the full review fan-out after a
-narrow correction. A final Reviewer closure records that all triggered reviews
-are satisfied.
-
-## Escalation Protocol
-
-Escalate to Chief Architect when:
-
-- Agents disagree about architecture, subsystem boundaries, or release readiness.
-- A task requires changing accepted semantics.
-- A soundness issue lacks an obvious resolution.
-- Simplicity and extensibility requirements conflict.
-
-Escalate to Language Designer when:
-
-- `docs/SPEC.md` is ambiguous.
-- An ADR is missing, incomplete, or contradictory.
-- A task requires new semantic rules.
-
-Escalate to Roadmap Planner when:
-
-- A task depends on unscheduled prerequisite work.
-- Milestone scope is too large or misordered.
-
-Escalate to Build Engineer when:
-
-- CI, target packs, build reproducibility, or release artifacts are affected.
-
-Escalation output must include the ambiguity or conflict, affected files, attempted resolution, and the specific decision requested.
-
-## Conflict-Resolution Rules
-
-- `docs/SPEC.md` beats implementation behavior.
-- New ADRs must supersede old decisions explicitly.
-- Safety beats ergonomics when the spec does not explicitly choose ergonomics.
-- Fast compilation matters, but not at the cost of accepted safety semantics.
-- Diagnostics quality is a semantic requirement, not polish.
-- Simplicity wins unless complexity is required by accepted semantics or measured project goals.
-- The Chief Architect makes the final call when role owners cannot reconcile their positions.
-
-## Commit And Branch Naming Conventions
-
-Branch names:
-
-- `agents/<topic>` for branches that update the agent system.
-- `adr/<adr-number>-<topic>` for ADR work.
-- `spec/<topic>` for specification work.
-- `roadmap/<milestone>` for roadmap planning.
-- `task/<task-id>-<topic>` for implementation tasks.
-- `fix/<topic>` for narrowly scoped fixes.
-
-Commit subjects:
-
-- `agents: <change>`
-- `adr: <change>`
-- `spec: <change>`
-- `roadmap: <change>`
-- `task: <change>`
-- `tests: <change>`
-- `compiler: <change>`
-- `diagnostics: <change>`
-- `build: <change>`
-
-Commits must not mix semantic decisions, tests, implementation, and build changes unless the task explicitly requires it and reviewers approve the combined scope.
-
-## Definition Of Done
-
-A task is done only when:
-
-- The task has an accepted source: roadmap item, task file, ADR, or spec requirement.
-- Required context files were read.
-- Ambiguities were resolved or reported.
-- Tests were written before implementation when implementation is involved.
-- Implementation matches `docs/SPEC.md` and accepted ADRs.
-- Diagnostics affected by the task meet diagnostic requirements.
-- Scope remains limited to the task.
-- Required reviews are complete.
-- CI gates pass.
-- Handoff notes or release notes are written when needed.
-
-## CI Gate Requirements
-
-Minimum CI gates for implementation changes:
-
-- Formatting check.
-- Lint check.
-- Unit tests.
-- Parser tests when syntax is touched.
-- Semantic tests when type checking, ownership, borrowing, lifetimes, nullability, error handling, async, or thread safety is touched.
-- Diagnostic snapshot tests when diagnostics are touched.
-- Negative tests for rejected programs.
-- Build smoke test for the compiler.
-- Cross-target smoke test when target packs, code generation, ABI, layout, or build tooling is touched.
-- `sh docs/tests/agent-configs.sh` when agent definitions or Codex agent configuration changes.
-
-CI may not be bypassed because tests expose an implementation defect. A failing test that contradicts `docs/SPEC.md` must be resolved by Test Engineer and Spec Compliance Auditor, not silently weakened.
-
-## Workflow: Creating A New ADR
-
-1. Language Designer opens an ADR proposal.
-2. Required inputs: problem statement, affected `docs/SPEC.md` sections, affected ADRs, examples of ambiguity or missing decision.
-3. Language Lawyer checks whether existing ADRs already answer the question.
-4. Simplicity Guardian challenges whether a new semantic mechanism is necessary.
-5. Adversarial Engineer identifies soundness risks in each competing design.
-6. Diagnostics Engineer identifies diagnostic consequences.
-7. Roadmap Planner identifies milestone impact.
-8. Chief Architect approves, rejects, or requests revision.
-9. Accepted ADR is written under `docs/adr/` with a new number or as an explicit supersession.
-10. `docs/SPEC.md` is updated only through the spec workflow.
-
-## Workflow: Creating Or Revising `docs/SPEC.md`
-
-1. Language Designer proposes the spec change.
-2. Required inputs: accepted ADRs, exact current spec text, proposed replacement text, compatibility impact.
-3. Language Lawyer verifies precision and consistency.
-4. Spec Compliance Auditor checks that the proposed text matches accepted ADRs.
-5. Diagnostics Engineer checks diagnostic obligations.
-6. Chief Architect approves the revision.
-7. The change is applied to `docs/SPEC.md`.
-8. Roadmap Planner updates milestone impact if needed.
-
-## Workflow: Creating Roadmap Milestones
-
-1. Roadmap Planner reads `docs/SPEC.md`, accepted ADRs, existing roadmap files, and known implementation constraints.
-2. Milestones are ordered by dependency, risk, and validation value.
-3. Each milestone states goals, non-goals, entry criteria, exit criteria, risks, and required agents.
-4. Chief Architect reviews architectural sequencing.
-5. Task Decomposer receives accepted milestones for task breakdown.
-
-## Workflow: Decomposing Milestones Into Tasks
-
-1. Task Decomposer reads the accepted milestone and relevant spec material.
-2. Tasks are split into independently reviewable units.
-3. Each task includes scope, non-scope, required tests, implementation area,
-   diagnostics impact, dependencies, review triggers, and an Authority Extract.
-4. Test Engineer confirms tasks are testable.
-5. Implementer receives only accepted tasks.
-
-## Workflow: Implementing A Task
-
-1. Implementer reads the task Authority Extract, the cited source-of-truth
-   sections, tests, and agent rules.
-2. If tests do not exist, hand off to Test Engineer.
-3. If semantics are ambiguous, file an ambiguity report.
-4. Implement only the accepted task scope.
-5. Do not weaken or delete tests.
-6. Run required validation.
-7. Handoff to Reviewer and only the specialty reviewers triggered by the diff.
-
-## Workflow: Adding Tests
-
-1. Test Engineer reads the task Authority Extract, cited source-of-truth
-   sections, and expected diagnostics.
-2. Write positive tests for accepted behavior.
-3. Write negative tests for rejected behavior.
-4. Add diagnostic expectations when errors are involved.
-5. If behavior is ambiguous, file an ambiguity report instead of encoding a guess.
-6. Handoff to Implementer only after tests express spec-backed expectations.
-
-## Workflow: Reviewing A PR
-
-1. Reviewer reads the task Authority Extract, diff, tests, prior findings, and
-   cited source-of-truth sections.
-2. Check scope first.
-3. Check architecture and maintainability.
-4. Check test-first rule.
-5. Route only the review triggers present in the diff.
-6. Report blocking findings first with file and line references.
-7. Approve only after blockers are resolved and CI gates pass.
-
-## Workflow: Adversarial Testing
-
-1. Adversarial Engineer reads the task Authority Extract, relevant soundness
-   sections, implementation diff, and existing tests.
-2. Identify ways to violate memory safety, thread safety, lifetime validity, ownership, borrowing, async cancellation, unsafe boundaries, FFI contracts, or diagnostics.
-3. Produce negative tests or a written attack report.
-4. If the attack exposes ambiguity, file an ambiguity report.
-5. Handoff findings to Implementer and Reviewer.
-
-## Workflow: Resolving Spec Ambiguity
-
-1. Any agent may file an ambiguity report.
-2. Language Lawyer determines whether existing text already resolves it.
-3. Language Designer proposes a semantic resolution when new semantics are required.
-4. Simplicity Guardian and Adversarial Engineer review alternatives.
-5. Chief Architect resolves conflicts.
-6. Accepted resolution becomes an ADR or `docs/SPEC.md` revision.
-7. Blocked tasks resume only after the source of truth is updated.
-
-## Workflow: Releasing A Milestone
-
-1. Roadmap Planner confirms milestone exit criteria.
-2. Build Engineer verifies build, CI, target packs, and release artifacts.
-3. Spec Compliance Auditor verifies implementation against `docs/SPEC.md`.
-4. Test Engineer verifies test coverage and required negative tests.
-5. Diagnostics Engineer verifies diagnostic quality for milestone features.
-6. Reviewer confirms scope and maintainability.
-7. Chief Architect approves release readiness.
-8. Release notes list implemented spec areas, known limitations, and deferred decisions.
+A task is complete only when its tests were created first, scope remains
+bounded, required review and adversarial checks pass, and CI passes. Minimum CI
+for implementation changes is formatting, linting, unit tests, relevant
+negative tests, relevant diagnostic tests, compiler smoke tests, and
+cross-target smoke tests when target behavior changes.

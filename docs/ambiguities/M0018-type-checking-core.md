@@ -5,10 +5,10 @@
 - Report ID: `M0018-type-checking-core`
 - Related Task: `M0018-001`
 - Related Milestone: `M0018`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-10`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 - Resolution Source: `docs/adr/ADR-0027-type-checking-core.md`
 - Resolved Date: `2026-07-10`
 
@@ -66,12 +66,12 @@ M0017 risks state "Primitive type set may be unspecified."
 
 ## Recommended Resolution Path
 
-- [x] Language Lawyer determines whether existing text resolves it.
-- [x] Language Designer drafts ADR or spec revision if new semantics are required.
-- [x] Adversarial Engineer reviews soundness risk.
-- [x] Diagnostics Engineer reviews diagnostic consequences.
-- [x] Simplicity Guardian reviews complexity.
-- [x] Chief Architect approves final resolution.
+- [x] main-task language review determines whether existing text resolves it.
+- [x] main-task semantic design drafts ADR or spec revision if new semantics are required.
+- [x] main-task adversarial check reviews soundness risk.
+- [x] main-task diagnostics check reviews diagnostic consequences.
+- [x] main-task simplicity check reviews complexity.
+- [x] main task approves final resolution.
 
 ## Temporary Rule
 

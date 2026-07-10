@@ -1,4 +1,4 @@
-# ADR-0021 Language Designer Review
+# ADR-0021 main-task semantic design Review
 
 Decision: request-revision-before-acceptance
 
@@ -40,6 +40,6 @@ The accepted revision should not:
 
 ## Non-Authority Finding
 
-This review is not accepted source of truth. It records Language Designer ownership feedback only.
+This review is not accepted source of truth. It records main-task semantic design ownership feedback only.
 
-Agents must not implement lexer behavior from this review or from the draft proposal. Lexer implementation remains blocked until the Chief Architect accepts a concrete lexical grammar into `docs/SPEC.md` or accepted `docs/adr/`.
+main tasks must not implement lexer behavior from this review or from the draft proposal. Lexer implementation remains blocked until the main task accepts a concrete lexical grammar into `docs/SPEC.md` or accepted `docs/adr/`.

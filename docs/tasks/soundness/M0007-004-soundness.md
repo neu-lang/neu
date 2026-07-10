@@ -4,7 +4,7 @@
 
 - Task ID: `M0007-004`
 - Milestone: `M0007`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-09`
 - Decision: `pass`
 
@@ -37,15 +37,15 @@
 ## Attacks Attempted
 
 ```text
-Attack: Use Language Designer review as accepted lexical grammar.
+Attack: Use main-task semantic design review as accepted lexical grammar.
 Expected result: Rejected.
 Actual result: Review states it is not accepted source of truth and must not implement lexer behavior.
-Source of truth: docs/AGENTS.md, docs/adr/proposals/reviews/ADR-0021-language-designer-review.md
+Source of truth: docs/main task rules, docs/adr/proposals/reviews/ADR-0021-language-designer-review.md
 Outcome: pass
 
 Attack: Close M0007 blocker after ownership review alone.
 Expected result: Rejected.
-Actual result: docs/ambiguities/M0006-lexical-grammar.md remains open and Chief Architect decision remains pending.
+Actual result: docs/ambiguities/M0006-lexical-grammar.md remains open and main task decision remains pending.
 Source of truth: docs/ambiguities/M0006-lexical-grammar.md
 Outcome: pass
 

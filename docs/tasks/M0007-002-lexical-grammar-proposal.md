@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-002-lexical-grammar-proposal`
 
@@ -16,17 +16,17 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
-Draft a lexical grammar ADR proposal that can be reviewed by Language Designer, Adversarial Engineer, Diagnostics Engineer, Simplicity Guardian, and Chief Architect.
+Draft a lexical grammar ADR proposal that can be reviewed by main-task semantic design, main-task adversarial check, main-task diagnostics check, main-task simplicity check, and main task.
 
 ## Motivation
 
@@ -79,7 +79,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Draft lexical grammar ADR proposal does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -94,7 +94,7 @@ Add `docs/adr/proposals/ADR-0021-lexical-grammar.md` as a draft proposal only. D
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is not marked complete because M0007 remains blocked.
 
@@ -128,25 +128,25 @@ Add `docs/adr/proposals/ADR-0021-lexical-grammar.md` as a draft proposal only. D
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity remains `docs/ambiguities/M0006-lexical-grammar.md`.
-- Chief Architect approval is required before the proposal can become accepted source of truth.
+- main task approval is required before the proposal can become accepted source of truth.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexical grammar ADR proposal task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0007-lexical-grammar-proposal.sh before adding proposal.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/ADR-0021-lexical-grammar.md.
-2026-07-09 agent=Language-Designer phase=ordinary-tests result=pass notes=Proposal validation and M0007 blocked-state validation passed.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms proposal remains non-authoritative and no lexer code was added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Self-review approved as draft-only unblock package; M0007 remains blocked pending Chief Architect approval.
-2026-07-09 agent=Language-Designer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexical grammar ADR proposal task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0007-lexical-grammar-proposal.sh before adding proposal.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/proposals/ADR-0021-lexical-grammar.md.
+2026-07-09 main_task=Language-Designer phase=ordinary-tests result=pass notes=Proposal validation and M0007 blocked-state validation passed.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms proposal remains non-authoritative and no lexer code was added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Self-review approved as draft-only unblock package; M0007 remains blocked pending main task approval.
+2026-07-09 main_task=Language-Designer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Draft a non-authoritative lexical grammar ADR proposal for review.`
 - Required Context:
   - This task file

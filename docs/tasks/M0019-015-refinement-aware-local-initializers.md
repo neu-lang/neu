@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-015-refinement-aware-local-initializers`
 
@@ -19,8 +19,8 @@
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
   - `docs/adr/ADR-0029-immutable-local-const-keyword.md`
   - `docs/adr/ADR-0030-local-initializer-nullable-diagnostic.md`
-- Project Rules: `AGENTS.md`
-- Agent Prompts: `.codex/agents/task-decomposer.toml`, `.codex/agents/test-engineer.toml`, `.codex/agents/implementer.toml`, `.codex/agents/diagnostics-engineer.toml`, `.codex/agents/adversarial-engineer.toml`, `.codex/agents/reviewer.toml`, `.codex/agents/spec-compliance-auditor.toml`, `.codex/agents/build-engineer.toml`
+- Project Rules: `main task rules`
+- main task Prompts: `main task rules`, `main task rules`, `main task rules`, `main task rules`, `main task rules`, `main task rules`, `main task rules`, `main task rules`
 
 ## Goal
 
@@ -65,7 +65,7 @@ Tests must be created before implementation.
 - Test files to create before implementation: `crates/newlang/tests/type_check.rs` and `docs/tests/m0019-refinement-aware-local-initializers.sh`.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation: the local-initializer checker does not yet consume validated refined expression types.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Dependencies And Blockers
 
@@ -78,10 +78,10 @@ Reuse the validated exact-expression compatibility path established by M0019-013
 
 ## Diagnostics, Build, And Reviews
 
-- Diagnostics Engineer confirms the identifier ambiguity is resolved before tests and checks spans and wording.
-- Adversarial Engineer checks provenance, identity, branch containment, and cross-use isolation.
-- Reviewer and Spec Compliance Auditor verify scope and ADR-0028/0029 compliance.
-- Build Engineer verifies formatting, lint, workspace tests, task validator, and final CI.
+- main-task diagnostics check confirms the identifier ambiguity is resolved before tests and checks spans and wording.
+- main-task adversarial check checks provenance, identity, branch containment, and cross-use isolation.
+- main-task review and main-task specification check verify scope and ADR-0028/0029 compliance.
+- main-task build check verifies formatting, lint, workspace tests, task validator, and final CI.
 
 ## Acceptance Criteria
 
@@ -111,24 +111,24 @@ Reuse the validated exact-expression compatibility path established by M0019-013
 
 - Do not edit `docs/SPEC.md`, `docs/adr/`, milestones, examples, or build files.
 - Do not expand beyond the exact ADR-0030 initializer case or change accepted semantics.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 
 ## Revalidation Log
 
-- `Task Decomposer` — after `4d2a3ae` and `2128abc`, dependency and diagnostic blocker cleared; authority extract and test-first commands refreshed; handoff to `Test Engineer`.
+- `main-task task planning` — after `4d2a3ae` and `2128abc`, dependency and diagnostic blocker cleared; authority extract and test-first commands refreshed; handoff to `main-task test work`.
 
 ## Execution Log
 
-- 2026-07-10 agent=Test-Engineer phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` fails only because `type_m0019_local_declaration_initializers` is not implemented; `sh docs/tests/m0019-refinement-aware-local-initializers.sh` fails on the same missing API. next=Implementer
-- 2026-07-10 agent=Task-Decomposer phase=ordinary-tests result=pass evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` passed (7); `sh docs/tests/m0019-refinement-aware-local-initializers.sh` passed; `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check`, and `cargo test --workspace --all-targets` passed (214 tests). next=Reviewer
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial result=pass evidence=`docs/scripts/adversarial-check.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md` passed; cross-use and invalid-provenance checks hold. next=Reviewer
-- 2026-07-10 agent=Reviewer phase=final-review result=approve evidence=Diagnostics, Test, Spec Compliance, and Adversarial reviews approved; no findings. next=Build-Engineer
-- 2026-07-10 agent=Build-Engineer phase=final-ci result=pass evidence=CI passed 5/5: formatting, clippy, workspace tests (214), task validator, and diff check. next=Roadmap-Planner
+- 2026-07-10 main_task=main-task test work phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` fails only because `type_m0019_local_declaration_initializers` is not implemented; `sh docs/tests/m0019-refinement-aware-local-initializers.sh` fails on the same missing API. next=main-task implementation
+- 2026-07-10 main_task=Task-Decomposer phase=ordinary-tests result=pass evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` passed (7); `sh docs/tests/m0019-refinement-aware-local-initializers.sh` passed; `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check`, and `cargo test --workspace --all-targets` passed (214 tests). next=main-task review
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial result=pass evidence=`docs/scripts/adversarial-check.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md` passed; cross-use and invalid-provenance checks hold. next=main-task review
+- 2026-07-10 main_task=main-task review phase=final-review result=approve evidence=Diagnostics, Test, Spec Compliance, and Adversarial reviews approved; no findings. next=Build-Engineer
+- 2026-07-10 main_task=Build-Engineer phase=final-ci result=pass evidence=CI passed 5/5: formatting, clippy, workspace tests (214), task validator, and diff check. next=Roadmap-Planner
 
 This remains one M0019 milestone task for one problem: consuming an exact initializer use’s accepted refinement while preserving original nullable data.
 
 ## Handoff
 
-- Next Agent: `Roadmap-Planner`
+- Next main task: `Roadmap-Planner`
 - Reason: M0019-015 evidence is complete; continue with the next accepted M0019 work item according to milestone sequencing.
 - Required Context: the accepted M0019 roadmap/task records and their stated Authority Extracts.

@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-004-name-resolution-concrete-draft`
 
@@ -29,12 +29,12 @@
   - `docs/adr/proposals/reviews/ADR-0026-spec-compliance-review.md`
   - `docs/adr/proposals/reviews/ADR-0026-simplicity-review.md`
   - `docs/adr/proposals/reviews/ADR-0026-chief-architect-decision.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -94,7 +94,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0026 does not yet contain the concrete draft sections required by review.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -109,7 +109,7 @@ Revise the proposal only. Use review findings as requirements, but keep the resu
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0016 remains blocked pending accepted source-of-truth authority.
 
@@ -149,19 +149,19 @@ Revise the proposal only. Use review findings as requirements, but keep the resu
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0016 concrete draft revision task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0016-name-resolution-concrete-draft.sh before revising ADR-0026 concrete draft sections.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-concrete-draft.sh failed before implementation because ADR-0026 did not contain the required concrete draft sections.
-2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Revised ADR-0026 proposal with concrete non-authoritative draft sections while keeping M0016 blocked.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=docs/tests/m0016-name-resolution-concrete-draft.sh, policy-review, policy-proposal, and blocked validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-004-soundness.md after ordinary tests were recorded.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0016-004-review.md approved draft-only scope pending final CI gate.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 concrete/review/proposal/blocker validators, M0015 validator, and M0002 validator passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 concrete draft revision task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0016-name-resolution-concrete-draft.sh before revising ADR-0026 concrete draft sections.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-concrete-draft.sh failed before implementation because ADR-0026 did not contain the required concrete draft sections.
+2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Revised ADR-0026 proposal with concrete non-authoritative draft sections while keeping M0016 blocked.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=docs/tests/m0016-name-resolution-concrete-draft.sh, policy-review, policy-proposal, and blocked validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-004-soundness.md after ordinary tests were recorded.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0016-004-review.md approved draft-only scope pending final CI gate.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 concrete/review/proposal/blocker validators, M0015 validator, and M0002 validator passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Revise ADR-0026 proposal into a concrete draft model.`
 - Required Context:
   - This task file

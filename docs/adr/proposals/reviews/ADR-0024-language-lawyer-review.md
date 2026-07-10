@@ -1,4 +1,4 @@
-# ADR-0024 Language Lawyer Review
+# ADR-0024 main-task language review Review
 
 Decision: request-revision-before-acceptance
 

@@ -4,7 +4,7 @@
 
 - Task ID: `<TASK_ID>`
 - Milestone: `<MILESTONE_ID>`
-- Reviewer: `Reviewer`
+- main-task review: `main-task review`
 - Review Date: `YYYY-MM-DD`
 - Decision: `approve | request changes | block pending ambiguity | block pending tests | block pending CI`
 
@@ -32,7 +32,7 @@ explicit user request.
 - [ ] Out-of-scope items were not changed.
 - [ ] Tests were created before implementation.
 - [ ] Pre-implementation test failure was recorded.
-- [ ] Implementation did not weaken or delete tests unless reviewer approval is recorded.
+- [ ] Implementation did not weaken or delete tests unless main-task review approval is recorded.
 - [ ] Ordinary tests passed before adversarial tests.
 - [ ] Adversarial check ran after ordinary tests, when triggered by the task.
 - [ ] Output was compared against `docs/SPEC.md`.
@@ -87,7 +87,7 @@ Source of truth:
 - Simplicity concerns:
   - <concern or `none`>
 - Required specialty reviews:
-  - `Spec Compliance Auditor | Diagnostics Engineer | Build Engineer | Adversarial Engineer | Simplicity Guardian | none`
+  - `main-task specification check | main-task diagnostics check | main-task build check | main-task adversarial check | main-task simplicity check | none`
 
 ## Decision
 

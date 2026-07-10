@@ -6,8 +6,8 @@
 - Milestone: `M0014`
 - Milestone File: `docs/milestones/M0014-module-package-and-visibility-model.md`
 - Status: `complete`
-- Owner Agent: `Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0014-005-accept-module-package-visibility-model-adr`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/proposals/ADR-0025-module-package-visibility-model.md`
   - `docs/adr/proposals/reviews/ADR-0025-chief-architect-decision.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/chief-architect.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -36,7 +36,7 @@ M0014 is blocked by an open ambiguity report. The proposal has been revised into
 - Create accepted `docs/adr/ADR-0025-module-package-visibility-model.md`.
 - Update `docs/SPEC.md` with the accepted ADR-0025 semantics.
 - Resolve `docs/ambiguities/M0014-module-package-visibility-model.md`.
-- Update the Chief Architect decision to approved.
+- Update the main task decision to approved.
 - Update M0014 validators to reflect accepted source of truth.
 - Keep module metadata implementation out of scope.
 
@@ -63,7 +63,7 @@ Tests must be created before implementation.
   - Accepted ADR-0025 exists and has `Status: Accepted`.
   - `docs/SPEC.md` contains ADR-0025 semantics.
   - Ambiguity report is resolved.
-  - Chief Architect decision is approved.
+  - main task decision is approved.
 - Negative tests:
   - Compiler module implementation remains absent.
   - Accepted ADR does not define manifest, package manager, target-pack artifact, or name-resolution behavior.
@@ -79,7 +79,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted ADR-0025 does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -94,7 +94,7 @@ Move the concrete model from proposal to accepted ADR form, add the correspondin
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0014 ambiguity is resolved by accepted source of truth.
 
@@ -140,19 +140,19 @@ Move the concrete model from proposal to accepted ADR form, add the correspondin
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0014 accepted ADR task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created accepted ADR validator before adding accepted source of truth.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-package-visibility-model-accepted.sh failed before implementation because accepted ADR-0025 was missing.
-2026-07-10 agent=Chief-Architect phase=implementation result=pass notes=Accepted ADR-0025, updated SPEC, resolved M0014 ambiguity, and approved the Chief Architect decision.
-2026-07-10 agent=Chief-Architect phase=ordinary-tests result=pass notes=M0014 accepted, concrete draft, review, proposal, and authority validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-005-soundness.md after ordinary-test evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0014-005-review.md approves ADR-0025 acceptance scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0014-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0014 accepted ADR task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created accepted ADR validator before adding accepted source of truth.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-package-visibility-model-accepted.sh failed before implementation because accepted ADR-0025 was missing.
+2026-07-10 main_task=Chief-Architect phase=implementation result=pass notes=Accepted ADR-0025, updated SPEC, resolved M0014 ambiguity, and approved the main task decision.
+2026-07-10 main_task=Chief-Architect phase=ordinary-tests result=pass notes=M0014 accepted, concrete draft, review, proposal, and authority validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-005-soundness.md after ordinary-test evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0014-005-review.md approves ADR-0025 acceptance scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0014-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Accept ADR-0025 and resolve M0014 ambiguity.`
 - Required Context:
   - This task file

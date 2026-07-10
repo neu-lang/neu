@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-002-type-checking-core-proposal`
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `docs/adr/proposals/ADR-0027-type-checking-core.md` does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -93,7 +93,7 @@ Add a draft proposal only. Do not promote it into accepted ADRs, update SPEC, or
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0018 remains blocked pending accepted source-of-truth authority.
 
@@ -129,14 +129,14 @@ Add a draft proposal only. Do not promote it into accepted ADRs, update SPEC, or
 ## Ambiguities And Dependencies
 
 - M0018 remains blocked by `docs/ambiguities/M0018-type-checking-core.md`.
-- Required follow-up reviews: Language Lawyer, Diagnostics Engineer, Adversarial Engineer, Spec Compliance Auditor, Simplicity Guardian, Chief Architect.
+- Required follow-up reviews: main-task language review, main-task diagnostics check, main-task adversarial check, main-task specification check, main-task simplicity check, main task.
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 type checking core proposal task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0018-type-checking-core-proposal.sh before adding ADR-0027 proposal.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Proposal validator failed before implementation because docs/adr/proposals/ADR-0027-type-checking-core.md was missing.
-- 2026-07-10 agent=Language-Designer phase=ordinary-tests result=pass notes=Added non-authoritative ADR-0027 type checking core proposal; M0018 proposal and ambiguity blocker validators passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-002-type-checking-core-proposal.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-002-type-checking-core-proposal.md` created review and concrete review approved proposal-only scope.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-proposal.sh`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 type checking core proposal task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0018-type-checking-core-proposal.sh before adding ADR-0027 proposal.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Proposal validator failed before implementation because docs/adr/proposals/ADR-0027-type-checking-core.md was missing.
+- 2026-07-10 main_task=Language-Designer phase=ordinary-tests result=pass notes=Added non-authoritative ADR-0027 type checking core proposal; M0018 proposal and ambiguity blocker validators passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-002-type-checking-core-proposal.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-002-type-checking-core-proposal.md` created review and concrete review approved proposal-only scope.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-proposal.sh`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-005-accept-expression-statement-pattern-syntax-adr`
 
@@ -17,12 +17,12 @@
 - ADRs:
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
   - `docs/adr/proposals/ADR-0024-expression-statement-pattern-syntax.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/chief-architect.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -38,7 +38,7 @@ ADR-0024 now contains concrete draft grammar, precedence, diagnostics, recovery 
 - Add an ADR-0024 summary to `docs/SPEC.md`.
 - Resolve `docs/ambiguities/M0008-expression-statement-pattern-syntax.md`.
 - Update `docs/syntax/grammar-authority-ledger.md` for ADR-0024 body constructs.
-- Update the Chief Architect decision artifact to approved.
+- Update the main task decision artifact to approved.
 - Update M0013 validators to distinguish historical blocker/proposal evidence from accepted authority.
 
 ## Out Of Scope
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted `docs/adr/ADR-0024-expression-statement-pattern-syntax.md` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -92,7 +92,7 @@ Promote the reviewed concrete draft into an accepted ADR and update only source-
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -138,19 +138,19 @@ Promote the reviewed concrete draft into an accepted ADR and update only source-
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0024 acceptance task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created accepted-state validator before accepting ADR-0024.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Accepted-state validator failed before implementation because docs/adr/ADR-0024-expression-statement-pattern-syntax.md did not exist.
-2026-07-10 agent=Chief-Architect phase=implementation result=pass notes=Promoted reviewed concrete draft to accepted ADR-0024, updated SPEC, resolved ambiguity, updated ledger, and approved decision artifact without parser implementation.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0013 accepted-state and historical validators passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-005-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-005-review.md approves source-of-truth acceptance scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0024 acceptance task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created accepted-state validator before accepting ADR-0024.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Accepted-state validator failed before implementation because docs/adr/ADR-0024-expression-statement-pattern-syntax.md did not exist.
+2026-07-10 main_task=Chief-Architect phase=implementation result=pass notes=Promoted reviewed concrete draft to accepted ADR-0024, updated SPEC, resolved ambiguity, updated ledger, and approved decision artifact without parser implementation.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0013 accepted-state and historical validators passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-005-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-005-review.md approves source-of-truth acceptance scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Create concrete body parser fixtures after accepted source-of-truth update.`
 - Required Context:
   - This task file

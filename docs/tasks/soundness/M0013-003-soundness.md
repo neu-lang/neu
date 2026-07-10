@@ -4,7 +4,7 @@
 
 - Task ID: `M0013-003`
 - Milestone: `M0013`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -38,7 +38,7 @@
 
 ```text
 Attack: Use review artifacts as accepted source of truth.
-Expected result: rejected because Chief Architect decision remains pending.
+Expected result: rejected because main task decision remains pending.
 Actual result: decision artifact says no acceptance yet and validator requires pending status.
 Source of truth: docs/adr/proposals/reviews/ADR-0024-chief-architect-decision.md
 Outcome: pass

@@ -1,4 +1,4 @@
-# ADR-0023 Language Lawyer Review
+# ADR-0023 main-task language review Review
 
 Decision: request-revision-before-acceptance
 

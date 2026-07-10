@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-013-known-local-symbol-types`
 
@@ -75,7 +75,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Known local symbol derivation entry point does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -90,7 +90,7 @@ Add a pure helper that scans local bindings in order, looks up each binding node
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] No compiler behavior beyond known local symbol type derivation is introduced.
 
@@ -130,10 +130,10 @@ Add a pure helper that scans local bindings in order, looks up each binding node
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 known local symbol type derivation task.
-- 2026-07-10 agent=Test-Engineer phase=test-first result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `newlang::type_check::known_local_symbol_types`.
-- 2026-07-10 agent=Implementer phase=implementation result=pass notes=Added pure known local symbol type derivation from local bindings and declaration signatures.
-- 2026-07-10 agent=Implementer phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 146 tests.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-013-known-local-symbol-types.md` created a passing soundness report after ordinary tests.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Review approved scope, spec compliance, and maintainability.
-- 2026-07-10 agent=Implementer phase=ci result=pass notes=`cargo fmt --all --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace --all-targets`; `sh docs/tests/m0018-type-checking-core-accepted.sh`; `sh docs/tests/m0002-workspace-ci.sh`.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 known local symbol type derivation task.
+- 2026-07-10 main_task=main-task test work phase=test-first result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `newlang::type_check::known_local_symbol_types`.
+- 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added pure known local symbol type derivation from local bindings and declaration signatures.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 146 tests.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-013-known-local-symbol-types.md` created a passing soundness report after ordinary tests.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Review approved scope, spec compliance, and maintainability.
+- 2026-07-10 main_task=main-task implementation phase=ci result=pass notes=`cargo fmt --all --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo test --workspace --all-targets`; `sh docs/tests/m0018-type-checking-core-accepted.sh`; `sh docs/tests/m0002-workspace-ci.sh`.

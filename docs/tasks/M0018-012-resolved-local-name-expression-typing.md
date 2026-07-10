@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-012-resolved-local-name-expression-typing`
 
@@ -74,7 +74,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Resolved name expression typing entry point and known-symbol type input records do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -89,7 +89,7 @@ Add a minimal `KnownSymbolType` input and a function that reads `ResolutionTable
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] No compiler behavior beyond resolved name expression typing from explicit known symbol types is introduced.
 
@@ -129,10 +129,10 @@ Add a minimal `KnownSymbolType` input and a function that reads `ResolutionTable
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 resolved local name expression typing task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added resolved name expression typing tests before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed because `KnownSymbolType` and `type_resolved_name_expressions` do not exist yet.
-- 2026-07-10 agent=Implementer phase=ordinary-tests result=pass notes=Added explicit known-symbol resolved name expression typing only; `cargo fmt --all --check`, `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-012-resolved-local-name-expression-typing.md` created a passing soundness report; concrete adversarial review found no scope expansion.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-012-resolved-local-name-expression-typing.md` created review artifact; concrete review approved against SPEC, ADR-0027, ADR-0026, and M0018.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Final CI gate passed after review and soundness reports.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 resolved local name expression typing task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added resolved name expression typing tests before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed because `KnownSymbolType` and `type_resolved_name_expressions` do not exist yet.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=Added explicit known-symbol resolved name expression typing only; `cargo fmt --all --check`, `cargo test --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-012-resolved-local-name-expression-typing.md` created a passing soundness report; concrete adversarial review found no scope expansion.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-012-resolved-local-name-expression-typing.md` created review artifact; concrete review approved against SPEC, ADR-0027, ADR-0026, and M0018.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Final CI gate passed after review and soundness reports.

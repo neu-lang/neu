@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Diagnostics Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task diagnostics check`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-021-unresolved-type-rule-diagnostics`
 
@@ -73,7 +73,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Existing helpers skip missing annotation authority and missing resolved-name types without diagnostics.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -88,7 +88,7 @@ Add unresolved diagnostic recording in the existing accepted M0018 helper paths 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] No compiler behavior beyond unresolved diagnostic emission for accepted M0018 constructs is introduced.
 
@@ -126,12 +126,12 @@ Add unresolved diagnostic recording in the existing accepted M0018 helper paths 
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 unresolved type-rule diagnostic task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Updated accepted M0018 tests to require `missing_annotation_type` and `missing_resolved_name_type` diagnostics before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with four missing-diagnostic assertion failures.
-- 2026-07-10 agent=Diagnostics-Engineer phase=implementation result=pass notes=Recorded unresolved diagnostics for missing primitive annotation authority and resolved symbols without supplied known types.
-- 2026-07-10 agent=Diagnostics-Engineer phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 166 tests.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-021-unresolved-type-rule-diagnostics.md` passed after ordinary tests.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, ADR-0026, and `docs/milestones/M0018-type-checking-core.md`.
-- 2026-07-10 agent=Examples-Curator phase=examples result=skip notes=No example update required because this task changes diagnostic behavior, not the language-level source forms users can write.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 unresolved type-rule diagnostic task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated accepted M0018 tests to require `missing_annotation_type` and `missing_resolved_name_type` diagnostics before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with four missing-diagnostic assertion failures.
+- 2026-07-10 main_task=Diagnostics-Engineer phase=implementation result=pass notes=Recorded unresolved diagnostics for missing primitive annotation authority and resolved symbols without supplied known types.
+- 2026-07-10 main_task=Diagnostics-Engineer phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 166 tests.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-021-unresolved-type-rule-diagnostics.md` passed after ordinary tests.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, ADR-0026, and `docs/milestones/M0018-type-checking-core.md`.
+- 2026-07-10 main_task=Examples-Curator phase=examples result=skip notes=No example update required because this task changes diagnostic behavior, not the language-level source forms users can write.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

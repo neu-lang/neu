@@ -1,22 +1,22 @@
-# ADR-0029 Language Lawyer Review
+# ADR-0029 main-task language review Review
 
 ## Metadata
 
 - Proposal: `ADR-0029`
-- Reviewer: `Language Lawyer`
+- main-task review: `main-task language review`
 - Date: `2026-07-10`
 - Initial verdict: `revise`
 
 ## Required Classification
 
-Role: Language Lawyer
+Role: main-task language review
 
 Question: Is draft ADR-0029 precise and complete enough to replace the project language's immutable-local `val` spelling with `const`, while preserving only the existing immutable-local semantics and conferring no compile-time-constant meaning?
 
 Inputs read:
 
-- `AGENTS.md`
-- `.codex/agents/language-lawyer.toml`
+- `main task rules`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - `docs/adr/ADR-0005-copy-move-and-value-categories.md`
@@ -35,7 +35,7 @@ Classification: ambiguous
 
 Controlling text:
 
-- `docs/SPEC.md:5-6` makes the specification the record of accepted language-level decisions, and `AGENTS.md` places `docs/SPEC.md` above accepted ADRs in the authority hierarchy.
+- `docs/SPEC.md:5-6` makes the specification the record of accepted language-level decisions, and `main task rules` places `docs/SPEC.md` above accepted ADRs in the authority hierarchy.
 - `docs/SPEC.md:70-73` and ADR-0013 define immutable bindings and explicit mutable bindings without attaching compile-time evaluation to binding immutability.
 - `docs/SPEC.md:103-107` and `docs/adr/ADR-0019-compile-time-evaluation-and-metaprogramming.md:24-32` accept bounded compile-time evaluation as a distinct direction but do not define its concrete syntax.
 - `docs/adr/ADR-0021-lexical-grammar.md:56-70` classifies a spelling as a keyword only by exact membership in the accepted keyword set; `docs/adr/ADR-0021-lexical-grammar.md:73-108` currently reserves `val`, does not reserve `const`, and requires accepted authority for future keywords.
@@ -57,9 +57,9 @@ Non-authoritative assumptions:
 
 Required escalation:
 
-- Language Designer must revise the proposal to close the findings below.
-- Diagnostics Engineer must approve the exact legacy-`val` recognition, diagnostic category, recovery artifact, and interaction with valid identifier uses.
-- Chief Architect must require the accepted ADR and conforming `docs/SPEC.md` revision to become authoritative together, after the semantic reviews are complete.
+- main-task semantic design must revise the proposal to close the findings below.
+- main-task diagnostics check must approve the exact legacy-`val` recognition, diagnostic category, recovery artifact, and interaction with valid identifier uses.
+- main task must require the accepted ADR and conforming `docs/SPEC.md` revision to become authoritative together, after the semantic reviews are complete.
 
 ## Actionable Findings
 
@@ -76,7 +76,7 @@ Required revision:
 
 ### 2. High: the supersession plan does not make the higher-authority SPEC update atomic with ADR acceptance
 
-The proposal lists `docs/SPEC.md` as a dependency and a downstream update, but its supersession targets name only ADR-0021, ADR-0024, and ADR-0026 (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:254-278`). The current specification still accepts local `val` syntax at `docs/SPEC.md:149-154` and names local `val` binding positions at `docs/SPEC.md:192-198`. Under `AGENTS.md`, that text outranks an accepted ADR. The workflow at proposal lines 292-294 could therefore be read as allowing ADR acceptance before the corresponding SPEC revision, producing contradictory authority in which the SPEC continues to control.
+The proposal lists `docs/SPEC.md` as a dependency and a downstream update, but its supersession targets name only ADR-0021, ADR-0024, and ADR-0026 (`docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md:254-278`). The current specification still accepts local `val` syntax at `docs/SPEC.md:149-154` and names local `val` binding positions at `docs/SPEC.md:192-198`. Under `main task rules`, that text outranks an accepted ADR. The workflow at proposal lines 292-294 could therefore be read as allowing ADR acceptance before the corresponding SPEC revision, producing contradictory authority in which the SPEC continues to control.
 
 Required revision:
 
@@ -126,19 +126,19 @@ Decision: Revise before acceptance. The selected hard replacement is not blocked
 
 Files changed: only `docs/adr/proposals/reviews/ADR-0029-language-lawyer-review.md`.
 
-Files proposed for change: the draft proposal, by the Language Designer; no direct edits are authorized by this review.
+Files proposed for change: the draft proposal, by the main-task semantic design; no direct edits are authorized by this review.
 
 Open questions:
 
 - What exact rejected token sequence triggers the legacy-`val` migration diagnostic without capturing valid identifier uses?
 - What stable diagnostic category and invalid recovery representation will be used?
-- Will the Chief Architect require ADR acceptance and SPEC synchronization in one change, as the authority hierarchy requires?
+- Will the main task require ADR acceptance and SPEC synchronization in one change, as the authority hierarchy requires?
 
 Blockers: ADR-0029 acceptance, tests, compiler implementation, and downstream syntax migration must remain blocked until the required revisions are accepted.
 
 Validation performed: cross-checked every controlling claim against the cited SPEC and accepted ADR text; checked the grammar authority ledger's maintenance rule; inspected repository status before and after writing the report. No compiler or test validation was appropriate for this documentation-only semantic review.
 
-Handoff target: Language Designer for proposal revision, then Diagnostics Engineer for the migration contract, then Chief Architect for synchronized acceptance or further direction.
+Handoff target: main-task semantic design for proposal revision, then main-task diagnostics check for the migration contract, then main task for synchronized acceptance or further direction.
 
 ## Revised-Round Review
 
@@ -192,15 +192,15 @@ Final verdict: Revise before acceptance. All four prior findings are resolved in
 
 Files changed in this round: only `docs/adr/proposals/reviews/ADR-0029-language-lawyer-review.md`.
 
-Files proposed for change: the draft proposal, by the Language Designer; this review authorizes no direct proposal edit.
+Files proposed for change: the draft proposal, by the main-task semantic design; this review authorizes no direct proposal edit.
 
-Open question: Does the Language Designer confirm that `const val: Int = 1;` is intended to remain syntactically valid because `val` is an ordinary identifier in binding-name position?
+Open question: Does the main-task semantic design confirm that `const val: Int = 1;` is intended to remain syntactically valid because `val` is an ordinary identifier in binding-name position?
 
 Blocker: ADR-0029 acceptance and downstream migration remain blocked until the invariant is positionally qualified.
 
 Validation performed: re-read the complete revised proposal, mapped each prior finding to its revised text, and re-checked the controlling SPEC, ADR-0021 lexical classification, ADR-0024 statement and recovery grammar, ADR-0026 binding positions, and ADR-0028 immutable-binding eligibility.
 
-Handoff target: Language Designer for the one-line semantic-precision correction, then Chief Architect for final approval after confirming synchronized acceptance.
+Handoff target: main-task semantic design for the one-line semantic-precision correction, then main task for final approval after confirming synchronized acceptance.
 
 ## Final Sign-Off
 
@@ -210,9 +210,9 @@ Handoff target: Language Designer for the one-line semantic-precision correction
 - Final classification: `specified`
 - Final verdict: `approve`
 
-Role: Language Lawyer
+Role: main-task language review
 
-Question: Did the Language Designer resolve the sole remaining positional-`val` ambiguity, and do the final proposal, accepted ADR-0029, synchronized specification, and grammar authority ledger state one precise semantic rule?
+Question: Did the main-task semantic design resolve the sole remaining positional-`val` ambiguity, and do the final proposal, accepted ADR-0029, synchronized specification, and grammar authority ledger state one precise semantic rule?
 
 Inputs read:
 
@@ -246,14 +246,14 @@ Non-authoritative assumptions: none. No Kotlin rule, implementation behavior, fi
 
 Required escalation: none for semantic precision or source-of-truth consistency.
 
-Final verdict: **Approve.** The final proposal is precise, the accepted ADR faithfully carries the decision, the SPEC and ledger are synchronized, all prior Language Lawyer findings are closed, and no semantic blocker remains.
+Final verdict: **Approve.** The final proposal is precise, the accepted ADR faithfully carries the decision, the SPEC and ledger are synchronized, all prior main-task language review findings are closed, and no semantic blocker remains.
 
 Files changed in this sign-off: only `docs/adr/proposals/reviews/ADR-0029-language-lawyer-review.md`.
 
-Open questions: none within Language Lawyer scope.
+Open questions: none within main-task language review scope.
 
-Blockers: none within Language Lawyer scope. Downstream work remains subject to the ordered gates in accepted ADR-0029 rather than to this review.
+Blockers: none within main-task language review scope. Downstream work remains subject to the ordered gates in accepted ADR-0029 rather than to this review.
 
 Validation performed: read the complete final proposal and accepted ADR, cross-checked every affected SPEC summary, verified each relevant grammar-ledger authority row and deferral, and confirmed the positional `val` rule and examples agree across all four artifacts.
 
-Handoff target: Chief Architect and downstream role owners may proceed under the accepted ADR-0029 authority bundle and its explicit roadmap gates.
+Handoff target: main task and downstream role owners may proceed under the accepted ADR-0029 authority bundle and its explicit roadmap gates.

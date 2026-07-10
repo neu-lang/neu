@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Build Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task build check`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-024-complete-type-checking-core-milestone`
 
@@ -70,7 +70,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0018 milestone checklist still has open well-typed and ill-typed items.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -85,7 +85,7 @@ Add the validator, prove it fails with the current open checklist, then update t
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Examples update is explicitly skipped because no language-level source forms changed.
 
@@ -121,12 +121,12 @@ Add the validator, prove it fails with the current open checklist, then update t
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 milestone completion task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created `docs/tests/m0018-type-checking-core-complete.sh` before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`sh docs/tests/m0018-type-checking-core-complete.sh` failed before implementation because the M0018 well-typed checklist item was still open.
-- 2026-07-10 agent=Build-Engineer phase=implementation result=pass notes=Marked M0018 well-typed and ill-typed fixture checklist items complete based on existing M0018 core fixture coverage.
-- 2026-07-10 agent=Build-Engineer phase=ordinary-tests result=pass notes=`sh docs/tests/m0018-type-checking-core-complete.sh` passed and `cargo test --workspace --all-targets` passed with 171 tests.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-024-complete-type-checking-core-milestone.md` passed after ordinary tests.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, and `docs/milestones/M0018-type-checking-core.md`.
-- 2026-07-10 agent=Examples-Curator phase=examples result=skip notes=No example update required because this task changes milestone metadata and validation only.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, `sh docs/tests/m0018-type-checking-core-complete.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 milestone completion task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created `docs/tests/m0018-type-checking-core-complete.sh` before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`sh docs/tests/m0018-type-checking-core-complete.sh` failed before implementation because the M0018 well-typed checklist item was still open.
+- 2026-07-10 main_task=Build-Engineer phase=implementation result=pass notes=Marked M0018 well-typed and ill-typed fixture checklist items complete based on existing M0018 core fixture coverage.
+- 2026-07-10 main_task=Build-Engineer phase=ordinary-tests result=pass notes=`sh docs/tests/m0018-type-checking-core-complete.sh` passed and `cargo test --workspace --all-targets` passed with 171 tests.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-024-complete-type-checking-core-milestone.md` passed after ordinary tests.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Review approved against `docs/SPEC.md`, ADR-0027, and `docs/milestones/M0018-type-checking-core.md`.
+- 2026-07-10 main_task=Examples-Curator phase=examples result=skip notes=No example update required because this task changes milestone metadata and validation only.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-accepted.sh`, `sh docs/tests/m0018-type-checking-core-complete.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

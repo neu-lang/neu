@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-013-refinement-aware-assignment-checking`
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0019 refinement-aware assignment checking API does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Reuse the existing assignment compatibility predicate through a shared internal 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Examples decision is recorded.
 
@@ -138,27 +138,27 @@ Reuse the existing assignment compatibility predicate through a shared internal 
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0019 assignment-statement nullable-use integration task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added refined success, nullable-use diagnostic boundary, M0018 compatibility, ordinary mismatch, inconsistent-view tests, and a docs validator before implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Focused tests failed on the missing `type_m0019_assignment_statements` import and the validator failed on the absent API.
-- 2026-07-10 agent=Implementer phase=implement result=pass notes=Added M0019 assignment checking through the shared M0018 compatibility loop with validated per-use views and nullable-specific diagnostic classification.
-- 2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=Five focused tests, all 61 type-check tests, docs validator, and `git diff --check` passed; `cargo fmt --all` applied mechanical formatting.
-- 2026-07-10 agent=Adversarial-Engineer phase=add-attacks result=pass notes=Added duplicate refined-view attack after ordinary tests to prevent insertion-order selection.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-check result=pass notes=All six focused tests and the harness passed; concrete soundness report covers inconsistent, duplicate, and misclassified assignment attacks.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=Compared implementation against SPEC, ADR-0027, ADR-0028, and M0019; no findings and M0018 public behavior remains unchanged; approved pending final CI.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Formatting, workspace clippy with warnings denied, all 201 workspace tests, all listed M0019 validators, and the M0002 baseline CI gate passed.
-- 2026-07-10 agent=Task-Decomposer phase=milestone-checklist result=pass notes=No M0019 completion item changed; assignment statements now consume refinements, but local initializers, orchestration, and invalidation remain incomplete.
-- 2026-07-10 agent=Implementer phase=examples-decision result=pass notes=Updated the current nullability example with direct assignment from a refined nullable local and documented the exact implemented versus pending M0019 surface.
-- 2026-07-10 agent=Reviewer phase=precommit-audit result=fail notes=Cached diff revealed the shared loop changed M0018 `T? -> T` diagnostics; required explicit M0018/M0019 mode separation.
-- 2026-07-10 agent=Implementer phase=review-fix result=pass notes=Added explicit private diagnostic mode and an M0018 nullable-to-base regression test; full validation must be rerun.
-- 2026-07-10 agent=Adversarial-Engineer phase=parallel-review result=fail notes=Independent GPT-5.6 Sol review found that assignment checking trusted type-consistent refined records without validating branch or binding provenance.
-- 2026-07-10 agent=Implementer phase=provenance-fix result=pass notes=Required unique flow record, refinement-region record, exact resolved binding, AST branch containment, and consistent nullable/base types before consuming a refined view.
-- 2026-07-10 agent=Test-Engineer phase=post-review-regression result=pass notes=Seven focused assignment tests, the M0018 compatibility regression, and all 64 type-check tests passed after provenance validation.
-- 2026-07-10 agent=Build-Engineer phase=final-ci-rerun result=pass notes=Formatting, workspace clippy with warnings denied, all 203 workspace tests, all listed M0019 validators, and the M0002 baseline CI gate passed after both review fixes.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 assignment-statement nullable-use integration task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added refined success, nullable-use diagnostic boundary, M0018 compatibility, ordinary mismatch, inconsistent-view tests, and a docs validator before implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Focused tests failed on the missing `type_m0019_assignment_statements` import and the validator failed on the absent API.
+- 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added M0019 assignment checking through the shared M0018 compatibility loop with validated per-use views and nullable-specific diagnostic classification.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=Five focused tests, all 61 type-check tests, docs validator, and `git diff --check` passed; `cargo fmt --all` applied mechanical formatting.
+- 2026-07-10 main_task=Adversarial-Engineer phase=add-attacks result=pass notes=Added duplicate refined-view attack after ordinary tests to prevent insertion-order selection.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=All six focused tests and the harness passed; concrete soundness report covers inconsistent, duplicate, and misclassified assignment attacks.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared implementation against SPEC, ADR-0027, ADR-0028, and M0019; no findings and M0018 public behavior remains unchanged; approved pending final CI.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Formatting, workspace clippy with warnings denied, all 201 workspace tests, all listed M0019 validators, and the M0002 baseline CI gate passed.
+- 2026-07-10 main_task=Task-Decomposer phase=milestone-checklist result=pass notes=No M0019 completion item changed; assignment statements now consume refinements, but local initializers, orchestration, and invalidation remain incomplete.
+- 2026-07-10 main_task=main-task implementation phase=examples-decision result=pass notes=Updated the current nullability example with direct assignment from a refined nullable local and documented the exact implemented versus pending M0019 surface.
+- 2026-07-10 main_task=main-task review phase=precommit-audit result=fail notes=Cached diff revealed the shared loop changed M0018 `T? -> T` diagnostics; required explicit M0018/M0019 mode separation.
+- 2026-07-10 main_task=main-task implementation phase=review-fix result=pass notes=Added explicit private diagnostic mode and an M0018 nullable-to-base regression test; full validation must be rerun.
+- 2026-07-10 main_task=Adversarial-Engineer phase=parallel-review result=fail notes=Independent GPT-5.6 Sol review found that assignment checking trusted type-consistent refined records without validating branch or binding provenance.
+- 2026-07-10 main_task=main-task implementation phase=provenance-fix result=pass notes=Required unique flow record, refinement-region record, exact resolved binding, AST branch containment, and consistent nullable/base types before consuming a refined view.
+- 2026-07-10 main_task=main-task test work phase=post-review-regression result=pass notes=Seven focused assignment tests, the M0018 compatibility regression, and all 64 type-check tests passed after provenance validation.
+- 2026-07-10 main_task=Build-Engineer phase=final-ci-rerun result=pass notes=Formatting, workspace clippy with warnings denied, all 203 workspace tests, all listed M0019 validators, and the M0002 baseline CI gate passed after both review fixes.
 
 ## Handoff
 
-- Next Agent: `Task Decomposer`
+- Next main task: `main-task task planning`
 - Reason: `Create the next M0019 task for refinement-aware local declaration initializers.`
 - Required Context:
   - This task file

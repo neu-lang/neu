@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Reviewer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-026-complete-name-resolution-milestone`
 
@@ -16,11 +16,11 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0026-name-resolution-policy.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
-  - `.codex/agents/build-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -72,7 +72,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0016 milestone checklist still has unchecked approved-name and unresolved-name items.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -87,7 +87,7 @@ Add milestone checklist assertions to the M0016 validator, verify they fail, the
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 
 ## Execution Commands
@@ -123,20 +123,20 @@ Add milestone checklist assertions to the M0016 validator, verify they fail, the
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0016 milestone completion task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Updated M0016 data-model validator to require completed milestone checklist items.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-data-model.sh failed before milestone update because Approved names resolve remained unchecked.
-2026-07-10 agent=Reviewer phase=implementation result=pass notes=Marked M0016 approved-name and unresolved-name checklist items complete based on implemented accepted-subset binders and diagnostics.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0016 data-model validator, cargo test -p newlang --test name_resolution, and M0016 accepted-state validator passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found milestone closure backed by validators and no unsupported semantic changes.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
-2026-07-10 agent=Build-Engineer phase=ci-fix result=pass notes=Updated legacy M0016 authority validator to require completed checklist items after milestone closure.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 milestone completion task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated M0016 data-model validator to require completed milestone checklist items.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-data-model.sh failed before milestone update because Approved names resolve remained unchecked.
+2026-07-10 main_task=main-task review phase=implementation result=pass notes=Marked M0016 approved-name and unresolved-name checklist items complete based on implemented accepted-subset binders and diagnostics.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0016 data-model validator, cargo test -p newlang --test name_resolution, and M0016 accepted-state validator passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found milestone closure backed by validators and no unsupported semantic changes.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
+2026-07-10 main_task=Build-Engineer phase=ci-fix result=pass notes=Updated legacy M0016 authority validator to require completed checklist items after milestone closure.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Roadmap Planner`
+- Next main task: `main-task roadmap planning`
 - Reason: `M0016 milestone is complete; select M0017 next.`
 - Required Context:
   - This task file

@@ -1,6 +1,6 @@
 # ADR-0031: Region-Exit Refinement Invalidation
 
-Status: Draft — non-authoritative; requires Chief Architect approval.
+Status: Draft — non-authoritative; requires main task approval.
 
 ## Question
 
@@ -62,6 +62,6 @@ and M0019-016.
 
 ## Handoff
 
-Request Adversarial Engineer, Diagnostics Engineer, and Simplicity Guardian
-reviews, then Chief Architect acceptance. No implementation or tests follow
+Request main-task adversarial check, main-task diagnostics check, and main-task simplicity check
+reviews, then main task acceptance. No implementation or tests follow
 from this draft alone.

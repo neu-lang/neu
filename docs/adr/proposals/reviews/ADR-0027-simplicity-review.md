@@ -4,13 +4,13 @@
 
 - ADR: `ADR-0027`
 - Milestone: `M0018`
-- Reviewer: `Simplicity Guardian`
+- main-task review: `main-task simplicity check`
 - Date: `2026-07-10`
 - Decision: `request revision before acceptance`
 
 ## Findings
 
-The proposal risks making M0018 too broad if it accepts literals, primitives, assignments, direct calls, and structural function application all at once. The bootstrap subset should be small enough for one implementation agent to complete in under five working days.
+The proposal risks making M0018 too broad if it accepts literals, primitives, assignments, direct calls, and structural function application all at once. The bootstrap subset should be small enough for one implementation main task to complete in under five working days.
 
 The accepted ADR should prefer exact type identity and explicit deferrals over early coercion, overload, subtyping, protocol conformance, or generic solving.
 

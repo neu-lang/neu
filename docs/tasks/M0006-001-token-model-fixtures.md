@@ -6,8 +6,8 @@
 - Milestone: `M0006`
 - Milestone File: `docs/milestones/M0006-token-model-and-lexer-fixtures.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0006-001-token-model-fixtures`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -57,7 +57,7 @@ M0006 requires the project to identify what token categories are authorized by `
 - Existing files:
   - `docs/test-harness.md`
   - `tests/fixtures/`
-  - `.codex/agents/language-lawyer.md`
+  - `main task rules`
 
 ## Required Tests
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Token model planning docs, inert lexer fixture metadata, and ambiguity report do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Add documentation and metadata only: `docs/lexer/token-model.md`, one inert lexe
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -124,7 +124,7 @@ Add documentation and metadata only: `docs/lexer/token-model.md`, one inert lexe
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement lexer code.
 - Do not add token enums.
 - Do not introduce language syntax or lexical semantics not present in `docs/SPEC.md` or `docs/adr/`.
@@ -139,18 +139,18 @@ Add documentation and metadata only: `docs/lexer/token-model.md`, one inert lexe
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created first M0006 task for token model planning and lexer fixture metadata.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0006-token-model-fixtures.sh before implementation.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/lexer/token-model.md.
-2026-07-09 agent=Language-Lawyer phase=ordinary-tests result=pass notes=M0006 token model fixture validation and prior milestone gates passed.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; no lexical behavior or token implementation introduced.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved against docs/SPEC.md and M0006.
-2026-07-09 agent=Language-Lawyer phase=ci result=pass notes=Final CI-equivalent M0006 gate and prior milestone gates passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created first M0006 task for token model planning and lexer fixture metadata.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0006-token-model-fixtures.sh before implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/lexer/token-model.md.
+2026-07-09 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=M0006 token model fixture validation and prior milestone gates passed.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; no lexical behavior or token implementation introduced.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved against docs/SPEC.md and M0006.
+2026-07-09 main_task=Language-Lawyer phase=ci result=pass notes=Final CI-equivalent M0006 gate and prior milestone gates passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Roadmap Planner`
+- Next main task: `main-task roadmap planning`
 - Reason: `M0006 is complete; M0007 remains blocked until lexical grammar ambiguity is resolved.`
 - Required Context:
   - This task file

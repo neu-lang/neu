@@ -10,15 +10,15 @@ M0001
 
 ## Goal
 
-Align project documentation paths and authority references so every agent and future task can locate the language source of truth.
+Align project documentation paths and authority references so every main task and future task can locate the language source of truth.
 
 ## Motivation
 
-The agent rules and execution templates must consistently refer to the canonical specification path, `docs/SPEC.md`.
+The main task rules and execution templates must consistently refer to the canonical specification path, `docs/SPEC.md`.
 
 ## Background
 
-`docs/AGENTS.md` states that the specification and ADRs are authoritative. The current repository contains `docs/SPEC.md` and `docs/adr/`.
+`docs/main task rules` states that the specification and ADRs are authoritative. The current repository contains `docs/SPEC.md` and `docs/adr/`.
 
 ## Prerequisites
 
@@ -26,10 +26,10 @@ None.
 
 ## Inputs
 
-- `AGENTS.md`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/`
-- `.codex/agents/`
+- `AGENTS.md`
 
 ## Outputs
 
@@ -50,7 +50,7 @@ None.
 ## Deliverables
 
 - Updated references or a recorded ambiguity report.
-- Validation that all agent references point to the canonical spec path.
+- Validation that all main task references point to the canonical spec path.
 
 ## Acceptance Criteria
 
@@ -66,7 +66,7 @@ None.
 ## Risks
 
 - Accidentally changing semantic wording while fixing paths.
-- Leaving agents with inconsistent required inputs.
+- Leaving main tasks with inconsistent required inputs.
 
 ## Estimated Effort
 
@@ -74,12 +74,12 @@ None.
 
 ## Expected Files Changed
 
+- `main task rules`
 - `AGENTS.md`
-- `.codex/agents/*.md`
 - Possibly `docs/ambiguities/*`
 
 ## Completion Checklist
 
 - [x] Canonical spec path is decided or ambiguity is recorded.
-- [x] Agent references are consistent.
+- [x] main task references are consistent.
 - [x] No semantic rules are changed.

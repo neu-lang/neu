@@ -1,4 +1,4 @@
-# ADR-0026 Language Lawyer Review
+# ADR-0026 main-task language review Review
 
 Decision: request-revision-before-acceptance
 

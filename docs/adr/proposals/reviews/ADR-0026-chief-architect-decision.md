@@ -1,4 +1,4 @@
-# ADR-0026 Chief Architect Decision
+# ADR-0026 main task Decision
 
 Decision: approved
 
@@ -18,11 +18,11 @@ M0016 ambiguity is resolved. Implementation may proceed only against the accepte
 
 ## Required Review Dependencies
 
-- Language Lawyer review.
-- Diagnostics Engineer review.
-- Adversarial Engineer review.
-- Spec Compliance Auditor review.
-- Simplicity Guardian review.
+- main-task language review review.
+- main-task diagnostics check review.
+- main-task adversarial check review.
+- main-task specification check review.
+- main-task simplicity check review.
 
 ## Resolved Acceptance Blockers
 

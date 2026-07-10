@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-017-build-scoped-local-bindings`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/ADR-0026-name-resolution-policy.md`
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -76,7 +76,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `build_scoped_local_binding_index` does not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -91,7 +91,7 @@ Add a builder that uses binding statement spans and scope owner spans to select 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 
 ## Execution Commands
@@ -128,19 +128,19 @@ Add a builder that uses binding statement spans and scope owner spans to select 
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0016 scoped local binding builder task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Updated name-resolution tests and M0016 data-model validator before adding build_scoped_local_binding_index.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=cargo test -p newlang --test name_resolution failed before implementation because build_scoped_local_binding_index was missing.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Added scoped local binding builder that assigns parsed local bindings to the nearest containing block scope.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=cargo test -p newlang --test name_resolution, M0016 data-model validator, and M0016 accepted-state validator passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests were recorded; concrete adversarial review found no lookup or declaration-order visibility.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0016-017-review.md approved scoped local binding construction pending final CI gate.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 scoped local binding builder task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated name-resolution tests and M0016 data-model validator before adding build_scoped_local_binding_index.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test -p newlang --test name_resolution failed before implementation because build_scoped_local_binding_index was missing.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added scoped local binding builder that assigns parsed local bindings to the nearest containing block scope.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test -p newlang --test name_resolution, M0016 data-model validator, and M0016 accepted-state validator passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests were recorded; concrete adversarial review found no lookup or declaration-order visibility.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0016-017-review.md approved scoped local binding construction pending final CI gate.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Implementer`
+- Next main task: `main-task implementation`
 - Reason: `Add scoped local binding builder after tests fail.`
 - Required Context:
   - This task file

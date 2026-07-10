@@ -1,6 +1,6 @@
 # ADR-0029 Adversarial Review
 
-Role: Adversarial Engineer
+Role: main-task adversarial check
 
 Target: Draft `ADR-0029`, replacing the immutable-local `val` spelling with
 `const` while preserving an ordinary immutable local binding and ordinary
@@ -12,9 +12,9 @@ can acquire unintended semantics. These must be closed before approval.
 
 ## Inputs read
 
-- `AGENTS.md`
-- `.codex/agents/adversarial-engineer.toml`
-- `.codex/agents/language-lawyer.toml`
+- `main task rules`
+- `main task rules`
+- `main task rules`
 - `docs/SPEC.md`
 - `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - `docs/adr/ADR-0001-ownership-model.md`
@@ -36,7 +36,7 @@ can acquire unintended semantics. These must be closed before approval.
 - `docs/syntax/grammar-authority-ledger.md`
 - Current lexer, parser, name-resolution, type-checking, and related test
   references to `val`, inspected read-only to identify phase boundaries
-- Concurrent ADR-0029 Diagnostics Engineer and Simplicity Guardian reviews,
+- Concurrent ADR-0029 main-task diagnostics check and main-task simplicity check reviews,
   inspected read-only after they appeared in the workspace
 
 There is no accepted ADR-0029 task, test change, or compiler implementation
@@ -169,7 +169,7 @@ Required revision: do not encode a new answer in ADR-0029. State that optional
 initializer syntax is preserved, while definite-initialization and one-time
 initialization semantics remain exactly as specified or deferred by existing
 authority. Route any claim of exact later-initialization behavior to Language
-Designer and Language Lawyer before tests encode it.
+Designer and main-task language review before tests encode it.
 
 ### 5. Major diagnostic/source-compatibility case: reserving `const` also invalidates old identifiers
 
@@ -187,7 +187,7 @@ would therefore violate the safe-suggestion obligation.
 
 Required revision: acknowledge the identifier-collision side of the source
 break and make the `val`-to-`const` fix conditional on the resulting declaration
-being valid. This is primarily owned by Diagnostics Engineer, but it also
+being valid. This is primarily owned by main-task diagnostics check, but it also
 prevents recovery from pretending that an invalid rewritten declaration is an
 accepted alias.
 
@@ -230,7 +230,7 @@ accepted alias.
 ## Negative tests added/proposed
 
 No tests were added because the user prohibited test edits and the proposal is
-not accepted authority. After revision and acceptance, Test Engineer should add
+not accepted authority. After revision and acceptance, main-task test work should add
 or update tests covering:
 
 1. `const x = runtimeEffect();` is accepted without const evaluation.
@@ -272,7 +272,7 @@ is the only file added.
 ## Files changed or proposed for change
 
 - Changed: `docs/adr/proposals/reviews/ADR-0029-adversarial-review.md`
-- Proposed for later Language Designer revision:
+- Proposed for later main-task semantic design revision:
   `docs/adr/proposals/ADR-0029-immutable-local-const-keyword.md`
 - Proposed after acceptance only: phase-spanning positive, negative, recovery,
   diagnostic, ownership, flow, and thread-safety tests listed above
@@ -302,10 +302,10 @@ is the only file added.
 
 ## Handoff
 
-Language Designer should revise ADR-0029 for the four blockers above.
-Diagnostics Engineer should own the exact migration recognition, recovery,
-severity, span, and conditional-fix contract. Language Lawyer should verify the
-initializer-free-binding deferral and supersession wording. Reviewer and Chief
+main-task semantic design should revise ADR-0029 for the four blockers above.
+main-task diagnostics check should own the exact migration recognition, recovery,
+severity, span, and conditional-fix contract. main-task language review should verify the
+initializer-free-binding deferral and supersession wording. main-task review and Chief
 Architect should not approve the proposal until those revisions are complete.
 
 ## Revised-round review
@@ -388,12 +388,12 @@ revised proposal.
 ## Final verdict
 
 **APPROVE.** The revised ADR-0029 proposal resolves all prior adversarial
-findings and is sufficiently precise for Chief Architect consideration. This
+findings and is sufficiently precise for main task consideration. This
 approval covers the proposal's safety, soundness, phase-consistency, ownership,
 smart-cast, and thread-safety boundaries; it does not itself accept the ADR or
 authorize downstream changes. Acceptance must still follow the proposal's
 atomic ADR/SPEC authority update and tests-first migration gates.
 
-Final handoff: Chief Architect for the acceptance decision, with Reviewer,
-Language Lawyer, Diagnostics Engineer, Simplicity Guardian, and Roadmap Planner
+Final handoff: main task for the acceptance decision, with main-task review,
+main-task language review, main-task diagnostics check, main-task simplicity check, and main-task roadmap planning
 confirming their respective revised-round obligations.

@@ -5,10 +5,10 @@
 - Report ID: `M0008-TYPE-GENERIC-SYNTAX`
 - Related Task: `M0008-001`
 - Related Milestone: `M0008`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-09`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 - Blocking milestone: `M0012`
 
 ## Ambiguous Or Missing Authority
@@ -57,11 +57,11 @@ Accepted ADRs define nullable types, nominal user-defined types, interfaces or p
 
 ## Recommended Resolution Path
 
-- [x] Language Designer drafts type and generic syntax ADR or `docs/SPEC.md` revision.
-- [x] Language Lawyer audits consistency with nullability and generic ADRs.
-- [x] Adversarial Engineer reviews capability-bound and variance risks.
-- [x] Diagnostics Engineer reviews type syntax diagnostic obligations.
-- [x] Chief Architect approves final source-of-truth update.
+- [x] main-task semantic design drafts type and generic syntax ADR or `docs/SPEC.md` revision.
+- [x] main-task language review audits consistency with nullability and generic ADRs.
+- [x] main-task adversarial check reviews capability-bound and variance risks.
+- [x] main-task diagnostics check reviews type syntax diagnostic obligations.
+- [x] main task approves final source-of-truth update.
 
 ## Temporary Rule
 

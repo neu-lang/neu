@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-003-type-checking-core-proposal-review`
 
@@ -34,12 +34,12 @@ M0018 cannot implement well-typed or ill-typed fixtures until accepted source of
 
 ## Scope
 
-- Add Language Lawyer review.
-- Add Diagnostics Engineer review.
-- Add Adversarial Engineer review.
-- Add Spec Compliance Auditor review.
-- Add Simplicity Guardian review.
-- Add Chief Architect decision artifact preserving pending status.
+- Add main-task language review review.
+- Add main-task diagnostics check review.
+- Add main-task adversarial check review.
+- Add main-task specification check review.
+- Add main-task simplicity check review.
+- Add main task decision artifact preserving pending status.
 - Add validator for review completeness.
 
 ## Out Of Scope
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0027 review artifacts do not exist.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -93,7 +93,7 @@ Create review artifacts only. Keep ADR-0027 as a draft proposal and leave M0018 
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0018 remains blocked pending accepted source-of-truth authority.
 
@@ -138,10 +138,10 @@ Create review artifacts only. Keep ADR-0027 as a draft proposal and leave M0018 
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 ADR-0027 review task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0018-type-checking-core-review.sh before adding ADR-0027 review artifacts.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Review validator failed before implementation because ADR-0027 review artifacts were missing.
-- 2026-07-10 agent=Language-Lawyer phase=ordinary-tests result=pass notes=Added ADR-0027 specialty review artifacts; M0018 review, proposal, and ambiguity blocker validators passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-003-type-checking-core-proposal-review.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-003-type-checking-core-proposal-review.md` created review and concrete review approved review-only scope.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-review.sh`, `sh docs/tests/m0018-type-checking-core-proposal.sh`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 ADR-0027 review task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0018-type-checking-core-review.sh before adding ADR-0027 review artifacts.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Review validator failed before implementation because ADR-0027 review artifacts were missing.
+- 2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=Added ADR-0027 specialty review artifacts; M0018 review, proposal, and ambiguity blocker validators passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-003-type-checking-core-proposal-review.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-003-type-checking-core-proposal-review.md` created review and concrete review approved review-only scope.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-review.sh`, `sh docs/tests/m0018-type-checking-core-proposal.sh`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

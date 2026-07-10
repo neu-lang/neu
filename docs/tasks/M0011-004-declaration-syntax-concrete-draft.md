@@ -6,8 +6,8 @@
 - Milestone: `M0011`
 - Milestone File: `docs/milestones/M0011-declaration-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0011-004-declaration-syntax-concrete-draft`
 
@@ -16,16 +16,16 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
-Revise draft ADR-0022 so it contains concrete declaration grammar and diagnostic decisions required for a future Chief Architect acceptance decision.
+Revise draft ADR-0022 so it contains concrete declaration grammar and diagnostic decisions required for a future main task acceptance decision.
 
 ## Motivation
 
@@ -89,7 +89,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0022 lacks concrete draft grammar sections.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -104,7 +104,7 @@ Patch ADR-0022 only. Do not update accepted source of truth or parser implementa
 - [x] Implementation is the smallest passing proposal revision.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0011 milestone checklist is not marked complete because parser implementation remains blocked.
 
@@ -145,18 +145,18 @@ Patch ADR-0022 only. Do not update accepted source of truth or parser implementa
 ## Execution Log
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0022 concrete draft revision task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created concrete draft validator before revising ADR-0022.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected because ADR-0022 lacked concrete draft grammar sections.
-2026-07-09 agent=Language-Designer phase=ordinary-tests result=pass notes=Concrete draft validation passed after revising ADR-0022 with grammar and diagnostics.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms concrete draft remains non-authoritative and no parser code or fixtures were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved concrete draft revision as scoped blocker-resolution progress.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0022 concrete draft revision task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created concrete draft validator before revising ADR-0022.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected because ADR-0022 lacked concrete draft grammar sections.
+2026-07-09 main_task=Language-Designer phase=ordinary-tests result=pass notes=Concrete draft validation passed after revising ADR-0022 with grammar and diagnostics.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms concrete draft remains non-authoritative and no parser code or fixtures were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved concrete draft revision as scoped blocker-resolution progress.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Revise ADR-0022 with concrete draft grammar while keeping it non-authoritative.`
 - Required Context:
   - This task file

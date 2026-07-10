@@ -4,7 +4,7 @@
 
 - Task ID: `M0019-002`
 - Milestone: `M0019`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -47,7 +47,7 @@
 Attack: Treat the draft proposal as accepted implementation authority.
 Expected result: Rejected by non-authority notice and validator checks.
 Actual result: Proposal says no implementation may depend on it until accepted, accepted ADR-0028 remains absent, and docs/SPEC.md is unchanged.
-Source of truth: AGENTS.md source-of-truth rules, docs/ambiguities/M0019-nullability-and-flow-typing.md.
+Source of truth: main task rules source-of-truth rules, docs/ambiguities/M0019-nullability-and-flow-typing.md.
 Outcome: pass
 ```
 

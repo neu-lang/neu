@@ -4,7 +4,7 @@
 
 - Task ID: `M0016-003`
 - Milestone: `M0016`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -50,19 +50,19 @@
 ```text
 Attack: Treat ADR-0026 review artifacts as acceptance.
 Expected result: Reviews must explicitly request revision or keep acceptance pending.
-Actual result: Specialty reviews request revision before acceptance, and the Chief Architect decision is pending-revision.
+Actual result: Specialty reviews request revision before acceptance, and the main task decision is pending-revision.
 Source of truth: docs/adr/proposals/reviews/ADR-0026-*.md
 Outcome: pass
 
 Attack: Allow implementation to proceed from a non-authoritative proposal.
 Expected result: Review artifacts must state that ADR-0026 is not accepted and M0016 remains blocked.
-Actual result: Chief Architect decision states ADR-0026 is not accepted and M0016 remains blocked; validator rejects accepted SPEC or implementation changes.
+Actual result: main task decision states ADR-0026 is not accepted and M0016 remains blocked; validator rejects accepted SPEC or implementation changes.
 Source of truth: docs/adr/proposals/reviews/ADR-0026-chief-architect-decision.md, docs/tests/m0016-name-resolution-policy-review.sh
 Outcome: pass
 
 Attack: Miss silent-misbinding risks in the proposal review.
 Expected result: Review must call out shadowing, duplicate-name, declaration-order, and ambiguity rules as blockers.
-Actual result: Language Lawyer and Adversarial reviews require exact rules for declaration order, shadowing, duplicate behavior, and ambiguity.
+Actual result: main-task language review and Adversarial reviews require exact rules for declaration order, shadowing, duplicate behavior, and ambiguity.
 Source of truth: docs/adr/proposals/reviews/ADR-0026-language-lawyer-review.md, docs/adr/proposals/reviews/ADR-0026-adversarial-review.md
 Outcome: pass
 ```

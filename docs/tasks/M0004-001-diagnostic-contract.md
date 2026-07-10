@@ -6,8 +6,8 @@
 - Milestone: `M0004`
 - Milestone File: `docs/milestones/M0004-diagnostic-infrastructure-contract.md`
 - Status: `complete`
-- Owner Agent: `Diagnostics Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task diagnostics check`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0004-001-diagnostic-contract`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -55,7 +55,7 @@ M0004 requires diagnostic structure before lexer, parser, type, ownership, borro
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - Existing files:
   - `docs/test-harness.md`
-  - `.codex/agents/diagnostics-engineer.md`
+  - `main task rules`
 
 ## Required Tests
 
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Diagnostic contract documentation and inert snapshot fixture do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -92,7 +92,7 @@ Add `docs/diagnostics.md` and one inert diagnostic snapshot metadata file that d
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -120,7 +120,7 @@ Add `docs/diagnostics.md` and one inert diagnostic snapshot metadata file that d
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
@@ -134,18 +134,18 @@ Add `docs/diagnostics.md` and one inert diagnostic snapshot metadata file that d
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created first M0004 task and narrowed it to diagnostic contract documentation plus inert snapshot shape.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0004-diagnostic-contract.sh before implementation.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/diagnostics.md.
-2026-07-09 agent=Diagnostics-Engineer phase=ordinary-tests result=pass notes=docs/tests/m0004-diagnostic-contract.sh, m0003 fixture validation, and m0002 workspace validation passed.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; inert diagnostic snapshot encodes shape only.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved against docs/SPEC.md and M0004.
-2026-07-09 agent=Diagnostics-Engineer phase=ci result=pass notes=Final CI-equivalent gate m0004, m0003, and m0002 validations passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created first M0004 task and narrowed it to diagnostic contract documentation plus inert snapshot shape.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0004-diagnostic-contract.sh before implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/diagnostics.md.
+2026-07-09 main_task=Diagnostics-Engineer phase=ordinary-tests result=pass notes=docs/tests/m0004-diagnostic-contract.sh, m0003 fixture validation, and m0002 workspace validation passed.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Soundness report approved; inert diagnostic snapshot encodes shape only.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved against docs/SPEC.md and M0004.
+2026-07-09 main_task=Diagnostics-Engineer phase=ci result=pass notes=Final CI-equivalent gate m0004, m0003, and m0002 validations passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Roadmap Planner`
+- Next main task: `main-task roadmap planning`
 - Reason: `M0004 is complete; select M0005 next.`
 - Required Context:
   - This task file

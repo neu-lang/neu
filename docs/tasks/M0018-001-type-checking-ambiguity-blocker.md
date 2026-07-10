@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-001-type-checking-ambiguity-blocker`
 
@@ -81,7 +81,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `newlang::type_check` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -96,7 +96,7 @@ Add a diagnostic-only `type_check` module with `AmbiguousTypeRule`, `TypeCheckDi
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0018 ambiguous-rule checklist is updated.
 
@@ -131,7 +131,7 @@ Add a diagnostic-only `type_check` module with `AmbiguousTypeRule`, `TypeCheckDi
 - Do not implement type checking.
 - Do not assign types to literals.
 - Do not implement call or assignment checking.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
 ## Ambiguities And Dependencies
@@ -142,9 +142,9 @@ Add a diagnostic-only `type_check` module with `AmbiguousTypeRule`, `TypeCheckDi
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Task references only M0018 and blocks ambiguous type rules before checking implementation.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check` failed because `newlang::type_check` did not exist.
-- 2026-07-10 agent=Language-Lawyer phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check` passed after adding diagnostic-only ambiguous type rule blocking; validator initially failed only because the milestone checklist had not yet been updated.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md` created review and concrete review approved after source-of-truth comparison.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0018 and blocks ambiguous type rules before checking implementation.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check` failed because `newlang::type_check` did not exist.
+- 2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check` passed after adding diagnostic-only ambiguous type rule blocking; validator initially failed only because the milestone checklist had not yet been updated.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md` created review and concrete review approved after source-of-truth comparison.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

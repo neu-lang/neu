@@ -1,6 +1,6 @@
 # Spec Compliance Review: M0019-014
 
-Role: Spec Compliance Auditor
+Role: main-task specification check
 
 Target: Implementation and full current working-tree diff for
 `docs/tasks/M0019-014-immutable-local-const-migration.md`.
@@ -50,7 +50,7 @@ Target: Implementation and full current working-tree diff for
 
 ## Inputs Read
 
-- `AGENTS.md` and `.codex/agents/spec-compliance-auditor.toml`
+- `main task rules` and `main task rules`
 - `docs/SPEC.md` (ADR-0021, ADR-0024, ADR-0026, ADR-0028, and ADR-0029
   summaries)
 - Accepted ADRs: `ADR-0015`, `ADR-0019`, `ADR-0021`, `ADR-0024`, `ADR-0026`,
@@ -106,7 +106,7 @@ semantic-category preservation, and absence of compile-time semantics.
 
 Decision: block
 
-Required handoff: Test Engineer and Implementer must repair the spec-backed
+Required handoff: main-task test work and main-task implementation must repair the spec-backed
 fixtures, replace the obsolete validator expectation without restoring legacy
 semantics, and add ordinary diagnostic-span coverage. Return to Spec Compliance
 Auditor after focused, fixture, M0019 eligibility, and workspace validation
@@ -181,12 +181,12 @@ supersede it.
 
 Final decision: block
 
-Final handoff: Test Engineer and Implementer for the single diagnostic-span
-correction, then return to Spec Compliance Auditor for closure.
+Final handoff: main-task test work and main-task implementation for the single diagnostic-span
+correction, then return to main-task specification check for closure.
 
 ## Final Closure
 
-Role: Spec Compliance Auditor
+Role: main-task specification check
 
 Inputs read: task execution log and Authority Extract; SPEC ADR-0021, ADR-0022,
 ADR-0024, ADR-0026, and ADR-0029 summaries; accepted ADR-0022 declaration
@@ -210,4 +210,4 @@ bounded M0019-014 behavior.
 
 Final decision: **APPROVE**
 
-Handoff: Reviewer for final task closure.
+Handoff: main-task review for final task closure.

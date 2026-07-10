@@ -14,7 +14,7 @@ Create the Rust compiler workspace and minimal CI skeleton without implementing 
 
 ## Motivation
 
-Autonomous implementation agents need a stable project layout and repeatable validation commands before adding compiler stages.
+Autonomous implementation main tasks need a stable project layout and repeatable validation commands before adding compiler stages.
 
 ## Background
 
@@ -28,8 +28,8 @@ The compiler is planned to be implemented in Rust with Cranelift initially. Buil
 
 - `docs/SPEC.md`
 - `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
-- `docs/AGENTS.md`
-- `.codex/agents/build-engineer.md`
+- `docs/main task rules`
+- `main task rules`
 
 ## Outputs
 
@@ -53,7 +53,7 @@ The compiler is planned to be implemented in Rust with Cranelift initially. Buil
 
 - Workspace manifest.
 - Build and CI documentation.
-- CI gate list matching `AGENTS.md`.
+- CI gate list matching `main task rules`.
 
 ## Acceptance Criteria
 

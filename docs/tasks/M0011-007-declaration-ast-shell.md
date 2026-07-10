@@ -6,8 +6,8 @@
 - Milestone: `M0011`
 - Milestone File: `docs/milestones/M0011-declaration-parser.md`
 - Status: `complete`
-- Owner Agent: `Test Engineer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task test work`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0011-007-<slug>`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0022-declaration-syntax.md`
-- Project Rules: `AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -79,7 +79,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `AstNodeKind` does not include ADR-0022 declaration node kinds and `AstArena` has no declaration constructors.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -94,7 +94,7 @@ Extend the existing syntax-independent AST shell with declaration node kinds and
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -124,7 +124,7 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 - Do not add `crates/newlang/src/parser.rs`.
@@ -140,20 +140,20 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=<agent> phase=<phase> result=<result> notes=<notes>
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration AST shell task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Added failing AST tests and docs/tests/m0011-declaration-ast-shell.sh before AST implementation.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=cargo test --workspace --all-targets ast failed because AstNodeKind declaration variants and AstArena constructors were missing.
-2026-07-09 agent=Implementer phase=implementation result=pass notes=Added ADR-0022 declaration node kinds and span-preserving AstArena constructors only.
-2026-07-09 agent=Implementer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets ast passed and docs/tests/m0011-declaration-ast-shell.sh reached only task-completion guard before status update.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0011-007-soundness.md after ordinary-tests evidence.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0011-M0002 validation scripts passed.
-2026-07-09 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0011-007-review.md approves AST shell scope and parser implementation deferral.
+2026-07-09 main_task=<main task> phase=<phase> result=<result> notes=<notes>
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration AST shell task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Added failing AST tests and docs/tests/m0011-declaration-ast-shell.sh before AST implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test --workspace --all-targets ast failed because AstNodeKind declaration variants and AstArena constructors were missing.
+2026-07-09 main_task=main-task implementation phase=implementation result=pass notes=Added ADR-0022 declaration node kinds and span-preserving AstArena constructors only.
+2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets ast passed and docs/tests/m0011-declaration-ast-shell.sh reached only task-completion guard before status update.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0011-007-soundness.md after ordinary-tests evidence.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0011-M0002 validation scripts passed.
+2026-07-09 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0011-007-review.md approves AST shell scope and parser implementation deferral.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add failing AST shell tests before implementation.`
 - Required Context:
   - This task file

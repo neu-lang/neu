@@ -6,7 +6,7 @@ Status: Draft proposal - not accepted source of truth
 
 This file is a draft proposal only. It is not accepted language semantics, not an accepted ADR, and not a valid basis for implementation.
 
-No implementation may depend on this proposal until accepted by Chief Architect and moved into the accepted ADR set or incorporated into `docs/SPEC.md`.
+No implementation may depend on this proposal until accepted by main task and moved into the accepted ADR set or incorporated into `docs/SPEC.md`.
 
 The active blocker remains `docs/ambiguities/M0014-module-package-visibility-model.md`.
 

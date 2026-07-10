@@ -6,8 +6,8 @@
 - Milestone: `M0018`
 - Milestone File: `docs/milestones/M0018-type-checking-core.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0018-004-type-checking-core-concrete-draft`
 
@@ -83,7 +83,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0027 does not yet contain the concrete draft sections required by review.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -98,7 +98,7 @@ Revise the proposal only. Use review findings as requirements, but keep the resu
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0018 remains blocked pending accepted source-of-truth authority.
 
@@ -138,10 +138,10 @@ Revise the proposal only. Use review findings as requirements, but keep the resu
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0018 ADR-0027 concrete draft revision task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0018-type-checking-core-concrete-draft.sh before revising ADR-0027.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Concrete draft validator failed before implementation because ADR-0027 lacked required concrete draft sections.
-- 2026-07-10 agent=Language-Designer phase=ordinary-tests result=pass notes=Revised ADR-0027 proposal into concrete non-authoritative draft; M0018 concrete, review, proposal, and ambiguity blocker validators passed after validator alignment.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-004-type-checking-core-concrete-draft.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-004-type-checking-core-concrete-draft.md` created review and concrete review approved draft-only scope.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-concrete-draft.sh`, `sh docs/tests/m0018-type-checking-core-review.sh`, `sh docs/tests/m0018-type-checking-core-proposal.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 ADR-0027 concrete draft revision task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0018-type-checking-core-concrete-draft.sh before revising ADR-0027.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Concrete draft validator failed before implementation because ADR-0027 lacked required concrete draft sections.
+- 2026-07-10 main_task=Language-Designer phase=ordinary-tests result=pass notes=Revised ADR-0027 proposal into concrete non-authoritative draft; M0018 concrete, review, proposal, and ambiguity blocker validators passed after validator alignment.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-004-type-checking-core-concrete-draft.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-004-type-checking-core-concrete-draft.md` created review and concrete review approved draft-only scope.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-core-concrete-draft.sh`, `sh docs/tests/m0018-type-checking-core-review.sh`, `sh docs/tests/m0018-type-checking-core-proposal.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

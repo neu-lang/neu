@@ -6,8 +6,8 @@
 - Milestone: `M0016`
 - Milestone File: `docs/milestones/M0016-name-resolution-pass.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0016-003-name-resolution-policy-proposal-review`
 
@@ -21,14 +21,14 @@
   - `docs/adr/ADR-0022-declaration-syntax.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
-  - `.codex/agents/simplicity-guardian.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -40,12 +40,12 @@ ADR-0026 proposes a direction but still leaves concrete accepted implementation 
 
 ## Scope
 
-- Add Language Lawyer review for semantic consistency and missing authority.
-- Add Diagnostics Engineer review for resolution diagnostic obligations.
-- Add Adversarial Engineer review for soundness and ambiguity risks.
-- Add Spec Compliance Auditor review for source-of-truth boundaries.
-- Add Simplicity Guardian review for bootstrap subset control.
-- Add Chief Architect decision artifact preserving pending status.
+- Add main-task language review review for semantic consistency and missing authority.
+- Add main-task diagnostics check review for resolution diagnostic obligations.
+- Add main-task adversarial check review for soundness and ambiguity risks.
+- Add main-task specification check review for source-of-truth boundaries.
+- Add main-task simplicity check review for bootstrap subset control.
+- Add main task decision artifact preserving pending status.
 
 ## Out Of Scope
 
@@ -83,7 +83,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0026 review artifacts do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -98,7 +98,7 @@ Create review artifacts only. Keep ADR-0026 as a draft proposal and leave the am
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0016 remains blocked pending accepted source-of-truth authority.
 
@@ -143,19 +143,19 @@ Create review artifacts only. Keep ADR-0026 as a draft proposal and leave the am
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0016 ADR-0026 review task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0016-name-resolution-policy-review.sh before adding ADR-0026 review artifacts.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Review validator failed before implementation because ADR-0026 review artifacts did not exist.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Added required ADR-0026 review artifacts and kept ADR-0026 pending revision.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=docs/tests/m0016-name-resolution-policy-review.sh, docs/tests/m0016-name-resolution-policy-proposal.sh, and docs/tests/m0016-name-resolution-blocked.sh passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-003-soundness.md after ordinary tests were recorded.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0016-003-review.md approved review-only scope against docs/SPEC.md and docs/milestones/M0016-name-resolution-pass.md.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 review/proposal/blocker validators, M0015 validator, and M0002 validator passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 ADR-0026 review task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0016-name-resolution-policy-review.sh before adding ADR-0026 review artifacts.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Review validator failed before implementation because ADR-0026 review artifacts did not exist.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Added required ADR-0026 review artifacts and kept ADR-0026 pending revision.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=docs/tests/m0016-name-resolution-policy-review.sh, docs/tests/m0016-name-resolution-policy-proposal.sh, and docs/tests/m0016-name-resolution-blocked.sh passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0016-003-soundness.md after ordinary tests were recorded.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0016-003-review.md approved review-only scope against docs/SPEC.md and docs/milestones/M0016-name-resolution-pass.md.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 review/proposal/blocker validators, M0015 validator, and M0002 validator passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Lawyer`
+- Next main task: `main-task language review`
 - Reason: `Audit ADR-0026 before acceptance.`
 - Required Context:
   - This task file

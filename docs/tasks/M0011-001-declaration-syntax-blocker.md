@@ -6,8 +6,8 @@
 - Milestone: `M0011`
 - Milestone File: `docs/milestones/M0011-declaration-parser.md`
 - Status: `blocked`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0011-001-declaration-syntax-blocker`
 
@@ -16,11 +16,11 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - M0011 blocker task is not yet recorded as blocked.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Add blocker validation only. Do not implement parser code.
 - [x] Implementation is the smallest passing blocker artifact.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is not marked complete because M0011 remains blocked.
 
@@ -127,23 +127,23 @@ Add blocker validation only. Do not implement parser code.
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity: `docs/ambiguities/M0008-declaration-syntax.md`
-- Required next step: Language Designer drafts declaration syntax ADR or `docs/SPEC.md` revision.
+- Required next step: main-task semantic design drafts declaration syntax ADR or `docs/SPEC.md` revision.
 
 ## Execution Log
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration syntax blocker task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created M0011 blocker validator.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation would fail before blocker task status was recorded as blocked.
-2026-07-09 agent=Language-Lawyer phase=ordinary-tests result=pass notes=M0011 blocker validation passed.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code or concrete declaration fixtures were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Blocker is valid against M0011 and M0008 declaration syntax ambiguity.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration syntax blocker task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created M0011 blocker validator.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation would fail before blocker task status was recorded as blocked.
+2026-07-09 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=M0011 blocker validation passed.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code or concrete declaration fixtures were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Blocker is valid against M0011 and M0008 declaration syntax ambiguity.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Draft declaration syntax source-of-truth proposal before M0011 parser implementation.`
 - Required Context:
   - This task file

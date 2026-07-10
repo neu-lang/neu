@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-006-accept-lexical-grammar-adr`
 
@@ -16,14 +16,14 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/chief-architect.md`
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/adversarial-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -31,14 +31,14 @@ Accept a concrete lexical grammar ADR as source of truth so M0007 can proceed to
 
 ## Motivation
 
-M0007 is blocked because no accepted source-of-truth document defines whitespace, comments, identifiers, keywords, literals, operators, delimiters, lexical errors, or lexical diagnostic spans. The draft proposal and required reviews are complete, so the next step is a Chief Architect decision that accepts concrete lexical rules.
+M0007 is blocked because no accepted source-of-truth document defines whitespace, comments, identifiers, keywords, literals, operators, delimiters, lexical errors, or lexical diagnostic spans. The draft proposal and required reviews are complete, so the next step is a main task decision that accepts concrete lexical rules.
 
 ## Scope
 
 - Add accepted `docs/adr/ADR-0021-lexical-grammar.md`.
 - Add an ADR-0021 summary to `docs/SPEC.md`.
 - Update `docs/ambiguities/M0006-lexical-grammar.md` to resolved.
-- Update the Chief Architect decision document to approved.
+- Update the main task decision document to approved.
 - Replace open-blocker validation with resolved-state validation.
 - Preserve old proposal and review artifacts as historical context.
 
@@ -88,7 +88,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted `docs/adr/ADR-0021-lexical-grammar.md` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -103,7 +103,7 @@ Promote the draft direction into an accepted ADR by defining a small Kotlin-like
 - [x] Implementation is the smallest passing source-of-truth change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0007 implementation remains incomplete because lexer code and fixtures are separate tasks.
 
@@ -151,18 +151,18 @@ Promote the draft direction into an accepted ADR by defining a small Kotlin-like
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 accepted lexical grammar ADR task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0007-lexical-grammar-accepted.sh before adding accepted ADR-0021.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/ADR-0021-lexical-grammar.md.
-2026-07-09 agent=Chief-Architect phase=ordinary-tests result=pass notes=Accepted grammar and resolved-state M0007 validators passed after ADR-0021 was accepted and blocker docs were updated.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms acceptance did not add lexer code or concrete fixtures and diagnostics are specified in ADR-0021.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved accepted lexical grammar ADR as source-of-truth update for M0007.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 accepted lexical grammar ADR task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0007-lexical-grammar-accepted.sh before adding accepted ADR-0021.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/adr/ADR-0021-lexical-grammar.md.
+2026-07-09 main_task=Chief-Architect phase=ordinary-tests result=pass notes=Accepted grammar and resolved-state M0007 validators passed after ADR-0021 was accepted and blocker docs were updated.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms acceptance did not add lexer code or concrete fixtures and diagnostics are specified in ADR-0021.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved accepted lexical grammar ADR as source-of-truth update for M0007.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Chief Architect`
+- Next main task: `main task`
 - Reason: `Accept or reject concrete lexical grammar as source of truth.`
 - Required Context:
   - This task file

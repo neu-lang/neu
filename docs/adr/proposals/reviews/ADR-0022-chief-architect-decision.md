@@ -1,4 +1,4 @@
-# ADR-0022 Chief Architect Decision
+# ADR-0022 main task Decision
 
 Decision: approved
 
@@ -16,9 +16,9 @@ The concrete declaration grammar is approved for the bootstrap compiler. The dra
 
 ## Completed Review Dependencies
 
-- Language Lawyer review.
-- Diagnostics Engineer review.
-- Simplicity Guardian review.
+- main-task language review review.
+- main-task diagnostics check review.
+- main-task simplicity check review.
 
 ## Resolved Acceptance Blockers
 
@@ -28,7 +28,7 @@ The concrete declaration grammar is approved for the bootstrap compiler. The dra
 - Explicit declaration header grammar.
 - Explicit member declaration rules and deferrals.
 - Explicit declaration diagnostics.
-- Final Chief Architect approval through accepted ADR and `docs/SPEC.md` update.
+- Final main task approval through accepted ADR and `docs/SPEC.md` update.
 
 ## Consequences
 

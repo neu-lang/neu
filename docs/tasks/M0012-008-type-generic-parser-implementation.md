@@ -6,8 +6,8 @@
 - Milestone: `M0012`
 - Milestone File: `docs/milestones/M0012-type-and-generic-syntax-parser.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0012-008-type-generic-parser-implementation`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -82,7 +82,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Parser does not yet produce ADR-0023 type/generic AST nodes or diagnostic kinds.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -97,7 +97,7 @@ Extend the existing parser with the smallest recursive-descent type parser neede
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -126,7 +126,7 @@ Extend the existing parser with the smallest recursive-descent type parser neede
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 - Do not implement type checking, name resolution, constraint solving, or capability semantics.
@@ -143,19 +143,19 @@ Extend the existing parser with the smallest recursive-descent type parser neede
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0012 type/generic parser implementation task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Added parser implementation tests and docs validator before implementation.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Focused parser tests failed before implementation because ADR-0023 AST nodes and diagnostics were not produced by parser.
-2026-07-10 agent=Implementer phase=implementation result=pass notes=Implemented ADR-0023 type and generic parser support for declaration generic lists and function return types.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=Parser Rust tests and docs/tests/m0012-type-generic-parser-implementation.sh passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-008-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0012-008-review.md approves ADR-0023 parser implementation scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0012 type/generic parser implementation task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added parser implementation tests and docs validator before implementation.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Focused parser tests failed before implementation because ADR-0023 AST nodes and diagnostics were not produced by parser.
+2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Implemented ADR-0023 type and generic parser support for declaration generic lists and function return types.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=Parser Rust tests and docs/tests/m0012-type-generic-parser-implementation.sh passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0012-008-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0012-008-review.md approves ADR-0023 parser implementation scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && M0012-M0002 validation scripts passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Implementer`
+- Next main task: `main-task implementation`
 - Reason: `Implement ADR-0023 parser support after tests fail.`
 - Required Context:
   - This task file

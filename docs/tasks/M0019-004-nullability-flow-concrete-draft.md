@@ -6,8 +6,8 @@
 - Milestone: `M0019`
 - Milestone File: `docs/milestones/M0019-nullability-and-flow-typing.md`
 - Status: `complete`
-- Owner Agent: `Language Designer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task semantic design`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0019-004-nullability-flow-concrete-draft`
 
@@ -85,7 +85,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0028 does not yet contain the concrete draft sections required by review.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -100,7 +100,7 @@ Revise the proposal only. Use review findings as requirements, but keep the resu
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0019 remains blocked pending accepted source-of-truth authority.
 
@@ -141,18 +141,18 @@ Revise the proposal only. Use review findings as requirements, but keep the resu
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0019 ADR-0028 concrete draft revision task.
-- 2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0019-nullability-flow-concrete-draft.sh before revising ADR-0028.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Concrete draft validator failed before implementation because ADR-0028 lacked required concrete draft sections.
-- 2026-07-10 agent=Language-Designer phase=implementation result=pass notes=Revised ADR-0028 proposal with concrete non-authoritative draft sections for null-test recognition, branch boundaries, refined output, shadowing, and diagnostics.
-- 2026-07-10 agent=Language-Designer phase=ordinary-tests result=pass notes=`sh docs/tests/m0019-nullability-flow-concrete-draft.sh`, `sh docs/tests/m0019-nullability-flow-review.sh`, `sh docs/tests/m0019-nullability-flow-proposal.sh`, and `sh docs/tests/m0019-nullability-flow-blocked.sh` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-004-nullability-flow-concrete-draft.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0019-004-nullability-flow-concrete-draft.md` created review report; concrete review approved draft-only scope.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0019-nullability-flow-concrete-draft.sh`, `sh docs/tests/m0019-nullability-flow-review.sh`, `sh docs/tests/m0019-nullability-flow-proposal.sh`, `sh docs/tests/m0019-nullability-flow-blocked.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 ADR-0028 concrete draft revision task.
+- 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0019-nullability-flow-concrete-draft.sh before revising ADR-0028.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Concrete draft validator failed before implementation because ADR-0028 lacked required concrete draft sections.
+- 2026-07-10 main_task=Language-Designer phase=implementation result=pass notes=Revised ADR-0028 proposal with concrete non-authoritative draft sections for null-test recognition, branch boundaries, refined output, shadowing, and diagnostics.
+- 2026-07-10 main_task=Language-Designer phase=ordinary-tests result=pass notes=`sh docs/tests/m0019-nullability-flow-concrete-draft.sh`, `sh docs/tests/m0019-nullability-flow-review.sh`, `sh docs/tests/m0019-nullability-flow-proposal.sh`, and `sh docs/tests/m0019-nullability-flow-blocked.sh` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-004-nullability-flow-concrete-draft.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0019-004-nullability-flow-concrete-draft.md` created review report; concrete review approved draft-only scope.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0019-nullability-flow-concrete-draft.sh`, `sh docs/tests/m0019-nullability-flow-review.sh`, `sh docs/tests/m0019-nullability-flow-proposal.sh`, `sh docs/tests/m0019-nullability-flow-blocked.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Verify the concrete draft validator fails before ADR-0028 is revised.`
 - Required Context:
   - This task file

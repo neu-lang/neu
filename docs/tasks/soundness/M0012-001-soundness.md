@@ -4,7 +4,7 @@
 
 - Task ID: `M0012-001`
 - Milestone: `M0012`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `block pending ambiguity`
 

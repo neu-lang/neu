@@ -6,8 +6,8 @@
 - Milestone: `M0007`
 - Milestone File: `docs/milestones/M0007-lexer-implementation.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0007-008-lexer-implementation`
 
@@ -16,12 +16,12 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/ADR-0021-lexical-grammar.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/implementer.md`
-  - `.codex/agents/test-engineer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/adversarial-engineer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -81,7 +81,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `newlang::lexer` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -96,7 +96,7 @@ Add `crates/newlang/src/lexer.rs` and export it from `lib.rs`. Keep token and di
 - [x] Implementation is the smallest passing lexer change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0007 milestone checklist is updated.
 
@@ -142,18 +142,18 @@ Add `crates/newlang/src/lexer.rs` and export it from `lib.rs`. Keep token and di
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexer implementation task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created crates/newlang/tests/lexer.rs before adding lexer implementation.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Rust tests failed as expected because newlang::lexer did not exist.
-2026-07-09 agent=Implementer phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets and M0007 lexer implementation validator passed after adding lexer module.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Adversarial report confirms no parser behavior, no unsafe code, no overflow lexer diagnostic, and Unicode identifiers remain rejected.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved lexer implementation against ADR-0021 and M0007 fixtures.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexer implementation task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created crates/newlang/tests/lexer.rs before adding lexer implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Rust tests failed as expected because newlang::lexer did not exist.
+2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets and M0007 lexer implementation validator passed after adding lexer module.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Adversarial report confirms no parser behavior, no unsafe code, no overflow lexer diagnostic, and Unicode identifiers remain rejected.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved lexer implementation against ADR-0021 and M0007 fixtures.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Add executable lexer tests before implementation.`
 - Required Context:
   - This task file

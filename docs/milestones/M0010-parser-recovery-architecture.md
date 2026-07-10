@@ -61,7 +61,7 @@ ADR-0015 requires diagnostic obligations. Parser recovery affects every later sy
 ## Test Strategy
 
 - Parser harness smoke test for synthetic error reporting.
-- Manual review by Diagnostics Engineer.
+- Manual review by main-task diagnostics check.
 
 ## Risks
 

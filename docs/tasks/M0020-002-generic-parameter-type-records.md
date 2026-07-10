@@ -60,9 +60,9 @@ and interned parameter names.
 
 ## Execution Log
 
-- 2026-07-10 main_task=Main phase=create-task result=pass evidence=bounded type-record task created from ADR-0016 and M0020-001 output. handoff=Test-Engineer
-- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0020_generic_parameter_types` failed only because `build_m0020_generic_parameter_types` was absent. handoff=Implementer
-- 2026-07-10 main_task=Main phase=implementation result=pass evidence=helper creates one generic parameter type record per parsed parameter without interpreting bounds; focused test passed. handoff=Reviewer
-- 2026-07-10 agent=Main phase=ordinary-tests result=pass evidence=focused type-record test, validator, formatting, strict clippy, and 217 workspace tests passed. handoff=Reviewer
-- 2026-07-10 agent=Main phase=adversarial result=pass evidence=distinct declaration identity and opaque-bound boundary verified; `docs/tasks/soundness/M0020-002-soundness.md`. handoff=Reviewer
-- 2026-07-10 agent=Main phase=review result=approve evidence=scope and ADR-0016/0023 compliance verified; `docs/tasks/reviews/M0020-002-review.md`. handoff=none
+- 2026-07-10 main_task=Main phase=create-task result=pass evidence=bounded type-record task created from ADR-0016 and M0020-001 output. handoff=main-task test work
+- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0020_generic_parameter_types` failed only because `build_m0020_generic_parameter_types` was absent. handoff=main-task implementation
+- 2026-07-10 main_task=Main phase=implementation result=pass evidence=helper creates one generic parameter type record per parsed parameter without interpreting bounds; focused test passed. handoff=main-task review
+- 2026-07-10 main_task=Main phase=ordinary-tests result=pass evidence=focused type-record test, validator, formatting, strict clippy, and 217 workspace tests passed. handoff=main-task review
+- 2026-07-10 main_task=Main phase=adversarial result=pass evidence=distinct declaration identity and opaque-bound boundary verified; `docs/tasks/soundness/M0020-002-soundness.md`. handoff=main-task review
+- 2026-07-10 main_task=Main phase=review result=approve evidence=scope and ADR-0016/0023 compliance verified; `docs/tasks/reviews/M0020-002-review.md`. handoff=none

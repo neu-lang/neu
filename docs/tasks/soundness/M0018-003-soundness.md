@@ -4,7 +4,7 @@
 
 - Task ID: `M0018-003`
 - Milestone: `M0018`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -40,7 +40,7 @@
 Attack: Treat review artifacts as implementation authority.
 Expected result: Reviews state they are not source of truth and accepted ADR-0027 remains absent.
 Actual result: Validator checks accepted ADR absence and non-authority boundaries.
-Source of truth: Agent rules and docs/ambiguities/M0018-type-checking-core.md.
+Source of truth: main task rules and docs/ambiguities/M0018-type-checking-core.md.
 Outcome: pass
 ```
 

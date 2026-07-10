@@ -4,7 +4,7 @@
 
 - ADR: `ADR-0027`
 - Milestone: `M0018`
-- Reviewer: `Spec Compliance Auditor`
+- main-task review: `main-task specification check`
 - Date: `2026-07-10`
 - Decision: `request revision before acceptance`
 
@@ -12,7 +12,7 @@
 
 ADR-0027 is not accepted source of truth. `docs/SPEC.md` does not contain an ADR-0027 section, and `docs/adr/ADR-0027-type-checking-core.md` does not exist.
 
-The proposal correctly cites accepted dependencies, but it must not be used to implement type checking until promoted by Chief Architect and summarized in `docs/SPEC.md`.
+The proposal correctly cites accepted dependencies, but it must not be used to implement type checking until promoted by main task and summarized in `docs/SPEC.md`.
 
 The accepted ADR must reconcile the M0018 ambiguity report and update it to resolved only after source-of-truth text exists.
 

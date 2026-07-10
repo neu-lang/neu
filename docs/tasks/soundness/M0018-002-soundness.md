@@ -4,7 +4,7 @@
 
 - Task ID: `M0018-002`
 - Milestone: `M0018`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -45,7 +45,7 @@
 Attack: Treat the proposal as accepted implementation authority.
 Expected result: The proposal has a non-authority notice and accepted ADR-0027 is absent.
 Actual result: Validator requires draft status and absence of docs/adr/ADR-0027-type-checking-core.md.
-Source of truth: Agent rules and M0018 ambiguity report.
+Source of truth: main task rules and M0018 ambiguity report.
 Outcome: pass
 ```
 

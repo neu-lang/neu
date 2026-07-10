@@ -5,10 +5,10 @@
 - Report ID: `<AMBIGUITY_ID>`
 - Related Task: `<TASK_ID or none>`
 - Related Milestone: `<MILESTONE_ID>`
-- Filed By: `<agent>`
+- Filed By: `<main task>`
 - Date: `YYYY-MM-DD`
 - Status: `open | resolved | superseded`
-- Required Owner: `Language Lawyer | Language Designer | Chief Architect`
+- Required Owner: `main-task language review | main-task semantic design | main task`
 
 ## Ambiguous Or Missing Authority
 
@@ -47,16 +47,16 @@
 
 ## Recommended Resolution Path
 
-- [ ] Language Lawyer determines whether existing text resolves it.
-- [ ] Language Designer drafts ADR or spec revision if new semantics are required.
-- [ ] Adversarial Engineer reviews soundness risk.
-- [ ] Diagnostics Engineer reviews diagnostic consequences.
-- [ ] Simplicity Guardian reviews complexity.
-- [ ] Chief Architect approves final resolution.
+- [ ] main-task language review determines whether existing text resolves it.
+- [ ] main-task semantic design drafts ADR or spec revision if new semantics are required.
+- [ ] main-task adversarial check reviews soundness risk.
+- [ ] main-task diagnostics check reviews diagnostic consequences.
+- [ ] main-task simplicity check reviews complexity.
+- [ ] main task approves final resolution.
 
 ## Temporary Rule
 
-No implementation may proceed on the ambiguous behavior until the source of truth is updated or the ambiguity is ruled non-blocking by Chief Architect.
+No implementation may proceed on the ambiguous behavior until the source of truth is updated or the ambiguity is ruled non-blocking by main task.
 
 ## Resolution
 

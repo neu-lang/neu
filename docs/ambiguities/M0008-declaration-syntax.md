@@ -5,10 +5,10 @@
 - Report ID: `M0008-DECLARATION-SYNTAX`
 - Related Task: `M0008-001`
 - Related Milestone: `M0008`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-09`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 - Blocking milestone: `M0011`
 
 ## Ambiguous Or Missing Authority
@@ -55,11 +55,11 @@ Accepted ADRs define modules, nominal types, interfaces, sealed sums, and API vi
 
 ## Recommended Resolution Path
 
-- [x] Language Designer drafts declaration syntax ADR or `docs/SPEC.md` revision.
-- [x] Language Lawyer audits the draft against existing ADRs.
-- [x] Diagnostics Engineer reviews declaration diagnostic obligations.
-- [x] Simplicity Guardian reviews grammar complexity.
-- [x] Chief Architect approves final source-of-truth update.
+- [x] main-task semantic design drafts declaration syntax ADR or `docs/SPEC.md` revision.
+- [x] main-task language review audits the draft against existing ADRs.
+- [x] main-task diagnostics check reviews declaration diagnostic obligations.
+- [x] main-task simplicity check reviews grammar complexity.
+- [x] main task approves final source-of-truth update.
 
 ## Temporary Rule
 

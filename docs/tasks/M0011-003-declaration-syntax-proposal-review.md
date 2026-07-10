@@ -6,8 +6,8 @@
 - Milestone: `M0011`
 - Milestone File: `docs/milestones/M0011-declaration-parser.md`
 - Status: `complete`
-- Owner Agent: `Reviewer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0011-003-declaration-syntax-proposal-review`
 
@@ -16,13 +16,13 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/diagnostics-engineer.md`
-  - `.codex/agents/simplicity-guardian.md`
-  - `.codex/agents/chief-architect.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -30,12 +30,12 @@ Review draft ADR-0022 declaration syntax proposal and record required findings b
 
 ## Motivation
 
-M0011 remains blocked until declaration syntax is accepted. ADR-0022 is currently a draft proposal and needs specialty review before Chief Architect can approve, reject, or request revisions.
+M0011 remains blocked until declaration syntax is accepted. ADR-0022 is currently a draft proposal and needs specialty review before main task can approve, reject, or request revisions.
 
 ## Scope
 
 - Add ADR-0022 proposal review artifacts.
-- Add a pending Chief Architect decision artifact.
+- Add a pending main task decision artifact.
 - Validate that ADR-0022 remains non-authoritative.
 - Keep declaration syntax ambiguity open.
 - Keep parser implementation blocked.
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 - Diagnostic tests:
   - Diagnostics review must mention declaration diagnostics and ADR-0015.
 - Adversarial tests:
-  - Confirm Chief Architect decision remains pending.
+  - Confirm main task decision remains pending.
   - Confirm ambiguity remains open.
   - Confirm no parser code, parser fixtures, or declaration AST nodes are introduced.
 
@@ -88,11 +88,11 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - ADR-0022 review artifacts do not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Add review files under `docs/adr/proposals/reviews/` for ADR-0022. The Chief Architect decision must remain pending.
+Add review files under `docs/adr/proposals/reviews/` for ADR-0022. The main task decision must remain pending.
 
 ## Acceptance Criteria
 
@@ -103,7 +103,7 @@ Add review files under `docs/adr/proposals/reviews/` for ADR-0022. The Chief Arc
 - [x] Implementation is the smallest passing review package.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] M0011 milestone checklist is not marked complete because parser implementation remains blocked.
 
@@ -142,23 +142,23 @@ Add review files under `docs/adr/proposals/reviews/` for ADR-0022. The Chief Arc
 ## Ambiguities And Dependencies
 
 - Blocking ambiguity remains `docs/ambiguities/M0008-declaration-syntax.md`.
-- Chief Architect approval is required before ADR-0022 can become accepted source of truth.
+- main task approval is required before ADR-0022 can become accepted source of truth.
 
 ## Execution Log
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0022 review task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0011-declaration-syntax-review.sh before adding review artifacts.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing ADR-0022 review artifacts.
-2026-07-09 agent=Reviewer phase=ordinary-tests result=pass notes=ADR-0022 review validation passed after adding required review artifacts.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms reviews do not accept syntax and no parser code or fixtures were added.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved ADR-0022 review package as scoped blocker-resolution progress.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0022 review task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0011-declaration-syntax-review.sh before adding review artifacts.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing ADR-0022 review artifacts.
+2026-07-09 main_task=main-task review phase=ordinary-tests result=pass notes=ADR-0022 review validation passed after adding required review artifacts.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms reviews do not accept syntax and no parser code or fixtures were added.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved ADR-0022 review package as scoped blocker-resolution progress.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Reviewer`
+- Next main task: `main-task review`
 - Reason: `Review draft ADR-0022 without accepting declaration syntax.`
 - Required Context:
   - This task file

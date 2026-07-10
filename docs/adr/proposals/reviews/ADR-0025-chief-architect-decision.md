@@ -1,4 +1,4 @@
-# ADR-0025 Chief Architect Decision
+# ADR-0025 main task Decision
 
 Decision: approved
 
@@ -18,10 +18,10 @@ M0014 ambiguity is resolved. Implementation may proceed only against the accepte
 
 ## Required Review Dependencies
 
-- Language Lawyer review completed.
-- Build Engineer review completed.
-- Spec Compliance Auditor review completed.
-- Simplicity Guardian review completed.
+- main-task language review review completed.
+- main-task build check review completed.
+- main-task specification check review completed.
+- main-task simplicity check review completed.
 
 ## Resolved Acceptance Blockers
 

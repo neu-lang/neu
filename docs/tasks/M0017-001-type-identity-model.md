@@ -6,8 +6,8 @@
 - Milestone: `M0017`
 - Milestone File: `docs/milestones/M0017-type-representation.md`
 - Status: `complete`
-- Owner Agent: `Implementer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task implementation`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0017-001-type-identity-model`
 
@@ -80,7 +80,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - The public `newlang::types` module does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -95,7 +95,7 @@ Add the smallest type representation module that can store and retrieve type rec
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated only if this task fully satisfies an item.
 
@@ -128,7 +128,7 @@ Add the smallest type representation module that can store and retrieve type rec
 - Do not implement type checking.
 - Do not introduce a primitive scalar catalog in this task.
 - Do not implement nullable type representation in this task.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 
 ## Ambiguities And Dependencies
@@ -139,9 +139,9 @@ Add the smallest type representation module that can store and retrieve type rec
 
 ## Execution Log
 
-- 2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and avoids unresolved primitive semantics.
-- 2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `newlang::types` did not exist.
-- 2026-07-10 agent=Implementer phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` and `sh docs/tests/m0017-type-identity-model.sh` passed.
-- 2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-001-type-identity-model.md` created a passing soundness report.
-- 2026-07-10 agent=Reviewer phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-001-type-identity-model.md` created review and concrete review approved after source-of-truth comparison.
-- 2026-07-10 agent=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
+- 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and avoids unresolved primitive semantics.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `newlang::types` did not exist.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` and `sh docs/tests/m0017-type-identity-model.sh` passed.
+- 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-001-type-identity-model.md` created a passing soundness report.
+- 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-001-type-identity-model.md` created review and concrete review approved after source-of-truth comparison.
+- 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

@@ -5,10 +5,10 @@
 - Report ID: `M0016-NAME-RESOLUTION-POLICY`
 - Related Task: `M0016-001`
 - Related Milestone: `M0016`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-10`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 - Blocking milestone: `M0016`
 
 ## Ambiguous Or Missing Authority
@@ -69,12 +69,12 @@ M0016 requires approved local, module, and declaration name resolution, duplicat
 
 ## Recommended Resolution Path
 
-- [x] Language Lawyer determines whether existing text resolves it.
-- [x] Language Designer drafts a name-resolution policy ADR or `docs/SPEC.md` revision.
-- [x] Adversarial Engineer reviews soundness risk.
-- [x] Diagnostics Engineer reviews unresolved-name and duplicate-name diagnostics.
-- [x] Simplicity Guardian reviews the bootstrap subset for overreach.
-- [x] Chief Architect approves final source-of-truth update.
+- [x] main-task language review determines whether existing text resolves it.
+- [x] main-task semantic design drafts a name-resolution policy ADR or `docs/SPEC.md` revision.
+- [x] main-task adversarial check reviews soundness risk.
+- [x] main-task diagnostics check reviews unresolved-name and duplicate-name diagnostics.
+- [x] main-task simplicity check reviews the bootstrap subset for overreach.
+- [x] main task approves final source-of-truth update.
 
 ## Temporary Rule
 

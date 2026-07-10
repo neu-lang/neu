@@ -6,8 +6,8 @@
 - Milestone: `M0013`
 - Milestone File: `docs/milestones/M0013-expression-statement-and-pattern-parser.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0013-001-expression-statement-pattern-syntax-blocker`
 
@@ -22,12 +22,12 @@
   - `docs/adr/ADR-0012-pattern-matching-and-algebraic-data.md`
   - `docs/adr/ADR-0018-unsafe-ffi-and-trust-boundaries.md`
   - `docs/adr/ADR-0021-lexical-grammar.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/task-decomposer.md`
-  - `.codex/agents/reviewer.md`
-  - `.codex/agents/spec-compliance-auditor.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -35,7 +35,7 @@ Record that M0013 parser implementation is blocked until expression, statement, 
 
 ## Motivation
 
-M0013 depends on concrete body syntax, operator precedence, pattern grammar, block grammar, unsafe syntax, coroutine syntax, and diagnostics. Current accepted ADRs define semantic goals but do not define grammar. Guessing from Kotlin, Rust, Go, or existing parser behavior would violate the project rule that agents may not invent language semantics.
+M0013 depends on concrete body syntax, operator precedence, pattern grammar, block grammar, unsafe syntax, coroutine syntax, and diagnostics. Current accepted ADRs define semantic goals but do not define grammar. Guessing from Kotlin, Rust, Go, or existing parser behavior would violate the project rule that main tasks may not invent language semantics.
 
 ## Scope
 
@@ -87,7 +87,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `pass`
 - Failure reason expected before implementation:
   - Not applicable; this blocker task records the current correct blocked state.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -102,7 +102,7 @@ Add a blocker-state validator and task metadata only. Do not create syntax, fixt
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -129,7 +129,7 @@ Add a blocker-state validator and task metadata only. Do not create syntax, fixt
 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
 - Do not add expression, statement, pattern, coroutine, or unsafe parser APIs.
@@ -139,25 +139,25 @@ Add a blocker-state validator and task metadata only. Do not create syntax, fixt
 ## Ambiguities And Dependencies
 
 - M0013 remains blocked by `docs/ambiguities/M0008-expression-statement-pattern-syntax.md`.
-- The next safe task is for Language Designer to draft a non-authoritative syntax proposal.
+- The next safe task is for main-task semantic design to draft a non-authoritative syntax proposal.
 
 ## Execution Log
 
 Append entries as the task progresses.
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created M0013 expression/statement/pattern syntax blocker task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-parser-blocked.sh to enforce blocked state.
-2026-07-10 agent=Language-Lawyer phase=implementation result=pass notes=Recorded M0013 blocker without adding syntax or parser implementation.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=M0013 blocker validator and M0008 ledger validator passed.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-001-soundness.md after ordinary-tests evidence.
-2026-07-10 agent=Reviewer phase=review result=pass notes=docs/tasks/reviews/M0013-001-review.md approves blocked scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0013 expression/statement/pattern syntax blocker task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0013-expression-statement-pattern-parser-blocked.sh to enforce blocked state.
+2026-07-10 main_task=Language-Lawyer phase=implementation result=pass notes=Recorded M0013 blocker without adding syntax or parser implementation.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0013 blocker validator and M0008 ledger validator passed.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0013-001-soundness.md after ordinary-tests evidence.
+2026-07-10 main_task=main-task review phase=review result=pass notes=docs/tasks/reviews/M0013-001-review.md approves blocked scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=Full M0013-M0002 validation command passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Designer`
+- Next main task: `main-task semantic design`
 - Reason: `Draft expression, statement, and pattern syntax proposal without accepting it as source of truth.`
 - Required Context:
   - This task file

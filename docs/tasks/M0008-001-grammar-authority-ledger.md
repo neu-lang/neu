@@ -6,8 +6,8 @@
 - Milestone: `M0008`
 - Milestone File: `docs/milestones/M0008-grammar-authority-and-syntax-ambiguity-ledger.md`
 - Status: `complete`
-- Owner Agent: `Language Lawyer`
-- Created By: `Task Decomposer`
+- Owner main task: `main-task language review`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-09`
 - Branch: `task/M0008-001-grammar-authority-ledger`
 
@@ -16,11 +16,11 @@
 - Specification: `docs/SPEC.md`
 - ADRs:
   - `docs/adr/`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/language-designer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -84,7 +84,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `docs/syntax/grammar-authority-ledger.md` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -99,7 +99,7 @@ Add a syntax ledger plus ambiguity reports only. Classify syntax by existing aut
 - [x] Implementation is the smallest passing planning artifact.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated if the whole milestone is satisfied.
 
@@ -147,18 +147,18 @@ Add a syntax ledger plus ambiguity reports only. Classify syntax by existing aut
 Append entries as the task progresses.
 
 ```text
-2026-07-09 agent=Task-Decomposer phase=create-task result=pass notes=Created M0008 grammar authority ledger task.
-2026-07-09 agent=Test-Engineer phase=generate-tests result=pass notes=Created docs/tests/m0008-grammar-authority-ledger.sh before adding ledger and ambiguity reports.
-2026-07-09 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/syntax/grammar-authority-ledger.md.
-2026-07-09 agent=Language-Lawyer phase=ordinary-tests result=pass notes=M0008 grammar authority ledger validation passed after adding ledger and ambiguity reports.
-2026-07-09 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code or parser fixtures were added and ambiguous constructs remain blocked.
-2026-07-09 agent=Reviewer phase=review result=pass notes=Review approved M0008 ledger and ambiguity reports as scoped planning artifacts.
-2026-07-09 agent=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
+2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0008 grammar authority ledger task.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0008-grammar-authority-ledger.sh before adding ledger and ambiguity reports.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Validation failed as expected: missing docs/syntax/grammar-authority-ledger.md.
+2026-07-09 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=M0008 grammar authority ledger validation passed after adding ledger and ambiguity reports.
+2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code or parser fixtures were added and ambiguous constructs remain blocked.
+2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved M0008 ledger and ambiguity reports as scoped planning artifacts.
+2026-07-09 main_task=Build-Engineer phase=ci result=pass notes=Full CI-equivalent gate passed.
 ```
 
 ## Handoff
 
-- Next Agent: `Language Lawyer`
+- Next main task: `main-task language review`
 - Reason: `Classify parser syntax authority without inventing grammar.`
 - Required Context:
   - This task file

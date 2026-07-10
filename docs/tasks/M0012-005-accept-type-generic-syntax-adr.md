@@ -6,8 +6,8 @@
 - Milestone: `M0012`
 - Milestone File: `docs/milestones/M0012-type-and-generic-syntax-parser.md`
 - Status: `complete`
-- Owner Agent: `Chief Architect`
-- Created By: `Task Decomposer`
+- Owner main task: `main task`
+- Created By: `main-task task planning`
 - Created Date: `2026-07-10`
 - Branch: `task/M0012-005-accept-type-generic-syntax-adr`
 
@@ -17,11 +17,11 @@
 - ADRs:
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
   - `docs/adr/proposals/ADR-0023-type-and-generic-syntax.md`
-- Project Rules: `docs/AGENTS.md`
-- Agent Prompts:
-  - `.codex/agents/chief-architect.md`
-  - `.codex/agents/language-lawyer.md`
-  - `.codex/agents/reviewer.md`
+- Project Rules: `docs/main task rules`
+- main task Prompts:
+  - `main task rules`
+  - `main task rules`
+  - `main task rules`
 
 ## Goal
 
@@ -37,7 +37,7 @@ M0012 is blocked until type, nullable, generic, function-type, and capability-bo
 - Add an ADR-0023 summary to `docs/SPEC.md`.
 - Resolve `docs/ambiguities/M0008-type-generic-syntax.md`.
 - Update `docs/syntax/grammar-authority-ledger.md` for ADR-0023 type/generic constructs.
-- Update the Chief Architect decision artifact to approved.
+- Update the main task decision artifact to approved.
 - Update M0012 validators to distinguish historical blocker/proposal evidence from accepted authority.
 
 ## Out Of Scope
@@ -76,7 +76,7 @@ Tests must be created before implementation.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted `docs/adr/ADR-0023-type-and-generic-syntax.md` does not exist yet.
-- Reviewer approval required to modify/delete failing tests: `yes`
+- main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
@@ -91,7 +91,7 @@ Promote the reviewed concrete draft into an accepted ADR and update only source-
 - [x] Implementation is the smallest passing change.
 - [x] Ordinary tests pass.
 - [x] Adversarial tests pass after ordinary tests.
-- [x] Reviewer compares output against `docs/SPEC.md` and the milestone.
+- [x] main-task review compares output against `docs/SPEC.md` and the milestone.
 - [x] CI passes as final gate.
 - [x] Milestone checklist is updated.
 
@@ -122,7 +122,7 @@ Promote the reviewed concrete draft into an accepted ADR and update only source-
 
 - Do not add type parser APIs, type AST nodes, HIR, MIR, or type/generic fixtures.
 - Do not implement type checking or capability analysis.
-- Do not weaken or delete failing tests without reviewer approval.
+- Do not weaken or delete failing tests without main-task review approval.
 - Do not introduce language semantics outside ADR-0023.
 
 ## Ambiguities And Dependencies
@@ -132,19 +132,19 @@ Promote the reviewed concrete draft into an accepted ADR and update only source-
 ## Execution Log
 
 ```text
-2026-07-10 agent=Task-Decomposer phase=create-task result=pass notes=Created ADR-0023 acceptance task.
-2026-07-10 agent=Test-Engineer phase=generate-tests result=pass notes=Created accepted-state validator before accepting ADR-0023.
-2026-07-10 agent=Test-Engineer phase=verify-tests-fail result=pass notes=Tests fail before implementation for the expected reason: accepted ADR-0023 did not exist.
-2026-07-10 agent=Chief-Architect phase=implementation result=pass notes=Promoted reviewed concrete draft to accepted ADR-0023, updated SPEC, resolved ambiguity, updated ledger, and approved decision artifact without parser implementation.
-2026-07-10 agent=Test-Engineer phase=ordinary-tests result=pass notes=Focused M0012 and M0008 validators pass for accepted authority and deferred implementation.
-2026-07-10 agent=Adversarial-Engineer phase=adversarial-tests result=pass notes=Acceptance keeps parser APIs, type AST nodes, and type/generic parser fixtures absent.
-2026-07-10 agent=Reviewer phase=review result=pass notes=Review compares accepted ADR-0023, SPEC summary, ambiguity resolution, and milestone scope.
-2026-07-10 agent=Build-Engineer phase=ci result=pass notes=CI passes as final gate.
+2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created ADR-0023 acceptance task.
+2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created accepted-state validator before accepting ADR-0023.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=Tests fail before implementation for the expected reason: accepted ADR-0023 did not exist.
+2026-07-10 main_task=Chief-Architect phase=implementation result=pass notes=Promoted reviewed concrete draft to accepted ADR-0023, updated SPEC, resolved ambiguity, updated ledger, and approved decision artifact without parser implementation.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=Focused M0012 and M0008 validators pass for accepted authority and deferred implementation.
+2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Acceptance keeps parser APIs, type AST nodes, and type/generic parser fixtures absent.
+2026-07-10 main_task=main-task review phase=review result=pass notes=Review compares accepted ADR-0023, SPEC summary, ambiguity resolution, and milestone scope.
+2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=CI passes as final gate.
 ```
 
 ## Handoff
 
-- Next Agent: `Test Engineer`
+- Next main task: `main-task test work`
 - Reason: `Create concrete type/generic fixtures after accepted source-of-truth update.`
 - Required Context:
   - This task file

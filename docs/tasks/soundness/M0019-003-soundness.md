@@ -4,7 +4,7 @@
 
 - Task ID: `M0019-003`
 - Milestone: `M0019`
-- Filed By: `Adversarial Engineer`
+- Filed By: `main-task adversarial check`
 - Date: `2026-07-10`
 - Decision: `pass`
 
@@ -48,7 +48,7 @@
 ```text
 Attack: Use the review task to silently accept ADR-0028.
 Expected result: Rejected; review-only task must keep implementation blocked.
-Actual result: Chief Architect decision requests revision before acceptance and says implementation may not proceed against ADR-0028 until accepted.
+Actual result: main task decision requests revision before acceptance and says implementation may not proceed against ADR-0028 until accepted.
 Source of truth: docs/tasks/M0019-003-nullability-flow-proposal-review.md.
 Outcome: pass
 ```
@@ -56,7 +56,7 @@ Outcome: pass
 ```text
 Attack: Preserve refinements beyond their sound branch region.
 Expected result: Rejected before acceptance.
-Actual result: Language Lawyer, Adversarial, and Chief Architect reviews require concrete branch region boundaries before acceptance.
+Actual result: main-task language review, Adversarial, and main task reviews require concrete branch region boundaries before acceptance.
 Source of truth: ADR-0011, ADR-0013.
 Outcome: pass
 ```

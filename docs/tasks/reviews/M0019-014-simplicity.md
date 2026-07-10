@@ -1,6 +1,6 @@
-Role: Simplicity Guardian
+Role: main-task simplicity check
 Target: M0019-014 final re-review
-Inputs read: AGENTS.md; `.codex/agents/simplicity-guardian.toml`; task log; cited SPEC sections for ADR-0021/0022/0024/0026/0028; accepted ADR-0029 decision, invariant, and diagnostics sections; prior findings; current diff.
+Inputs read: main task rules; `main task rules`; task log; cited SPEC sections for ADR-0021/0022/0024/0026/0028; accepted ADR-0029 decision, invariant, and diagnostics sections; prior findings; current diff.
 Complexity under review: immutable-local spelling migration, authority-span correction, validator and example migration.
 Accepted requirement: `const` maps directly to the existing immutable category; `val` remains an ordinary identifier; no compile-time, compatibility, alias, legacy, or spelling-specific semantic machinery is permitted.
 Simpler alternative: the implemented `KwConst` plus `Immutable | Var` mapping is the minimum sufficient design.
@@ -10,4 +10,4 @@ Closure: prior fixture, unused-helper, validator, and diagnostic-span blockers a
 Validation: 15 task validators passed; formatting, Clippy, and diff checks passed; workspace tests: 207 passed.
 Files changed: this report only.
 Open questions/blockers: none.
-Handoff: Reviewer for final task closure.
+Handoff: main-task review for final task closure.

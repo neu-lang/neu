@@ -5,10 +5,10 @@
 - Report ID: `M0019-local-initializer-diagnostic-identifier`
 - Related Task: `M0019-015`
 - Related Milestone: `M0019`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-10`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
 
@@ -63,12 +63,12 @@ must use when it is the initializer of `const definite: T = maybe`.
 
 ## Recommended Resolution Path
 
-- [x] Language Lawyer determines whether existing text resolves it.
-- [x] Language Designer drafts ADR and spec revision.
-- [x] Adversarial Engineer reviews soundness risk.
-- [x] Diagnostics Engineer reviews diagnostic consequences.
-- [x] Simplicity Guardian reviews complexity.
-- [x] Chief Architect approves final resolution.
+- [x] main-task language review determines whether existing text resolves it.
+- [x] main-task semantic design drafts ADR and spec revision.
+- [x] main-task adversarial check reviews soundness risk.
+- [x] main-task diagnostics check reviews diagnostic consequences.
+- [x] main-task simplicity check reviews complexity.
+- [x] main task approves final resolution.
 
 ## Temporary Rule
 

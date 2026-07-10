@@ -5,10 +5,10 @@
 - Report ID: `M0006-LEXICAL-GRAMMAR`
 - Related Task: `M0006-001`
 - Related Milestone: `M0006`
-- Filed By: `Language Lawyer`
+- Filed By: `main-task language review`
 - Date: `2026-07-09`
 - Status: `resolved`
-- Required Owner: `Language Designer`
+- Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
 
@@ -52,12 +52,12 @@ Detailed lexical grammar is missing. docs/SPEC.md says the language has Kotlin-l
 
 ## Recommended Resolution Path
 
-- [x] Language Lawyer determines whether existing text resolves it.
-- [x] Language Designer drafted non-authoritative ADR proposal and ownership review.
-- [x] Adversarial Engineer reviewed soundness risk.
-- [x] Diagnostics Engineer reviewed diagnostic consequences.
-- [x] Simplicity Guardian reviewed complexity.
-- [x] Chief Architect approves final resolution.
+- [x] main-task language review determines whether existing text resolves it.
+- [x] main-task semantic design drafted non-authoritative ADR proposal and ownership review.
+- [x] main-task adversarial check reviewed soundness risk.
+- [x] main-task diagnostics check reviewed diagnostic consequences.
+- [x] main-task simplicity check reviewed complexity.
+- [x] main task approves final resolution.
 
 ## Temporary Rule
 
