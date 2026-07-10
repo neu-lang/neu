@@ -1,6 +1,9 @@
 use newlang::ast::AstNodeId;
+use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName,
+    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
+    ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable,
+    ResolvedName,
 };
 use newlang::source::{ByteSpan, SourceFileId};
 use newlang::symbol::SymbolId;
@@ -68,4 +71,142 @@ fn diagnostic_kinds_cover_accepted_adr0026_variants() {
     ];
 
     assert_eq!(kinds.len(), 6);
+}
+
+#[test]
+fn declaration_key_preserves_adr0026_top_level_tuple() {
+    let module = ModuleName::parse("demo.app").unwrap();
+    let package = PackageNamespace::parse("demo.pkg").unwrap();
+    let symbol = SymbolId::from_raw(4);
+    let key = DeclarationKey::new(
+        module.clone(),
+        package.clone(),
+        symbol,
+        DeclarationKind::Function,
+    );
+
+    assert_eq!(key.module(), &module);
+    assert_eq!(key.package(), &package);
+    assert_eq!(key.name(), symbol);
+    assert_eq!(key.kind(), DeclarationKind::Function);
+}
+
+#[test]
+fn declaration_index_preserves_insertion_order_and_lookup_by_key() {
+    let module = ModuleName::parse("demo").unwrap();
+    let package = PackageNamespace::root();
+    let first_key = DeclarationKey::new(
+        module.clone(),
+        package.clone(),
+        SymbolId::from_raw(1),
+        DeclarationKind::Function,
+    );
+    let second_key = DeclarationKey::new(
+        module,
+        package,
+        SymbolId::from_raw(2),
+        DeclarationKind::Type,
+    );
+    let first = DeclaredName::new(first_key.clone(), AstNodeId::from_raw(10));
+    let second = DeclaredName::new(second_key.clone(), AstNodeId::from_raw(11));
+    let mut index = DeclarationIndex::new();
+
+    assert_eq!(
+        index.insert(first.clone()),
+        DeclarationInsert::Inserted(first.clone())
+    );
+    assert_eq!(
+        index.insert(second.clone()),
+        DeclarationInsert::Inserted(second.clone())
+    );
+
+    assert_eq!(index.declarations(), [first.clone(), second]);
+    assert_eq!(index.get(&first_key), Some(&first));
+}
+
+#[test]
+fn declaration_index_key_includes_module_package_and_kind() {
+    let symbol = SymbolId::from_raw(7);
+    let first = DeclaredName::new(
+        DeclarationKey::new(
+            ModuleName::parse("demo.one").unwrap(),
+            PackageNamespace::parse("pkg").unwrap(),
+            symbol,
+            DeclarationKind::Function,
+        ),
+        AstNodeId::from_raw(1),
+    );
+    let second = DeclaredName::new(
+        DeclarationKey::new(
+            ModuleName::parse("demo.two").unwrap(),
+            PackageNamespace::parse("pkg").unwrap(),
+            symbol,
+            DeclarationKind::Function,
+        ),
+        AstNodeId::from_raw(2),
+    );
+    let third = DeclaredName::new(
+        DeclarationKey::new(
+            ModuleName::parse("demo.one").unwrap(),
+            PackageNamespace::parse("other").unwrap(),
+            symbol,
+            DeclarationKind::Function,
+        ),
+        AstNodeId::from_raw(3),
+    );
+    let fourth = DeclaredName::new(
+        DeclarationKey::new(
+            ModuleName::parse("demo.one").unwrap(),
+            PackageNamespace::parse("pkg").unwrap(),
+            symbol,
+            DeclarationKind::Type,
+        ),
+        AstNodeId::from_raw(4),
+    );
+    let mut index = DeclarationIndex::new();
+
+    assert!(matches!(
+        index.insert(first),
+        DeclarationInsert::Inserted(_)
+    ));
+    assert!(matches!(
+        index.insert(second),
+        DeclarationInsert::Inserted(_)
+    ));
+    assert!(matches!(
+        index.insert(third),
+        DeclarationInsert::Inserted(_)
+    ));
+    assert!(matches!(
+        index.insert(fourth),
+        DeclarationInsert::Inserted(_)
+    ));
+    assert_eq!(index.declarations().len(), 4);
+}
+
+#[test]
+fn duplicate_declaration_key_preserves_existing_declaration() {
+    let key = DeclarationKey::new(
+        ModuleName::parse("demo").unwrap(),
+        PackageNamespace::root(),
+        SymbolId::from_raw(1),
+        DeclarationKind::Function,
+    );
+    let existing = DeclaredName::new(key.clone(), AstNodeId::from_raw(10));
+    let attempted = DeclaredName::new(key.clone(), AstNodeId::from_raw(11));
+    let mut index = DeclarationIndex::new();
+
+    assert_eq!(
+        index.insert(existing.clone()),
+        DeclarationInsert::Inserted(existing.clone())
+    );
+    assert_eq!(
+        index.insert(attempted.clone()),
+        DeclarationInsert::Duplicate {
+            existing: existing.clone(),
+            attempted
+        }
+    );
+    assert_eq!(index.get(&key), Some(&existing));
+    assert_eq!(index.declarations().len(), 1);
 }
