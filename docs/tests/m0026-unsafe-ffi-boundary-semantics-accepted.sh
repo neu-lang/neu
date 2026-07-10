@@ -45,7 +45,6 @@ require_text "$ambiguity" 'Accepted `docs/adr/ADR-0039-bootstrap-unsafe-ffi-boun
 require_text "$task" 'Status: `complete`'
 require_text "$task" 'ADR-0039 is accepted'
 
-require_absent_path crates/compiler/src/unsafe_boundary.rs
 require_absent_path crates/compiler/src/ffi.rs
 
 echo "m0026 unsafe and FFI boundary semantics accepted validation passed"

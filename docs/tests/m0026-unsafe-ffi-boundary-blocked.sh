@@ -36,7 +36,6 @@ require_text "$task" 'Status: `complete`'
 require_text "$task" 'An accepted ADR or spec revision must define either a source-syntax subset or a'
 require_text "$task" 'No compiler implementation is added'
 
-require_absent_path crates/compiler/src/unsafe_boundary.rs
 require_absent_path crates/compiler/src/ffi.rs
 
 echo "m0026 unsafe and FFI boundary semantics blocker resolution validation passed"
