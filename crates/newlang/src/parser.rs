@@ -66,6 +66,8 @@ pub struct ParseOutput {
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
     pub generic_parameters: Vec<ParsedGenericParameter>,
     pub enum_variants: Vec<ParsedEnumVariant>,
+    pub when_expressions: Vec<ParsedWhenExpression>,
+    pub match_arms: Vec<ParsedMatchArm>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,6 +91,23 @@ pub struct ParsedEnumVariant {
     pub variant: AstNodeId,
     pub name: String,
     pub name_span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedWhenExpression {
+    pub expression: AstNodeId,
+    pub subject: AstNodeId,
+    pub arms: Vec<AstNodeId>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedMatchArm {
+    pub arm: AstNodeId,
+    pub pattern: AstNodeId,
+    pub pattern_kind: AstNodeKind,
+    pub body: AstNodeId,
+    pub span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -220,6 +239,8 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         assignment_statements: parser.assignment_statements,
         generic_parameters: parser.generic_parameters,
         enum_variants: parser.enum_variants,
+        when_expressions: parser.when_expressions,
+        match_arms: parser.match_arms,
     }
 }
 
@@ -242,6 +263,8 @@ struct Parser<'source> {
     assignment_statements: Vec<ParsedAssignmentStatement>,
     generic_parameters: Vec<ParsedGenericParameter>,
     enum_variants: Vec<ParsedEnumVariant>,
+    when_expressions: Vec<ParsedWhenExpression>,
+    match_arms: Vec<ParsedMatchArm>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -259,6 +282,8 @@ impl<'source> Parser<'source> {
             local_binding_names: Vec::new(),
             generic_parameters: Vec::new(),
             enum_variants: Vec::new(),
+            when_expressions: Vec::new(),
+            match_arms: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
@@ -985,6 +1010,7 @@ impl<'source> Parser<'source> {
             Some(TokenKind::Identifier) => self.parse_name_expression(),
             Some(TokenKind::LeftParen) => self.parse_grouped_expression(),
             Some(TokenKind::KwIf) => self.parse_if_expression(),
+            Some(TokenKind::KwWhen) => self.parse_when_expression(),
             Some(TokenKind::Equal) => {
                 self.diagnostic_current(DiagnosticKind::UnsupportedExpressionForm);
                 None
@@ -1027,6 +1053,25 @@ impl<'source> Parser<'source> {
             .iter()
             .rev()
             .find(|node| node.span == span && node.kind == kind)
+            .map(|node| node.id)
+    }
+
+    fn latest_pattern_node_for_span(&self, span: ByteSpan) -> Option<AstNodeId> {
+        self.arena
+            .nodes()
+            .iter()
+            .rev()
+            .find(|node| {
+                node.span == span
+                    && matches!(
+                        node.kind,
+                        AstNodeKind::WildcardPattern
+                            | AstNodeKind::LiteralPattern
+                            | AstNodeKind::BindingPattern
+                            | AstNodeKind::QualifiedCasePattern
+                            | AstNodeKind::GroupedPattern
+                    )
+            })
             .map(|node| node.id)
     }
 
@@ -1146,6 +1191,106 @@ impl<'source> Parser<'source> {
                 span,
             });
         }
+        Some(span)
+    }
+
+    fn parse_when_expression(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            return None;
+        }
+        self.advance();
+        let subject_span = self.parse_expression()?;
+        let subject = self.latest_expression_node_for_span(subject_span)?;
+        if self.current_kind() != Some(TokenKind::RightParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            return None;
+        }
+        self.advance();
+        if self.current_kind() != Some(TokenKind::LeftBrace) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            return None;
+        }
+        self.advance();
+        let mut arms = Vec::new();
+        while !self.is_eof() && self.current_kind() != Some(TokenKind::RightBrace) {
+            let arm_start = self.current().map_or(start, |token| token.span.start());
+            let Some(pattern_span) = self.parse_pattern() else {
+                self.skip_to_pattern_boundary();
+                continue;
+            };
+            let Some(pattern) = self.latest_pattern_node_for_span(pattern_span) else {
+                self.skip_to_pattern_boundary();
+                continue;
+            };
+            let pattern_kind = self.arena.node(pattern).expect("pattern exists").kind;
+            if !matches!(
+                pattern_kind,
+                AstNodeKind::QualifiedCasePattern | AstNodeKind::WildcardPattern
+            ) || self.current_kind() != Some(TokenKind::Arrow)
+            {
+                self.diagnostic_current_or_span(DiagnosticKind::MalformedPattern, pattern_span);
+                self.skip_to_pattern_boundary();
+                continue;
+            }
+            self.advance();
+            let Some(body_span) = self.parse_expression() else {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MissingPatternArmBody,
+                    pattern_span,
+                );
+                self.skip_to_pattern_boundary();
+                continue;
+            };
+            let Some(body) = self.latest_expression_node_for_span(body_span) else {
+                continue;
+            };
+            let end = if self.current_kind() == Some(TokenKind::Semicolon) {
+                let end = self.current().expect("semicolon exists").span.end();
+                self.advance();
+                end
+            } else {
+                body_span.end()
+            };
+            let span = self.span(arm_start, end);
+            let arm = self.arena.add_match_arm(span);
+            self.match_arms.push(ParsedMatchArm {
+                arm,
+                pattern,
+                pattern_kind,
+                body,
+                span,
+            });
+            arms.push(arm);
+        }
+        if self.current_kind() != Some(TokenKind::RightBrace) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            return None;
+        }
+        let end = self.current().expect("right brace exists").span.end();
+        self.advance();
+        let span = self.span(start, end);
+        let expression = self.arena.add_when_expression(span);
+        self.when_expressions.push(ParsedWhenExpression {
+            expression,
+            subject,
+            arms,
+            span,
+        });
         Some(span)
     }
 
@@ -1706,6 +1851,7 @@ impl<'source> Parser<'source> {
                 | TokenKind::KwFalse
                 | TokenKind::KwNull
                 | TokenKind::KwIf
+                | TokenKind::KwWhen
                 | TokenKind::LeftParen
                 | TokenKind::Bang
                 | TokenKind::Minus
@@ -2050,6 +2196,7 @@ fn expression_node_kind(kind: AstNodeKind) -> bool {
             | AstNodeKind::NameExpression
             | AstNodeKind::GroupedExpression
             | AstNodeKind::IfExpression
+            | AstNodeKind::WhenExpression
             | AstNodeKind::BinaryExpression
             | AstNodeKind::UnaryExpression
             | AstNodeKind::CallExpression

@@ -218,6 +218,57 @@ fn m0021_enum_variants_exclude_empty_and_payload_shaped_entries() {
 }
 
 #[test]
+fn m0021_when_expression_records_subject_and_ordered_arms() {
+    let file = SourceFileId::from_raw(205);
+    let output = parse_source(
+        file,
+        "fun code() { when (signal) { Signal.Red -> 0; _ -> 1 } }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.when_expressions.len(), 1);
+    assert_eq!(output.match_arms.len(), 2);
+    assert!(output.node_kinds().contains(&AstNodeKind::WhenExpression));
+    assert!(output.node_kinds().contains(&AstNodeKind::MatchArm));
+
+    let when = &output.when_expressions[0];
+    assert_eq!(when.arms.len(), 2);
+    assert_eq!(when.subject, output.name_references[0].reference);
+    assert_eq!(output.match_arms[0].arm, when.arms[0]);
+    assert_eq!(
+        output.match_arms[0].pattern_kind,
+        AstNodeKind::QualifiedCasePattern
+    );
+    assert_eq!(output.match_arms[1].arm, when.arms[1]);
+    assert_eq!(
+        output.match_arms[1].pattern_kind,
+        AstNodeKind::WildcardPattern
+    );
+    assert_eq!(
+        output.arena.node(output.match_arms[0].body).unwrap().span,
+        ByteSpan::new(file, 43, 44).unwrap()
+    );
+}
+
+#[test]
+fn m0021_when_expression_rejects_incomplete_or_unsupported_arms() {
+    let missing_body = parse_source(
+        SourceFileId::from_raw(206),
+        "fun bad() { when (x) { A.B -> } }",
+    );
+    assert!(!missing_body.diagnostics.is_empty());
+    assert!(missing_body.match_arms.is_empty());
+
+    let binding = parse_source(
+        SourceFileId::from_raw(207),
+        "fun bad() { when (x) { value -> 1 } }",
+    );
+    assert!(!binding.diagnostics.is_empty());
+    assert!(binding.match_arms.is_empty());
+}
+
+#[test]
 fn reports_malformed_type_and_generic_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(7),
@@ -868,7 +919,6 @@ fn rejects_deferred_body_forms() {
 
     assert!(kinds.contains(&DiagnosticKind::UnsupportedStatementForm));
     assert!(kinds.contains(&DiagnosticKind::MalformedUnsafeBlock));
-    assert!(kinds.contains(&DiagnosticKind::UnsupportedExpressionForm));
 }
 
 #[test]

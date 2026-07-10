@@ -36,6 +36,7 @@ pub enum AstNodeKind {
     NameExpression,
     GroupedExpression,
     IfExpression,
+    WhenExpression,
     BinaryExpression,
     UnaryExpression,
     CallExpression,
@@ -49,6 +50,7 @@ pub enum AstNodeKind {
     BindingPattern,
     QualifiedCasePattern,
     GroupedPattern,
+    MatchArm,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -152,6 +154,10 @@ impl AstArena {
         self.push(AstNodeKind::IfExpression, span)
     }
 
+    pub fn add_when_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::WhenExpression, span)
+    }
+
     pub fn add_binary_expression(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::BinaryExpression, span)
     }
@@ -202,6 +208,10 @@ impl AstArena {
 
     pub fn add_grouped_pattern(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::GroupedPattern, span)
+    }
+
+    pub fn add_match_arm(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::MatchArm, span)
     }
 
     pub fn node(&self, id: AstNodeId) -> Option<&AstNode> {
