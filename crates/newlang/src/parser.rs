@@ -68,6 +68,7 @@ pub struct ParseOutput {
     pub enum_variants: Vec<ParsedEnumVariant>,
     pub when_expressions: Vec<ParsedWhenExpression>,
     pub match_arms: Vec<ParsedMatchArm>,
+    pub qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -108,6 +109,15 @@ pub struct ParsedMatchArm {
     pub pattern_kind: AstNodeKind,
     pub body: AstNodeId,
     pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedQualifiedCasePattern {
+    pub pattern: AstNodeId,
+    pub enum_name: String,
+    pub enum_name_span: ByteSpan,
+    pub variant_name: String,
+    pub variant_name_span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -241,6 +251,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         enum_variants: parser.enum_variants,
         when_expressions: parser.when_expressions,
         match_arms: parser.match_arms,
+        qualified_case_patterns: parser.qualified_case_patterns,
     }
 }
 
@@ -265,6 +276,7 @@ struct Parser<'source> {
     enum_variants: Vec<ParsedEnumVariant>,
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
+    qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -284,6 +296,7 @@ impl<'source> Parser<'source> {
             enum_variants: Vec::new(),
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
+            qualified_case_patterns: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
@@ -1351,8 +1364,10 @@ impl<'source> Parser<'source> {
 
     #[allow(dead_code)]
     fn parse_named_pattern(&mut self) -> Option<ByteSpan> {
-        let start = self.current()?.span.start();
-        let mut end = self.current()?.span.end();
+        let first = self.current()?.clone();
+        let start = first.span.start();
+        let mut end = first.span.end();
+        let mut names = vec![first];
         self.advance();
         let mut qualified = false;
         while self.current_kind() == Some(TokenKind::Dot)
@@ -1360,20 +1375,33 @@ impl<'source> Parser<'source> {
         {
             qualified = true;
             self.advance();
-            end = self
+            let name = self
                 .current()
                 .expect("qualified pattern identifier exists")
-                .span
-                .end();
+                .clone();
+            end = name.span.end();
+            names.push(name);
             self.advance();
         }
+        let has_arguments = self.current_kind() == Some(TokenKind::LeftParen);
         if self.current_kind() == Some(TokenKind::LeftParen) {
             qualified = true;
             end = self.parse_pattern_arguments().unwrap_or(end);
         }
         let span = self.span(start, end);
         if qualified {
-            self.arena.add_qualified_case_pattern(span);
+            let pattern = self.arena.add_qualified_case_pattern(span);
+            if names.len() == 2 && !has_arguments {
+                self.qualified_case_patterns
+                    .push(ParsedQualifiedCasePattern {
+                        pattern,
+                        enum_name: self.text[names[0].span.start()..names[0].span.end()].to_owned(),
+                        enum_name_span: names[0].span,
+                        variant_name: self.text[names[1].span.start()..names[1].span.end()]
+                            .to_owned(),
+                        variant_name_span: names[1].span,
+                    });
+            }
         } else {
             self.arena.add_binding_pattern(span);
         }

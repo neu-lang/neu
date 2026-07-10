@@ -269,6 +269,28 @@ fn m0021_when_expression_rejects_incomplete_or_unsupported_arms() {
 }
 
 #[test]
+fn m0021_qualified_case_pattern_records_exact_identifier_metadata() {
+    let file = SourceFileId::from_raw(208);
+    let output = parse_source(file, "fun code() { when (signal) { Signal.Red -> 0 } }");
+
+    assert_eq!(output.qualified_case_patterns.len(), 1);
+    let pattern = &output.qualified_case_patterns[0];
+    assert_eq!(pattern.enum_name, "Signal");
+    assert_eq!(pattern.variant_name, "Red");
+    assert_eq!(pattern.enum_name_span, ByteSpan::new(file, 29, 35).unwrap());
+    assert_eq!(
+        pattern.variant_name_span,
+        ByteSpan::new(file, 36, 39).unwrap()
+    );
+
+    let unsupported = parse_source(
+        SourceFileId::from_raw(209),
+        "fun code() { when (signal) { Signal.Red.Blue -> 0; Signal.Red(_) -> 1 } }",
+    );
+    assert!(unsupported.qualified_case_patterns.is_empty());
+}
+
+#[test]
 fn reports_malformed_type_and_generic_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(7),
