@@ -407,3 +407,40 @@ completion-or-cancellation check. Runtime cancellation propagation, destructor
 execution during cancellation, cancellation handlers, cancellation masking, and
 async drop are deferred. ADR-0037 remains the authority for any supplied
 thread-capability capture records.
+
+## ADR-0039: Bootstrap Unsafe FFI Boundary Analysis
+
+M0026 uses a metadata-only bootstrap unsafe and FFI boundary model. It adds no
+source-level unsafe block, unsafe function, extern block, foreign declaration,
+ABI string, link attribute, target attribute, safe-wrapper syntax, or module
+audit syntax. Existing unsupported unsafe-like and FFI-like source forms remain
+rejected or unsupported.
+
+M0026 defines `ProvenSafe` for operations proven safe by accepted compiler
+analyses and `TrustedUnsafe` for operations relying on explicit programmer or
+binding assertions. Unsafe context records contain a context node and context
+kind: `block`, `function`, or `module_audit`. Unsafe operation records contain
+an operation node, operation kind, safety basis, and optional containing unsafe
+context node.
+
+A `ProvenSafe` operation is accepted without an unsafe context. A
+`TrustedUnsafe` operation is accepted only when its containing context node
+matches a supplied unsafe context record. M0026 reports
+`unsafe_operation_outside_context` when a trusted unsafe operation has no
+matching unsafe context. The operation node is primary. A non-matching supplied
+context node is secondary when present. The diagnostic identifies trusted
+assertion rather than compiler-proven safety.
+
+FFI declaration records contain a declaration node, declaration kind, safety
+basis, safe-wrapper status, and metadata presence for target contract, calling
+convention, nullability, ownership transfer, lifetime validity, and
+thread-safety or send/share guarantees. M0026 validates metadata presence only;
+target triples, layout, calling convention compatibility, symbols, linker
+inputs, generated bindings, dynamic loading, platform APIs, and ABI lowering
+are deferred.
+
+M0026 reports `missing_ffi_safety_metadata` when an FFI declaration lacks one
+or more required metadata categories. The FFI declaration node is primary, and
+the diagnostic lists the missing categories. Safe-wrapper status is metadata
+only in M0026 and does not affect source visibility, type checking, or call
+lowering.

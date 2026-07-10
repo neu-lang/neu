@@ -7,7 +7,7 @@
 - Related Milestone: `M0026`
 - Filed By: `main task`
 - Date: `2026-07-11`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
@@ -103,8 +103,8 @@ metadata-only bootstrap subset with required diagnostics.
 ## Resolution
 
 - Decision:
-  - pending
+  - Accepted `docs/adr/ADR-0039-bootstrap-unsafe-ffi-boundary-analysis.md`.
 - Source of truth updated:
-  - pending
+  - `docs/SPEC.md`, `ADR-0039: Bootstrap Unsafe FFI Boundary Analysis`.
 - Date resolved:
-  - pending
+  - `2026-07-11`
