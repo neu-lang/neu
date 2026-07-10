@@ -1,7 +1,7 @@
 use newlang::ast::AstNodeKind;
 use newlang::name_resolution::{DeclarationKind, LocalBindingKind};
 use newlang::parser::ParsedBinaryOperator;
-use newlang::parser::{parse_source, DiagnosticKind, ParsedLiteralKind};
+use newlang::parser::{DiagnosticKind, ParsedLiteralKind, parse_source};
 use newlang::source::{ByteSpan, SourceFileId};
 
 #[test]
@@ -174,10 +174,12 @@ fn m0020_generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
         "struct Bad<T: > {} fun use(): Box<Send> {};",
     );
 
-    assert!(output
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingGenericBound));
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingGenericBound)
+    );
     assert!(output.generic_parameters.is_empty());
 }
 
@@ -200,10 +202,12 @@ fn m0021_enum_variants_preserve_enclosing_enum_order_and_spans() {
     );
     assert_eq!(output.enum_variants[1].name, "Yellow");
     assert_eq!(output.enum_variants[2].name, "Green");
-    assert!(output
-        .enum_variants
-        .iter()
-        .all(|variant| variant.enum_declaration == declaration));
+    assert!(
+        output
+            .enum_variants
+            .iter()
+            .all(|variant| variant.enum_declaration == declaration)
+    );
 }
 
 #[test]
@@ -392,8 +396,7 @@ fn records_simple_identifier_expression_name_references() {
 #[test]
 fn records_literal_expression_metadata_for_type_checking() {
     let file = SourceFileId::from_raw(27);
-    let source =
-        "fun run() { const a = true; const b = false; const c = 42; const d = \"ok\"; const e = null; }";
+    let source = "fun run() { const a = true; const b = false; const c = 42; const d = \"ok\"; const e = null; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -483,10 +486,12 @@ fn grouped_expression_metadata_excludes_malformed_groups() {
         "fun run() { const broken = (42; const ok = (true); }",
     );
 
-    assert!(output
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.kind == DiagnosticKind::UnexpectedTokenInExpression));
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::UnexpectedTokenInExpression)
+    );
     assert_eq!(output.grouped_expressions.len(), 1);
     assert_eq!(
         output
@@ -650,10 +655,11 @@ fn removed_val_introducer_uses_ordinary_recovery_without_a_binding_alias() {
     assert_eq!(output.local_binding_names.len(), 1);
     assert_eq!(output.local_binding_names[0].kind, LocalBindingKind::Var);
     assert_eq!(output.local_binding_names[0].name, "retained");
-    assert!(output
-        .local_declarations
-        .iter()
-        .all(|declaration| { declaration.declaration == output.local_binding_names[0].binding }));
+    assert!(
+        output.local_declarations.iter().all(|declaration| {
+            declaration.declaration == output.local_binding_names[0].binding
+        })
+    );
 }
 
 #[test]
@@ -818,10 +824,12 @@ fn assignment_statement_metadata_excludes_malformed_and_non_assignment_statement
         "fun run() { broken = ; value; const local = 1; ok = true; }",
     );
 
-    assert!(output
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedAssignment));
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedAssignment)
+    );
     assert_eq!(output.assignment_statements.len(), 1);
     let assignment = &output.assignment_statements[0];
     assert_eq!(
@@ -950,10 +958,12 @@ fn reports_adr0024_body_diagnostics() {
     assert!(kinds.contains(&DiagnosticKind::MalformedCallExpression));
     assert!(kinds.contains(&DiagnosticKind::MalformedMemberAccess));
     assert!(kinds.contains(&DiagnosticKind::MalformedConditional));
-    assert!(output
-        .diagnostics
-        .iter()
-        .all(|diagnostic| diagnostic.span.start() <= diagnostic.span.end()));
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.span.start() <= diagnostic.span.end())
+    );
 }
 
 #[test]
@@ -1029,8 +1039,10 @@ fn declaration_name_metadata_excludes_nested_declarations_and_missing_names() {
         .collect();
 
     assert_eq!(names, vec!["Module"]);
-    assert!(nested
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingDeclarationName));
+    assert!(
+        nested
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingDeclarationName)
+    );
 }

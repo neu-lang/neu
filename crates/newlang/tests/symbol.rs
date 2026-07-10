@@ -98,9 +98,11 @@ fn name_table_lookup_uses_exact_module_and_symbol() {
         "alpha declaration",
     ));
 
-    assert!(table
-        .get(&NameTableKey::new(module.clone(), alpha))
-        .is_some());
+    assert!(
+        table
+            .get(&NameTableKey::new(module.clone(), alpha))
+            .is_some()
+    );
     assert!(table.get(&NameTableKey::new(module, beta)).is_none());
 }
 

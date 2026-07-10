@@ -1,18 +1,23 @@
 use newlang::{
     ast::{AstArena, AstNodeId, AstNodeKind},
     name_resolution::{
-        bind_local_name_references, build_local_scope_tree, build_scoped_local_binding_index,
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
-        ResolvedLocalBinding, ResolvedName,
+        ResolvedLocalBinding, ResolvedName, bind_local_name_references, build_local_scope_tree,
+        build_scoped_local_binding_index,
     },
     parser::{
-        parse_source, ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
+        ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
         ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
+        parse_source,
     },
     source::ByteSpan,
     source::SourceFileId,
     symbol::{SymbolId, SymbolInterner},
     type_check::{
+        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement,
+        ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind,
+        NullTestRefinedBranch, RecognizedNullTest, RefinedExpressionType, RefinementRecord,
+        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
         build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
         known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
         record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
@@ -22,11 +27,7 @@ use newlang::{
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_parser_literals, type_primitive_local_declarations,
         type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        type_unsupported_m0018_expressions, AmbiguousTypeRule, AssignmentCheck,
-        DeclarationSignature, EligibleNullTestRefinement, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
-        RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport, TypeRuleDiagnostic,
+        type_unsupported_m0018_expressions,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -401,12 +402,16 @@ fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() 
     );
 
     assert_eq!(recognized.len(), 2);
-    assert!(recognized
-        .iter()
-        .all(|test| test.refined_branch() == NullTestRefinedBranch::Else));
-    assert!(recognized
-        .iter()
-        .all(|test| test.operator() == ParsedBinaryOperator::Equal));
+    assert!(
+        recognized
+            .iter()
+            .all(|test| test.refined_branch() == NullTestRefinedBranch::Else)
+    );
+    assert!(
+        recognized
+            .iter()
+            .all(|test| test.operator() == ParsedBinaryOperator::Equal)
+    );
 }
 
 #[test]
@@ -1251,11 +1256,13 @@ fn unsupported_expression_diagnostics_ignore_accepted_and_non_expression_nodes()
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
-    assert!(parsed
-        .arena
-        .nodes()
-        .iter()
-        .any(|node| node.kind == AstNodeKind::ReturnStatement));
+    assert!(
+        parsed
+            .arena
+            .nodes()
+            .iter()
+            .any(|node| node.kind == AstNodeKind::ReturnStatement)
+    );
 
     let report = type_unsupported_m0018_expressions(&parsed.arena);
 
@@ -2255,10 +2262,12 @@ fn m0019_refinement_aware_assignment_keeps_other_mismatches() {
 
     assert!(report.assignment_checks().is_empty());
     assert_eq!(report.diagnostics().len(), 2);
-    assert!(report
-        .diagnostics()
-        .iter()
-        .all(|diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch));
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .all(|diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch)
+    );
     assert_eq!(report.diagnostics()[0].actual_type(), Some(null_id));
     assert_eq!(
         report.diagnostics()[1].actual_type(),
@@ -2475,8 +2484,8 @@ fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_accepts_exact_active_view_and_preserves_original_records(
-) {
+fn m0019_refinement_aware_local_initializer_accepts_exact_active_view_and_preserves_original_records()
+ {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
@@ -3335,9 +3344,11 @@ fn m0018_core_types_well_typed_accepted_fixture() {
         );
         assert!(report.assignment_check(declaration.declaration).is_some());
     }
-    assert!(report
-        .assignment_check(parsed.assignment_statements[0].statement)
-        .is_some());
+    assert!(
+        report
+            .assignment_check(parsed.assignment_statements[0].statement)
+            .is_some()
+    );
 }
 
 #[test]
@@ -3379,44 +3390,54 @@ fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
         &bindings,
     );
 
-    assert!(report
-        .diagnostics()
-        .iter()
-        .any(
-            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch
-                && diagnostic.node() == parsed.local_declarations[1].initializer.unwrap()
-                && diagnostic.expected_type() == Some(TypeId::from_raw(2))
-                && diagnostic.actual_type() == Some(TypeId::from_raw(1))
-        ));
-    assert!(report
-        .diagnostics()
-        .iter()
-        .any(
-            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnresolvedTypeRule
-                && diagnostic.rule() == TypeRuleDiagnostic::MissingAnnotationType
-                && diagnostic.node() == parsed.local_declarations[2].declaration
-        ));
-    assert!(report
-        .diagnostics()
-        .iter()
-        .any(
-            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnresolvedTypeRule
-                && diagnostic.rule() == TypeRuleDiagnostic::MissingResolvedNameType
-        ));
-    assert!(report
-        .diagnostics()
-        .iter()
-        .any(
-            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
-                && diagnostic.rule() == TypeRuleDiagnostic::MemberExpressionDeferred
-        ));
-    assert!(report
-        .diagnostics()
-        .iter()
-        .any(
-            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
-                && diagnostic.rule() == TypeRuleDiagnostic::DirectCallDeferred
-        ));
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(
+                |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch
+                    && diagnostic.node() == parsed.local_declarations[1].initializer.unwrap()
+                    && diagnostic.expected_type() == Some(TypeId::from_raw(2))
+                    && diagnostic.actual_type() == Some(TypeId::from_raw(1))
+            )
+    );
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(
+                |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnresolvedTypeRule
+                    && diagnostic.rule() == TypeRuleDiagnostic::MissingAnnotationType
+                    && diagnostic.node() == parsed.local_declarations[2].declaration
+            )
+    );
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(
+                |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnresolvedTypeRule
+                    && diagnostic.rule() == TypeRuleDiagnostic::MissingResolvedNameType
+            )
+    );
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(
+                |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
+                    && diagnostic.rule() == TypeRuleDiagnostic::MemberExpressionDeferred
+            )
+    );
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(
+                |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
+                    && diagnostic.rule() == TypeRuleDiagnostic::DirectCallDeferred
+            )
+    );
     assert_eq!(
         report.assignment_check(parsed.local_declarations[2].declaration),
         None

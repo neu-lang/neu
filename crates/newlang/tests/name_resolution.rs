@@ -1,17 +1,17 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    analyze_duplicate_enum_variants, analyze_duplicate_match_arms, analyze_match_exhaustiveness,
-    analyze_when_subjects, bind_accepted_name_references, bind_local_name_references,
-    bind_package_qualified_type_references, bind_unqualified_function_references,
-    bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
-    build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
-    build_scoped_binding_index, build_scoped_local_binding_index, resolve_enum_parameter_types,
-    resolve_qualified_variant_arms, DeclarationIndex, DeclarationInsert, DeclarationKey,
-    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
-    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
-    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
-    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
+    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
+    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
+    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
+    TopLevelLookupResult, analyze_duplicate_enum_variants, analyze_duplicate_match_arms,
+    analyze_match_exhaustiveness, analyze_when_subjects, bind_accepted_name_references,
+    bind_local_name_references, bind_package_qualified_type_references,
+    bind_unqualified_function_references, bind_unqualified_type_references,
+    build_declaration_index, build_enum_variant_index, build_function_parameter_binding_index,
+    build_local_binding_index, build_local_scope_tree, build_scoped_binding_index,
+    build_scoped_local_binding_index, resolve_enum_parameter_types, resolve_qualified_variant_arms,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -745,10 +745,12 @@ fn builds_declaration_index_from_parser_metadata_and_module_package() {
     assert_eq!(interner.symbols(), ["main", "Box"]);
     assert_eq!(built.index().declarations().len(), 2);
     assert_eq!(built.inserts().len(), 2);
-    assert!(built
-        .inserts()
-        .iter()
-        .all(|insert| matches!(insert, DeclarationInsert::Inserted(_))));
+    assert!(
+        built
+            .inserts()
+            .iter()
+            .all(|insert| matches!(insert, DeclarationInsert::Inserted(_)))
+    );
     assert!(built.index().declarations().iter().all(|declaration| {
         declaration.key().module().as_str() == "demo"
             && declaration.key().package().as_str() == "demo.pkg"
@@ -814,10 +816,12 @@ fn declaration_index_builder_keeps_same_name_in_distinct_packages() {
 
     assert_eq!(built.index().declarations().len(), 2);
     assert!(built.diagnostics().is_empty());
-    assert!(built
-        .inserts()
-        .iter()
-        .all(|insert| matches!(insert, DeclarationInsert::Inserted(_))));
+    assert!(
+        built
+            .inserts()
+            .iter()
+            .all(|insert| matches!(insert, DeclarationInsert::Inserted(_)))
+    );
 }
 
 #[test]
@@ -1042,10 +1046,12 @@ fn builds_local_binding_index_from_parser_metadata() {
     assert_eq!(built.index().bindings().len(), 2);
     assert_eq!(built.inserts().len(), 2);
     assert!(built.diagnostics().is_empty());
-    assert!(built
-        .inserts()
-        .iter()
-        .all(|insert| matches!(insert, LocalBindingInsert::Inserted(_))));
+    assert!(
+        built
+            .inserts()
+            .iter()
+            .all(|insert| matches!(insert, LocalBindingInsert::Inserted(_)))
+    );
     assert_eq!(built.index().bindings()[0].key().scope(), scope);
     assert_eq!(
         built.index().bindings()[0].kind(),
@@ -2251,8 +2257,10 @@ fn accepted_name_reference_binding_collects_expression_and_type_unresolved_diagn
 
     assert!(bound.table().resolved_names().is_empty());
     assert_eq!(bound.diagnostics().len(), 2);
-    assert!(bound
-        .diagnostics()
-        .iter()
-        .all(|diagnostic| diagnostic.kind() == ResolutionDiagnosticKind::UnresolvedName));
+    assert!(
+        bound
+            .diagnostics()
+            .iter()
+            .all(|diagnostic| diagnostic.kind() == ResolutionDiagnosticKind::UnresolvedName)
+    );
 }

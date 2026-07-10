@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
@@ -810,10 +810,10 @@ impl LocalBindingIndex {
         let mut current_scope = Some(lookup.start_scope);
         while let Some(scope) = current_scope {
             let key = LocalBindingKey::new(scope, lookup.name);
-            if let Some(binding) = self.get(&key) {
-                if local_binding_is_visible(arena, binding, lookup.reference_span) {
-                    return LocalNameLookupResult::Found(binding.clone());
-                }
+            if let Some(binding) = self.get(&key)
+                && local_binding_is_visible(arena, binding, lookup.reference_span)
+            {
+                return LocalNameLookupResult::Found(binding.clone());
             }
             current_scope = scopes.get(scope).and_then(|scope| scope.parent());
         }
