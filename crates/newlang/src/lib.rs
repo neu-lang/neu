@@ -5,6 +5,7 @@ pub mod ast;
 pub mod lexer;
 pub mod module;
 pub mod name_resolution;
+pub mod ownership;
 pub mod parser;
 pub mod source;
 pub mod symbol;
