@@ -5,7 +5,8 @@ use newlang::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolvedLocalBinding,
     },
     ownership::{
-        OwnershipCategory, OwnershipTransfer, OwnershipTransferKind, classify_ownership_category,
+        OwnershipCategory, OwnershipDiagnostic, OwnershipDiagnosticKind, OwnershipTransfer,
+        OwnershipTransferKind, analyze_use_after_move, classify_ownership_category,
         collect_ownership_transfers,
     },
     parser::{ParsedAssignmentStatement, ParsedLocalDeclaration},
@@ -134,6 +135,39 @@ fn m0022_transfer_sites_record_only_move_only_local_sources() {
             ),
         ]
     );
+}
+
+#[test]
+fn m0022_use_after_move_diagnostics_report_later_uses_and_origin() {
+    let moved = local_binding(10, 100);
+    let other = local_binding(11, 101);
+    let before = ResolvedLocalBinding::new(AstNodeId::from_raw(90), moved.clone());
+    let origin = ResolvedLocalBinding::new(AstNodeId::from_raw(100), moved.clone());
+    let later = ResolvedLocalBinding::new(AstNodeId::from_raw(110), moved.clone());
+    let second_later = ResolvedLocalBinding::new(AstNodeId::from_raw(120), moved.clone());
+    let other_later = ResolvedLocalBinding::new(AstNodeId::from_raw(130), other);
+    let transfers = [OwnershipTransfer::new(
+        OwnershipTransferKind::LocalInitializer,
+        AstNodeId::from_raw(200),
+        origin.reference(),
+        moved,
+    )];
+
+    let diagnostics = analyze_use_after_move(
+        &[before, origin, later, second_later, other_later],
+        &transfers,
+    );
+
+    assert_eq!(
+        diagnostics,
+        [
+            OwnershipDiagnostic::use_after_move(AstNodeId::from_raw(110), AstNodeId::from_raw(100)),
+            OwnershipDiagnostic::use_after_move(AstNodeId::from_raw(120), AstNodeId::from_raw(100)),
+        ]
+    );
+    assert_eq!(diagnostics[0].kind(), OwnershipDiagnosticKind::UseAfterMove);
+    assert_eq!(diagnostics[0].node(), AstNodeId::from_raw(110));
+    assert_eq!(diagnostics[0].move_origin(), AstNodeId::from_raw(100));
 }
 
 fn local_binding(binding_raw: usize, symbol_raw: usize) -> LocalBinding {

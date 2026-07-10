@@ -136,3 +136,60 @@ fn move_only_source_binding(
         Some(OwnershipCategory::Copyable) | None => None,
     }
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OwnershipDiagnosticKind {
+    UseAfterMove,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OwnershipDiagnostic {
+    kind: OwnershipDiagnosticKind,
+    node: AstNodeId,
+    move_origin: AstNodeId,
+}
+
+impl OwnershipDiagnostic {
+    pub fn use_after_move(node: AstNodeId, move_origin: AstNodeId) -> Self {
+        Self {
+            kind: OwnershipDiagnosticKind::UseAfterMove,
+            node,
+            move_origin,
+        }
+    }
+
+    pub fn kind(&self) -> OwnershipDiagnosticKind {
+        self.kind
+    }
+
+    pub fn node(&self) -> AstNodeId {
+        self.node
+    }
+
+    pub fn move_origin(&self) -> AstNodeId {
+        self.move_origin
+    }
+}
+
+pub fn analyze_use_after_move(
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    transfers: &[OwnershipTransfer],
+) -> Vec<OwnershipDiagnostic> {
+    let mut diagnostics = Vec::new();
+
+    for resolved in resolved_local_bindings {
+        for transfer in transfers {
+            if resolved.binding() != transfer.source_binding()
+                || resolved.reference() <= transfer.source_use()
+            {
+                continue;
+            }
+            diagnostics.push(OwnershipDiagnostic::use_after_move(
+                resolved.reference(),
+                transfer.source_use(),
+            ));
+        }
+    }
+
+    diagnostics
+}
