@@ -2,8 +2,9 @@ use crate::{
     ast::{AstArena, AstNodeId, AstNodeKind},
     name_resolution::{LocalBinding, ResolutionTable},
     parser::{
-        ParsedAssignmentStatement, ParsedGroupedExpression, ParsedLiteralExpression,
-        ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference,
+        ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
+        ParsedGroupedExpression, ParsedLiteralExpression, ParsedLiteralKind,
+        ParsedLocalDeclaration, ParsedTypeNameReference,
     },
     symbol::SymbolId,
     types::{PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
@@ -322,6 +323,59 @@ impl RefinedExpressionType {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NullTestRefinedBranch {
+    Then,
+    Else,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RecognizedNullTest {
+    expression: AstNodeId,
+    name_expression: AstNodeId,
+    null_literal: AstNodeId,
+    operator: ParsedBinaryOperator,
+    refined_branch: NullTestRefinedBranch,
+}
+
+impl RecognizedNullTest {
+    pub fn new(
+        expression: AstNodeId,
+        name_expression: AstNodeId,
+        null_literal: AstNodeId,
+        operator: ParsedBinaryOperator,
+        refined_branch: NullTestRefinedBranch,
+    ) -> Self {
+        Self {
+            expression,
+            name_expression,
+            null_literal,
+            operator,
+            refined_branch,
+        }
+    }
+
+    pub fn expression(self) -> AstNodeId {
+        self.expression
+    }
+
+    pub fn name_expression(self) -> AstNodeId {
+        self.name_expression
+    }
+
+    pub fn null_literal(self) -> AstNodeId {
+        self.null_literal
+    }
+
+    pub fn operator(self) -> ParsedBinaryOperator {
+        self.operator
+    }
+
+    pub fn refined_branch(self) -> NullTestRefinedBranch {
+        self.refined_branch
+    }
+}
+
 impl AssignmentCheck {
     pub fn new(statement: AstNodeId, target: TypeId, value: TypeId) -> Self {
         Self {
@@ -513,6 +567,52 @@ impl Default for TypeCheckReport {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn recognize_m0019_null_tests(
+    binary_expressions: &[ParsedBinaryExpression],
+    literal_expressions: &[ParsedLiteralExpression],
+    arena: &AstArena,
+) -> Vec<RecognizedNullTest> {
+    let mut recognized = Vec::new();
+
+    for binary in binary_expressions {
+        let refined_branch = match binary.operator {
+            ParsedBinaryOperator::NotEqual => NullTestRefinedBranch::Then,
+            ParsedBinaryOperator::Equal => NullTestRefinedBranch::Else,
+            _ => continue,
+        };
+
+        let left_is_null = is_null_literal(binary.left, literal_expressions);
+        let right_is_null = is_null_literal(binary.right, literal_expressions);
+        let (name_expression, null_literal) = match (left_is_null, right_is_null) {
+            (true, false) if is_name_expression(binary.right, arena) => (binary.right, binary.left),
+            (false, true) if is_name_expression(binary.left, arena) => (binary.left, binary.right),
+            _ => continue,
+        };
+
+        recognized.push(RecognizedNullTest::new(
+            binary.expression,
+            name_expression,
+            null_literal,
+            binary.operator,
+            refined_branch,
+        ));
+    }
+
+    recognized
+}
+
+fn is_null_literal(expression: AstNodeId, literal_expressions: &[ParsedLiteralExpression]) -> bool {
+    literal_expressions
+        .iter()
+        .any(|literal| literal.expression == expression && literal.kind == ParsedLiteralKind::Null)
+}
+
+fn is_name_expression(expression: AstNodeId, arena: &AstArena) -> bool {
+    arena
+        .node(expression)
+        .is_some_and(|node| node.kind == AstNodeKind::NameExpression)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

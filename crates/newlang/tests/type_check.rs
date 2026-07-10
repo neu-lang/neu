@@ -6,24 +6,104 @@ use newlang::{
         ResolvedName,
     },
     parser::{
-        parse_source, ParsedAssignmentStatement, ParsedGroupedExpression, ParsedLiteralExpression,
-        ParsedLiteralKind,
+        parse_source, ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
+        ParsedLiteralExpression, ParsedLiteralKind,
     },
     source::ByteSpan,
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
-        known_local_symbol_types, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
-        type_m0018_local_declaration_initializers, type_parser_literals,
+        known_local_symbol_types, recognize_m0019_null_tests, type_assignment_statements,
+        type_grouped_expressions, type_literal_expressions, type_m0018_accepted_expressions,
+        type_m0018_core, type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
         AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, RefinedExpressionType, RefinementRecord,
-        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
+        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RefinedExpressionType,
+        RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
+        TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
+
+#[test]
+fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(190),
+        "fun check() { if (maybe != null) { val definite = maybe; }; if (null != other) { val also = other; } }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let recognized = recognize_m0019_null_tests(
+        &parsed.binary_expressions,
+        &parsed.literal_expressions,
+        &parsed.arena,
+    );
+
+    assert_eq!(recognized.len(), 2);
+    assert_eq!(recognized[0].refined_branch(), NullTestRefinedBranch::Then);
+    assert_eq!(recognized[1].refined_branch(), NullTestRefinedBranch::Then);
+    assert_eq!(recognized[0].operator(), ParsedBinaryOperator::NotEqual);
+    assert_eq!(
+        parsed
+            .arena
+            .node(recognized[0].name_expression())
+            .unwrap()
+            .kind,
+        AstNodeKind::NameExpression
+    );
+    assert_eq!(
+        parsed
+            .arena
+            .node(recognized[0].null_literal())
+            .unwrap()
+            .kind,
+        AstNodeKind::LiteralExpression
+    );
+}
+
+#[test]
+fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(191),
+        "fun check() { if (maybe == null) { val fallback = \"missing\"; } else { val definite = maybe; }; if (null == other) { val fallback2 = \"missing\"; } else { val also = other; } }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let recognized = recognize_m0019_null_tests(
+        &parsed.binary_expressions,
+        &parsed.literal_expressions,
+        &parsed.arena,
+    );
+
+    assert_eq!(recognized.len(), 2);
+    assert!(recognized
+        .iter()
+        .all(|test| test.refined_branch() == NullTestRefinedBranch::Else));
+    assert!(recognized
+        .iter()
+        .all(|test| test.operator() == ParsedBinaryOperator::Equal));
+}
+
+#[test]
+fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(192),
+        "fun check() { if (left == right) { val a = left; }; if (null == null) { val b = null; }; if (maybe < null) { val c = maybe; }; if (maybe == 1) { val d = maybe; } }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let recognized = recognize_m0019_null_tests(
+        &parsed.binary_expressions,
+        &parsed.literal_expressions,
+        &parsed.arena,
+    );
+
+    assert!(recognized.is_empty());
+}
 
 #[test]
 fn m0019_flow_diagnostic_constructors_preserve_rule_node_and_types() {
