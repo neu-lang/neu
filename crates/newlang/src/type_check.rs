@@ -578,6 +578,21 @@ pub fn type_m0018_accepted_expressions(
     resolutions: &ResolutionTable,
     known_symbols: &[KnownSymbolType],
 ) -> (TypeArena, TypeCheckReport) {
+    let (arena, _primitives, report) = type_m0018_accepted_expressions_with_primitives(
+        literals,
+        grouped_expressions,
+        resolutions,
+        known_symbols,
+    );
+    (arena, report)
+}
+
+fn type_m0018_accepted_expressions_with_primitives(
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    resolutions: &ResolutionTable,
+    known_symbols: &[KnownSymbolType],
+) -> (TypeArena, PrimitiveTypeIds, TypeCheckReport) {
     let mut arena = TypeArena::new();
     let primitives = PrimitiveTypeIds::insert_into(&mut arena);
     let mut report = TypeCheckReport::new();
@@ -613,6 +628,62 @@ pub fn type_m0018_accepted_expressions(
         }
         if !added_group {
             break;
+        }
+    }
+
+    (arena, primitives, report)
+}
+
+pub fn type_m0018_local_declaration_initializers(
+    declarations: &[ParsedLocalDeclaration],
+    type_name_references: &[ParsedTypeNameReference],
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    resolutions: &ResolutionTable,
+    known_symbols: &[KnownSymbolType],
+) -> (TypeArena, TypeCheckReport) {
+    let (arena, primitives, expression_report) = type_m0018_accepted_expressions_with_primitives(
+        literals,
+        grouped_expressions,
+        resolutions,
+        known_symbols,
+    );
+    let mut report = TypeCheckReport::new();
+
+    for expression_type in expression_report.expression_types() {
+        report.record_expression_type(*expression_type);
+    }
+
+    for declaration in declarations {
+        let Some(annotation_type) =
+            primitive_annotation_type(declaration, type_name_references, primitives)
+        else {
+            continue;
+        };
+        report.record_declaration_signature(DeclarationSignature::new(
+            declaration.declaration,
+            annotation_type,
+        ));
+
+        let Some(initializer) = declaration.initializer else {
+            continue;
+        };
+        let Some(initializer_type) = report.expression_type(initializer) else {
+            continue;
+        };
+
+        if assignment_compatible(annotation_type, initializer_type, &arena) {
+            report.record_assignment_check(AssignmentCheck::new(
+                declaration.declaration,
+                annotation_type,
+                initializer_type,
+            ));
+        } else {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                initializer,
+                annotation_type,
+                initializer_type,
+            ));
         }
     }
 

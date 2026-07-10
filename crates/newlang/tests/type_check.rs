@@ -12,7 +12,8 @@ use newlang::{
     symbol::SymbolId,
     type_check::{
         known_local_symbol_types, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_m0018_accepted_expressions, type_parser_literals,
+        type_literal_expressions, type_m0018_accepted_expressions,
+        type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
         ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
@@ -835,4 +836,95 @@ fn accepted_expression_composition_skips_unknown_names_and_groups() {
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.declaration_signatures(), &[]);
     assert_eq!(report.assignment_checks(), &[]);
+}
+
+#[test]
+fn accepted_local_initializer_checks_names_and_grouped_names() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(83),
+        "fun run() { val source: Int = 1; val copy: Int = source; val grouped: Int = (source); }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let source_symbol = SymbolId::from_raw(50);
+    let mut resolutions = ResolutionTable::new();
+    for reference in &parsed.name_references {
+        resolutions.insert(ResolvedName::new(reference.reference, source_symbol));
+    }
+    let known = [KnownSymbolType::new(source_symbol, TypeId::from_raw(1))];
+
+    let (_arena, report) = type_m0018_local_declaration_initializers(
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &resolutions,
+        &known,
+    );
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures().len(), 3);
+    let declarations: Vec<_> = parsed
+        .local_declarations
+        .iter()
+        .map(|declaration| declaration.declaration)
+        .collect();
+    assert_eq!(
+        report.assignment_checks(),
+        &[
+            AssignmentCheck::new(declarations[0], TypeId::from_raw(1), TypeId::from_raw(1)),
+            AssignmentCheck::new(declarations[1], TypeId::from_raw(1), TypeId::from_raw(1)),
+            AssignmentCheck::new(declarations[2], TypeId::from_raw(1), TypeId::from_raw(1)),
+        ]
+    );
+}
+
+#[test]
+fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(84),
+        "fun run() { val source: Int = 1; val bad: String = source; val unknown: UserId = source; val skipped: Int = missing; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let source_symbol = SymbolId::from_raw(51);
+    let mut resolutions = ResolutionTable::new();
+    for reference in &parsed.name_references {
+        if reference.name == "source" {
+            resolutions.insert(ResolvedName::new(reference.reference, source_symbol));
+        }
+    }
+    let known = [KnownSymbolType::new(source_symbol, TypeId::from_raw(1))];
+
+    let (_arena, report) = type_m0018_local_declaration_initializers(
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &resolutions,
+        &known,
+    );
+
+    let bad_initializer = parsed.local_declarations[1].initializer.unwrap();
+    let unknown_declaration = parsed.local_declarations[2].declaration;
+    let skipped_declaration = parsed.local_declarations[3].declaration;
+
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::TypeMismatch
+    );
+    assert_eq!(report.diagnostics()[0].node(), bad_initializer);
+    assert_eq!(
+        report.diagnostics()[0].expected_type(),
+        Some(TypeId::from_raw(2))
+    );
+    assert_eq!(
+        report.diagnostics()[0].actual_type(),
+        Some(TypeId::from_raw(1))
+    );
+    assert_eq!(report.assignment_check(unknown_declaration), None);
+    assert_eq!(report.assignment_check(skipped_declaration), None);
 }
