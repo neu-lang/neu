@@ -1,8 +1,10 @@
 use crate::{
     ast::AstNodeId,
+    name_resolution::ResolutionTable,
     parser::{
         ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference,
     },
+    symbol::SymbolId,
     types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
 
@@ -167,6 +169,26 @@ impl LiteralExpressionInput {
 
     pub fn kind(self) -> LiteralKind {
         self.kind
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct KnownSymbolType {
+    symbol: SymbolId,
+    ty: TypeId,
+}
+
+impl KnownSymbolType {
+    pub fn new(symbol: SymbolId, ty: TypeId) -> Self {
+        Self { symbol, ty }
+    }
+
+    pub fn symbol(self) -> SymbolId {
+        self.symbol
+    }
+
+    pub fn ty(self) -> TypeId {
+        self.ty
     }
 }
 
@@ -427,4 +449,23 @@ fn primitive_annotation_type(
         .iter()
         .find(|reference| reference.reference == annotation)?;
     primitives.type_for_primitive_name(type_name.name.as_str())
+}
+
+pub fn type_resolved_name_expressions(
+    resolutions: &ResolutionTable,
+    known_symbols: &[KnownSymbolType],
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+
+    for resolved in resolutions.resolved_names() {
+        let Some(known) = known_symbols
+            .iter()
+            .find(|known| known.symbol() == resolved.symbol())
+        else {
+            continue;
+        };
+        report.record_expression_type(ExpressionType::new(resolved.reference(), known.ty()));
+    }
+
+    report
 }

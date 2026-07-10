@@ -1,12 +1,15 @@
 use newlang::{
     ast::AstNodeId,
+    name_resolution::{ResolutionTable, ResolvedName},
     parser::parse_source,
     source::SourceFileId,
+    symbol::SymbolId,
     type_check::{
         type_literal_expressions, type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, AmbiguousTypeRule, AssignmentCheck,
-        DeclarationSignature, ExpressionType, LiteralExpressionInput, LiteralKind,
-        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
+        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
+        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport,
     },
     types::{PrimitiveType, TypeId, TypeKind},
 };
@@ -354,4 +357,69 @@ fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
     );
     assert_eq!(report.assignment_check(custom_declaration), None);
     assert_eq!(report.assignment_check(later_declaration), None);
+}
+
+#[test]
+fn resolved_name_expression_typing_records_known_symbol_types_in_resolution_order() {
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(
+        AstNodeId::from_raw(70),
+        SymbolId::from_raw(1),
+    ));
+    resolutions.insert(ResolvedName::new(
+        AstNodeId::from_raw(71),
+        SymbolId::from_raw(2),
+    ));
+    resolutions.insert(ResolvedName::new(
+        AstNodeId::from_raw(72),
+        SymbolId::from_raw(1),
+    ));
+
+    let known = [
+        KnownSymbolType::new(SymbolId::from_raw(1), TypeId::from_raw(1)),
+        KnownSymbolType::new(SymbolId::from_raw(2), TypeId::from_raw(0)),
+    ];
+    let report = type_resolved_name_expressions(&resolutions, &known);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(
+        report.expression_types(),
+        &[
+            ExpressionType::new(AstNodeId::from_raw(70), TypeId::from_raw(1)),
+            ExpressionType::new(AstNodeId::from_raw(71), TypeId::from_raw(0)),
+            ExpressionType::new(AstNodeId::from_raw(72), TypeId::from_raw(1)),
+        ]
+    );
+}
+
+#[test]
+fn resolved_name_expression_typing_skips_unknown_symbols() {
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(
+        AstNodeId::from_raw(80),
+        SymbolId::from_raw(10),
+    ));
+    resolutions.insert(ResolvedName::new(
+        AstNodeId::from_raw(81),
+        SymbolId::from_raw(11),
+    ));
+
+    let known = [KnownSymbolType::new(
+        SymbolId::from_raw(11),
+        TypeId::from_raw(2),
+    )];
+    let report = type_resolved_name_expressions(&resolutions, &known);
+
+    assert_eq!(report.expression_type(AstNodeId::from_raw(80)), None);
+    assert_eq!(
+        report.expression_type(AstNodeId::from_raw(81)),
+        Some(TypeId::from_raw(2))
+    );
+    assert_eq!(
+        report.expression_type(AstNodeId::from_raw(82)),
+        None,
+        "missing resolution entries must not synthesize expression types"
+    );
 }
