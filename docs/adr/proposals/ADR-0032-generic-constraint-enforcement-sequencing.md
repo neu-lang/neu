@@ -1,12 +1,11 @@
 # ADR-0032: Generic Constraint Enforcement Sequencing
 
-Status: Draft proposal - not accepted source of truth
+Status: Accepted as `docs/adr/ADR-0032-generic-constraint-enforcement-sequencing.md`
 
 ## Non-Authority Notice
 
-This proposal does not define accepted capability semantics and must not be
-used as implementation authority. The active blocker is
-`docs/ambiguities/M0020-generic-constraint-semantics.md`.
+This proposal is retained as design history. The accepted ADR is the only
+source of authority; this file does not define capability semantics.
 
 ## Question
 

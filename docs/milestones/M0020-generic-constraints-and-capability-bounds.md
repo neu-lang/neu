@@ -10,11 +10,13 @@ M0020
 
 ## Goal
 
-Implement generic constraints and capability-bound representation for approved generic APIs.
+Implement generic parameter and capability-bound representation for approved
+generic syntax.
 
 ## Motivation
 
-Ownership, copyability, send/share, and nullability need generic constraints before safety analyses can be general.
+Ownership, copyability, send/share, and nullability will need generic
+constraints, but ADR-0032 defers enforcement until those semantic inputs exist.
 
 ## Background
 
@@ -33,44 +35,43 @@ ADR-0016 selects constrained nominal generics with explicit capability bounds.
 
 ## Outputs
 
-- Generic parameter and constraint checking.
+- Generic parameter type representation.
 - Capability-bound representation.
-- Constraint diagnostics.
+- Explicit enforcement deferral.
 
 ## Scope
 
-- Approved generic declarations and uses.
-- Copyability and send/share bounds as representable constraints where syntax is specified.
+- Accepted generic parameter and bound syntax metadata.
+- Parameter type records and opaque capability-bound records.
 
 ## Out of Scope
 
 - Higher-kinded types.
 - Template metaprogramming.
 - Full monomorphization strategy.
+- Generic constraint solving, capability semantics, generic argument checking,
+  and bound-violation diagnostics.
 
 ## Deliverables
 
-- Generic constraint checking.
-- Positive and negative generic fixtures.
-- Diagnostic snapshots.
+- Generic parameter and bound representation fixtures.
+- Explicit deferral coverage.
 
 ## Acceptance Criteria
 
-- Approved generic declarations type check.
-- Violated specified bounds produce diagnostics.
-- Unspecified bound syntax or inference rules are recorded as ambiguities.
+- Accepted generic parameter and bound syntax is represented in source order.
+- Parameter types and bound occurrences preserve exact AST identity.
+- Constraint enforcement is explicitly deferred by ADR-0032.
 
 ## Test Strategy
 
-- Generic declaration tests.
-- Generic use tests.
-- Negative bound violation tests.
-- Diagnostic snapshots.
+- Generic declaration metadata tests.
+- Parameter type and bound record tests.
+- Deferred-enforcement boundary tests.
 
 ## Risks
 
-- Capability-bound syntax may be unspecified.
-- Static specialization policy may require later backend decisions.
+- Capability semantics remain intentionally deferred to a post-M0024 decision.
 
 ## Estimated Effort
 
@@ -78,14 +79,11 @@ ADR-0016 selects constrained nominal generics with explicit capability bounds.
 
 ## Expected Files Changed
 
-- Type checker files.
-- Constraint files.
-- Tests.
-- Diagnostic snapshots.
+- Parser/type representation files.
+- Tests and explicit deferral records.
 
 ## Completion Checklist
 
-- [ ] Generic constraints are represented.
-- [ ] Bound violations diagnose.
-- [ ] Unsupported generic features are rejected or blocked.
-
+- [x] Generic parameter and bound records are represented.
+- [x] Enforcement deferral is recorded.
+- [x] Unsupported generic features are rejected or blocked.

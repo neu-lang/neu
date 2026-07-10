@@ -6,7 +6,7 @@
 - Milestone: `M0020`
 - Milestone File: `docs/milestones/M0020-generic-constraints-and-capability-bounds.md`
 - Specification: `docs/SPEC.md`
-- Status: `proposal in_progress`
+- Status: `complete`
 - Owner: `Language Designer`
 
 ## Objective
@@ -30,12 +30,11 @@ resolve, how types satisfy them, or which diagnostic applies.
 
 ## Required Resolution
 
-Language Designer must propose an accepted semantic decision covering capability
-identity, allowed bound names or resolution, satisfaction rules, generic use
-substitution, and diagnostic obligations. Roadmap Planner must then split the
-remaining M0020 tasks against that decision.
+ADR-0032 is accepted. M0020 completes representation only; a later accepted
+ADR must define enforcement semantics after M0024.
 
 ## Execution Log
 
 - 2026-07-10 agent=Main phase=blocker-recorded result=blocked evidence=SPEC explicitly defers generic constraint solving and capability semantics. handoff=Language-Designer
 - 2026-07-10 agent=Main phase=proposal-drafted result=pass evidence=ADR-0032 proposes deferring enforcement rather than inventing provisional capability satisfaction. handoff=Language-Designer
+- 2026-07-10 agent=Main phase=resolution-accepted result=pass evidence=user accepted ADR-0032; source of truth and roadmap updated to defer enforcement post-M0024. handoff=Roadmap-Planner

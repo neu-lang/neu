@@ -29,3 +29,9 @@ use validation.
 
 M0020-001 through M0020-003 preserve accepted syntax, generic parameter type
 identity, and opaque bound occurrences. They do not interpret a capability.
+
+## Resolution
+
+Resolved by accepted ADR-0032. M0020 is limited to representation; generic
+constraint enforcement remains a post-M0024 semantic milestone requiring a
+separate accepted ADR.

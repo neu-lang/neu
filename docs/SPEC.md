@@ -267,3 +267,14 @@ Reserving the formerly ordinary identifier `const` is source-breaking for old
 uses of that spelling as an identifier. Any future rule that gives local
 `const` compile-time meaning must explicitly supersede ADR-0029; a separate
 compile-time-evaluation feature does not reinterpret it implicitly.
+
+## ADR-0032: Generic Constraint Enforcement Sequencing
+
+M0020 represents generic parameter identity and explicit capability-bound
+occurrences, but does not enforce a bound. The language still selects
+constrained nominal generics; however, capability identity or resolution,
+satisfaction rules, generic substitution, and bound-violation diagnostics are
+deferred until ownership and thread-capability semantics provide their required
+inputs. M0021 depends only on the representation boundary. A later
+post-M0024 milestone must introduce enforcement through a separate accepted
+semantic decision.

@@ -33,7 +33,7 @@ Source of truth: `docs/SPEC.md` and `docs/adr/`. This roadmap does not modify la
 - M0017: Type Representation
 - M0018: Type Checking Core
 - M0019: Nullability And Flow Typing
-- M0020: Generic Constraints And Capability Bounds
+- M0020: Generic Parameter And Capability-Bound Representation
 - M0021: Algebraic Data And Exhaustiveness
 
 ### Phase 3: Safety Semantics
@@ -80,7 +80,7 @@ Source of truth: `docs/SPEC.md` and `docs/adr/`. This roadmap does not modify la
 17. M0017 Type Representation
 18. M0018 Type Checking Core
 19. M0019 Nullability And Flow Typing
-20. M0020 Generic Constraints And Capability Bounds
+20. M0020 Generic Parameter And Capability-Bound Representation
 21. M0021 Algebraic Data And Exhaustiveness
 22. M0022 Ownership And Move Analysis
 23. M0023 Borrow And Lifetime Analysis
@@ -180,6 +180,8 @@ Optional milestones are not on the initial critical path:
 - Full standard library.
 - Macro system or general metaprogramming beyond bounded compile-time evaluation.
 - Higher-kinded types.
+- Generic constraint enforcement until after M0024 capability semantics and a
+  separate accepted ADR define satisfaction and diagnostics.
 - Advanced coroutine scheduler implementation.
 - Multi-backend backend abstraction for LLVM.
 - Binary distribution signing and update channels.
