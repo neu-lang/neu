@@ -6,7 +6,7 @@
 - Milestone: `M0022`
 - Review: `main-task chief-architect decision`
 - Date: `2026-07-11`
-- Decision: `approve for owner acceptance`
+- Decision: `accepted by delegated Chief Architect authority`
 
 ## Inputs Read
 
@@ -21,10 +21,9 @@
 
 ## Decision
 
-ADR-0035 is approved as the proposed resolution for the M0022 value-category
-blocker, subject to explicit owner acceptance. This decision does not make the
-proposal authoritative and does not authorize implementation before
-acceptance.
+ADR-0035 is accepted as the resolution for the M0022 value-category blocker
+under delegated Chief Architect authority. The accepted source-of-truth bundle
+must exist before implementation relies on the semantics.
 
 The proposal is the right architectural shape for M0022 because it creates a
 testable ownership side-table and use-after-move diagnostic while avoiding
@@ -34,7 +33,7 @@ copyability, or ABI layout.
 
 ## Acceptance Bundle
 
-If accepted by the owner, apply one atomic source-of-truth update:
+Apply one atomic source-of-truth update:
 
 1. Create `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md` with
    `Status: Accepted`, removing draft-only non-authority framing.
@@ -46,11 +45,12 @@ If accepted by the owner, apply one atomic source-of-truth update:
 
 ## Handoff
 
-Owner acceptance is required before M0022 implementation tasks may begin.
+The accepted source-of-truth bundle is required before M0022 implementation
+tasks may rely on ADR-0035.
 
 ## Future ADR Delegation
 
-After the project owner's ADR-0035 acceptance, future ADRs may be accepted by
-the main-task Chief Architect decision once required reviews are complete. No
-separate owner acceptance message is required for ADR-0036 and later unless the
-Chief Architect explicitly escalates the decision back to the owner.
+By project-owner delegation, future ADRs may be accepted by the main-task Chief
+Architect decision once required reviews are complete. No separate owner
+acceptance message is required for ADR-0036 and later unless the Chief
+Architect explicitly escalates the decision back to the owner.

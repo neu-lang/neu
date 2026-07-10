@@ -6,7 +6,7 @@
 - Milestone: `M0022`
 - Review: `main-task diagnostics check`
 - Date: `2026-07-11`
-- Decision: `approve for owner acceptance`
+- Decision: `approve for Chief Architect acceptance`
 
 ## Inputs Read
 
