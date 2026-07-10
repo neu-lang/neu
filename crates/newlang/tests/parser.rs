@@ -360,6 +360,88 @@ fn records_local_val_and_var_binding_name_metadata() {
 }
 
 #[test]
+fn records_local_declaration_type_and_initializer_metadata() {
+    let file = SourceFileId::from_raw(29);
+    let source = "fun run() { val answer: Int = 42; var next = answer; val pending: String; }";
+    let output = parse_source(file, source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.local_declarations.len(), 3);
+
+    let annotated_initialized = &output.local_declarations[0];
+    let inferred_initialized = &output.local_declarations[1];
+    let annotated_uninitialized = &output.local_declarations[2];
+
+    assert_eq!(
+        output
+            .arena
+            .node(annotated_initialized.declaration)
+            .unwrap()
+            .kind,
+        AstNodeKind::VariableDeclarationStatement
+    );
+    assert_eq!(
+        output
+            .arena
+            .node(annotated_initialized.annotation.unwrap())
+            .unwrap()
+            .kind,
+        AstNodeKind::NamedType
+    );
+    assert_eq!(
+        output
+            .arena
+            .node(annotated_initialized.initializer.unwrap())
+            .unwrap()
+            .kind,
+        AstNodeKind::LiteralExpression
+    );
+    assert_eq!(inferred_initialized.annotation, None);
+    assert_eq!(
+        output
+            .arena
+            .node(inferred_initialized.initializer.unwrap())
+            .unwrap()
+            .kind,
+        AstNodeKind::NameExpression
+    );
+    assert_eq!(annotated_uninitialized.initializer, None);
+    assert_eq!(
+        output
+            .arena
+            .node(annotated_uninitialized.annotation.unwrap())
+            .unwrap()
+            .kind,
+        AstNodeKind::NamedType
+    );
+    assert!(
+        annotated_initialized.declaration < inferred_initialized.declaration
+            && inferred_initialized.declaration < annotated_uninitialized.declaration
+    );
+}
+
+#[test]
+fn local_declaration_metadata_excludes_malformed_and_other_statements() {
+    let output = parse_source(
+        SourceFileId::from_raw(30),
+        "fun run() { val : Int = value; value; return value; var ok: Int = 1; }",
+    );
+
+    assert_eq!(output.local_declarations.len(), 1);
+    assert_eq!(
+        output
+            .arena
+            .node(output.local_declarations[0].declaration)
+            .unwrap()
+            .kind,
+        AstNodeKind::VariableDeclarationStatement
+    );
+    assert!(output.local_declarations[0].annotation.is_some());
+    assert!(output.local_declarations[0].initializer.is_some());
+}
+
+#[test]
 fn local_binding_name_metadata_excludes_malformed_declarations() {
     let output = parse_source(
         SourceFileId::from_raw(19),

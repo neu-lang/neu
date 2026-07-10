@@ -1,4 +1,4 @@
-use crate::ast::{AstArena, AstNodeKind};
+use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::lexer::{self, Token, TokenKind};
 use crate::name_resolution::{DeclarationKind, LocalBindingKind};
 use crate::source::{ByteSpan, SourceFileId};
@@ -59,6 +59,7 @@ pub struct ParseOutput {
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
+    pub local_declarations: Vec<ParsedLocalDeclaration>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -107,6 +108,13 @@ pub struct ParsedLiteralExpression {
     pub span: ByteSpan,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedLocalDeclaration {
+    pub declaration: AstNodeId,
+    pub annotation: Option<AstNodeId>,
+    pub initializer: Option<AstNodeId>,
+}
+
 impl ParseOutput {
     pub fn node_kinds(&self) -> Vec<AstNodeKind> {
         self.arena.nodes().iter().map(|node| node.kind).collect()
@@ -127,6 +135,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
+        local_declarations: parser.local_declarations,
     }
 }
 
@@ -142,6 +151,7 @@ struct Parser<'source> {
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
+    local_declarations: Vec<ParsedLocalDeclaration>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -160,6 +170,7 @@ impl<'source> Parser<'source> {
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
+            local_declarations: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -568,9 +579,12 @@ impl<'source> Parser<'source> {
             .clone();
         self.advance();
 
+        let mut annotation = None;
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
-            if self.parse_type().is_none() {
+            if let Some(span) = self.parse_type() {
+                annotation = self.latest_type_node_for_span(span);
+            } else {
                 self.diagnostic_current_or_span(
                     DiagnosticKind::MalformedVariableDeclaration,
                     self.span_at(start),
@@ -580,9 +594,12 @@ impl<'source> Parser<'source> {
             }
         }
 
+        let mut initializer = None;
         if self.current_kind() == Some(TokenKind::Equal) {
             self.advance();
-            if self.parse_expression().is_none() {
+            if let Some(span) = self.parse_expression() {
+                initializer = self.latest_expression_node_for_span(span);
+            } else {
                 self.diagnostic_current_or_span(
                     DiagnosticKind::MalformedVariableDeclaration,
                     self.span_at(start),
@@ -598,6 +615,11 @@ impl<'source> Parser<'source> {
             let binding = self
                 .arena
                 .add_variable_declaration_statement(self.span(start, end));
+            self.local_declarations.push(ParsedLocalDeclaration {
+                declaration: binding,
+                annotation,
+                initializer,
+            });
             self.local_binding_names.push(ParsedLocalBindingName {
                 binding,
                 kind,
@@ -800,6 +822,24 @@ impl<'source> Parser<'source> {
                 None
             }
         }
+    }
+
+    fn latest_type_node_for_span(&self, span: ByteSpan) -> Option<AstNodeId> {
+        self.arena
+            .nodes()
+            .iter()
+            .rev()
+            .find(|node| node.span == span && type_node_kind(node.kind))
+            .map(|node| node.id)
+    }
+
+    fn latest_expression_node_for_span(&self, span: ByteSpan) -> Option<AstNodeId> {
+        self.arena
+            .nodes()
+            .iter()
+            .rev()
+            .find(|node| node.span == span && expression_node_kind(node.kind))
+            .map(|node| node.id)
     }
 
     fn parse_name_expression(&mut self) -> Option<ByteSpan> {
@@ -1711,4 +1751,28 @@ fn parsed_literal_kind(kind: TokenKind) -> ParsedLiteralKind {
         TokenKind::KwNull => ParsedLiteralKind::Null,
         _ => unreachable!("parser literal metadata is only built for literal tokens"),
     }
+}
+
+fn type_node_kind(kind: AstNodeKind) -> bool {
+    matches!(
+        kind,
+        AstNodeKind::NamedType
+            | AstNodeKind::NullableType
+            | AstNodeKind::FunctionType
+            | AstNodeKind::GroupedType
+    )
+}
+
+fn expression_node_kind(kind: AstNodeKind) -> bool {
+    matches!(
+        kind,
+        AstNodeKind::LiteralExpression
+            | AstNodeKind::NameExpression
+            | AstNodeKind::GroupedExpression
+            | AstNodeKind::IfExpression
+            | AstNodeKind::BinaryExpression
+            | AstNodeKind::UnaryExpression
+            | AstNodeKind::CallExpression
+            | AstNodeKind::MemberExpression
+    )
 }
