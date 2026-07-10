@@ -36,7 +36,7 @@ require_text "$task" 'Status: `complete`'
 require_text "$task" 'An accepted ADR or spec revision must define either a source-syntax subset or a'
 require_text "$task" 'No compiler implementation is added'
 
-require_absent_path crates/compiler/src/coroutine.rs
 require_absent_path crates/compiler/src/suspension.rs
+require_absent_path crates/compiler/src/scheduler.rs
 
 echo "m0025 coroutine scope and suspension semantics blocker resolution validation passed"

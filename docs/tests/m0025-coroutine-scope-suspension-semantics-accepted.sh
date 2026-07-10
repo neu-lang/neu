@@ -48,7 +48,6 @@ require_text "$ambiguity" 'Accepted `docs/adr/ADR-0038-bootstrap-coroutine-scope
 require_text "$task" 'Status: `complete`'
 require_text "$task" 'ADR-0038 is accepted'
 
-require_absent_path crates/compiler/src/coroutine.rs
 require_absent_path crates/compiler/src/suspension.rs
 require_absent_path crates/compiler/src/scheduler.rs
 

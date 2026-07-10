@@ -3,6 +3,7 @@
 
 pub mod ast;
 pub mod borrow;
+pub mod coroutine;
 pub mod lexer;
 pub mod module;
 pub mod name_resolution;
