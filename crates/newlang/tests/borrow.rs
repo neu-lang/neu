@@ -2,7 +2,7 @@ use newlang::{
     ast::AstNodeId,
     borrow::{
         BorrowDiagnostic, BorrowDiagnosticKind, BorrowKind, BorrowRecord, LifetimeEscapeRecord,
-        analyze_borrow_conflicts, analyze_lifetime_escapes,
+        analyze_borrow, analyze_borrow_conflicts, analyze_lifetime_escapes,
     },
     name_resolution::{LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId},
     symbol::SymbolId,
@@ -141,6 +141,46 @@ fn m0023_lifetime_escape_diagnoses_uses_outside_borrow_region() {
     assert_eq!(diagnostics[0].kind(), BorrowDiagnosticKind::LifetimeEscape);
     assert_eq!(diagnostics[0].node(), AstNodeId::from_raw(301));
     assert_eq!(diagnostics[0].conflict_origin(), AstNodeId::from_raw(401));
+}
+
+#[test]
+fn m0023_borrow_report_combines_conflicts_and_lifetime_escapes() {
+    let binding = local_binding(10, 100);
+    let region = AstNodeId::from_raw(200);
+    let other_region = AstNodeId::from_raw(201);
+    let borrows = [
+        BorrowRecord::new(
+            AstNodeId::from_raw(300),
+            binding.clone(),
+            BorrowKind::Shared,
+            region,
+        ),
+        BorrowRecord::new(
+            AstNodeId::from_raw(301),
+            binding.clone(),
+            BorrowKind::Exclusive,
+            region,
+        ),
+    ];
+    let escapes = [LifetimeEscapeRecord::new(
+        AstNodeId::from_raw(400),
+        binding,
+        AstNodeId::from_raw(300),
+        region,
+        other_region,
+    )];
+
+    let report = analyze_borrow(borrows.to_vec(), escapes.to_vec());
+
+    assert_eq!(report.borrows(), &borrows);
+    assert_eq!(report.lifetime_escapes(), &escapes);
+    assert_eq!(
+        report.diagnostics(),
+        &[
+            BorrowDiagnostic::borrow_conflict(AstNodeId::from_raw(301), AstNodeId::from_raw(300)),
+            BorrowDiagnostic::lifetime_escape(AstNodeId::from_raw(400), AstNodeId::from_raw(300)),
+        ]
+    );
 }
 
 fn local_binding(binding_raw: usize, symbol_raw: usize) -> LocalBinding {

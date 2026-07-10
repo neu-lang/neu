@@ -87,7 +87,6 @@ ADR-0002 defines borrowing. ADR-0003 defines inferred lifetimes with explicit an
 
 ## Completion Checklist
 
-- [ ] Borrow conflicts are diagnosed.
-- [ ] Lifetime escape is diagnosed.
-- [ ] Async borrowing remains out of scope.
-
+- [x] Borrow conflicts are diagnosed.
+- [x] Lifetime escape is diagnosed.
+- [x] Async borrowing remains out of scope.

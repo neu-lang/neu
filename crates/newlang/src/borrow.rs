@@ -177,3 +177,46 @@ pub fn analyze_lifetime_escapes(records: &[LifetimeEscapeRecord]) -> Vec<BorrowD
 
     diagnostics
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BorrowReport {
+    borrows: Vec<BorrowRecord>,
+    lifetime_escapes: Vec<LifetimeEscapeRecord>,
+    diagnostics: Vec<BorrowDiagnostic>,
+}
+
+impl BorrowReport {
+    pub fn new(
+        borrows: Vec<BorrowRecord>,
+        lifetime_escapes: Vec<LifetimeEscapeRecord>,
+        diagnostics: Vec<BorrowDiagnostic>,
+    ) -> Self {
+        Self {
+            borrows,
+            lifetime_escapes,
+            diagnostics,
+        }
+    }
+
+    pub fn borrows(&self) -> &[BorrowRecord] {
+        &self.borrows
+    }
+
+    pub fn lifetime_escapes(&self) -> &[LifetimeEscapeRecord] {
+        &self.lifetime_escapes
+    }
+
+    pub fn diagnostics(&self) -> &[BorrowDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn analyze_borrow(
+    borrows: Vec<BorrowRecord>,
+    lifetime_escapes: Vec<LifetimeEscapeRecord>,
+) -> BorrowReport {
+    let mut diagnostics = analyze_borrow_conflicts(&borrows);
+    diagnostics.extend(analyze_lifetime_escapes(&lifetime_escapes));
+
+    BorrowReport::new(borrows, lifetime_escapes, diagnostics)
+}
