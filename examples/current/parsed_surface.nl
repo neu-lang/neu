@@ -13,10 +13,10 @@ internal interface Service {
 public enum State {}
 
 public fun choose() {
-    val outer = one();
+    const outer = one();
 
     if (ready) {
-        val inner = outer;
+        const inner = outer;
     } else {
         var other = two();
         other = outer;

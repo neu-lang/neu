@@ -5,7 +5,7 @@ category = "negative"
 
 [[cases]]
 name = "malformed_variable_declaration_and_assignment"
-source_text = "val : Int = compute(); target = ;"
+source_text = "const : Int = compute(); target = ;"
 expected_diagnostics = ["malformed_variable_declaration", "malformed_assignment"]
 recovery_boundary = "semicolon"
 
@@ -17,9 +17,15 @@ recovery_boundary = "semicolon"
 
 [[cases]]
 name = "malformed_block"
-source_text = "{ val value = compute();"
+source_text = "{ const value = compute();"
 expected_diagnostics = ["malformed_block"]
 recovery_boundary = "end of file"
+
+[[cases]]
+name = "removed_val_introducer_uses_ordinary_statement_recovery"
+source_text = "val removed = 1; var retained = 2;"
+expected_diagnostics = ["unexpected_token_in_statement"]
+recovery_boundary = "semicolon"
 
 [[cases]]
 name = "deferred_loop_coroutine_and_unsafe_forms"

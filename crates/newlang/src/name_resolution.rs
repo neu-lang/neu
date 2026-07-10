@@ -261,7 +261,7 @@ pub fn build_local_scope_tree(arena: &AstArena) -> LocalScopeTree {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LocalBindingKind {
-    Val,
+    Immutable,
     Var,
 }
 

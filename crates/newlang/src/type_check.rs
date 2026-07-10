@@ -685,7 +685,7 @@ pub fn select_m0019_eligible_null_tests(
         };
 
         match binding.kind() {
-            LocalBindingKind::Val => {}
+            LocalBindingKind::Immutable => {}
             LocalBindingKind::Var => {
                 report.record_diagnostic(TypeCheckDiagnostic::unsupported_flow_rule(
                     TypeRuleDiagnostic::MutableLocalRefinementDeferred,

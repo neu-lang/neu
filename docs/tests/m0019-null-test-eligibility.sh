@@ -34,7 +34,7 @@ require_file "$task"
 
 require_text "$source" 'pub struct EligibleNullTestRefinement'
 require_text "$source" 'pub fn select_m0019_eligible_null_tests'
-require_text "$source" 'LocalBindingKind::Val'
+require_text "$source" 'LocalBindingKind::Immutable'
 require_text "$source" 'LocalBindingKind::Var'
 require_text "$source" 'TypeKind::Nullable'
 require_text "$source" 'TypeRuleDiagnostic::MutableLocalRefinementDeferred'

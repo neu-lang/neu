@@ -10,5 +10,10 @@ expected_tokens = ["KW_FUN", "IDENTIFIER", "LEFT_PAREN", "RIGHT_PAREN", "LEFT_BR
 
 [[cases]]
 name = "reserved_keyword_set"
-source_text = "package import val var type struct enum interface impl if else when for while break continue return true false null as is in unsafe extern"
-expected_tokens = ["KW_PACKAGE", "KW_IMPORT", "KW_VAL", "KW_VAR", "KW_TYPE", "KW_STRUCT", "KW_ENUM", "KW_INTERFACE", "KW_IMPL", "KW_IF", "KW_ELSE", "KW_WHEN", "KW_FOR", "KW_WHILE", "KW_BREAK", "KW_CONTINUE", "KW_RETURN", "KW_TRUE", "KW_FALSE", "KW_NULL", "KW_AS", "KW_IS", "KW_IN", "KW_UNSAFE", "KW_EXTERN"]
+source_text = "package import const var type struct enum interface impl if else when for while break continue return true false null as is in unsafe extern"
+expected_tokens = ["KW_PACKAGE", "KW_IMPORT", "KW_CONST", "KW_VAR", "KW_TYPE", "KW_STRUCT", "KW_ENUM", "KW_INTERFACE", "KW_IMPL", "KW_IF", "KW_ELSE", "KW_WHEN", "KW_FOR", "KW_WHILE", "KW_BREAK", "KW_CONTINUE", "KW_RETURN", "KW_TRUE", "KW_FALSE", "KW_NULL", "KW_AS", "KW_IS", "KW_IN", "KW_UNSAFE", "KW_EXTERN"]
+
+[[cases]]
+name = "val_is_an_ordinary_identifier"
+source_text = "val"
+expected_tokens = ["IDENTIFIER"]

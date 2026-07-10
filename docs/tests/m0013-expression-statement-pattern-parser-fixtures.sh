@@ -60,10 +60,10 @@ require_text tests/fixtures/parser/expressions/positive.fixture.toml 'name = "ca
 require_text tests/fixtures/parser/expressions/positive.fixture.toml 'source_text = "if \(ready\) \{ service\.run\(arg, 2\); \} else \{ fallback\(\); \}"'
 
 require_text tests/fixtures/parser/statements/positive.fixture.toml 'name = "local_bindings_assignment_return_and_expression_statement"'
-require_text tests/fixtures/parser/statements/positive.fixture.toml 'source_text = "val answer: Int = compute\(\); var next = answer; next = next \+ 1; log\(next\); return next;"'
+require_text tests/fixtures/parser/statements/positive.fixture.toml 'source_text = "const answer: Int = compute\(\); var next = answer; next = next \+ 1; log\(next\); return next;"'
 require_text tests/fixtures/parser/statements/positive.fixture.toml 'expected_forms = \["variable-declaration", "assignment-statement", "expression-statement", "return-statement"\]'
 require_text tests/fixtures/parser/statements/positive.fixture.toml 'name = "block_with_trailing_expression"'
-require_text tests/fixtures/parser/statements/positive.fixture.toml 'source_text = "\{ val value = compute\(\); value \}"'
+require_text tests/fixtures/parser/statements/positive.fixture.toml 'source_text = "\{ const value = compute\(\); value \}"'
 
 require_text tests/fixtures/parser/patterns/positive.fixture.toml 'name = "wildcard_literal_binding_and_grouped_patterns"'
 require_text tests/fixtures/parser/patterns/positive.fixture.toml 'source_text = "_ 0 true null name \(name\)"'

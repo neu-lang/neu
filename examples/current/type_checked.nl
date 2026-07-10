@@ -1,14 +1,14 @@
 package examples.current
 
 public fun typeChecked() {
-    val ready: Bool = true;
-    val count: Int = 1;
-    val label: String = "ok";
-    val absent: Null = null;
+    const ready: Bool = true;
+    const count: Int = 1;
+    const label: String = "ok";
+    const absent: Null = null;
 
-    val source: Int = 1;
-    val copy: Int = source;
-    val grouped: Int = (source);
+    const source: Int = 1;
+    const copy: Int = source;
+    const grouped: Int = (source);
 
     var next: Int = count;
     next = source;

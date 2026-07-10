@@ -343,10 +343,11 @@ impl<'source> Parser<'source> {
     }
 
     fn parse_function(&mut self, in_body: bool) {
-        let start = self.current().expect("function token exists").span.start();
+        let keyword = self.current().expect("function token exists").clone();
+        let start = keyword.span.start();
         self.advance();
         if self.current_kind() != Some(TokenKind::Identifier) {
-            self.diagnostic(DiagnosticKind::MissingDeclarationName, self.span_at(start));
+            self.diagnostic(DiagnosticKind::MissingDeclarationName, keyword.span);
             self.skip_to_declaration_boundary(in_body);
             return;
         }
@@ -512,7 +513,7 @@ impl<'source> Parser<'source> {
                     self.arena.add_block(span);
                     return Some(span);
                 }
-                Some(TokenKind::KwVal | TokenKind::KwVar | TokenKind::KwReturn) => {
+                Some(TokenKind::KwConst | TokenKind::KwVar | TokenKind::KwReturn) => {
                     self.parse_statement();
                 }
                 Some(kind) if self.can_start_expression_kind(kind) => {
@@ -576,7 +577,7 @@ impl<'source> Parser<'source> {
                         }
                         Some(TokenKind::RightBrace) => {}
                         _ => {
-                            self.diagnostic_current_or_span(
+                            self.diagnostic(
                                 DiagnosticKind::UnexpectedTokenInStatement,
                                 expression_span,
                             );
@@ -614,7 +615,7 @@ impl<'source> Parser<'source> {
 
     fn parse_statement(&mut self) {
         match self.current_kind() {
-            Some(TokenKind::KwVal | TokenKind::KwVar) => {
+            Some(TokenKind::KwConst | TokenKind::KwVar) => {
                 self.parse_variable_declaration_statement()
             }
             Some(TokenKind::KwReturn) => self.parse_return_statement(),
@@ -629,15 +630,15 @@ impl<'source> Parser<'source> {
     fn parse_variable_declaration_statement(&mut self) {
         let kind = match self
             .current_kind()
-            .expect("variable declaration starts with val or var")
+            .expect("variable declaration starts with const or var")
         {
-            TokenKind::KwVal => LocalBindingKind::Val,
+            TokenKind::KwConst => LocalBindingKind::Immutable,
             TokenKind::KwVar => LocalBindingKind::Var,
-            _ => unreachable!("variable declaration starts with val or var"),
+            _ => unreachable!("variable declaration starts with const or var"),
         };
         let start = self
             .current()
-            .expect("variable declaration starts with val or var")
+            .expect("variable declaration starts with const or var")
             .span
             .start();
         self.advance();

@@ -444,7 +444,11 @@ fn local_binding_index_preserves_insertion_order_and_lookup_by_key() {
     let scope = LocalScopeId::from_raw(1);
     let first_key = LocalBindingKey::new(scope, SymbolId::from_raw(10));
     let second_key = LocalBindingKey::new(scope, SymbolId::from_raw(11));
-    let first = LocalBinding::new(first_key, AstNodeId::from_raw(40), LocalBindingKind::Val);
+    let first = LocalBinding::new(
+        first_key,
+        AstNodeId::from_raw(40),
+        LocalBindingKind::Immutable,
+    );
     let second = LocalBinding::new(second_key, AstNodeId::from_raw(41), LocalBindingKind::Var);
     let mut index = LocalBindingIndex::new();
 
@@ -459,7 +463,7 @@ fn local_binding_index_preserves_insertion_order_and_lookup_by_key() {
 
     assert_eq!(index.bindings(), [first.clone(), second]);
     assert_eq!(index.get(&first_key), Some(&first));
-    assert_eq!(first.kind(), LocalBindingKind::Val);
+    assert_eq!(first.kind(), LocalBindingKind::Immutable);
 }
 
 #[test]
@@ -468,7 +472,7 @@ fn local_binding_index_allows_same_name_in_distinct_scopes() {
     let outer = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(1), name),
         AstNodeId::from_raw(50),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let inner = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(2), name),
@@ -491,7 +495,7 @@ fn local_binding_index_allows_same_name_in_distinct_scopes() {
 #[test]
 fn duplicate_local_binding_key_preserves_existing_binding() {
     let key = LocalBindingKey::new(LocalScopeId::from_raw(3), SymbolId::from_raw(13));
-    let existing = LocalBinding::new(key, AstNodeId::from_raw(60), LocalBindingKind::Val);
+    let existing = LocalBinding::new(key, AstNodeId::from_raw(60), LocalBindingKind::Immutable);
     let attempted = LocalBinding::new(key, AstNodeId::from_raw(61), LocalBindingKind::Var);
     let mut index = LocalBindingIndex::new();
 
@@ -513,7 +517,10 @@ fn duplicate_local_binding_key_preserves_existing_binding() {
 #[test]
 fn builds_local_binding_index_from_parser_metadata() {
     let file = SourceFileId::from_raw(40);
-    let parsed = parse_source(file, "fun run() { val first = one(); var second = first; }");
+    let parsed = parse_source(
+        file,
+        "fun run() { const first = one(); var second = first; }",
+    );
     assert!(parsed.diagnostics.is_empty());
     let scope = LocalScopeId::from_raw(4);
     let mut interner = SymbolInterner::new();
@@ -529,14 +536,17 @@ fn builds_local_binding_index_from_parser_metadata() {
         .iter()
         .all(|insert| matches!(insert, LocalBindingInsert::Inserted(_))));
     assert_eq!(built.index().bindings()[0].key().scope(), scope);
-    assert_eq!(built.index().bindings()[0].kind(), LocalBindingKind::Val);
+    assert_eq!(
+        built.index().bindings()[0].kind(),
+        LocalBindingKind::Immutable
+    );
     assert_eq!(built.index().bindings()[1].kind(), LocalBindingKind::Var);
 }
 
 #[test]
 fn local_binding_index_builder_reports_same_scope_duplicates() {
     let file = SourceFileId::from_raw(41);
-    let parsed = parse_source(file, "fun run() { val same = one(); var same = two(); }");
+    let parsed = parse_source(file, "fun run() { const same = one(); var same = two(); }");
     assert!(parsed.diagnostics.is_empty());
     let mut interner = SymbolInterner::new();
 
@@ -608,7 +618,7 @@ fn local_scope_tree_unknown_scope_id_returns_none() {
 fn builds_local_scope_tree_for_parser_blocks_in_source_order() {
     let parsed = parse_source(
         SourceFileId::from_raw(50),
-        "fun choose() { if (ready) { val inner = one(); } else { val other = two(); } }",
+        "fun choose() { if (ready) { const inner = one(); } else { const other = two(); } }",
     );
     assert!(parsed.diagnostics.is_empty());
 
@@ -660,7 +670,7 @@ fn local_scope_tree_builder_ignores_non_scope_owner_nodes() {
 fn scoped_local_binding_builder_assigns_nearest_block_scope() {
     let parsed = parse_source(
         SourceFileId::from_raw(60),
-        "fun run() { val outer = one(); if (ready) { val inner = outer; } }",
+        "fun run() { const outer = one(); if (ready) { const inner = outer; } }",
     );
     assert!(parsed.diagnostics.is_empty());
     let scopes = build_local_scope_tree(&parsed.arena);
@@ -689,7 +699,7 @@ fn scoped_local_binding_builder_assigns_nearest_block_scope() {
 fn scoped_local_binding_builder_allows_nested_shadowing() {
     let parsed = parse_source(
         SourceFileId::from_raw(61),
-        "fun run() { val same = one(); if (ready) { var same = two(); } }",
+        "fun run() { const same = one(); if (ready) { var same = two(); } }",
     );
     assert!(parsed.diagnostics.is_empty());
     let scopes = build_local_scope_tree(&parsed.arena);
@@ -704,7 +714,10 @@ fn scoped_local_binding_builder_allows_nested_shadowing() {
 
     assert_eq!(built.index().bindings().len(), 2);
     assert!(built.diagnostics().is_empty());
-    assert_eq!(built.index().bindings()[0].kind(), LocalBindingKind::Val);
+    assert_eq!(
+        built.index().bindings()[0].kind(),
+        LocalBindingKind::Immutable
+    );
     assert_eq!(built.index().bindings()[1].kind(), LocalBindingKind::Var);
 }
 
@@ -712,7 +725,7 @@ fn scoped_local_binding_builder_allows_nested_shadowing() {
 fn scoped_local_binding_builder_reports_same_block_duplicates() {
     let parsed = parse_source(
         SourceFileId::from_raw(62),
-        "fun run() { val same = one(); var same = two(); }",
+        "fun run() { const same = one(); var same = two(); }",
     );
     assert!(parsed.diagnostics.is_empty());
     let scopes = build_local_scope_tree(&parsed.arena);
@@ -743,7 +756,7 @@ fn scoped_local_binding_builder_reports_same_block_duplicates() {
 
 #[test]
 fn local_binding_lookup_finds_visible_binding_after_declaration() {
-    let source = "fun run() { val value = one(); value; }";
+    let source = "fun run() { const value = one(); value; }";
     let file = SourceFileId::from_raw(70);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -774,7 +787,7 @@ fn local_binding_lookup_finds_visible_binding_after_declaration() {
 
 #[test]
 fn local_binding_lookup_rejects_reference_before_declaration() {
-    let source = "fun run() { value; val value = one(); }";
+    let source = "fun run() { value; const value = one(); }";
     let file = SourceFileId::from_raw(71);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -802,7 +815,7 @@ fn local_binding_lookup_rejects_reference_before_declaration() {
 
 #[test]
 fn local_binding_lookup_uses_nearest_visible_scope() {
-    let source = "fun run() { val same = one(); if (ready) { var same = two(); same; } }";
+    let source = "fun run() { const same = one(); if (ready) { var same = two(); same; } }";
     let file = SourceFileId::from_raw(72);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -833,7 +846,7 @@ fn local_binding_lookup_uses_nearest_visible_scope() {
 
 #[test]
 fn local_binding_lookup_continues_past_not_yet_visible_inner_binding() {
-    let source = "fun run() { val same = one(); if (ready) { same; var same = two(); } }";
+    let source = "fun run() { const same = one(); if (ready) { same; var same = two(); } }";
     let file = SourceFileId::from_raw(73);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -896,7 +909,7 @@ fn missing_local_binding_lookup_returns_unresolved_name_diagnostic() {
 
 #[test]
 fn local_reference_binding_records_visible_local_resolution() {
-    let source = "fun run() { val value = 1; value; }";
+    let source = "fun run() { const value = 1; value; }";
     let file = SourceFileId::from_raw(80);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -928,7 +941,7 @@ fn local_reference_binding_records_visible_local_resolution() {
 
 #[test]
 fn m0019_local_binding_resolution_identity_records_exact_binding() {
-    let source = "fun run() { val value = 1; value; }";
+    let source = "fun run() { const value = 1; value; }";
     let file = SourceFileId::from_raw(83);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -958,7 +971,7 @@ fn m0019_local_binding_resolution_identity_records_exact_binding() {
 
 #[test]
 fn m0019_local_binding_resolution_identity_distinguishes_nested_shadowing() {
-    let source = "fun run() { val same = 1; if (ready) { same; val same = 2; same; }; same; }";
+    let source = "fun run() { const same = 1; if (ready) { same; const same = 2; same; }; same; }";
     let file = SourceFileId::from_raw(84);
     let parsed = parse_source(file, source);
     assert!(
@@ -1046,7 +1059,7 @@ fn m0019_local_binding_resolution_identity_skips_unresolved_uses() {
 
 #[test]
 fn local_reference_binding_reports_reference_before_declaration() {
-    let source = "fun run() { value; val value = 1; }";
+    let source = "fun run() { value; const value = 1; }";
     let file = SourceFileId::from_raw(81);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -1159,7 +1172,7 @@ fn unqualified_function_reference_binding_uses_same_package_top_level_fallback()
 #[test]
 fn unqualified_function_reference_binding_keeps_local_lookup_before_top_level() {
     let file = SourceFileId::from_raw(91);
-    let parsed = parse_source(file, "fun value(); fun run() { val value = 1; value; }");
+    let parsed = parse_source(file, "fun value(); fun run() { const value = 1; value; }");
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.name_references.len(), 1);
     let metadata = newlang::module::ModuleMetadata::with_packages(
@@ -1336,7 +1349,7 @@ fn unqualified_type_reference_binding_keeps_local_lookup_before_top_level() {
     let file = SourceFileId::from_raw(101);
     let parsed = parse_source(
         file,
-        "struct Box {} fun run() { val Box = make(); val item: Box = make(); }",
+        "struct Box {} fun run() { const Box = make(); const item: Box = make(); }",
     );
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.type_name_references.len(), 1);
@@ -1604,7 +1617,7 @@ fn accepted_name_reference_binding_combines_expression_and_type_bindings() {
     let box_source = parse_source(box_file, "struct Box {}");
     let run = parse_source(
         run_file,
-        "struct Item {} fun helper(); fun run(): lib.Box { val local: Item = helper(); local; }",
+        "struct Item {} fun helper(); fun run(): lib.Box { const local: Item = helper(); local; }",
     );
     assert!(box_source.diagnostics.is_empty());
     assert!(run.diagnostics.is_empty());

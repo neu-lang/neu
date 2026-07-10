@@ -50,6 +50,14 @@ fn lexes_keywords_and_identifiers() {
 }
 
 #[test]
+fn const_is_reserved_and_val_is_an_ordinary_identifier() {
+    assert_eq!(
+        kinds("const val var"),
+        vec![TokenKind::KwConst, TokenKind::Identifier, TokenKind::KwVar]
+    );
+}
+
+#[test]
 fn rejects_unicode_identifiers_with_spans() {
     assert_eq!(
         diagnostic_texts("café"),
@@ -77,15 +85,15 @@ fn lexes_literals_without_treating_integer_overflow_as_lexical() {
 #[test]
 fn skips_comments_and_reports_unterminated_block_comment() {
     assert_eq!(
-        kinds("val // comment\nvar"),
-        vec![TokenKind::KwVal, TokenKind::KwVar]
+        kinds("const // comment\nvar"),
+        vec![TokenKind::KwConst, TokenKind::KwVar]
     );
     assert_eq!(
-        kinds("/* outer /* inner */ done */ val"),
-        vec![TokenKind::KwVal]
+        kinds("/* outer /* inner */ done */ const"),
+        vec![TokenKind::KwConst]
     );
     assert_eq!(
-        diagnostic_texts("val /* open"),
+        diagnostic_texts("const /* open"),
         vec![(DiagnosticKind::UnterminatedBlockComment, "/* open")]
     );
 }

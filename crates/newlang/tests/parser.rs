@@ -150,7 +150,7 @@ fn reports_malformed_type_and_generic_syntax() {
 fn parses_adr0024_body_statements_and_expressions() {
     let output = parse_source(
         SourceFileId::from_raw(8),
-        "fun run(): Int { val answer: Int = compute(); var next = answer; next = next + 1; logger.info(next); return next; }",
+        "fun run(): Int { const answer: Int = compute(); var next = answer; next = next + 1; logger.info(next); return next; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -171,7 +171,7 @@ fn parses_adr0024_body_statements_and_expressions() {
 #[test]
 fn records_simple_identifier_expression_name_references() {
     let file = SourceFileId::from_raw(20);
-    let source = "fun run() { val answer = compute(); answer; next + answer; }";
+    let source = "fun run() { const answer = compute(); answer; next + answer; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -199,7 +199,7 @@ fn records_simple_identifier_expression_name_references() {
 fn records_literal_expression_metadata_for_type_checking() {
     let file = SourceFileId::from_raw(27);
     let source =
-        "fun run() { val a = true; val b = false; val c = 42; val d = \"ok\"; val e = null; }";
+        "fun run() { const a = true; const b = false; const c = 42; const d = \"ok\"; const e = null; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -240,7 +240,7 @@ fn records_literal_expression_metadata_for_type_checking() {
 fn literal_expression_metadata_excludes_non_literal_expressions() {
     let output = parse_source(
         SourceFileId::from_raw(28),
-        "fun run() { val item = compute(); val other = item; }",
+        "fun run() { const item = compute(); const other = item; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -252,7 +252,7 @@ fn literal_expression_metadata_excludes_non_literal_expressions() {
 fn records_grouped_expression_metadata_for_type_checking() {
     let output = parse_source(
         SourceFileId::from_raw(31),
-        "fun run() { val answer = (42); val nested = ((answer)); }",
+        "fun run() { const answer = (42); const nested = ((answer)); }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -286,7 +286,7 @@ fn records_grouped_expression_metadata_for_type_checking() {
 fn grouped_expression_metadata_excludes_malformed_groups() {
     let output = parse_source(
         SourceFileId::from_raw(32),
-        "fun run() { val broken = (42; val ok = (true); }",
+        "fun run() { const broken = (42; const ok = (true); }",
     );
 
     assert!(output
@@ -324,7 +324,7 @@ fn name_reference_metadata_excludes_member_import_and_package_names() {
 #[test]
 fn records_named_type_reference_metadata() {
     let file = SourceFileId::from_raw(22);
-    let source = "fun run(): demo.Result<Box<Int?>> { val item: Box<Int> = make(); }";
+    let source = "fun run(): demo.Result<Box<Int?>> { const item: Box<Int> = make(); }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -389,9 +389,9 @@ fn type_name_reference_metadata_excludes_package_import_expression_and_missing_t
 }
 
 #[test]
-fn records_local_val_and_var_binding_name_metadata() {
+fn records_local_immutable_and_var_binding_name_metadata() {
     let file = SourceFileId::from_raw(18);
-    let source = "fun run() { val answer: Int = compute(); var next = answer; }";
+    let source = "fun run() { const answer: Int = compute(); var next = answer; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -401,7 +401,7 @@ fn records_local_val_and_var_binding_name_metadata() {
     let first = &output.local_binding_names[0];
     let second = &output.local_binding_names[1];
 
-    assert_eq!(first.kind, LocalBindingKind::Val);
+    assert_eq!(first.kind, LocalBindingKind::Immutable);
     assert_eq!(first.name, "answer");
     assert_eq!(
         &source[first.name_span.start()..first.name_span.end()],
@@ -417,9 +417,75 @@ fn records_local_val_and_var_binding_name_metadata() {
 }
 
 #[test]
+fn parses_const_declarations_and_val_binding_names() {
+    let output = parse_source(
+        SourceFileId::from_raw(93),
+        "fun run() { const val: Int = 1; var val = 2; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.local_binding_names.len(), 2);
+    assert_eq!(
+        output.local_binding_names[0].kind,
+        LocalBindingKind::Immutable
+    );
+    assert_eq!(output.local_binding_names[0].name, "val");
+    assert_eq!(output.local_binding_names[1].kind, LocalBindingKind::Var);
+    assert_eq!(output.local_binding_names[1].name, "val");
+}
+
+#[test]
+fn removed_val_introducer_uses_ordinary_recovery_without_a_binding_alias() {
+    let source = "fun run() { val removed = 1; var retained = 2; }";
+    let output = parse_source(SourceFileId::from_raw(94), source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert_eq!(
+        output
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.kind)
+            .collect::<Vec<_>>(),
+        vec![DiagnosticKind::UnexpectedTokenInStatement]
+    );
+    assert_eq!(
+        &source[output.diagnostics[0].span.start()..output.diagnostics[0].span.end()],
+        "val"
+    );
+    assert_eq!(output.local_binding_names.len(), 1);
+    assert_eq!(output.local_binding_names[0].kind, LocalBindingKind::Var);
+    assert_eq!(output.local_binding_names[0].name, "retained");
+    assert!(output
+        .local_declarations
+        .iter()
+        .all(|declaration| { declaration.declaration == output.local_binding_names[0].binding }));
+}
+
+#[test]
+fn const_is_rejected_in_prior_identifier_positions_by_ordinary_parser_diagnostics() {
+    let source = "fun const();";
+    let output = parse_source(SourceFileId::from_raw(95), source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert_eq!(
+        output
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.kind)
+            .collect::<Vec<_>>(),
+        vec![DiagnosticKind::MissingDeclarationName]
+    );
+    assert_eq!(
+        &source[output.diagnostics[0].span.start()..output.diagnostics[0].span.end()],
+        "fun"
+    );
+}
+
+#[test]
 fn records_local_declaration_type_and_initializer_metadata() {
     let file = SourceFileId::from_raw(29);
-    let source = "fun run() { val answer: Int = 42; var next = answer; val pending: String; }";
+    let source = "fun run() { const answer: Int = 42; var next = answer; const pending: String; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -482,7 +548,7 @@ fn records_local_declaration_type_and_initializer_metadata() {
 fn local_declaration_metadata_excludes_malformed_and_other_statements() {
     let output = parse_source(
         SourceFileId::from_raw(30),
-        "fun run() { val : Int = value; value; return value; var ok: Int = 1; }",
+        "fun run() { const : Int = value; value; return value; var ok: Int = 1; }",
     );
 
     assert_eq!(output.local_declarations.len(), 1);
@@ -502,7 +568,7 @@ fn local_declaration_metadata_excludes_malformed_and_other_statements() {
 fn local_binding_name_metadata_excludes_malformed_declarations() {
     let output = parse_source(
         SourceFileId::from_raw(19),
-        "fun broken() { val : Int = compute(); var ok = value; }",
+        "fun broken() { const : Int = compute(); var ok = value; }",
     );
 
     assert_eq!(output.local_binding_names.len(), 1);
@@ -555,7 +621,7 @@ fn records_assignment_statement_metadata_for_type_checking() {
 fn assignment_statement_metadata_excludes_malformed_and_non_assignment_statements() {
     let output = parse_source(
         SourceFileId::from_raw(34),
-        "fun run() { broken = ; value; val local = 1; ok = true; }",
+        "fun run() { broken = ; value; const local = 1; ok = true; }",
     );
 
     assert!(output
@@ -582,7 +648,7 @@ fn assignment_statement_metadata_excludes_malformed_and_non_assignment_statement
 fn parses_trailing_expression_and_if_expression_body() {
     let output = parse_source(
         SourceFileId::from_raw(9),
-        "fun choose(): Int { val ready = check(); if (ready) { service.run(arg, 2); } else { fallback(); } }",
+        "fun choose(): Int { const ready = check(); if (ready) { service.run(arg, 2); } else { fallback(); } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -600,7 +666,7 @@ fn parses_trailing_expression_and_if_expression_body() {
 fn m0019_records_binary_expression_metadata_for_flow_inputs() {
     let output = parse_source(
         SourceFileId::from_raw(90),
-        "fun check() { val maybe: String? = null; if (maybe != null) { val definite = maybe; } }",
+        "fun check() { const maybe: String? = null; if (maybe != null) { const definite = maybe; } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -628,7 +694,7 @@ fn m0019_records_binary_expression_metadata_for_flow_inputs() {
 fn m0019_records_if_expression_condition_and_branch_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(91),
-        "fun check() { if (null == maybe) { val fallback = \"missing\"; } else { val definite = maybe; } }",
+        "fun check() { if (null == maybe) { const fallback = \"missing\"; } else { const definite = maybe; } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -662,7 +728,7 @@ fn m0019_records_if_expression_condition_and_branch_metadata() {
 fn m0019_records_if_expression_without_else_as_none() {
     let output = parse_source(
         SourceFileId::from_raw(92),
-        "fun check() { if (maybe != null) { val definite = maybe; } }",
+        "fun check() { if (maybe != null) { const definite = maybe; } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -675,7 +741,7 @@ fn m0019_records_if_expression_without_else_as_none() {
 fn reports_adr0024_body_diagnostics() {
     let output = parse_source(
         SourceFileId::from_raw(10),
-        "fun broken() { val : Int = compute(); target = ; return + ; service.(arg,); if ready { nope(); } }",
+        "fun broken() { const : Int = compute(); target = ; return + ; service.(arg,); if ready { nope(); } }",
     );
 
     let kinds: Vec<_> = output

@@ -33,7 +33,7 @@ use newlang::{
 fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
     let parsed = parse_source(
         SourceFileId::from_raw(190),
-        "fun check() { if (maybe != null) { val definite = maybe; }; if (null != other) { val also = other; } }",
+        "fun check() { if (maybe != null) { const definite = maybe; }; if (null != other) { const also = other; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -70,7 +70,7 @@ fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
 fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() {
     let parsed = parse_source(
         SourceFileId::from_raw(191),
-        "fun check() { if (maybe == null) { val fallback = \"missing\"; } else { val definite = maybe; }; if (null == other) { val fallback2 = \"missing\"; } else { val also = other; } }",
+        "fun check() { if (maybe == null) { const fallback = \"missing\"; } else { const definite = maybe; }; if (null == other) { const fallback2 = \"missing\"; } else { const also = other; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -94,7 +94,7 @@ fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() 
 fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
     let parsed = parse_source(
         SourceFileId::from_raw(192),
-        "fun check() { if (left == right) { val a = left; }; if (null == null) { val b = null; }; if (maybe < null) { val c = maybe; }; if (maybe == 1) { val d = maybe; } }",
+        "fun check() { if (left == right) { const a = left; }; if (null == null) { const b = null; }; if (maybe < null) { const c = maybe; }; if (maybe == 1) { const d = maybe; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -121,7 +121,7 @@ fn m0019_null_test_eligibility_accepts_immutable_nullable_local() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), symbol),
         AstNodeId::from_raw(203),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(null_test.name_expression(), symbol));
@@ -230,12 +230,12 @@ fn m0019_null_test_eligibility_ignores_non_nullable_and_incomplete_inputs() {
     let non_nullable_binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), non_nullable_symbol),
         AstNodeId::from_raw(229),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let missing_signature_binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), missing_signature_symbol),
         AstNodeId::from_raw(230),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(
@@ -278,12 +278,12 @@ fn m0019_null_test_eligibility_reports_ambiguous_local_binding_match() {
     let first = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), symbol),
         AstNodeId::from_raw(243),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let second = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(1), symbol),
         AstNodeId::from_raw(244),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(null_test.name_expression(), symbol));
@@ -317,7 +317,7 @@ fn m0019_branch_refinement_records_then_branch_for_not_equal_tests() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(300)),
         AstNodeId::from_raw(303),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let eligible = EligibleNullTestRefinement::new(
         null_test,
@@ -360,7 +360,7 @@ fn m0019_branch_refinement_records_else_branch_for_equal_tests() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(310)),
         AstNodeId::from_raw(313),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let eligible = EligibleNullTestRefinement::new(
         null_test,
@@ -409,7 +409,7 @@ fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(320)),
         AstNodeId::from_raw(326),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let eligible = [
         EligibleNullTestRefinement::new(
@@ -442,7 +442,8 @@ fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
 
 #[test]
 fn m0019_refined_expression_type_records_active_exact_binding_uses() {
-    let source = "fun check() { val maybe: String? = null; if (maybe != null) { maybe; }; maybe; }";
+    let source =
+        "fun check() { const maybe: String? = null; if (maybe != null) { maybe; }; maybe; }";
     let file = SourceFileId::from_raw(330);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -507,7 +508,7 @@ fn m0019_refined_expression_type_records_active_exact_binding_uses() {
 
 #[test]
 fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bounds() {
-    let source = "fun check() { val maybe: String? = null; if (maybe != null) { maybe; if (ready) { maybe; val maybe: String? = null; maybe; }; }; maybe; }";
+    let source = "fun check() { const maybe: String? = null; if (maybe != null) { maybe; if (ready) { maybe; const maybe: String? = null; maybe; }; }; maybe; }";
     let file = SourceFileId::from_raw(331);
     let parsed = parse_source(file, source);
     assert!(
@@ -586,7 +587,7 @@ fn m0019_refined_expression_type_records_report_overlapping_regions() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(332)),
         AstNodeId::from_raw(333),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let resolved = ResolvedLocalBinding::new(expression, binding.clone());
     let mut report = TypeCheckReport::new();
@@ -635,7 +636,7 @@ fn m0019_refined_expression_type_records_reject_non_name_and_cross_file_uses() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(338)),
         AstNodeId::from_raw(340),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let resolved = [
         ResolvedLocalBinding::new(non_name, binding.clone()),
@@ -734,7 +735,7 @@ fn m0019_type_check_report_records_flow_refinements_in_insertion_order() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(1), SymbolId::from_raw(2)),
         AstNodeId::from_raw(191),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let first = RefinementRecord::new(
         AstNodeId::from_raw(192),
@@ -874,7 +875,7 @@ fn type_rule_diagnostic_identifiers_cover_adr0027_examples() {
 fn unsupported_expression_diagnostics_report_adr0027_deferred_forms() {
     let parsed = parse_source(
         SourceFileId::from_raw(85),
-        "fun run() { val answer: Int = compute(); next = next + 1; logger.info(next); if (ready) { val inner = next; } else { val other = answer; } }",
+        "fun run() { const answer: Int = compute(); next = next + 1; logger.info(next); if (ready) { const inner = next; } else { const other = answer; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -927,7 +928,7 @@ fn unsupported_expression_diagnostics_report_adr0027_deferred_forms() {
 fn unsupported_expression_diagnostics_ignore_accepted_and_non_expression_nodes() {
     let parsed = parse_source(
         SourceFileId::from_raw(86),
-        "fun run() { val source: Int = 1; val copy: Int = (source); copy = source; return; }",
+        "fun run() { const source: Int = 1; const copy: Int = (source); copy = source; return; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -1101,7 +1102,7 @@ fn literal_expression_typing_does_not_synthesize_missing_expression_types() {
 fn parser_literal_metadata_types_to_adr0027_primitives() {
     let parsed = parse_source(
         SourceFileId::from_raw(60),
-        "fun run() { val a = true; val b = 7; val c = \"text\"; val d = null; }",
+        "fun run() { const a = true; const b = 7; const c = \"text\"; const d = null; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1141,7 +1142,7 @@ fn parser_literal_metadata_types_to_adr0027_primitives() {
 fn primitive_local_declaration_annotations_record_declaration_signatures() {
     let parsed = parse_source(
         SourceFileId::from_raw(61),
-        "fun run() { val ready: Bool = true; val count: Int = 1; val label: String = \"x\"; val done: Unit; val absent: Null = null; }",
+        "fun run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const done: Unit; const absent: Null = null; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1184,7 +1185,7 @@ fn primitive_local_declaration_annotations_record_declaration_signatures() {
 fn primitive_local_declaration_annotations_do_not_synthesize_unknown_signatures() {
     let parsed = parse_source(
         SourceFileId::from_raw(62),
-        "fun run() { val inferred = true; val custom: UserId = value; val count: Int = 1; }",
+        "fun run() { const inferred = true; const custom: UserId = value; const count: Int = 1; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1230,7 +1231,7 @@ fn primitive_local_declaration_annotations_do_not_synthesize_unknown_signatures(
 fn primitive_local_initializer_checks_record_matching_assignments() {
     let parsed = parse_source(
         SourceFileId::from_raw(63),
-        "fun run() { val ready: Bool = true; val count: Int = 1; val label: String = \"x\"; }",
+        "fun run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1266,7 +1267,7 @@ fn primitive_local_initializer_checks_record_matching_assignments() {
 fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
     let parsed = parse_source(
         SourceFileId::from_raw(64),
-        "fun run() { val ready: Bool = 1; val count: Int = 2; val custom: UserId = 3; val later: String = compute(); }",
+        "fun run() { const ready: Bool = 1; const count: Int = 2; const custom: UserId = 3; const later: String = compute(); }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1395,7 +1396,7 @@ fn known_local_symbol_types_are_derived_from_declaration_signatures() {
         LocalBinding::new(
             LocalBindingKey::new(scope, first_symbol),
             AstNodeId::from_raw(90),
-            LocalBindingKind::Val,
+            LocalBindingKind::Immutable,
         ),
         LocalBinding::new(
             LocalBindingKey::new(scope, second_symbol),
@@ -1428,12 +1429,12 @@ fn known_local_symbol_types_skip_unsignatured_bindings_and_orphan_signatures() {
         LocalBinding::new(
             LocalBindingKey::new(scope, typed_symbol),
             AstNodeId::from_raw(100),
-            LocalBindingKind::Val,
+            LocalBindingKind::Immutable,
         ),
         LocalBinding::new(
             LocalBindingKey::new(scope, untyped_symbol),
             AstNodeId::from_raw(101),
-            LocalBindingKind::Val,
+            LocalBindingKind::Immutable,
         ),
     ];
     let signatures = [
@@ -1741,7 +1742,7 @@ fn m0019_refinement_aware_assignment_accepts_valid_refined_value() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(343)),
         AstNodeId::from_raw(344),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let resolved = [
         ResolvedLocalBinding::new(inside_value, binding.clone()),
@@ -1962,7 +1963,7 @@ fn m0019_refinement_aware_assignment_ignores_inconsistent_refined_views() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(365)),
         AstNodeId::from_raw(366),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let resolved = [
         ResolvedLocalBinding::new(first_value, binding.clone()),
@@ -2038,7 +2039,7 @@ fn m0019_refinement_aware_assignment_rejects_duplicate_refined_views() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(373)),
         AstNodeId::from_raw(374),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let resolved = [ResolvedLocalBinding::new(value, binding.clone())];
     let statement = AstNodeId::from_raw(375);
@@ -2108,7 +2109,7 @@ fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(381)),
         AstNodeId::from_raw(382),
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     );
     let resolved = [ResolvedLocalBinding::new(value, binding.clone())];
     let target = AstNodeId::from_raw(383);
@@ -2259,7 +2260,7 @@ fn accepted_expression_composition_reports_unknown_resolved_name_types() {
 fn accepted_local_initializer_checks_names_and_grouped_names() {
     let parsed = parse_source(
         SourceFileId::from_raw(83),
-        "fun run() { val source: Int = 1; val copy: Int = source; val grouped: Int = (source); }",
+        "fun run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (source); }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -2301,7 +2302,7 @@ fn accepted_local_initializer_checks_names_and_grouped_names() {
 fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers() {
     let parsed = parse_source(
         SourceFileId::from_raw(84),
-        "fun run() { val source: Int = 1; val bad: String = source; val unknown: UserId = source; val skipped: Int = missing; }",
+        "fun run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const skipped: Int = missing; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -2359,7 +2360,7 @@ fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers()
 fn m0018_core_types_well_typed_accepted_fixture() {
     let parsed = parse_source(
         SourceFileId::from_raw(88),
-        "fun run() { val source: Int = 1; val copy: Int = source; val grouped: Int = (copy); var next: Int = grouped; next = source; }",
+        "fun run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (copy); var next: Int = grouped; next = source; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -2383,17 +2384,17 @@ fn m0018_core_types_well_typed_accepted_fixture() {
         LocalBinding::new(
             LocalBindingKey::new(LocalScopeId::from_raw(0), source_symbol),
             parsed.local_declarations[0].declaration,
-            LocalBindingKind::Val,
+            LocalBindingKind::Immutable,
         ),
         LocalBinding::new(
             LocalBindingKey::new(LocalScopeId::from_raw(0), copy_symbol),
             parsed.local_declarations[1].declaration,
-            LocalBindingKind::Val,
+            LocalBindingKind::Immutable,
         ),
         LocalBinding::new(
             LocalBindingKey::new(LocalScopeId::from_raw(0), grouped_symbol),
             parsed.local_declarations[2].declaration,
-            LocalBindingKind::Val,
+            LocalBindingKind::Immutable,
         ),
         LocalBinding::new(
             LocalBindingKey::new(LocalScopeId::from_raw(0), next_symbol),
@@ -2432,7 +2433,7 @@ fn m0018_core_types_well_typed_accepted_fixture() {
 fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
     let parsed = parse_source(
         SourceFileId::from_raw(89),
-        "fun run() { val source: Int = 1; val bad: String = source; val unknown: UserId = source; val missingKnown: Int = external; logger.info(source); }",
+        "fun run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const missingKnown: Int = external; logger.info(source); }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -2453,7 +2454,7 @@ fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
     let bindings = [LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(0), source_symbol),
         parsed.local_declarations[0].declaration,
-        LocalBindingKind::Val,
+        LocalBindingKind::Immutable,
     )];
 
     let (_arena, report) = type_m0018_core(

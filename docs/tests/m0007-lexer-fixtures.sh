@@ -59,7 +59,7 @@ require_text tests/fixtures/lexer/identifiers.fixture.toml 'source_text = "alpha
 require_text tests/fixtures/lexer/identifiers.fixture.toml 'diagnostic = "unsupported_identifier_character"'
 require_text tests/fixtures/lexer/literals.fixture.toml 'source_text = "0 42 0b1010 0x2A 1_000"'
 require_text tests/fixtures/lexer/literals.fixture.toml 'Integer literal overflow is semantic, not lexical'
-require_text tests/fixtures/lexer/comments.fixture.toml 'source_text = "/\* outer /\* inner \*/ done \*/ val"'
+require_text tests/fixtures/lexer/comments.fixture.toml 'source_text = "/\* outer /\* inner \*/ done \*/ const"'
 require_text tests/fixtures/lexer/operators-delimiters.fixture.toml 'expected_tokens = \["PLUS_PLUS", "MINUS_MINUS"'
 require_text tests/fixtures/lexer/errors.fixture.toml 'unterminated_block_comment'
 require_text tests/fixtures/lexer/errors.fixture.toml 'invalid_string_escape'
