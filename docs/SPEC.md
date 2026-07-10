@@ -122,6 +122,10 @@ comments, and an explicit operator and delimiter set. Unicode identifiers,
 string interpolation, raw strings, character literals, and numeric suffixes are
 deferred until future accepted ADRs or spec updates.
 
+As superseded by ADR-0029, the fixed reserved keyword set reserves `const` and
+does not reserve `val`. Under ADR-0021's exact-match identifier rule, `val`
+lexes as an ordinary identifier.
+
 ## ADR-0022: Declaration Syntax
 
 The language uses a small Kotlin-like custom declaration grammar for the
@@ -150,14 +154,19 @@ suspension markers, expression syntax, statement syntax, or pattern syntax.
 
 The language uses a small Kotlin-like custom body grammar for the bootstrap
 compiler. The accepted body syntax covers block bodies, explicit semicolon
-statement separators, local `val` and `var` declaration statements, assignment
-statements, return statements, expression statements, expression grammar,
-operator precedence and associativity, call syntax, member access, grouped
-expressions, `if` expressions, and pattern grammar for wildcards, literals,
-bindings, qualified cases, and grouped patterns.
+statement separators, local `const` and `var` declaration statements,
+assignment statements, return statements, expression statements, expression
+grammar, operator precedence and associativity, call syntax, member access,
+grouped expressions, `if` expressions, and pattern grammar for wildcards,
+literals, bindings, qualified cases, and grouped patterns.
 
 ADR-0024 defines parser recovery boundaries and parser diagnostic obligations
 for expression grammar, statement grammar, block grammar, and pattern grammar.
+As superseded by ADR-0029, `const` is the immutable-local statement starter and
+controls directly spelling-dependent parser dispatch and recovery. `val` is an
+ordinary identifier, including as the binding name after `const` or `var`, and
+old declaration-introducer use receives only ordinary parser diagnostics and
+recovery.
 Unsafe block syntax, coroutine syntax, match or `when` syntax, loops,
 `break` and `continue`, indexing, lambdas, destructuring declarations, labels,
 error propagation syntax, and advanced pattern forms remain deferred.
@@ -193,7 +202,12 @@ unsupported visibility categories, and duplicate visibility metadata.
 
 M0016 resolves a bootstrap subset using local lexical scope plus same-module package top-level declarations. Included name references are simple identifier expressions, package-qualified name expressions, and type name nodes in accepted declaration, local binding, or explicit annotation positions.
 
-Function declaration names, type declaration names, local `val` statements, and local `var` statements introduce names. Function parameters, pattern bindings, import aliases, member declarations, and fields remain excluded from M0016 name binding.
+Function declaration names, type declaration names, local `const` statements,
+and local `var` statements introduce names. Function parameters, pattern
+bindings, import aliases, member declarations, and fields remain excluded from
+M0016 name binding. ADR-0029 changes only the immutable-local binding-position
+spelling; binding identity, scope, declaration order, lookup, shadowing,
+duplicate, and ambiguity rules remain unchanged.
 
 Declaration bodies and block expressions introduce lexical scopes. Top-level declarations in the same module and package namespace are visible throughout that module/package namespace regardless of source-file order. Local bindings are not visible before their declaration statement and remain visible through the end of their containing lexical block unless shadowed.
 
@@ -232,3 +246,24 @@ Refined output remains side-table metadata. Declaration signatures and original 
 M0019 diagnoses nullable use where a nullable expression is required to be non-null without an active refinement. Flow diagnostics include `invalid_nullable_use`, `invalidated_refinement`, `unsupported_flow_rule`, and `ambiguous_flow_rule`.
 
 Member nullable access, safe-call operators, force unwrap operators, boolean-combination refinement, negated-condition refinement, patterns, type-test smart casts, parameter refinements, top-level declaration refinements, mutable binding refinements, exclusive-borrow refinements, alias analysis, function call effects, member mutation effects, coroutine suspension effects, unsafe and FFI nullability, generic nullable constraints, HIR, MIR, and backend behavior remain deferred.
+
+## ADR-0029: Immutable Local `const` Keyword
+
+The immutable-local declaration introducer is `const`, replacing `val` as a
+hard lexical and grammar change. A valid local `const` maps to the existing
+immutable-local semantic category and follows the initializer rules already
+applicable to that category. The spelling has no compile-time-constant,
+evaluator, storage, copyability, ownership, destruction, borrow, lifetime,
+send/share, type-position, or layout meaning.
+
+`val` is not reserved and lexes as an ordinary identifier. It is excluded only
+from the immutable-local declaration-introducer position and remains valid in
+ordinary identifier positions, including as the binding name in
+`const val: Int = 1;` and `var val = 1;`. Removed declaration-introducer use has
+no alias or special legacy diagnostic and receives only ordinary parser
+diagnostics and recovery.
+
+Reserving the formerly ordinary identifier `const` is source-breaking for old
+uses of that spelling as an identifier. Any future rule that gives local
+`const` compile-time meaning must explicitly supersede ADR-0029; a separate
+compile-time-evaluation feature does not reinterpret it implicitly.

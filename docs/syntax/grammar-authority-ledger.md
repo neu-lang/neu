@@ -16,7 +16,7 @@ This ledger records whether planned parser syntax has accepted grammar authority
 
 | Construct | Classification | Authority | Owner | Blocking milestone | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Token spellings | specified | ADR-0021 | Chief Architect | none | Lexer token spellings are accepted, but parser grammar is not. |
+| Token spellings | specified | ADR-0021, ADR-0029 | Chief Architect | none | Lexer token spellings are accepted, but parser grammar is not; ADR-0029 replaces reserved `val` with reserved `const`. |
 | Package declaration | specified | ADR-0022 | Chief Architect | none | Source-file position and qualified-name syntax are specified. |
 | Import declaration | specified | ADR-0022 | Chief Architect | none | Import position, qualified-name syntax, and alias syntax are specified; wildcard and grouped imports are deferred. |
 | Visibility modifier syntax | specified | ADR-0022 | Chief Architect | none | `public`, `private`, and `internal` placement is specified for declarations covered by ADR-0022. |
@@ -31,30 +31,30 @@ This ledger records whether planned parser syntax has accepted grammar authority
 | Nullable type syntax | specified | ADR-0023 | Chief Architect | none | Nullable markers are postfix and bind to the immediately preceding primary type. |
 | Function type syntax | specified | ADR-0023 | Chief Architect | none | Parenthesized function type parameters followed by `->` and return type are specified. |
 | Expression grammar | specified | ADR-0024 | Chief Architect | none | Expression entry points, precedence, associativity, calls, member access, grouped expressions, and `if` expressions are specified. |
-| Statement grammar | specified | ADR-0024 | Chief Architect | none | Local declarations, assignments, returns, expression statements, blocks, and semicolon separators are specified. |
+| Statement grammar | specified | ADR-0024, ADR-0029 | Chief Architect | none | `const` is the immutable-local introducer; `var` and the remaining statement grammar are unchanged. |
 | Pattern grammar | specified | ADR-0024 | Chief Architect | none | Wildcard, literal, binding, qualified-case, and grouped pattern syntax is specified. |
 | Coroutine syntax | deferred | ADR-0024 | Chief Architect | future | Coroutine syntax is explicitly deferred. |
 | Unsafe block syntax | deferred | ADR-0024 | Chief Architect | future | Unsafe block syntax is explicitly deferred. |
 | Macro syntax | deferred | ADR-0019 | Chief Architect | future | Macros are deferred. |
-| Compile-time evaluation syntax | deferred | ADR-0019 | Language Designer | future | Bounded compile-time evaluation exists semantically but is outside M0011-M0013 parser scope. |
+| Compile-time evaluation syntax | deferred | ADR-0019, ADR-0029 | Language Designer | future | Bounded compile-time evaluation exists semantically but is outside M0011-M0013 parser scope; local `const` is not compile-time-evaluation syntax and gains no such semantics from ADR-0029. |
 
 ## Parser Unblock List
 
 Only token-consuming parser infrastructure may proceed before syntax ADRs. This includes parser input streams, cursor mechanics, delimiter balancing helpers, and diagnostic recovery scaffolding that does not accept or reject concrete language constructs.
 
-Concrete parser fixtures may use ADR-0021 token spellings only when the expected behavior is token-stream handling rather than declaration, type, expression, statement, or pattern grammar.
+Concrete parser fixtures may use ADR-0021 token spellings as superseded by ADR-0029 only when the expected behavior is token-stream handling rather than declaration, type, expression, statement, or pattern grammar.
 
 M0011 declaration parser may proceed only for ADR-0022 constructs. Type placeholders, function body placeholders, deferred declaration forms, and all later parser milestones must continue to follow their own authority rows.
 
 M0012 type and generic parser may proceed only for ADR-0023 constructs. Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain blocked until accepted source of truth defines them.
 
-M0013 expression, statement, and pattern parser may proceed only for ADR-0024 constructs. Coroutine syntax, unsafe block syntax, loops, match or `when`, and other ADR-0024 deferrals remain blocked until future accepted source of truth defines them.
+M0013 expression, statement, and pattern parser may proceed only for ADR-0024 constructs as superseded by ADR-0029 for the immutable-local statement introducer and directly spelling-dependent dispatch and recovery. Coroutine syntax, unsafe block syntax, loops, match or `when`, and other ADR-0024 deferrals remain blocked until future accepted source of truth defines them.
 
 ## Parser Block List
 
 - M0011 declaration parser is unblocked only for ADR-0022 declaration syntax.
 - M0012 type and generic syntax parser is unblocked only for ADR-0023 type and generic syntax.
-- M0013 expression, statement, and pattern parser is unblocked only for ADR-0024 body syntax.
+- M0013 expression, statement, and pattern parser is unblocked only for ADR-0024 body syntax as superseded by ADR-0029 for immutable-local statement syntax.
 
 ## Required Ambiguity Reports
 
