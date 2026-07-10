@@ -5,11 +5,12 @@ use newlang::name_resolution::{
     bind_package_qualified_type_references, bind_unqualified_function_references,
     bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
     build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
-    build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
-    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
-    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
-    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
-    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    build_scoped_local_binding_index, resolve_enum_parameter_types, DeclarationIndex,
+    DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName, LocalBinding,
+    LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup,
+    LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
+    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
+    TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -46,6 +47,59 @@ fn m0021_function_parameter_binding_uses_owning_body_scope() {
         built.index().bindings()[0].key().scope(),
         scopes.scopes()[0].id()
     );
+}
+
+#[test]
+fn m0021_enum_parameter_type_identity_records_same_package_enum() {
+    let file = SourceFileId::from_raw(803);
+    let parsed = parse_source(
+        file,
+        "enum Signal { Red } fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+    let metadata = ModuleMetadata::with_packages(
+        ModuleName::parse("demo.app").unwrap(),
+        [(file, PackageNamespace::parse("demo.pkg").unwrap())],
+    )
+    .unwrap();
+    let mut interner = SymbolInterner::new();
+
+    let resolved = resolve_enum_parameter_types(
+        &parsed.arena,
+        &metadata,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+
+    assert_eq!(resolved.records().len(), 1);
+    assert_eq!(
+        resolved.records()[0].parameter(),
+        parsed.function_parameters[0].parameter
+    );
+    assert_eq!(
+        resolved.records()[0].enum_declaration(),
+        parsed.declaration_names[0].declaration
+    );
+
+    let non_enum = parse_source(
+        SourceFileId::from_raw(804),
+        "struct Signal {} fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+    let non_enum_metadata = ModuleMetadata::new(
+        ModuleName::parse("demo.app").unwrap(),
+        [SourceFileId::from_raw(804)],
+    )
+    .unwrap();
+    let non_enum = resolve_enum_parameter_types(
+        &non_enum.arena,
+        &non_enum_metadata,
+        &non_enum.function_parameters,
+        &non_enum.type_name_references,
+        &non_enum.declaration_names,
+        &mut interner,
+    );
+    assert!(non_enum.records().is_empty());
 }
 
 #[test]

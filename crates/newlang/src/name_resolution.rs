@@ -114,6 +114,82 @@ pub fn build_enum_variant_index(
     index
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EnumParameterTypeRecord {
+    parameter: AstNodeId,
+    enum_declaration: AstNodeId,
+}
+
+impl EnumParameterTypeRecord {
+    pub fn parameter(&self) -> AstNodeId {
+        self.parameter
+    }
+
+    pub fn enum_declaration(&self) -> AstNodeId {
+        self.enum_declaration
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct EnumParameterTypeResolution {
+    records: Vec<EnumParameterTypeRecord>,
+}
+
+impl EnumParameterTypeResolution {
+    pub fn records(&self) -> &[EnumParameterTypeRecord] {
+        &self.records
+    }
+}
+
+pub fn resolve_enum_parameter_types(
+    arena: &AstArena,
+    metadata: &ModuleMetadata,
+    parameters: &[ParsedFunctionParameter],
+    type_references: &[ParsedTypeNameReference],
+    declarations: &[ParsedDeclarationName],
+    interner: &mut SymbolInterner,
+) -> EnumParameterTypeResolution {
+    let mut resolution = EnumParameterTypeResolution::default();
+
+    for parameter in parameters {
+        let Some(annotation) = type_references
+            .iter()
+            .find(|reference| reference.reference == parameter.annotation)
+        else {
+            continue;
+        };
+        let annotation_package = package_for_file(metadata, annotation.name_span.file());
+        let annotation_name = interner.intern(&annotation.name);
+        let enum_declaration = declarations.iter().find(|declaration| {
+            package_for_file(metadata, declaration.name_span.file()) == annotation_package
+                && interner.intern(&declaration.name) == annotation_name
+                && arena
+                    .node(declaration.declaration)
+                    .is_some_and(|node| node.kind == AstNodeKind::EnumDeclaration)
+        });
+        if let Some(enum_declaration) = enum_declaration {
+            resolution.records.push(EnumParameterTypeRecord {
+                parameter: parameter.parameter,
+                enum_declaration: enum_declaration.declaration,
+            });
+        }
+    }
+
+    resolution
+}
+
+fn package_for_file(
+    metadata: &ModuleMetadata,
+    file: crate::source::SourceFileId,
+) -> PackageNamespace {
+    metadata
+        .packages()
+        .iter()
+        .find(|package| package.source_file() == file)
+        .map(|package| package.namespace().clone())
+        .unwrap_or_else(PackageNamespace::root)
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DeclarationKey {
     module: ModuleName,
