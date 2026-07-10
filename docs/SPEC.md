@@ -302,3 +302,22 @@ subject shapes, unresolved types, and non-enum types report
 visible throughout their function body; general parameter typing, enum value
 expressions, constructors, member lookup, nullable/generic parameters, calls,
 and cross-module lookup remain deferred.
+
+## ADR-0035: Bootstrap Ownership And Move Analysis
+
+M0022 classifies `Bool`, `Int`, `Unit`, and `Null` as copyable primitive
+identities, `String` as move-only, and all current-module user-defined nominal
+identities, including bootstrap enums, as move-only. Explicitly copyable
+user-defined types remain deferred.
+
+Only a local `const` or `var` initializer, or an assignment statement, whose
+value is a bare resolved local name of move-only type is an M0022 ownership
+transfer site. A later bare local-name expression using that moved binding
+reports `use_after_move` on the later use with the transfer expression as the
+move-origin secondary span. Copyable values do not enter the moved state.
+
+M0022 records ownership facts in side tables and does not rewrite the AST or
+lower to HIR. Calls, returns, captures, `when` subject evaluation, branch move
+joins, destructuring, member or partial moves, destructors, borrowing,
+coroutine frames, FFI, layout, cloning, generic copyability, and user-declared
+copy remain deferred.

@@ -35,12 +35,12 @@ user-defined type rule.
 
 ## Required Resolution
 
-An accepted ADR or spec revision must define a bootstrap ownership subset
-before implementation can proceed. At minimum it must identify the supported
-copyable primitive scalar types, the supported move-only user-defined value
-forms, which expression/statement contexts perform a move, and the required
-diagnostic names and primary/secondary locations for use-after-move.
+ADR-0035 is accepted and defines the M0022 bootstrap ownership subset,
+including copyable and move-only value categories, local-name initializer and
+assignment transfer sites, and `use_after_move` diagnostics. Implementation
+may proceed against ADR-0035.
 
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=blocker-recorded result=blocked evidence=ADR-0005 selects primitive-copy/user-move direction but does not define a testable bootstrap value-category catalog or diagnostics. handoff=Language-Designer
+- 2026-07-11 agent=Main phase=resolution-accepted result=pass evidence=user accepted ADR-0035; accepted ADR and SPEC updated. handoff=Task-Decomposer

@@ -7,7 +7,7 @@
 - Related Milestone: `M0022`
 - Filed By: `main task`
 - Date: `2026-07-11`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
@@ -78,12 +78,12 @@ Missing rules:
 
 ## Recommended Resolution Path
 
-- [ ] main-task language review determines whether existing text resolves it.
-- [ ] main-task semantic design drafts ADR or spec revision if new semantics are required.
-- [ ] main-task adversarial check reviews soundness risk.
-- [ ] main-task diagnostics check reviews diagnostic consequences.
-- [ ] main-task simplicity check reviews complexity.
-- [ ] main task approves final resolution.
+- [x] main-task language review determines whether existing text resolves it.
+- [x] main-task semantic design drafts ADR or spec revision if new semantics are required.
+- [x] main-task adversarial check reviews soundness risk.
+- [x] main-task diagnostics check reviews diagnostic consequences.
+- [x] main-task simplicity check reviews complexity.
+- [x] main task approves final resolution.
 
 ## Temporary Rule
 
@@ -93,8 +93,13 @@ source of truth defines a bootstrap value-category and move-site subset.
 ## Resolution
 
 - Decision:
-  - pending
+  - ADR-0035 accepted. M0022 has a bootstrap ownership and move-analysis
+    subset with copyable `Bool`, `Int`, `Unit`, and `Null`, move-only
+    `String`, move-only current-module nominal identities, local-name
+    initializer and assignment transfer sites, and `use_after_move`
+    diagnostics.
 - Source of truth updated:
-  - pending
+  - `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - pending
+  - `2026-07-11`
