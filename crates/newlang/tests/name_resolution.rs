@@ -1,21 +1,36 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    analyze_duplicate_enum_variants, analyze_when_subjects, bind_accepted_name_references,
-    bind_local_name_references, bind_package_qualified_type_references,
-    bind_unqualified_function_references, bind_unqualified_type_references,
-    build_declaration_index, build_enum_variant_index, build_function_parameter_binding_index,
-    build_local_binding_index, build_local_scope_tree, build_scoped_binding_index,
-    build_scoped_local_binding_index, resolve_enum_parameter_types, resolve_qualified_variant_arms,
-    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
-    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
-    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
-    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
-    TopLevelLookupResult,
+    analyze_duplicate_enum_variants, analyze_duplicate_match_arms, analyze_when_subjects,
+    bind_accepted_name_references, bind_local_name_references,
+    bind_package_qualified_type_references, bind_unqualified_function_references,
+    bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
+    build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
+    build_scoped_binding_index, build_scoped_local_binding_index, resolve_enum_parameter_types,
+    resolve_qualified_variant_arms, DeclarationIndex, DeclarationInsert, DeclarationKey,
+    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
+    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
+    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
 use newlang::symbol::{SymbolId, SymbolInterner};
+
+#[test]
+fn m0021_duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
+    let diagnostics = analyze_duplicate_match_arms(
+        &[AstNodeId::from_raw(1), AstNodeId::from_raw(1)],
+        &[
+            (AstNodeId::from_raw(10), true),
+            (AstNodeId::from_raw(11), true),
+        ],
+    );
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0].node(), AstNodeId::from_raw(1));
+    assert_eq!(diagnostics[1].node(), AstNodeId::from_raw(11));
+}
 
 #[test]
 fn m0021_duplicate_enum_variant_diagnoses_only_same_enum_repeat() {

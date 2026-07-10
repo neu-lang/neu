@@ -141,6 +141,8 @@ pub enum MatchDiagnosticKind {
     InvalidMatchSubject,
     UnknownMatchVariant,
     DuplicateEnumVariant,
+    DuplicateMatchVariant,
+    DuplicateMatchWildcard,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -219,6 +221,35 @@ pub fn analyze_duplicate_enum_variants(
             Entry::Vacant(entry) => {
                 entry.insert(variant.variant);
             }
+        }
+    }
+    diagnostics
+}
+
+pub fn analyze_duplicate_match_arms(
+    variants: &[AstNodeId],
+    wildcards: &[(AstNodeId, bool)],
+) -> Vec<MatchDiagnostic> {
+    let mut seen_variants = HashMap::new();
+    let mut seen_wildcard = false;
+    let mut diagnostics = Vec::new();
+    for variant in variants {
+        match seen_variants.entry(*variant) {
+            Entry::Occupied(_) => diagnostics.push(MatchDiagnostic {
+                kind: MatchDiagnosticKind::DuplicateMatchVariant,
+                node: *variant,
+            }),
+            Entry::Vacant(entry) => {
+                entry.insert(());
+            }
+        }
+    }
+    for (pattern, is_wildcard) in wildcards {
+        if *is_wildcard && std::mem::replace(&mut seen_wildcard, true) {
+            diagnostics.push(MatchDiagnostic {
+                kind: MatchDiagnosticKind::DuplicateMatchWildcard,
+                node: *pattern,
+            });
         }
     }
     diagnostics
