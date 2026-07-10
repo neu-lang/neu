@@ -67,6 +67,118 @@ The draft direction is:
 - Omitted visibility defaults remain a required accepted decision before implementation.
 - Imports do not create module dependencies by themselves until name resolution defines dependency lookup.
 
+## Concrete Draft Model
+
+This concrete model is a draft only and is not accepted source of truth.
+
+### Module Identity
+
+```text
+module-name = identifier (`.` identifier)*
+```
+
+For the bootstrap compiler, a module is identified by an explicit module name supplied by the compiler invocation or test harness.
+
+The module name uses ADR-0021 identifier spelling and dot separators. Empty module names, leading dots, trailing dots, repeated dots, and non-identifier segments are malformed.
+
+The deterministic module ID for tests is the exact module name string after lexical validation. No host path, source root path, current directory, output path, or package name participates in module identity.
+
+Host paths are not module identity.
+
+host paths are not module identity.
+
+### Source File Assignment
+
+Each parsed source file belongs to exactly one module for one compilation.
+
+The bootstrap frontend receives source files as an ordered set paired with one explicit module name. All files in that set belong to the same module.
+
+A source file cannot belong to multiple modules in one frontend invocation.
+
+### Package Namespace Model
+
+Packages are namespaces inside a module.
+
+The package namespace path is the qualified name from ADR-0022 package declarations.
+
+If a file omits a package declaration, it belongs to the root package for its module.
+
+The root package is represented as the empty package path.
+
+Multiple files in one module may declare the same package namespace. Their top-level declarations share that package namespace for later name resolution.
+
+The same package namespace may appear in multiple modules. Later name resolution distinguishes those declarations by module identity.
+
+Imports are syntax only for M0014 and do not define module dependencies.
+
+### Visibility Categories
+
+The bootstrap visibility categories are:
+
+- `public`
+- `internal`
+- `private`
+
+Default visibility is `internal`.
+
+The default visibility is `internal`.
+
+`public` means visible to other modules, subject to later dependency and name resolution rules.
+
+`internal` means visible within the same module.
+
+`private` means visible only within the declaring source file.
+
+Visibility attaches to top-level declarations and member declarations that syntactically accept ADR-0022 visibility modifiers. Package declarations and import declarations do not have visibility metadata.
+
+### Visibility Metadata
+
+```text
+visibility-metadata = explicit-visibility | default-visibility
+explicit-visibility = `public` | `internal` | `private`
+default-visibility = `internal`
+```
+
+Each declaration has exactly one effective visibility category.
+
+If the declaration has an explicit ADR-0022 visibility modifier, metadata records that category and marks it explicit.
+
+If the declaration omits visibility, metadata records `internal` and marks it defaulted.
+
+Duplicate visibility modifiers are parser diagnostics from ADR-0022; M0014 metadata receives only the parser-accepted effective visibility if parsing succeeds.
+
+### Module Metadata Record
+
+The bootstrap module metadata record contains:
+
+- module name
+- ordered source file identities from the source database
+- package namespace for each source file
+- effective visibility metadata for declarations that have parsed visibility scope
+
+The draft record does not contain:
+
+- module dependencies
+- target triples
+- package manager metadata
+- manifest paths
+- artifact hashes
+- resolved symbols
+- imported names
+
+### Required Diagnostics
+
+| Diagnostic | Primary span or external input location | Recovery action | Safe suggestion |
+| --- | --- | --- | --- |
+| `missing_module_identity` | compiler invocation module-name input | reject module metadata construction | provide an explicit module name |
+| `invalid_module_identity` | invalid module-name input segment | reject module metadata construction | use dot-separated identifiers |
+| `ambiguous_source_module_assignment` | source file identity or invocation input | reject conflicting assignment | assign each source file to one module |
+| `invalid_package_namespace` | package qualified-name span | use root package for recovery metadata only | fix package qualified name |
+| `unsupported_visibility_category` | unsupported modifier span | ignore unsupported modifier for metadata | use `public`, `internal`, or `private` |
+| `duplicate_visibility_metadata` | second visibility modifier span | use first valid visibility for recovery metadata | remove duplicate visibility modifier |
+
+Each accepted diagnostic must cite ADR-0015, ADR-0017, ADR-0022, and ADR-0025 if accepted.
+
 ## Required Accepted Content
 
 Before implementation, the accepted source of truth must define:
@@ -105,7 +217,7 @@ The accepted version must define diagnostics for:
 
 Each diagnostic must define a primary span or external input location, recovery action, source-of-truth citation, and safe suggestion policy.
 
-## Explicit Draft Deferrals
+### Explicit Draft Deferrals
 
 This draft does not define:
 
