@@ -63,7 +63,7 @@ require_text "$spec" 'Modules are explicit compilation and visibility units'
 require_text "$milestone" 'M0014'
 require_text "$milestone" '\[x\] Module, package, and visibility source of truth is accepted'
 require_text "$milestone" '\[x\] Module identity exists'
-require_text "$milestone" '\[ \] Visibility metadata is represented'
+require_text "$milestone" '\[x\] Visibility metadata is represented'
 require_text "$milestone" '\[x\] Unspecified visibility rules are recorded'
 
 require_absent_path crates/newlang/src/modules.rs

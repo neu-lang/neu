@@ -1,4 +1,8 @@
-use newlang::module::{ModuleDiagnosticKind, ModuleMetadata, ModuleName, PackageNamespace};
+use newlang::ast::{AstNodeId, AstNodeKind};
+use newlang::module::{
+    DeclarationVisibility, ModuleDiagnosticKind, ModuleMetadata, ModuleName, PackageNamespace,
+    VisibilityCategory, VisibilityOrigin,
+};
 use newlang::source::{SourceDatabase, SourceFileId};
 
 #[test]
@@ -139,4 +143,83 @@ fn package_namespace_does_not_change_module_identity() {
         root_metadata.packages()[0].namespace(),
         nested_metadata.packages()[0].namespace()
     );
+}
+
+#[test]
+fn visibility_metadata_represents_explicit_categories() {
+    let public = DeclarationVisibility::explicit(
+        AstNodeId::from_raw(10),
+        AstNodeKind::FunctionDeclaration,
+        VisibilityCategory::Public,
+    )
+    .unwrap();
+    let internal = DeclarationVisibility::explicit(
+        AstNodeId::from_raw(11),
+        AstNodeKind::StructDeclaration,
+        VisibilityCategory::Internal,
+    )
+    .unwrap();
+    let private = DeclarationVisibility::explicit(
+        AstNodeId::from_raw(12),
+        AstNodeKind::InterfaceDeclaration,
+        VisibilityCategory::Private,
+    )
+    .unwrap();
+
+    assert_eq!(public.category(), VisibilityCategory::Public);
+    assert_eq!(internal.category(), VisibilityCategory::Internal);
+    assert_eq!(private.category(), VisibilityCategory::Private);
+    assert_eq!(public.origin(), VisibilityOrigin::Explicit);
+}
+
+#[test]
+fn default_visibility_is_internal_and_defaulted() {
+    let visibility = DeclarationVisibility::default_internal(
+        AstNodeId::from_raw(13),
+        AstNodeKind::EnumDeclaration,
+    )
+    .unwrap();
+
+    assert_eq!(visibility.category(), VisibilityCategory::Internal);
+    assert_eq!(visibility.origin(), VisibilityOrigin::Defaulted);
+}
+
+#[test]
+fn module_metadata_preserves_declaration_visibility_records() {
+    let declaration = AstNodeId::from_raw(21);
+    let visibility = DeclarationVisibility::explicit(
+        declaration,
+        AstNodeKind::FunctionDeclaration,
+        VisibilityCategory::Private,
+    )
+    .unwrap();
+
+    let metadata = ModuleMetadata::with_packages_and_visibility(
+        ModuleName::parse("demo").unwrap(),
+        [(SourceFileId::from_raw(0), PackageNamespace::root())],
+        [visibility.clone()],
+    )
+    .unwrap();
+
+    assert_eq!(metadata.visibility(), [visibility]);
+    assert_eq!(metadata.visibility()[0].declaration(), declaration);
+}
+
+#[test]
+fn visibility_metadata_does_not_attach_to_package_or_import_nodes() {
+    for kind in [
+        AstNodeKind::PackageDeclaration,
+        AstNodeKind::ImportDeclaration,
+    ] {
+        assert_eq!(
+            DeclarationVisibility::explicit(
+                AstNodeId::from_raw(30),
+                kind,
+                VisibilityCategory::Public,
+            )
+            .unwrap_err()
+            .kind,
+            ModuleDiagnosticKind::UnsupportedVisibilityCategory
+        );
+    }
 }

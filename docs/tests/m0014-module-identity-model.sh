@@ -62,7 +62,7 @@ require_text "$module_tests" 'module_identity_does_not_depend_on_source_file_pat
 
 require_text "$task" 'Status: `complete`'
 require_text "$milestone" '\[x\] Module identity exists'
-require_text "$milestone" '\[ \] Visibility metadata is represented'
+require_text "$milestone" '\[x\] Visibility metadata is represented'
 
 require_absent_text "$module_src" 'Manifest|TargetTriple|Dependency|PackageManager|NameResolution|SymbolTable|SourceRoot|OutputPath|CurrentDirectory'
 require_absent_text "$module_src" 'std::path|PathBuf|Path'

@@ -1,3 +1,4 @@
+use crate::ast::{AstNodeId, AstNodeKind};
 use crate::source::SourceFileId;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -76,11 +77,90 @@ impl SourceFilePackage {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VisibilityCategory {
+    Public,
+    Internal,
+    Private,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VisibilityOrigin {
+    Explicit,
+    Defaulted,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeclarationVisibility {
+    declaration: AstNodeId,
+    category: VisibilityCategory,
+    origin: VisibilityOrigin,
+}
+
+impl DeclarationVisibility {
+    pub fn explicit(
+        declaration: AstNodeId,
+        declaration_kind: AstNodeKind,
+        category: VisibilityCategory,
+    ) -> Result<Self, ModuleDiagnostic> {
+        Self::new(
+            declaration,
+            declaration_kind,
+            category,
+            VisibilityOrigin::Explicit,
+        )
+    }
+
+    pub fn default_internal(
+        declaration: AstNodeId,
+        declaration_kind: AstNodeKind,
+    ) -> Result<Self, ModuleDiagnostic> {
+        Self::new(
+            declaration,
+            declaration_kind,
+            VisibilityCategory::Internal,
+            VisibilityOrigin::Defaulted,
+        )
+    }
+
+    pub fn declaration(&self) -> AstNodeId {
+        self.declaration
+    }
+
+    pub fn category(&self) -> VisibilityCategory {
+        self.category
+    }
+
+    pub fn origin(&self) -> VisibilityOrigin {
+        self.origin
+    }
+
+    fn new(
+        declaration: AstNodeId,
+        declaration_kind: AstNodeKind,
+        category: VisibilityCategory,
+        origin: VisibilityOrigin,
+    ) -> Result<Self, ModuleDiagnostic> {
+        if accepts_visibility(declaration_kind) {
+            Ok(Self {
+                declaration,
+                category,
+                origin,
+            })
+        } else {
+            Err(ModuleDiagnostic::new(
+                ModuleDiagnosticKind::UnsupportedVisibilityCategory,
+            ))
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleMetadata {
     name: ModuleName,
     source_files: Vec<SourceFileId>,
     packages: Vec<SourceFilePackage>,
+    visibility: Vec<DeclarationVisibility>,
 }
 
 impl ModuleMetadata {
@@ -101,6 +181,7 @@ impl ModuleMetadata {
             name,
             source_files,
             packages,
+            visibility: Vec::new(),
         })
     }
 
@@ -120,6 +201,28 @@ impl ModuleMetadata {
             name,
             source_files,
             packages,
+            visibility: Vec::new(),
+        })
+    }
+
+    pub fn with_packages_and_visibility(
+        name: ModuleName,
+        packages: impl IntoIterator<Item = (SourceFileId, PackageNamespace)>,
+        visibility: impl IntoIterator<Item = DeclarationVisibility>,
+    ) -> Result<Self, ModuleDiagnostic> {
+        let packages: Vec<_> = packages
+            .into_iter()
+            .map(|(source_file, namespace)| SourceFilePackage {
+                source_file,
+                namespace,
+            })
+            .collect();
+        let source_files = packages.iter().map(|package| package.source_file).collect();
+        Ok(Self {
+            name,
+            source_files,
+            packages,
+            visibility: visibility.into_iter().collect(),
         })
     }
 
@@ -137,6 +240,10 @@ impl ModuleMetadata {
 
     pub fn packages(&self) -> &[SourceFilePackage] {
         &self.packages
+    }
+
+    pub fn visibility(&self) -> &[DeclarationVisibility] {
+        &self.visibility
     }
 }
 
@@ -157,6 +264,18 @@ pub enum ModuleDiagnosticKind {
     InvalidModuleIdentity,
     AmbiguousSourceModuleAssignment,
     InvalidPackageNamespace,
+    UnsupportedVisibilityCategory,
+    DuplicateVisibilityMetadata,
+}
+
+fn accepts_visibility(kind: AstNodeKind) -> bool {
+    matches!(
+        kind,
+        AstNodeKind::FunctionDeclaration
+            | AstNodeKind::StructDeclaration
+            | AstNodeKind::EnumDeclaration
+            | AstNodeKind::InterfaceDeclaration
+    )
 }
 
 fn is_identifier_segment(segment: &str) -> bool {

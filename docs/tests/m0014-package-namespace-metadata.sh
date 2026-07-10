@@ -56,7 +56,7 @@ require_text "$module_tests" 'package_namespace_does_not_change_module_identity'
 
 require_text "$task" 'Status: `complete`'
 require_text "$milestone" '\[x\] Package namespace metadata is represented'
-require_text "$milestone" '\[ \] Visibility metadata is represented'
+require_text "$milestone" '\[x\] Visibility metadata is represented'
 
 require_absent_text "$module_src" 'PackageManager|Manifest|TargetTriple|Dependency|NameResolution|SymbolTable|ImportResolver'
 require_absent_text crates/newlang/src/parser.rs 'PackageNamespace|SourceFilePackage|module::'
