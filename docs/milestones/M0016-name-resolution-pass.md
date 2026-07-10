@@ -84,6 +84,6 @@ ADR-0010 requires nominal user-defined types. ADR-0017 defines modules as visibi
 ## Completion Checklist
 
 - [x] Name resolution source of truth is accepted
-- [ ] Approved names resolve.
-- [ ] Unresolved names diagnose.
+- [x] Approved names resolve.
+- [x] Unresolved names diagnose.
 - [x] Ambiguous resolution cases are not guessed.

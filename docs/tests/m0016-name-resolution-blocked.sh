@@ -57,8 +57,8 @@ require_text "$ambiguity" 'Implementation may define name resolution only as spe
 
 require_text "$milestone" 'M0016'
 require_text "$milestone" '\[x\] Name resolution source of truth is accepted'
-require_text "$milestone" '\[ \] Approved names resolve'
-require_text "$milestone" '\[ \] Unresolved names diagnose'
+require_text "$milestone" '\[x\] Approved names resolve'
+require_text "$milestone" '\[x\] Unresolved names diagnose'
 require_text "$milestone" '\[x\] Ambiguous resolution cases are not guessed'
 
 require_text "$spec" '^## ADR-0025: Module Package And Visibility Model$'

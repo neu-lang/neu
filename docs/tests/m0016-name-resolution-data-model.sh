@@ -13,18 +13,19 @@ require_file() {
 require_text() {
   file="$1"
   pattern="$2"
-  grep -Eq "$pattern" "$file" || fail "missing expected pattern in $file: $pattern"
+  grep -Eq -- "$pattern" "$file" || fail "missing expected pattern in $file: $pattern"
 }
 
 require_absent_text() {
   file="$1"
   pattern="$2"
-  if grep -Eq "$pattern" "$file"; then
+  if grep -Eq -- "$pattern" "$file"; then
     fail "unexpected pattern in $file: $pattern"
   fi
 }
 
 task=docs/tasks/M0016-006-name-resolution-data-model.md
+milestone=docs/milestones/M0016-name-resolution-pass.md
 adr=docs/adr/ADR-0026-name-resolution-policy.md
 source=crates/newlang/src/name_resolution.rs
 lib=crates/newlang/src/lib.rs
@@ -33,6 +34,7 @@ parser=crates/newlang/src/parser.rs
 parser_test=crates/newlang/tests/parser.rs
 
 require_file "$task"
+require_file "$milestone"
 require_file "$adr"
 require_file "$source"
 require_file "$test_file"
@@ -40,6 +42,8 @@ require_file "$parser"
 require_file "$parser_test"
 
 require_text "$task" 'Status: `complete`'
+require_text "$milestone" '- \[x\] Approved names resolve\.'
+require_text "$milestone" '- \[x\] Unresolved names diagnose\.'
 require_text "$adr" '^Status: Accepted$'
 require_text "$source" 'pub struct ResolvedName'
 require_text "$source" 'pub struct ResolutionTable'
