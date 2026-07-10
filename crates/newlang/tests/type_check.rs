@@ -11,12 +11,12 @@ use newlang::{
     },
     source::ByteSpan,
     source::SourceFileId,
-    symbol::SymbolId,
+    symbol::{SymbolId, SymbolInterner},
     type_check::{
-        known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
-        record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
-        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
-        type_m0018_accepted_expressions, type_m0018_core,
+        build_m0020_generic_parameter_types, known_local_symbol_types, recognize_m0019_null_tests,
+        record_m0019_branch_refinements, record_m0019_refined_expression_types,
+        select_m0019_eligible_null_tests, type_assignment_statements, type_grouped_expressions,
+        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_parser_literals, type_primitive_local_declarations,
@@ -253,6 +253,56 @@ fn m0019_mutation_invalidation_classifies_only_exact_post_region_bare_name_initi
         TypeCheckDiagnosticKind::TypeMismatch
     );
     assert_eq!(report.diagnostics()[6].node(), grouped);
+}
+
+#[test]
+fn m0020_generic_parameter_types_preserve_parameter_identity_and_source_order() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(500),
+        "struct Pair<T: Send & Share, U> {} struct Other<T> {}",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.generic_parameters.len(), 3);
+
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let records =
+        build_m0020_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+
+    assert_eq!(records.len(), 3);
+    assert_eq!(types.records().len(), 3);
+    assert_eq!(
+        records[0].parameter(),
+        parsed.generic_parameters[0].parameter
+    );
+    assert_eq!(
+        records[1].parameter(),
+        parsed.generic_parameters[1].parameter
+    );
+    assert_eq!(
+        records[2].parameter(),
+        parsed.generic_parameters[2].parameter
+    );
+    assert_ne!(records[0].ty(), records[2].ty());
+
+    let first = match types.get(records[0].ty()).unwrap().kind() {
+        TypeKind::GenericParameter(parameter) => parameter,
+        other => panic!("expected generic parameter type, got {other:?}"),
+    };
+    let third = match types.get(records[2].ty()).unwrap().kind() {
+        TypeKind::GenericParameter(parameter) => parameter,
+        other => panic!("expected generic parameter type, got {other:?}"),
+    };
+    assert_eq!(first.declaration(), parsed.generic_parameters[0].parameter);
+    assert_eq!(third.declaration(), parsed.generic_parameters[2].parameter);
+    assert_eq!(first.symbol(), third.symbol());
+    assert_eq!(symbols.resolve(first.symbol()), Some("T"));
+    assert_eq!(symbols.resolve(SymbolId::from_raw(1)), Some("U"));
+
+    let empty = build_m0020_generic_parameter_types(&[], &mut symbols, &mut types);
+    assert!(empty.is_empty());
+    assert_eq!(types.records().len(), 3);
+    assert_eq!(symbols.symbols(), &["T".to_owned(), "U".to_owned()]);
 }
 
 #[test]

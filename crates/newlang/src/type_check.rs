@@ -3,11 +3,12 @@ use crate::{
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
         ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
-        ParsedGroupedExpression, ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind,
-        ParsedLocalDeclaration, ParsedTypeNameReference,
+        ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression,
+        ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
+        ParsedTypeNameReference,
     },
-    symbol::SymbolId,
-    types::{PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
+    symbol::{SymbolId, SymbolInterner},
+    types::{GenericParameterType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -473,6 +474,26 @@ pub struct KnownSymbolType {
     ty: TypeId,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GenericParameterTypeRecord {
+    parameter: AstNodeId,
+    ty: TypeId,
+}
+
+impl GenericParameterTypeRecord {
+    pub fn new(parameter: AstNodeId, ty: TypeId) -> Self {
+        Self { parameter, ty }
+    }
+
+    pub fn parameter(self) -> AstNodeId {
+        self.parameter
+    }
+
+    pub fn ty(self) -> TypeId {
+        self.ty
+    }
+}
+
 impl KnownSymbolType {
     pub fn new(symbol: SymbolId, ty: TypeId) -> Self {
         Self { symbol, ty }
@@ -485,6 +506,24 @@ impl KnownSymbolType {
     pub fn ty(self) -> TypeId {
         self.ty
     }
+}
+
+pub fn build_m0020_generic_parameter_types(
+    parameters: &[ParsedGenericParameter],
+    symbols: &mut SymbolInterner,
+    type_arena: &mut TypeArena,
+) -> Vec<GenericParameterTypeRecord> {
+    parameters
+        .iter()
+        .map(|parameter| {
+            let symbol = symbols.intern(&parameter.name);
+            let ty = type_arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+                parameter.parameter,
+                symbol,
+            )));
+            GenericParameterTypeRecord::new(parameter.parameter, ty)
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
