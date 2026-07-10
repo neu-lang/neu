@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
@@ -140,6 +140,7 @@ pub struct EnumParameterTypeResolution {
 pub enum MatchDiagnosticKind {
     InvalidMatchSubject,
     UnknownMatchVariant,
+    DuplicateEnumVariant,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -200,6 +201,27 @@ impl MatchAnalysisReport {
     pub fn diagnostics(&self) -> &[MatchDiagnostic] {
         &self.diagnostics
     }
+}
+
+pub fn analyze_duplicate_enum_variants(
+    variants: &[ParsedEnumVariant],
+    interner: &mut SymbolInterner,
+) -> Vec<MatchDiagnostic> {
+    let mut seen = HashMap::new();
+    let mut diagnostics = Vec::new();
+    for variant in variants {
+        let key = (variant.enum_declaration, interner.intern(&variant.name));
+        match seen.entry(key) {
+            Entry::Occupied(_) => diagnostics.push(MatchDiagnostic {
+                kind: MatchDiagnosticKind::DuplicateEnumVariant,
+                node: variant.variant,
+            }),
+            Entry::Vacant(entry) => {
+                entry.insert(variant.variant);
+            }
+        }
+    }
+    diagnostics
 }
 
 pub fn resolve_qualified_variant_arms(
