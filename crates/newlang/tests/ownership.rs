@@ -1,8 +1,16 @@
 use newlang::{
     ast::AstNodeId,
     module::{ModuleName, PackageNamespace},
-    ownership::{classify_ownership_category, OwnershipCategory},
+    name_resolution::{
+        LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolvedLocalBinding,
+    },
+    ownership::{
+        OwnershipCategory, OwnershipTransfer, OwnershipTransferKind, classify_ownership_category,
+        collect_ownership_transfers,
+    },
+    parser::{ParsedAssignmentStatement, ParsedLocalDeclaration},
     symbol::SymbolId,
+    type_check::DeclarationSignature,
     types::{
         GenericParameterType, NominalTypeIdentity, NullableType, PrimitiveType, TypeArena,
         TypeRecord,
@@ -57,4 +65,81 @@ fn m0022_unsupported_type_categories_do_not_guess() {
 
     assert_eq!(classify_ownership_category(&arena, generic), None);
     assert_eq!(classify_ownership_category(&arena, nullable), None);
+}
+
+#[test]
+fn m0022_transfer_sites_record_only_move_only_local_sources() {
+    let mut arena = TypeArena::new();
+    let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
+    let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let generic_ty = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+        AstNodeId::from_raw(900),
+        SymbolId::from_raw(901),
+    )));
+
+    let string_binding = local_binding(10, 100);
+    let int_binding = local_binding(11, 101);
+    let generic_binding = local_binding(12, 102);
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(200),
+            annotation: None,
+            initializer: Some(AstNodeId::from_raw(300)),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(201),
+            annotation: None,
+            initializer: Some(AstNodeId::from_raw(301)),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(202),
+            annotation: None,
+            initializer: Some(AstNodeId::from_raw(302)),
+        },
+    ];
+    let assignments = [ParsedAssignmentStatement {
+        statement: AstNodeId::from_raw(400),
+        target: AstNodeId::from_raw(401),
+        value: AstNodeId::from_raw(402),
+    }];
+    let resolved = [
+        ResolvedLocalBinding::new(AstNodeId::from_raw(300), string_binding.clone()),
+        ResolvedLocalBinding::new(AstNodeId::from_raw(301), int_binding.clone()),
+        ResolvedLocalBinding::new(AstNodeId::from_raw(302), generic_binding.clone()),
+        ResolvedLocalBinding::new(AstNodeId::from_raw(402), string_binding.clone()),
+    ];
+    let signatures = [
+        DeclarationSignature::new(string_binding.binding(), string_ty),
+        DeclarationSignature::new(int_binding.binding(), int_ty),
+        DeclarationSignature::new(generic_binding.binding(), generic_ty),
+    ];
+
+    let transfers =
+        collect_ownership_transfers(&declarations, &assignments, &resolved, &signatures, &arena);
+
+    assert_eq!(
+        transfers,
+        [
+            OwnershipTransfer::new(
+                OwnershipTransferKind::LocalInitializer,
+                AstNodeId::from_raw(200),
+                AstNodeId::from_raw(300),
+                string_binding.clone(),
+            ),
+            OwnershipTransfer::new(
+                OwnershipTransferKind::Assignment,
+                AstNodeId::from_raw(400),
+                AstNodeId::from_raw(402),
+                string_binding,
+            ),
+        ]
+    );
+}
+
+fn local_binding(binding_raw: usize, symbol_raw: usize) -> LocalBinding {
+    LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(symbol_raw)),
+        AstNodeId::from_raw(binding_raw),
+        LocalBindingKind::Immutable,
+    )
 }
