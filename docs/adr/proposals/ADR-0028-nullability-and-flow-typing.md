@@ -79,6 +79,105 @@ Draft exclusions:
 
 Excluded forms should produce `unsupported_flow_rule` or preserve the existing unsupported type-rule diagnostic until the accepted ADR defines a narrower behavior.
 
+## Draft Null-Test Recognition
+
+This section is a draft direction, not accepted semantics.
+
+M0019 should recognize only direct equality comparisons between one simple local name expression and the `null` literal as refinement conditions.
+
+Accepted null-test shapes:
+
+- `x != null`
+- `null != x`
+- `x == null`
+- `null == x`
+
+The recognizer is a flow-specific condition recognizer. It does not require general binary expression type checking, overload resolution, user-defined equality, implicit conversion, or Boolean operator typing.
+
+The recognizer may inspect the parsed AST shape accepted by ADR-0024 and the literal metadata accepted by ADR-0027 only to identify the comparison form. It must not assign a general type to binary expressions or make other binary operators type-check.
+
+Unsupported condition shapes:
+
+- boolean combinations such as `x != null && y != null`
+- negated expressions such as `!(x == null)`
+- comparisons against non-null literals
+- comparisons involving member expressions
+- comparisons involving calls
+- comparisons involving package-qualified names
+- comparisons where both sides are `null`
+- comparisons where neither side resolves to an eligible local binding
+
+Unsupported condition shapes do not create refinement facts. If a nullable value is later used where non-null is required, that use is diagnosed independently.
+
+## Draft Branch Region Boundaries
+
+This section is a draft direction, not accepted semantics.
+
+M0019 branch regions are syntactic regions from ADR-0024 `if` expressions.
+
+For `x != null`, the refinement is active only inside the then branch block.
+
+For `null != x`, the refinement is active only inside the then branch block.
+
+For `x == null`, the non-null refinement is active only inside the else branch block when an else branch exists.
+
+For `null == x`, the non-null refinement is active only inside the else branch block when an else branch exists.
+
+The then branch region is the statements and optional trailing expression contained directly inside the then branch block.
+
+The else branch region is the statements and optional trailing expression contained directly inside the else branch block.
+
+The refinement starts at the first statement or optional trailing expression in the refined branch and ends at the closing brace of that branch.
+
+No refinement is active in the condition expression itself, before the `if`, after the `if`, in sibling branches, or in a missing else branch.
+
+Nested blocks inherit an active refinement only while they remain within the refined branch region and do not shadow the refined local binding.
+
+## Draft Refined Output Shape
+
+This section is a draft direction, not accepted semantics.
+
+M0019 should keep the M0018 side-table model and add flow output without rewriting the AST.
+
+The draft flow output contains:
+
+- refinement table keyed by the `AstNodeId` of the `if` expression or branch block that introduces the fact
+- refinement records identifying the original local binding, original nullable type, refined non-null type, branch region, and originating null-test expression
+- refined expression type entries for eligible name expressions inside guarded regions
+- diagnostics list entries for invalid nullable use, invalidated refinement, unsupported flow rule, and ambiguous flow rule
+
+The original nullable type of the binding remains unchanged in declaration signature tables and local binding type facts.
+
+Refined expression type entries are per-use views. A use of `x` inside the active branch may receive refined type `T`, while the binding declaration still has original type `T?`.
+
+Assignment compatibility checks inside a refined branch may use the refined expression type for the assigned expression use only. They must not mutate the target declaration type or create a lasting non-null binding.
+
+If refinement output is missing because the condition is unsupported, ambiguous, or ineligible, later phases must treat the expression as its original nullable type.
+
+## Draft Shadowing And Nested Scope Rules
+
+This section is a draft direction, not accepted semantics.
+
+M0019 should identify refinements by local binding identity, not by textual name alone.
+
+Shadowing rules for shadowing declarations:
+
+- A nested declaration that introduces a new local binding with the same name hides the outer refinement for uses that resolve to the nested binding.
+- Uses before the nested declaration and still inside the refined branch keep the outer refinement when M0016 resolves them to the outer binding.
+- Uses after the nested declaration resolve according to M0016 local lookup and receive the refinement only if they still resolve to the original refined binding.
+
+Nested block rules:
+
+- A nested block inside the refined branch inherits the active refinement for the same local binding.
+- The inherited refinement ends when control leaves the refined branch.
+- A nested block outside the refined branch never receives the refinement.
+
+Duplicate local bindings and ambiguous local binding cases:
+
+- If M0016 reports duplicate local bindings in the same scope, M0019 must not create a refinement for the duplicate binding site.
+- If a name expression does not resolve to exactly one local binding, M0019 must not create a refinement.
+- If a condition references an ambiguous local binding, M0019 reports `ambiguous_flow_rule` with a stable rule identifier.
+
 ## Draft Nullable Use Rules
 
 This section is a draft direction, not accepted semantics.
@@ -152,14 +251,6 @@ M0019 must not preserve a refinement across function calls, coroutine suspension
 
 This section is a draft direction, not accepted semantics.
 
-M0019 should extend type-check output with:
-
-- refinement table keyed by expression or branch `AstNodeId`
-- refined expression type entries for eligible name expressions inside guarded regions
-- diagnostics list entries for invalid nullable use, invalidated refinement, unsupported flow rule, and ambiguous flow rule
-
-The flow output must not lower to HIR, rewrite the AST, or erase the original nullable type of the binding.
-
 ## Required Accepted Content
 
 The accepted ADR must define:
@@ -177,7 +268,9 @@ The accepted ADR must define:
 - diagnostic safe suggestion policy
 - explicit deferrals for calls, members, generics, patterns, exclusive borrows, coroutines, unsafe, FFI, HIR, MIR, and backend behavior
 
-## Required Diagnostics
+## Draft Flow Diagnostics
+
+This section is a draft direction, not accepted semantics.
 
 The accepted ADR must define diagnostic obligations for:
 
@@ -188,17 +281,19 @@ The accepted ADR must define diagnostic obligations for:
 
 Diagnostic: `invalid_nullable_use`
 
-- Primary span: the nullable expression used where a non-null value is required.
+- Primary span: the nullable expression used where a non-null value is required. For grouped expressions, use the innermost nullable expression span when known and the grouped expression span otherwise. For assignment values, use the assigned value expression span.
 - Recovery action: omit the successful refined type entry for that use and continue checking independent constructs.
 - Source-of-truth citation: accepted ADR-0028 nullable-use section.
 - Safe suggestion policy: mention the required non-null type and actual nullable type; do not suggest force unwraps, unsafe operations, API redesigns, or ownership changes.
+- Required stable rule identifier examples: `nullable_value_without_refinement`, `nullable_assignment_without_refinement`.
 
 Diagnostic: `invalidated_refinement`
 
-- Primary span: the use of a refinement after the invalidating operation.
+- Primary span: the use of a refinement after the invalidating operation. The invalidating operation should be a secondary span when available.
 - Recovery action: treat the value as its original nullable type after invalidation and continue checking independent constructs.
 - Source-of-truth citation: accepted ADR-0028 mutation-invalidation section.
 - Safe suggestion policy: name the invalidating operation when known; do not suggest hidden copies or unsafe casts.
+- Required stable rule identifier examples: `assignment_invalidated_refinement`, `region_exit_invalidated_refinement`.
 
 Diagnostic: `unsupported_flow_rule`
 
@@ -206,6 +301,7 @@ Diagnostic: `unsupported_flow_rule`
 - Recovery action: produce no refinement fact for that construct and continue checking independent constructs.
 - Source-of-truth citation: accepted ADR-0028 explicit deferrals.
 - Safe suggestion policy: no fix-it unless an accepted equivalent exists.
+- Required stable rule identifier examples: `mutable_local_refinement_deferred`, `boolean_combination_refinement_deferred`, `member_refinement_deferred`, `call_result_refinement_deferred`, `exclusive_borrow_refinement_deferred`.
 
 Diagnostic: `ambiguous_flow_rule`
 
@@ -213,6 +309,18 @@ Diagnostic: `ambiguous_flow_rule`
 - Recovery action: produce no refinement fact for that construct and continue checking independent constructs.
 - Source-of-truth citation: accepted ADR-0028 ambiguity-handling section.
 - Safe suggestion policy: no fix-it.
+- Required stable rule identifier examples: `ambiguous local binding`, `ambiguous_null_test_region`.
+
+## Required Diagnostics
+
+The accepted ADR must define diagnostic obligations for:
+
+- `invalid_nullable_use`
+- `invalidated_refinement`
+- `unsupported_flow_rule`
+- `ambiguous_flow_rule`
+
+Each diagnostic must define primary span, recovery action, source-of-truth citation, safe suggestion policy, and stable rule identifier requirements where the diagnostic represents a blocked or ambiguous rule.
 
 ## Explicit Draft Deferrals
 
