@@ -6,7 +6,7 @@
 - Milestone: `M0020`
 - Milestone File: `docs/milestones/M0020-generic-constraints-and-capability-bounds.md`
 - Specification: `docs/SPEC.md`
-- Status: `blocked`
+- Status: `proposal in_progress`
 - Owner: `Language Designer`
 
 ## Objective
@@ -38,3 +38,4 @@ remaining M0020 tasks against that decision.
 ## Execution Log
 
 - 2026-07-10 agent=Main phase=blocker-recorded result=blocked evidence=SPEC explicitly defers generic constraint solving and capability semantics. handoff=Language-Designer
+- 2026-07-10 agent=Main phase=proposal-drafted result=pass evidence=ADR-0032 proposes deferring enforcement rather than inventing provisional capability satisfaction. handoff=Language-Designer
