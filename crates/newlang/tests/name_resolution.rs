@@ -1,18 +1,64 @@
 use newlang::ast::{AstArena, AstNodeId};
-use newlang::module::{ModuleName, PackageNamespace};
+use newlang::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use newlang::name_resolution::{
     bind_accepted_name_references, bind_local_name_references,
     bind_package_qualified_type_references, bind_unqualified_function_references,
-    bind_unqualified_type_references, build_declaration_index, build_local_binding_index,
-    build_local_scope_tree, build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert,
-    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
-    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult,
-    LocalScopeId, LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
-    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
+    build_local_binding_index, build_local_scope_tree, build_scoped_local_binding_index,
+    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
+    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
+    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
+    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
+    TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
 use newlang::symbol::{SymbolId, SymbolInterner};
+
+#[test]
+fn m0021_enum_variant_identity_preserves_enum_and_variant_source_order() {
+    let file = SourceFileId::from_raw(800);
+    let parsed = parse_source(file, "enum Signal { Red, Green } enum Status { Red }");
+    let metadata = ModuleMetadata::with_packages(
+        ModuleName::parse("demo.app").unwrap(),
+        [(file, PackageNamespace::parse("demo.pkg").unwrap())],
+    )
+    .unwrap();
+    let mut interner = SymbolInterner::new();
+
+    let index = build_enum_variant_index(
+        &metadata,
+        &parsed.enum_variants,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+
+    assert_eq!(index.variants().len(), 3);
+    let first = &index.variants()[0];
+    let third = &index.variants()[2];
+    assert_eq!(
+        first.enum_declaration(),
+        parsed.enum_variants[0].enum_declaration
+    );
+    assert_eq!(first.variant(), parsed.enum_variants[0].variant);
+    assert_eq!(first.variant_name(), third.variant_name());
+    assert_ne!(first.enum_declaration(), third.enum_declaration());
+    assert_eq!(first.module(), metadata.name());
+    assert_eq!(
+        first.package(),
+        &PackageNamespace::parse("demo.pkg").unwrap()
+    );
+}
+
+#[test]
+fn m0021_enum_variant_identity_accepts_empty_parser_metadata() {
+    let file = SourceFileId::from_raw(801);
+    let metadata = ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [file]).unwrap();
+    let mut interner = SymbolInterner::new();
+    let index = build_enum_variant_index(&metadata, &[], &[], &mut interner);
+
+    assert!(index.variants().is_empty());
+}
 
 #[test]
 fn resolved_names_preserve_reference_symbol_and_insertion_order() {

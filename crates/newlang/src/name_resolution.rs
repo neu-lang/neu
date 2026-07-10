@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use crate::parser::{
-    ParsedDeclarationName, ParsedLocalBindingName, ParsedNameReference, ParsedTypeNameReference,
+    ParsedDeclarationName, ParsedEnumVariant, ParsedLocalBindingName, ParsedNameReference,
+    ParsedTypeNameReference,
 };
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
@@ -12,6 +13,105 @@ use crate::symbol::{SymbolId, SymbolInterner};
 pub enum DeclarationKind {
     Function,
     Type,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EnumVariantIdentity {
+    module: ModuleName,
+    package: PackageNamespace,
+    enum_declaration: AstNodeId,
+    enum_name: SymbolId,
+    variant: AstNodeId,
+    variant_name: SymbolId,
+}
+
+impl EnumVariantIdentity {
+    fn new(
+        module: ModuleName,
+        package: PackageNamespace,
+        enum_declaration: AstNodeId,
+        enum_name: SymbolId,
+        variant: AstNodeId,
+        variant_name: SymbolId,
+    ) -> Self {
+        Self {
+            module,
+            package,
+            enum_declaration,
+            enum_name,
+            variant,
+            variant_name,
+        }
+    }
+
+    pub fn module(&self) -> &ModuleName {
+        &self.module
+    }
+
+    pub fn package(&self) -> &PackageNamespace {
+        &self.package
+    }
+
+    pub fn enum_declaration(&self) -> AstNodeId {
+        self.enum_declaration
+    }
+
+    pub fn enum_name(&self) -> SymbolId {
+        self.enum_name
+    }
+
+    pub fn variant(&self) -> AstNodeId {
+        self.variant
+    }
+
+    pub fn variant_name(&self) -> SymbolId {
+        self.variant_name
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct EnumVariantIndex {
+    variants: Vec<EnumVariantIdentity>,
+}
+
+impl EnumVariantIndex {
+    pub fn variants(&self) -> &[EnumVariantIdentity] {
+        &self.variants
+    }
+}
+
+pub fn build_enum_variant_index(
+    metadata: &ModuleMetadata,
+    variants: &[ParsedEnumVariant],
+    declarations: &[ParsedDeclarationName],
+    interner: &mut SymbolInterner,
+) -> EnumVariantIndex {
+    let mut index = EnumVariantIndex::default();
+
+    for variant in variants {
+        let Some(enum_declaration) = declarations
+            .iter()
+            .find(|declaration| declaration.declaration == variant.enum_declaration)
+        else {
+            continue;
+        };
+        let package = metadata
+            .packages()
+            .iter()
+            .find(|package| package.source_file() == enum_declaration.name_span.file())
+            .map(|package| package.namespace().clone())
+            .unwrap_or_else(PackageNamespace::root);
+        index.variants.push(EnumVariantIdentity::new(
+            metadata.name().clone(),
+            package,
+            variant.enum_declaration,
+            interner.intern(&enum_declaration.name),
+            variant.variant,
+            interner.intern(&variant.name),
+        ));
+    }
+
+    index
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
