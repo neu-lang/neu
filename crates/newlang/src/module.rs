@@ -30,9 +30,57 @@ impl ModuleName {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PackageNamespace(String);
+
+impl PackageNamespace {
+    pub fn root() -> Self {
+        Self(String::new())
+    }
+
+    pub fn parse(input: &str) -> Result<Self, ModuleDiagnostic> {
+        if input.is_empty() {
+            return Ok(Self::root());
+        }
+
+        if input.split('.').all(is_identifier_segment) {
+            Ok(Self(input.to_owned()))
+        } else {
+            Err(ModuleDiagnostic::new(
+                ModuleDiagnosticKind::InvalidPackageNamespace,
+            ))
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceFilePackage {
+    source_file: SourceFileId,
+    namespace: PackageNamespace,
+}
+
+impl SourceFilePackage {
+    pub fn source_file(&self) -> SourceFileId {
+        self.source_file
+    }
+
+    pub fn namespace(&self) -> &PackageNamespace {
+        &self.namespace
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModuleMetadata {
     name: ModuleName,
     source_files: Vec<SourceFileId>,
+    packages: Vec<SourceFilePackage>,
 }
 
 impl ModuleMetadata {
@@ -40,8 +88,39 @@ impl ModuleMetadata {
         name: ModuleName,
         source_files: impl IntoIterator<Item = SourceFileId>,
     ) -> Result<Self, ModuleDiagnostic> {
-        let source_files = source_files.into_iter().collect();
-        Ok(Self { name, source_files })
+        let source_files: Vec<SourceFileId> = source_files.into_iter().collect();
+        let packages = source_files
+            .iter()
+            .copied()
+            .map(|source_file| SourceFilePackage {
+                source_file,
+                namespace: PackageNamespace::root(),
+            })
+            .collect();
+        Ok(Self {
+            name,
+            source_files,
+            packages,
+        })
+    }
+
+    pub fn with_packages(
+        name: ModuleName,
+        packages: impl IntoIterator<Item = (SourceFileId, PackageNamespace)>,
+    ) -> Result<Self, ModuleDiagnostic> {
+        let packages: Vec<_> = packages
+            .into_iter()
+            .map(|(source_file, namespace)| SourceFilePackage {
+                source_file,
+                namespace,
+            })
+            .collect();
+        let source_files = packages.iter().map(|package| package.source_file).collect();
+        Ok(Self {
+            name,
+            source_files,
+            packages,
+        })
     }
 
     pub fn name(&self) -> &ModuleName {
@@ -54,6 +133,10 @@ impl ModuleMetadata {
 
     pub fn source_files(&self) -> &[SourceFileId] {
         &self.source_files
+    }
+
+    pub fn packages(&self) -> &[SourceFilePackage] {
+        &self.packages
     }
 }
 
@@ -73,6 +156,7 @@ pub enum ModuleDiagnosticKind {
     MissingModuleIdentity,
     InvalidModuleIdentity,
     AmbiguousSourceModuleAssignment,
+    InvalidPackageNamespace,
 }
 
 fn is_identifier_segment(segment: &str) -> bool {

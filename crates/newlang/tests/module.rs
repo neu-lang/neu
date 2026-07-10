@@ -1,4 +1,4 @@
-use newlang::module::{ModuleDiagnosticKind, ModuleMetadata, ModuleName};
+use newlang::module::{ModuleDiagnosticKind, ModuleMetadata, ModuleName, PackageNamespace};
 use newlang::source::{SourceDatabase, SourceFileId};
 
 #[test]
@@ -66,5 +66,77 @@ fn module_identity_does_not_depend_on_source_file_paths() {
     assert_ne!(
         sources.file(first).unwrap().path(),
         sources.file(second).unwrap().path()
+    );
+}
+
+#[test]
+fn package_namespaces_validate_adr0025_segments_and_root() {
+    let root = PackageNamespace::root();
+    let simple = PackageNamespace::parse("demo").unwrap();
+    let dotted = PackageNamespace::parse("demo.core_1.Api").unwrap();
+
+    assert!(root.is_root());
+    assert_eq!(root.as_str(), "");
+    assert_eq!(simple.as_str(), "demo");
+    assert_eq!(dotted.as_str(), "demo.core_1.Api");
+}
+
+#[test]
+fn invalid_package_namespaces_report_package_diagnostics() {
+    for invalid in [
+        ".demo",
+        "demo.",
+        "demo..core",
+        "demo-core",
+        "demo.1core",
+        "demo.π",
+    ] {
+        assert_eq!(
+            PackageNamespace::parse(invalid).unwrap_err().kind,
+            ModuleDiagnosticKind::InvalidPackageNamespace,
+            "{invalid} should be rejected as an invalid package namespace"
+        );
+    }
+}
+
+#[test]
+fn module_metadata_preserves_package_namespace_per_source_file() {
+    let first = SourceFileId::from_raw(0);
+    let second = SourceFileId::from_raw(1);
+    let package = PackageNamespace::parse("demo.core").unwrap();
+
+    let metadata = ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(first, package.clone()), (second, package.clone())],
+    )
+    .unwrap();
+
+    assert_eq!(metadata.source_files(), [first, second]);
+    assert_eq!(metadata.packages()[0].source_file(), first);
+    assert_eq!(metadata.packages()[0].namespace(), &package);
+    assert_eq!(metadata.packages()[1].source_file(), second);
+    assert_eq!(metadata.packages()[1].namespace(), &package);
+}
+
+#[test]
+fn package_namespace_does_not_change_module_identity() {
+    let root_metadata = ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(SourceFileId::from_raw(0), PackageNamespace::root())],
+    )
+    .unwrap();
+    let nested_metadata = ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(
+            SourceFileId::from_raw(1),
+            PackageNamespace::parse("other.namespace").unwrap(),
+        )],
+    )
+    .unwrap();
+
+    assert_eq!(root_metadata.module_id(), nested_metadata.module_id());
+    assert_ne!(
+        root_metadata.packages()[0].namespace(),
+        nested_metadata.packages()[0].namespace()
     );
 }
