@@ -135,6 +135,84 @@ pub struct EnumParameterTypeResolution {
     records: Vec<EnumParameterTypeRecord>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MatchDiagnosticKind {
+    InvalidMatchSubject,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MatchDiagnostic {
+    kind: MatchDiagnosticKind,
+    node: AstNodeId,
+}
+
+impl MatchDiagnostic {
+    pub fn kind(self) -> MatchDiagnosticKind {
+        self.kind
+    }
+    pub fn node(self) -> AstNodeId {
+        self.node
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResolvedWhenSubject {
+    expression: AstNodeId,
+    enum_declaration: AstNodeId,
+}
+
+impl ResolvedWhenSubject {
+    pub fn enum_declaration(self) -> AstNodeId {
+        self.enum_declaration
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MatchAnalysisReport {
+    subjects: Vec<ResolvedWhenSubject>,
+    diagnostics: Vec<MatchDiagnostic>,
+}
+
+impl MatchAnalysisReport {
+    pub fn subjects(&self) -> &[ResolvedWhenSubject] {
+        &self.subjects
+    }
+    pub fn diagnostics(&self) -> &[MatchDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn analyze_when_subjects(
+    expressions: &[crate::parser::ParsedWhenExpression],
+    resolved: &[ResolvedLocalBinding],
+    enum_parameters: &EnumParameterTypeResolution,
+) -> MatchAnalysisReport {
+    let mut report = MatchAnalysisReport::default();
+    for expression in expressions {
+        let enum_declaration = resolved
+            .iter()
+            .find(|entry| entry.reference() == expression.subject)
+            .and_then(|entry| {
+                enum_parameters
+                    .records()
+                    .iter()
+                    .find(|record| record.parameter() == entry.binding().binding())
+            });
+        if let Some(enum_declaration) = enum_declaration {
+            report.subjects.push(ResolvedWhenSubject {
+                expression: expression.expression,
+                enum_declaration: enum_declaration.enum_declaration,
+            });
+        } else {
+            report.diagnostics.push(MatchDiagnostic {
+                kind: MatchDiagnosticKind::InvalidMatchSubject,
+                node: expression.subject,
+            });
+        }
+    }
+    report
+}
+
 impl EnumParameterTypeResolution {
     pub fn records(&self) -> &[EnumParameterTypeRecord] {
         &self.records

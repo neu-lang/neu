@@ -1,7 +1,7 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    bind_accepted_name_references, bind_local_name_references,
+    analyze_when_subjects, bind_accepted_name_references, bind_local_name_references,
     bind_package_qualified_type_references, bind_unqualified_function_references,
     bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
     build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
@@ -15,6 +15,92 @@ use newlang::name_resolution::{
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
 use newlang::symbol::{SymbolId, SymbolInterner};
+
+#[test]
+fn m0021_when_subject_analysis_accepts_enum_parameter_only() {
+    let file = SourceFileId::from_raw(806);
+    let parsed = parse_source(
+        file,
+        "enum Signal { Red } fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+    let metadata = ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [file]).unwrap();
+    let mut interner = SymbolInterner::new();
+    let enum_types = resolve_enum_parameter_types(
+        &parsed.arena,
+        &metadata,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let bindings = build_scoped_binding_index(
+        &parsed.arena,
+        &parsed.function_parameters,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let names = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        bindings.index(),
+        &mut interner,
+    );
+    let report = analyze_when_subjects(
+        &parsed.when_expressions,
+        names.resolved_local_bindings(),
+        &enum_types,
+    );
+
+    assert!(report.diagnostics().is_empty());
+    assert_eq!(
+        report.subjects()[0].enum_declaration(),
+        parsed.declaration_names[0].declaration
+    );
+
+    let non_enum_file = SourceFileId::from_raw(807);
+    let non_enum = parse_source(
+        non_enum_file,
+        "struct Signal {} fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+    let non_enum_metadata =
+        ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [non_enum_file]).unwrap();
+    let enum_types = resolve_enum_parameter_types(
+        &non_enum.arena,
+        &non_enum_metadata,
+        &non_enum.function_parameters,
+        &non_enum.type_name_references,
+        &non_enum.declaration_names,
+        &mut interner,
+    );
+    let scopes = build_local_scope_tree(&non_enum.arena);
+    let bindings = build_scoped_binding_index(
+        &non_enum.arena,
+        &non_enum.function_parameters,
+        &non_enum.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let names = bind_local_name_references(
+        &non_enum.arena,
+        &non_enum.name_references,
+        &scopes,
+        bindings.index(),
+        &mut interner,
+    );
+    let report = analyze_when_subjects(
+        &non_enum.when_expressions,
+        names.resolved_local_bindings(),
+        &enum_types,
+    );
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].node(),
+        non_enum.when_expressions[0].subject
+    );
+}
 
 #[test]
 fn m0021_function_parameter_binding_uses_owning_body_scope() {
