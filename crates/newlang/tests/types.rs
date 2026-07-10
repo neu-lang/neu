@@ -2,7 +2,9 @@ use newlang::{
     ast::AstNodeId,
     module::{ModuleName, PackageNamespace},
     symbol::SymbolId,
-    types::{GenericParameterType, NominalTypeIdentity, TypeArena, TypeKind, TypeRecord},
+    types::{
+        GenericParameterType, NominalTypeIdentity, NullableType, TypeArena, TypeKind, TypeRecord,
+    },
 };
 
 #[test]
@@ -84,4 +86,51 @@ fn type_record_preserves_kind_and_id() {
 
     assert_eq!(record.id(), id);
     assert_eq!(record.kind(), &TypeKind::GenericParameter(generic));
+}
+
+#[test]
+fn nullable_type_preserves_wrapped_base_type() {
+    let mut arena = TypeArena::new();
+    let base = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+        AstNodeId::from_raw(1),
+        SymbolId::from_raw(2),
+    )));
+
+    let nullable = NullableType::new(base);
+
+    assert_eq!(nullable.base(), base);
+}
+
+#[test]
+fn nullable_type_record_is_distinct_from_base_record() {
+    let mut arena = TypeArena::new();
+    let base = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+        AstNodeId::from_raw(1),
+        SymbolId::from_raw(2),
+    )));
+    let nullable = arena.insert(TypeRecord::nullable(NullableType::new(base)));
+
+    assert_ne!(base, nullable);
+    assert!(matches!(
+        arena.get(base).unwrap().kind(),
+        TypeKind::GenericParameter(_)
+    ));
+    assert_eq!(
+        arena.get(nullable).unwrap().kind(),
+        &TypeKind::Nullable(NullableType::new(base))
+    );
+}
+
+#[test]
+fn nullable_record_storage_preserves_insertion_order() {
+    let mut arena = TypeArena::new();
+    let base = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+        AstNodeId::from_raw(10),
+        SymbolId::from_raw(20),
+    )));
+    let nullable = arena.insert(TypeRecord::nullable(NullableType::new(base)));
+
+    assert_eq!(base.index(), 0);
+    assert_eq!(nullable.index(), 1);
+    assert_eq!(arena.get(nullable).unwrap().id(), nullable);
 }

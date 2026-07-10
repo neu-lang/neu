@@ -80,10 +80,26 @@ impl GenericParameterType {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NullableType {
+    base: TypeId,
+}
+
+impl NullableType {
+    pub fn new(base: TypeId) -> Self {
+        Self { base }
+    }
+
+    pub fn base(self) -> TypeId {
+        self.base
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeKind {
     Nominal(NominalTypeIdentity),
     GenericParameter(GenericParameterType),
+    Nullable(NullableType),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -104,6 +120,13 @@ impl TypeRecord {
         Self {
             id: TypeId::from_raw(usize::MAX),
             kind: TypeKind::GenericParameter(generic),
+        }
+    }
+
+    pub fn nullable(nullable: NullableType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::Nullable(nullable),
         }
     }
 

@@ -68,7 +68,7 @@ require_text "$test_file" 'type_record_preserves_kind_and_id'
 
 require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|OwnershipCapability|Layout|Abi|Hir|Mir|Cranelift|LLVM'
 require_absent_text "$source" 'PrimitiveScalar|Int32|Int64|Float32|Float64|Bool|StringType'
-require_absent_text "$source" 'NullableType|OptionalType|TypeKind::Nullable'
+require_absent_text "$source" 'OptionalType'
 
 cargo test -p newlang --test types
 
