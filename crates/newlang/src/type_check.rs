@@ -1,6 +1,6 @@
 use crate::{
     ast::{AstArena, AstNodeId, AstNodeKind},
-    name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable},
+    name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
         ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
         ParsedGroupedExpression, ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind,
@@ -758,6 +758,84 @@ fn m0019_refined_branch_region(
         NullTestRefinedBranch::Then => Some(if_expression.then_block),
         NullTestRefinedBranch::Else => if_expression.else_block,
     }
+}
+
+pub fn record_m0019_refined_expression_types(
+    report: &mut TypeCheckReport,
+    arena: &AstArena,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+) {
+    let mut refined_types = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for resolved in resolved_local_bindings {
+        let Some(expression) = arena.node(resolved.reference()) else {
+            continue;
+        };
+        if expression.kind != AstNodeKind::NameExpression {
+            continue;
+        }
+
+        let mut matching_refinement = None;
+        let mut ambiguous = false;
+        for refinement in report.refinements() {
+            if refinement.binding() != resolved.binding()
+                || !m0019_expression_is_inside_refinement_region(
+                    arena,
+                    resolved.reference(),
+                    refinement.region(),
+                )
+            {
+                continue;
+            }
+
+            if matching_refinement.is_some() {
+                ambiguous = true;
+                break;
+            }
+            matching_refinement = Some(refinement);
+        }
+
+        if ambiguous {
+            diagnostics.push(TypeCheckDiagnostic::ambiguous_flow_rule(
+                TypeRuleDiagnostic::AmbiguousNullTestRegion,
+                resolved.reference(),
+            ));
+        } else if let Some(refinement) = matching_refinement {
+            refined_types.push(RefinedExpressionType::new(
+                resolved.reference(),
+                refinement.region(),
+                refinement.original_nullable_type(),
+                refinement.refined_non_null_type(),
+            ));
+        }
+    }
+
+    for refined_type in refined_types {
+        report.record_refined_expression_type(refined_type);
+    }
+    for diagnostic in diagnostics {
+        report.record_diagnostic(diagnostic);
+    }
+}
+
+fn m0019_expression_is_inside_refinement_region(
+    arena: &AstArena,
+    expression: AstNodeId,
+    region: AstNodeId,
+) -> bool {
+    let Some(expression) = arena.node(expression) else {
+        return false;
+    };
+    let Some(region) = arena.node(region) else {
+        return false;
+    };
+
+    expression.kind == AstNodeKind::NameExpression
+        && region.kind == AstNodeKind::Block
+        && expression.span.file() == region.span.file()
+        && region.span.start() <= expression.span.start()
+        && expression.span.end() <= region.span.end()
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,9 +1,9 @@
 use newlang::{
-    ast::AstNodeId,
-    ast::AstNodeKind,
+    ast::{AstArena, AstNodeId, AstNodeKind},
     name_resolution::{
+        bind_local_name_references, build_local_scope_tree, build_scoped_local_binding_index,
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
-        ResolvedName,
+        ResolvedLocalBinding, ResolvedName,
     },
     parser::{
         parse_source, ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
@@ -14,8 +14,9 @@ use newlang::{
     symbol::SymbolId,
     type_check::{
         known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
-        select_m0019_eligible_null_tests, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
+        record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
+        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
+        type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
@@ -436,6 +437,223 @@ fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
     assert_eq!(report.diagnostics(), &[]);
     assert!(report.refinements().is_empty());
     assert!(report.refined_expression_types().is_empty());
+}
+
+#[test]
+fn m0019_refined_expression_type_records_active_exact_binding_uses() {
+    let source = "fun check() { val maybe: String? = null; if (maybe != null) { maybe; }; maybe; }";
+    let file = SourceFileId::from_raw(330);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let maybe_references = parsed
+        .name_references
+        .iter()
+        .filter(|reference| reference.name == "maybe")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(maybe_references.len(), 3);
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = newlang::symbol::SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let resolved = bind_local_name_references(
+        &parsed.arena,
+        &maybe_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+    assert!(resolved.diagnostics().is_empty());
+    let region = parsed.if_expressions[0].then_block;
+    let nullable = TypeId::from_raw(40);
+    let non_null = TypeId::from_raw(41);
+    let mut report = TypeCheckReport::new();
+    report.record_refinement(RefinementRecord::new(
+        region,
+        maybe_references[0].reference,
+        parsed.if_expressions[0].condition,
+        locals.index().bindings()[0].clone(),
+        nullable,
+        non_null,
+    ));
+
+    record_m0019_refined_expression_types(
+        &mut report,
+        &parsed.arena,
+        resolved.resolved_local_bindings(),
+    );
+
+    assert_eq!(report.refined_expression_types().len(), 1);
+    let refined = report.refined_expression_types()[0];
+    assert_eq!(refined.expression(), maybe_references[1].reference);
+    assert_eq!(refined.refinement(), region);
+    assert_eq!(refined.original_nullable_type(), nullable);
+    assert_eq!(refined.refined_non_null_type(), non_null);
+    assert_eq!(
+        report.refined_expression_type(maybe_references[0].reference),
+        None
+    );
+    assert_eq!(
+        report.refined_expression_type(maybe_references[2].reference),
+        None
+    );
+    assert!(report.diagnostics().is_empty());
+}
+
+#[test]
+fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bounds() {
+    let source = "fun check() { val maybe: String? = null; if (maybe != null) { maybe; if (ready) { maybe; val maybe: String? = null; maybe; }; }; maybe; }";
+    let file = SourceFileId::from_raw(331);
+    let parsed = parse_source(file, source);
+    assert!(
+        parsed.diagnostics.is_empty(),
+        "unexpected parser diagnostics: {:?}",
+        parsed.diagnostics
+    );
+    let maybe_references = parsed
+        .name_references
+        .iter()
+        .filter(|reference| reference.name == "maybe")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(maybe_references.len(), 5);
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = newlang::symbol::SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    assert_eq!(locals.index().bindings().len(), 2);
+    let resolved = bind_local_name_references(
+        &parsed.arena,
+        &maybe_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+    assert!(resolved.diagnostics().is_empty());
+    let region = parsed.if_expressions[0].then_block;
+    let mut report = TypeCheckReport::new();
+    report.record_refinement(RefinementRecord::new(
+        region,
+        maybe_references[0].reference,
+        parsed.if_expressions[0].condition,
+        locals.index().bindings()[0].clone(),
+        TypeId::from_raw(42),
+        TypeId::from_raw(43),
+    ));
+
+    record_m0019_refined_expression_types(
+        &mut report,
+        &parsed.arena,
+        resolved.resolved_local_bindings(),
+    );
+
+    assert_eq!(
+        report
+            .refined_expression_types()
+            .iter()
+            .map(|entry| entry.expression())
+            .collect::<Vec<_>>(),
+        [maybe_references[1].reference, maybe_references[2].reference]
+    );
+    assert_eq!(
+        report.refined_expression_type(maybe_references[3].reference),
+        None
+    );
+    assert_eq!(
+        report.refined_expression_type(maybe_references[4].reference),
+        None
+    );
+    assert!(report.diagnostics().is_empty());
+}
+
+#[test]
+fn m0019_refined_expression_type_records_report_overlapping_regions() {
+    let file = SourceFileId::from_raw(332);
+    let mut arena = AstArena::new();
+    arena.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let outer_region = arena.add_block(ByteSpan::new(file, 10, 90).unwrap());
+    let inner_region = arena.add_block(ByteSpan::new(file, 20, 80).unwrap());
+    let expression = arena.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(332)),
+        AstNodeId::from_raw(333),
+        LocalBindingKind::Val,
+    );
+    let resolved = ResolvedLocalBinding::new(expression, binding.clone());
+    let mut report = TypeCheckReport::new();
+    report.record_refinement(RefinementRecord::new(
+        outer_region,
+        AstNodeId::from_raw(334),
+        AstNodeId::from_raw(335),
+        binding.clone(),
+        TypeId::from_raw(44),
+        TypeId::from_raw(45),
+    ));
+    report.record_refinement(RefinementRecord::new(
+        inner_region,
+        AstNodeId::from_raw(336),
+        AstNodeId::from_raw(337),
+        binding,
+        TypeId::from_raw(44),
+        TypeId::from_raw(45),
+    ));
+
+    record_m0019_refined_expression_types(&mut report, &arena, &[resolved]);
+
+    assert!(report.refined_expression_types().is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::AmbiguousFlowRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::AmbiguousNullTestRegion
+    );
+    assert_eq!(report.diagnostics()[0].node(), expression);
+}
+
+#[test]
+fn m0019_refined_expression_type_records_reject_non_name_and_cross_file_uses() {
+    let branch_file = SourceFileId::from_raw(338);
+    let other_file = SourceFileId::from_raw(339);
+    let mut arena = AstArena::new();
+    arena.add_source_file(ByteSpan::new(branch_file, 0, 100).unwrap());
+    arena.add_source_file(ByteSpan::new(other_file, 0, 100).unwrap());
+    let region = arena.add_block(ByteSpan::new(branch_file, 10, 90).unwrap());
+    let non_name = arena.add_literal_expression(ByteSpan::new(branch_file, 30, 35).unwrap());
+    let cross_file_name = arena.add_name_expression(ByteSpan::new(other_file, 30, 35).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(338)),
+        AstNodeId::from_raw(340),
+        LocalBindingKind::Val,
+    );
+    let resolved = [
+        ResolvedLocalBinding::new(non_name, binding.clone()),
+        ResolvedLocalBinding::new(cross_file_name, binding.clone()),
+    ];
+    let mut report = TypeCheckReport::new();
+    report.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(341),
+        AstNodeId::from_raw(342),
+        binding,
+        TypeId::from_raw(46),
+        TypeId::from_raw(47),
+    ));
+
+    record_m0019_refined_expression_types(&mut report, &arena, &resolved);
+
+    assert!(report.refined_expression_types().is_empty());
+    assert!(report.diagnostics().is_empty());
 }
 
 #[test]
