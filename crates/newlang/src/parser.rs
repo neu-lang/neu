@@ -1,5 +1,6 @@
 use crate::ast::{AstArena, AstNodeKind};
 use crate::lexer::{self, Token, TokenKind};
+use crate::name_resolution::DeclarationKind;
 use crate::source::{ByteSpan, SourceFileId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,6 +54,15 @@ pub struct ParseOutput {
     pub arena: AstArena,
     pub diagnostics: Vec<Diagnostic>,
     pub lex_diagnostics: Vec<lexer::Diagnostic>,
+    pub declaration_names: Vec<ParsedDeclarationName>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedDeclarationName {
+    pub declaration: crate::ast::AstNodeId,
+    pub kind: DeclarationKind,
+    pub name: String,
+    pub name_span: ByteSpan,
 }
 
 impl ParseOutput {
@@ -70,6 +80,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         arena: parser.arena,
         diagnostics: parser.diagnostics,
         lex_diagnostics: lex_output.diagnostics,
+        declaration_names: parser.declaration_names,
     }
 }
 
@@ -80,6 +91,7 @@ struct Parser<'source> {
     index: usize,
     arena: AstArena,
     diagnostics: Vec<Diagnostic>,
+    declaration_names: Vec<ParsedDeclarationName>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -93,6 +105,7 @@ impl<'source> Parser<'source> {
             index: 0,
             arena: AstArena::new(),
             diagnostics: Vec::new(),
+            declaration_names: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -207,6 +220,7 @@ impl<'source> Parser<'source> {
             self.skip_to_declaration_boundary(in_body);
             return;
         }
+        let name = self.current().expect("function name exists").clone();
         self.advance();
 
         self.parse_generic_parameters();
@@ -231,14 +245,27 @@ impl<'source> Parser<'source> {
         match self.current_kind() {
             Some(TokenKind::Semicolon) => {
                 let end = self.current().expect("semicolon exists").span.end();
-                self.arena.add_function_declaration(self.span(start, end));
+                let declaration = self.arena.add_function_declaration(self.span(start, end));
+                self.record_declaration_name(
+                    declaration,
+                    DeclarationKind::Function,
+                    &name,
+                    in_body,
+                );
                 self.saw_top_level_declaration |= !in_body;
                 self.advance();
             }
             Some(TokenKind::LeftBrace) => {
                 let body_start = self.current().expect("body exists").span.start();
-                self.arena
+                let declaration = self
+                    .arena
                     .add_function_declaration(self.span(start, body_start));
+                self.record_declaration_name(
+                    declaration,
+                    DeclarationKind::Function,
+                    &name,
+                    in_body,
+                );
                 self.saw_top_level_declaration |= !in_body;
                 self.parse_body_block();
             }
@@ -264,6 +291,7 @@ impl<'source> Parser<'source> {
             self.skip_to_declaration_boundary(in_body);
             return;
         }
+        let name = self.current().expect("declaration name exists").clone();
         self.advance();
 
         self.parse_generic_parameters();
@@ -278,23 +306,40 @@ impl<'source> Parser<'source> {
         }
 
         let body_start = self.current().expect("body exists").span.start();
-        match kind {
-            AstNodeKind::StructDeclaration => {
-                self.arena
-                    .add_struct_declaration(self.span(start, body_start));
-            }
-            AstNodeKind::EnumDeclaration => {
-                self.arena
-                    .add_enum_declaration(self.span(start, body_start));
-            }
-            AstNodeKind::InterfaceDeclaration => {
-                self.arena
-                    .add_interface_declaration(self.span(start, body_start));
-            }
+        let declaration = match kind {
+            AstNodeKind::StructDeclaration => self
+                .arena
+                .add_struct_declaration(self.span(start, body_start)),
+            AstNodeKind::EnumDeclaration => self
+                .arena
+                .add_enum_declaration(self.span(start, body_start)),
+            AstNodeKind::InterfaceDeclaration => self
+                .arena
+                .add_interface_declaration(self.span(start, body_start)),
             _ => unreachable!("only named body declarations are parsed here"),
-        }
+        };
+        self.record_declaration_name(declaration, DeclarationKind::Type, &name, in_body);
         self.saw_top_level_declaration |= !in_body;
         self.parse_declaration_body();
+    }
+
+    fn record_declaration_name(
+        &mut self,
+        declaration: crate::ast::AstNodeId,
+        kind: DeclarationKind,
+        name: &Token,
+        in_body: bool,
+    ) {
+        if in_body {
+            return;
+        }
+
+        self.declaration_names.push(ParsedDeclarationName {
+            declaration,
+            kind,
+            name: self.text[name.span.start()..name.span.end()].to_owned(),
+            name_span: name.span,
+        });
     }
 
     fn parse_declaration_body(&mut self) {

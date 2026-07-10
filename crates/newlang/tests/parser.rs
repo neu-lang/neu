@@ -1,4 +1,5 @@
 use newlang::ast::AstNodeKind;
+use newlang::name_resolution::DeclarationKind;
 use newlang::parser::{parse_source, DiagnosticKind};
 use newlang::source::SourceFileId;
 
@@ -225,4 +226,66 @@ fn rejects_deferred_body_forms() {
     assert!(kinds.contains(&DiagnosticKind::UnsupportedStatementForm));
     assert!(kinds.contains(&DiagnosticKind::MalformedUnsafeBlock));
     assert!(kinds.contains(&DiagnosticKind::UnsupportedExpressionForm));
+}
+
+#[test]
+fn records_top_level_function_declaration_name_metadata() {
+    let output = parse_source(SourceFileId::from_raw(12), "public fun main(): Int;");
+
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.declaration_names.len(), 1);
+
+    let declaration = &output.declaration_names[0];
+    assert_eq!(declaration.kind, DeclarationKind::Function);
+    assert_eq!(declaration.name, "main");
+    assert_eq!(declaration.name_span.start(), 11);
+    assert_eq!(declaration.name_span.end(), 15);
+    assert_eq!(
+        output.arena.node(declaration.declaration).unwrap().kind,
+        AstNodeKind::FunctionDeclaration
+    );
+}
+
+#[test]
+fn records_top_level_type_declaration_name_metadata() {
+    let output = parse_source(
+        SourceFileId::from_raw(13),
+        "struct Box {} enum State {} interface Service {}",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    let names: Vec<_> = output
+        .declaration_names
+        .iter()
+        .map(|declaration| (declaration.kind, declaration.name.as_str()))
+        .collect();
+
+    assert_eq!(
+        names,
+        vec![
+            (DeclarationKind::Type, "Box"),
+            (DeclarationKind::Type, "State"),
+            (DeclarationKind::Type, "Service"),
+        ]
+    );
+}
+
+#[test]
+fn declaration_name_metadata_excludes_nested_declarations_and_missing_names() {
+    let nested = parse_source(
+        SourceFileId::from_raw(14),
+        "struct Module { fun build(); enum State {} } fun ();",
+    );
+
+    let names: Vec<_> = nested
+        .declaration_names
+        .iter()
+        .map(|declaration| declaration.name.as_str())
+        .collect();
+
+    assert_eq!(names, vec!["Module"]);
+    assert!(nested
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingDeclarationName));
 }
