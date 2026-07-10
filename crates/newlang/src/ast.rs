@@ -19,6 +19,7 @@ pub enum AstNodeKind {
     PackageDeclaration,
     ImportDeclaration,
     FunctionDeclaration,
+    FunctionParameter,
     StructDeclaration,
     EnumDeclaration,
     EnumVariant,
@@ -84,6 +85,10 @@ impl AstArena {
 
     pub fn add_function_declaration(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::FunctionDeclaration, span)
+    }
+
+    pub fn add_function_parameter(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::FunctionParameter, span)
     }
 
     pub fn add_struct_declaration(&mut self, span: ByteSpan) -> AstNodeId {

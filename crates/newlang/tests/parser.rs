@@ -291,6 +291,36 @@ fn m0021_qualified_case_pattern_records_exact_identifier_metadata() {
 }
 
 #[test]
+fn m0021_typed_function_parameter_records_function_and_named_type() {
+    let file = SourceFileId::from_raw(210);
+    let output = parse_source(
+        file,
+        "fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.function_parameters.len(), 1);
+    let parameter = &output.function_parameters[0];
+    assert_eq!(parameter.name, "signal");
+    assert_eq!(parameter.function, output.declaration_names[0].declaration);
+    assert_eq!(
+        output.arena.node(parameter.parameter).unwrap().kind,
+        AstNodeKind::FunctionParameter
+    );
+    assert_eq!(
+        output.arena.node(parameter.annotation).unwrap().kind,
+        AstNodeKind::NamedType
+    );
+
+    let malformed = parse_source(
+        SourceFileId::from_raw(211),
+        "fun bad(signal Signal) { when (signal) { _ -> 0 } }",
+    );
+    assert!(!malformed.diagnostics.is_empty());
+    assert!(malformed.function_parameters.is_empty());
+}
+
+#[test]
 fn reports_malformed_type_and_generic_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(7),

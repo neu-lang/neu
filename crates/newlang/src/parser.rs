@@ -65,6 +65,7 @@ pub struct ParseOutput {
     pub local_declarations: Vec<ParsedLocalDeclaration>,
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
     pub generic_parameters: Vec<ParsedGenericParameter>,
+    pub function_parameters: Vec<ParsedFunctionParameter>,
     pub enum_variants: Vec<ParsedEnumVariant>,
     pub when_expressions: Vec<ParsedWhenExpression>,
     pub match_arms: Vec<ParsedMatchArm>,
@@ -84,6 +85,15 @@ pub struct ParsedGenericParameter {
     pub name: String,
     pub name_span: ByteSpan,
     pub capability_bounds: Vec<ParsedCapabilityBound>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedFunctionParameter {
+    pub function: AstNodeId,
+    pub parameter: AstNodeId,
+    pub name: String,
+    pub name_span: ByteSpan,
+    pub annotation: AstNodeId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -248,6 +258,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         local_declarations: parser.local_declarations,
         assignment_statements: parser.assignment_statements,
         generic_parameters: parser.generic_parameters,
+        function_parameters: parser.function_parameters,
         enum_variants: parser.enum_variants,
         when_expressions: parser.when_expressions,
         match_arms: parser.match_arms,
@@ -273,6 +284,7 @@ struct Parser<'source> {
     local_declarations: Vec<ParsedLocalDeclaration>,
     assignment_statements: Vec<ParsedAssignmentStatement>,
     generic_parameters: Vec<ParsedGenericParameter>,
+    function_parameters: Vec<ParsedFunctionParameter>,
     enum_variants: Vec<ParsedEnumVariant>,
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
@@ -293,6 +305,7 @@ impl<'source> Parser<'source> {
             declaration_names: Vec::new(),
             local_binding_names: Vec::new(),
             generic_parameters: Vec::new(),
+            function_parameters: Vec::new(),
             enum_variants: Vec::new(),
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
@@ -425,14 +438,27 @@ impl<'source> Parser<'source> {
 
         self.parse_generic_parameters();
 
-        if !self.consume_balanced_parentheses() {
-            self.diagnostic(
-                DiagnosticKind::MalformedDeclarationHeader,
-                self.span_at(start),
-            );
-            self.skip_to_declaration_boundary(in_body);
-            return;
-        }
+        let parameters = if self.function_parameter_list_has_body() {
+            let Some(parameters) = self.parse_typed_function_parameters() else {
+                self.diagnostic(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    self.span_at(start),
+                );
+                self.skip_to_declaration_boundary(in_body);
+                return;
+            };
+            parameters
+        } else {
+            if !self.consume_balanced_parentheses() {
+                self.diagnostic(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    self.span_at(start),
+                );
+                self.skip_to_declaration_boundary(in_body);
+                return;
+            }
+            Vec::new()
+        };
 
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
@@ -467,6 +493,7 @@ impl<'source> Parser<'source> {
                     in_body,
                 );
                 self.saw_top_level_declaration |= !in_body;
+                self.record_function_parameters(declaration, parameters);
                 self.parse_body_block();
             }
             _ => {
@@ -477,6 +504,143 @@ impl<'source> Parser<'source> {
                 self.skip_to_declaration_boundary(in_body);
             }
         }
+    }
+
+    fn parse_typed_function_parameters(&mut self) -> Option<Vec<ParsedFunctionParameter>> {
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            return None;
+        }
+        self.advance();
+        let mut parameters = Vec::new();
+        if self.current_kind() == Some(TokenKind::RightParen) {
+            self.advance();
+            return Some(parameters);
+        }
+        loop {
+            let name = self.current()?.clone();
+            if name.kind != TokenKind::Identifier {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    name.span,
+                );
+                return None;
+            }
+            self.advance();
+            if self.current_kind() != Some(TokenKind::Colon) {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    name.span,
+                );
+                return None;
+            }
+            self.advance();
+            let annotation_span = self.parse_named_type()?;
+            let annotation = self
+                .type_name_references
+                .iter()
+                .rev()
+                .find(|reference| reference.name_span == annotation_span)
+                .map(|reference| reference.reference);
+            let Some(annotation) = annotation else {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    name.span,
+                );
+                return None;
+            };
+            let parameter = self
+                .arena
+                .add_function_parameter(self.span(name.span.start(), annotation_span.end()));
+            parameters.push(ParsedFunctionParameter {
+                function: AstNodeId::from_raw(usize::MAX),
+                parameter,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                name_span: name.span,
+                annotation,
+            });
+            match self.current_kind() {
+                Some(TokenKind::Comma) => self.advance(),
+                Some(TokenKind::RightParen) => {
+                    self.advance();
+                    return Some(parameters);
+                }
+                _ => {
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                        name.span,
+                    );
+                    return None;
+                }
+            }
+        }
+    }
+
+    fn record_function_parameters(
+        &mut self,
+        function: AstNodeId,
+        parameters: Vec<ParsedFunctionParameter>,
+    ) {
+        self.function_parameters
+            .extend(parameters.into_iter().map(|mut parameter| {
+                parameter.function = function;
+                parameter
+            }));
+    }
+
+    fn function_parameter_list_has_body(&self) -> bool {
+        let mut index = self.index;
+        let mut depth = 0usize;
+        while let Some(token) = self.tokens.get(index) {
+            match token.kind {
+                TokenKind::LeftParen => depth += 1,
+                TokenKind::RightParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        index += 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            index += 1;
+        }
+        while let Some(token) = self.tokens.get(index) {
+            match token.kind {
+                TokenKind::LeftBrace => return true,
+                TokenKind::Semicolon => return false,
+                _ => index += 1,
+            }
+        }
+        false
+    }
+
+    fn consume_balanced_parentheses(&mut self) -> bool {
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            return false;
+        }
+        let mut depth = 0usize;
+        while let Some(kind) = self.current_kind() {
+            match kind {
+                TokenKind::LeftParen => {
+                    depth += 1;
+                    self.advance();
+                }
+                TokenKind::RightParen => {
+                    depth -= 1;
+                    self.advance();
+                    if depth == 0 {
+                        return true;
+                    }
+                }
+                TokenKind::LeftBrace | TokenKind::RightBrace | TokenKind::Semicolon
+                    if depth > 0 =>
+                {
+                    return false;
+                }
+                _ => self.advance(),
+            }
+        }
+        false
     }
 
     fn parse_named_body_declaration(&mut self, kind: AstNodeKind, in_body: bool) {
@@ -1461,35 +1625,6 @@ impl<'source> Parser<'source> {
                 return;
             }
         }
-    }
-
-    fn consume_balanced_parentheses(&mut self) -> bool {
-        if self.current_kind() != Some(TokenKind::LeftParen) {
-            return false;
-        }
-        let mut depth = 0usize;
-        while let Some(kind) = self.current_kind() {
-            match kind {
-                TokenKind::LeftParen => {
-                    depth += 1;
-                    self.advance();
-                }
-                TokenKind::RightParen => {
-                    depth -= 1;
-                    self.advance();
-                    if depth == 0 {
-                        return true;
-                    }
-                }
-                TokenKind::LeftBrace | TokenKind::RightBrace | TokenKind::Semicolon
-                    if depth > 0 =>
-                {
-                    return false;
-                }
-                _ => self.advance(),
-            }
-        }
-        false
     }
 
     fn parse_generic_parameters(&mut self) {
