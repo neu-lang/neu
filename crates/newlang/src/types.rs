@@ -102,6 +102,59 @@ pub enum TypeKind {
     Nullable(NullableType),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UnsupportedTypeForm {
+    VarianceAnnotation,
+    WildcardOrStarProjection,
+    ReceiverFunctionType,
+    FunctionTypeParameterName,
+    TypeAnnotationSyntax,
+    TypeAlias,
+    AssociatedType,
+    HigherKindedType,
+    DependentType,
+    IntersectionType,
+    UnionType,
+    InferredPlaceholderType,
+    LayoutType,
+    EffectType,
+    CoroutineSuspensionMarker,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TypeDiagnosticKind {
+    UnsupportedTypeForm,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeDiagnostic {
+    kind: TypeDiagnosticKind,
+    form: Option<UnsupportedTypeForm>,
+    node: AstNodeId,
+}
+
+impl TypeDiagnostic {
+    pub fn unsupported_type_form(form: UnsupportedTypeForm, node: AstNodeId) -> Self {
+        Self {
+            kind: TypeDiagnosticKind::UnsupportedTypeForm,
+            form: Some(form),
+            node,
+        }
+    }
+
+    pub fn kind(&self) -> TypeDiagnosticKind {
+        self.kind
+    }
+
+    pub fn form(&self) -> Option<UnsupportedTypeForm> {
+        self.form
+    }
+
+    pub fn node(&self) -> AstNodeId {
+        self.node
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeRecord {
     id: TypeId,

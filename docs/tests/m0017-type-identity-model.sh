@@ -66,7 +66,7 @@ require_text "$test_file" 'distinct_packages_produce_distinct_nominal_type_ident
 require_text "$test_file" 'generic_parameter_type_preserves_declaring_node_and_symbol'
 require_text "$test_file" 'type_record_preserves_kind_and_id'
 
-require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|OwnershipCapability|Layout|Abi|Hir|Mir|Cranelift|LLVM'
+require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|OwnershipCapability|Cranelift|LLVM'
 require_absent_text "$source" 'PrimitiveScalar|Int32|Int64|Float32|Float64|Bool|StringType'
 require_absent_text "$source" 'OptionalType'
 

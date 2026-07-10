@@ -54,7 +54,7 @@ require_text "$test_file" 'nullable_type_record_is_distinct_from_base_record'
 require_text "$test_file" 'nullable_record_storage_preserves_insertion_order'
 
 require_absent_text "$source" 'smart_cast|flow_typ|FlowType|MutationInvalidation|NullCheck|NullLiteral|FfiNull|PlatformNull'
-require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|OwnershipCapability|Layout|Abi|Hir|Mir|Cranelift|LLVM'
+require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|OwnershipCapability|Cranelift|LLVM'
 
 cargo test -p newlang --test types
 

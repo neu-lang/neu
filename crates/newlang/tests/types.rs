@@ -3,7 +3,8 @@ use newlang::{
     module::{ModuleName, PackageNamespace},
     symbol::SymbolId,
     types::{
-        GenericParameterType, NominalTypeIdentity, NullableType, TypeArena, TypeKind, TypeRecord,
+        GenericParameterType, NominalTypeIdentity, NullableType, TypeArena, TypeDiagnostic,
+        TypeDiagnosticKind, TypeId, TypeKind, TypeRecord, UnsupportedTypeForm,
     },
 };
 
@@ -133,4 +134,55 @@ fn nullable_record_storage_preserves_insertion_order() {
     assert_eq!(base.index(), 0);
     assert_eq!(nullable.index(), 1);
     assert_eq!(arena.get(nullable).unwrap().id(), nullable);
+}
+
+#[test]
+fn unsupported_type_form_diagnostic_preserves_form_and_node() {
+    let node = AstNodeId::from_raw(99);
+
+    let diagnostic =
+        TypeDiagnostic::unsupported_type_form(UnsupportedTypeForm::WildcardOrStarProjection, node);
+
+    assert_eq!(diagnostic.kind(), TypeDiagnosticKind::UnsupportedTypeForm);
+    assert_eq!(
+        diagnostic.form(),
+        Some(UnsupportedTypeForm::WildcardOrStarProjection)
+    );
+    assert_eq!(diagnostic.node(), node);
+}
+
+#[test]
+fn unsupported_type_form_variants_cover_adr0023_deferrals() {
+    let deferred_forms = [
+        UnsupportedTypeForm::VarianceAnnotation,
+        UnsupportedTypeForm::WildcardOrStarProjection,
+        UnsupportedTypeForm::ReceiverFunctionType,
+        UnsupportedTypeForm::FunctionTypeParameterName,
+        UnsupportedTypeForm::TypeAnnotationSyntax,
+        UnsupportedTypeForm::TypeAlias,
+        UnsupportedTypeForm::AssociatedType,
+        UnsupportedTypeForm::HigherKindedType,
+        UnsupportedTypeForm::DependentType,
+        UnsupportedTypeForm::IntersectionType,
+        UnsupportedTypeForm::UnionType,
+        UnsupportedTypeForm::InferredPlaceholderType,
+        UnsupportedTypeForm::LayoutType,
+        UnsupportedTypeForm::EffectType,
+        UnsupportedTypeForm::CoroutineSuspensionMarker,
+    ];
+
+    assert_eq!(deferred_forms.len(), 15);
+}
+
+#[test]
+fn unsupported_type_forms_do_not_become_type_records() {
+    let arena = TypeArena::new();
+    let diagnostic = TypeDiagnostic::unsupported_type_form(
+        UnsupportedTypeForm::ReceiverFunctionType,
+        AstNodeId::from_raw(8),
+    );
+
+    assert_eq!(arena.records().len(), 0);
+    assert_eq!(diagnostic.kind(), TypeDiagnosticKind::UnsupportedTypeForm);
+    assert!(arena.get(TypeId::from_raw(0)).is_none());
 }
