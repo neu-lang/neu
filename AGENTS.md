@@ -16,6 +16,12 @@ Existing behavior never overrides the specification or accepted ADRs. Do not
 invent language semantics. When accepted authority is ambiguous, missing, or
 contradictory, file an ambiguity report and stop the affected implementation.
 
+The project owner delegates future ADR acceptance to the main-task Chief
+Architect decision after the required semantic, diagnostic, adversarial,
+simplicity, and spec-compliance reviews are complete. No separate owner
+acceptance message is required for ADR-0036 and later unless the Chief
+Architect explicitly escalates the decision back to the owner.
+
 ## Main Task Workflow
 
 1. Read the assigned task and its Authority Extract.
@@ -89,6 +95,12 @@ Escalate by filing an ambiguity report when:
 
 The report must quote the ambiguity, list competing interpretations, explain
 why guessing is unsafe, and identify affected source-of-truth files.
+
+For ADRs, the main-task Chief Architect may approve the atomic acceptance
+bundle after the required reviews are satisfied. The acceptance bundle still
+must update accepted ADRs, `docs/SPEC.md`, ambiguity reports, tasks, and any
+other source-of-truth files called out by the decision before implementation
+can rely on the new semantics.
 
 ## Commit And CI
 

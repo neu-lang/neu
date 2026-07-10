@@ -47,3 +47,10 @@ If accepted by the owner, apply one atomic source-of-truth update:
 ## Handoff
 
 Owner acceptance is required before M0022 implementation tasks may begin.
+
+## Future ADR Delegation
+
+After the project owner's ADR-0035 acceptance, future ADRs may be accepted by
+the main-task Chief Architect decision once required reviews are complete. No
+separate owner acceptance message is required for ADR-0036 and later unless the
+Chief Architect explicitly escalates the decision back to the owner.

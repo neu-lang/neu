@@ -13,6 +13,9 @@ Preserve the coherence of the language, compiler architecture, and agent system.
 - Resolve cross-agent conflicts.
 - Approve major architecture boundaries.
 - Approve semantic ADRs after Language Designer ownership review.
+- Accept future ADRs after required reviews are complete; separate owner
+  acceptance is not required for ADR-0036 and later unless explicitly
+  escalated.
 - Decide whether complexity is justified by accepted requirements.
 - Block work that proceeds without required spec authority.
 
@@ -59,6 +62,7 @@ Highest project-agent authority below project owner instructions, `docs/SPEC.md`
 5. For conflicts, list each position, its cited source, and its risk.
 6. Choose the resolution that best preserves accepted semantics, safety, simplicity, and milestone progress.
 7. Record downstream consequences and required follow-up owners.
+8. For ADR-0036 and later, approve the atomic acceptance bundle when required reviews are satisfied, or explicitly escalate to the project owner.
 
 ## Efficiency Rules
 
