@@ -19,17 +19,64 @@ use newlang::symbol::{SymbolId, SymbolInterner};
 
 #[test]
 fn m0021_duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
+    let file = SourceFileId::from_raw(811);
+    let parsed = parse_source(
+        file,
+        "enum Signal { Red } fun first(signal: Signal) { when (signal) { Signal.Red -> 0; Signal.Red -> 1; _ -> 2; _ -> 3 } } fun second(signal: Signal) { when (signal) { Signal.Red -> 0 } }",
+    );
+    let metadata = ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [file]).unwrap();
+    let mut interner = SymbolInterner::new();
+    let variants = build_enum_variant_index(
+        &metadata,
+        &parsed.enum_variants,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let enum_types = resolve_enum_parameter_types(
+        &parsed.arena,
+        &metadata,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let bindings = build_scoped_binding_index(
+        &parsed.arena,
+        &parsed.function_parameters,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let names = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        bindings.index(),
+        &mut interner,
+    );
+    let subjects = analyze_when_subjects(
+        &parsed.when_expressions,
+        names.resolved_local_bindings(),
+        &enum_types,
+    );
+    let resolved = resolve_qualified_variant_arms(
+        &parsed.when_expressions,
+        &parsed.match_arms,
+        &parsed.qualified_case_patterns,
+        subjects.subjects(),
+        &variants,
+        &mut interner,
+    );
     let diagnostics = analyze_duplicate_match_arms(
-        &[AstNodeId::from_raw(1), AstNodeId::from_raw(1)],
-        &[
-            (AstNodeId::from_raw(10), true),
-            (AstNodeId::from_raw(11), true),
-        ],
+        &parsed.when_expressions,
+        &parsed.match_arms,
+        resolved.arms(),
     );
 
     assert_eq!(diagnostics.len(), 2);
-    assert_eq!(diagnostics[0].node(), AstNodeId::from_raw(1));
-    assert_eq!(diagnostics[1].node(), AstNodeId::from_raw(11));
+    assert_eq!(diagnostics[0].node(), parsed.match_arms[1].pattern);
+    assert_eq!(diagnostics[1].node(), parsed.match_arms[3].pattern);
 }
 
 #[test]

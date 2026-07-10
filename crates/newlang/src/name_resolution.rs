@@ -227,29 +227,43 @@ pub fn analyze_duplicate_enum_variants(
 }
 
 pub fn analyze_duplicate_match_arms(
-    variants: &[AstNodeId],
-    wildcards: &[(AstNodeId, bool)],
+    expressions: &[ParsedWhenExpression],
+    arms: &[ParsedMatchArm],
+    resolved_arms: &[ResolvedVariantArm],
 ) -> Vec<MatchDiagnostic> {
-    let mut seen_variants = HashMap::new();
-    let mut seen_wildcard = false;
     let mut diagnostics = Vec::new();
-    for variant in variants {
-        match seen_variants.entry(*variant) {
-            Entry::Occupied(_) => diagnostics.push(MatchDiagnostic {
-                kind: MatchDiagnosticKind::DuplicateMatchVariant,
-                node: *variant,
-            }),
-            Entry::Vacant(entry) => {
-                entry.insert(());
+    for expression in expressions {
+        let mut seen_variants = HashMap::new();
+        let mut seen_wildcard = false;
+        for arm_id in &expression.arms {
+            let Some(arm) = arms.iter().find(|arm| arm.arm == *arm_id) else {
+                continue;
+            };
+            if arm.pattern_kind == AstNodeKind::WildcardPattern {
+                if std::mem::replace(&mut seen_wildcard, true) {
+                    diagnostics.push(MatchDiagnostic {
+                        kind: MatchDiagnosticKind::DuplicateMatchWildcard,
+                        node: arm.pattern,
+                    });
+                }
+                continue;
             }
-        }
-    }
-    for (pattern, is_wildcard) in wildcards {
-        if *is_wildcard && std::mem::replace(&mut seen_wildcard, true) {
-            diagnostics.push(MatchDiagnostic {
-                kind: MatchDiagnosticKind::DuplicateMatchWildcard,
-                node: *pattern,
-            });
+
+            let Some(resolved) = resolved_arms
+                .iter()
+                .find(|resolved| resolved.arm == arm.arm)
+            else {
+                continue;
+            };
+            match seen_variants.entry(resolved.variant) {
+                Entry::Occupied(_) => diagnostics.push(MatchDiagnostic {
+                    kind: MatchDiagnosticKind::DuplicateMatchVariant,
+                    node: arm.pattern,
+                }),
+                Entry::Vacant(entry) => {
+                    entry.insert(arm.arm);
+                }
+            }
         }
     }
     diagnostics
