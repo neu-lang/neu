@@ -13,15 +13,16 @@ use newlang::{
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
-        known_local_symbol_types, recognize_m0019_null_tests, type_assignment_statements,
-        type_grouped_expressions, type_literal_expressions, type_m0018_accepted_expressions,
-        type_m0018_core, type_m0018_local_declaration_initializers, type_parser_literals,
+        known_local_symbol_types, recognize_m0019_null_tests, select_m0019_eligible_null_tests,
+        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
+        type_m0018_accepted_expressions, type_m0018_core,
+        type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
-        AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RefinedExpressionType,
-        RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
-        TypeRuleDiagnostic,
+        AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement, ExpressionType,
+        KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
+        RecognizedNullTest, RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -103,6 +104,203 @@ fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
     );
 
     assert!(recognized.is_empty());
+}
+
+#[test]
+fn m0019_null_test_eligibility_accepts_immutable_nullable_local() {
+    let null_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(200),
+        AstNodeId::from_raw(201),
+        AstNodeId::from_raw(202),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let symbol = SymbolId::from_raw(200);
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), symbol),
+        AstNodeId::from_raw(203),
+        LocalBindingKind::Val,
+    );
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(null_test.name_expression(), symbol));
+    let mut types = TypeArena::new();
+    let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let nullable_string = types.insert(TypeRecord::nullable(NullableType::new(string)));
+    let signatures = [DeclarationSignature::new(
+        binding.binding(),
+        nullable_string,
+    )];
+
+    let (eligible, report) = select_m0019_eligible_null_tests(
+        &[null_test],
+        &resolutions,
+        std::slice::from_ref(&binding),
+        &signatures,
+        &types,
+    );
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(
+        eligible,
+        vec![EligibleNullTestRefinement::new(
+            null_test,
+            binding,
+            nullable_string,
+            string
+        )]
+    );
+    assert_eq!(eligible[0].null_test(), null_test);
+    assert_eq!(eligible[0].original_nullable_type(), nullable_string);
+    assert_eq!(eligible[0].refined_non_null_type(), string);
+}
+
+#[test]
+fn m0019_null_test_eligibility_rejects_mutable_local_with_flow_diagnostic() {
+    let null_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(210),
+        AstNodeId::from_raw(211),
+        AstNodeId::from_raw(212),
+        ParsedBinaryOperator::Equal,
+        NullTestRefinedBranch::Else,
+    );
+    let symbol = SymbolId::from_raw(210);
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), symbol),
+        AstNodeId::from_raw(213),
+        LocalBindingKind::Var,
+    );
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(null_test.name_expression(), symbol));
+    let mut types = TypeArena::new();
+    let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let nullable_string = types.insert(TypeRecord::nullable(NullableType::new(string)));
+    let signatures = [DeclarationSignature::new(
+        binding.binding(),
+        nullable_string,
+    )];
+
+    let (eligible, report) = select_m0019_eligible_null_tests(
+        &[null_test],
+        &resolutions,
+        &[binding],
+        &signatures,
+        &types,
+    );
+
+    assert!(eligible.is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::UnsupportedFlowRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::MutableLocalRefinementDeferred
+    );
+    assert_eq!(report.diagnostics()[0].node(), null_test.name_expression());
+}
+
+#[test]
+fn m0019_null_test_eligibility_ignores_non_nullable_and_incomplete_inputs() {
+    let non_nullable_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(220),
+        AstNodeId::from_raw(221),
+        AstNodeId::from_raw(222),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let unresolved_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(223),
+        AstNodeId::from_raw(224),
+        AstNodeId::from_raw(225),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let missing_signature_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(226),
+        AstNodeId::from_raw(227),
+        AstNodeId::from_raw(228),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let non_nullable_symbol = SymbolId::from_raw(220);
+    let missing_signature_symbol = SymbolId::from_raw(221);
+    let non_nullable_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), non_nullable_symbol),
+        AstNodeId::from_raw(229),
+        LocalBindingKind::Val,
+    );
+    let missing_signature_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), missing_signature_symbol),
+        AstNodeId::from_raw(230),
+        LocalBindingKind::Val,
+    );
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(
+        non_nullable_test.name_expression(),
+        non_nullable_symbol,
+    ));
+    resolutions.insert(ResolvedName::new(
+        missing_signature_test.name_expression(),
+        missing_signature_symbol,
+    ));
+    let mut types = TypeArena::new();
+    let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let signatures = [DeclarationSignature::new(
+        non_nullable_binding.binding(),
+        string,
+    )];
+
+    let (eligible, report) = select_m0019_eligible_null_tests(
+        &[non_nullable_test, unresolved_test, missing_signature_test],
+        &resolutions,
+        &[non_nullable_binding, missing_signature_binding],
+        &signatures,
+        &types,
+    );
+
+    assert!(eligible.is_empty());
+    assert_eq!(report.diagnostics(), &[]);
+}
+
+#[test]
+fn m0019_null_test_eligibility_reports_ambiguous_local_binding_match() {
+    let null_test = RecognizedNullTest::new(
+        AstNodeId::from_raw(240),
+        AstNodeId::from_raw(241),
+        AstNodeId::from_raw(242),
+        ParsedBinaryOperator::NotEqual,
+        NullTestRefinedBranch::Then,
+    );
+    let symbol = SymbolId::from_raw(240);
+    let first = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), symbol),
+        AstNodeId::from_raw(243),
+        LocalBindingKind::Val,
+    );
+    let second = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(1), symbol),
+        AstNodeId::from_raw(244),
+        LocalBindingKind::Val,
+    );
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(null_test.name_expression(), symbol));
+    let types = TypeArena::new();
+
+    let (eligible, report) =
+        select_m0019_eligible_null_tests(&[null_test], &resolutions, &[first, second], &[], &types);
+
+    assert!(eligible.is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::AmbiguousFlowRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::AmbiguousLocalBindingFlow
+    );
+    assert_eq!(report.diagnostics()[0].node(), null_test.name_expression());
 }
 
 #[test]

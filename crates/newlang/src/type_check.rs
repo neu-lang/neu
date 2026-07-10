@@ -1,6 +1,6 @@
 use crate::{
     ast::{AstArena, AstNodeId, AstNodeKind},
-    name_resolution::{LocalBinding, ResolutionTable},
+    name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable},
     parser::{
         ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
         ParsedGroupedExpression, ParsedLiteralExpression, ParsedLiteralKind,
@@ -376,6 +376,46 @@ impl RecognizedNullTest {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EligibleNullTestRefinement {
+    null_test: RecognizedNullTest,
+    binding: LocalBinding,
+    original_nullable_type: TypeId,
+    refined_non_null_type: TypeId,
+}
+
+impl EligibleNullTestRefinement {
+    pub fn new(
+        null_test: RecognizedNullTest,
+        binding: LocalBinding,
+        original_nullable_type: TypeId,
+        refined_non_null_type: TypeId,
+    ) -> Self {
+        Self {
+            null_test,
+            binding,
+            original_nullable_type,
+            refined_non_null_type,
+        }
+    }
+
+    pub fn null_test(&self) -> RecognizedNullTest {
+        self.null_test
+    }
+
+    pub fn binding(&self) -> &LocalBinding {
+        &self.binding
+    }
+
+    pub fn original_nullable_type(&self) -> TypeId {
+        self.original_nullable_type
+    }
+
+    pub fn refined_non_null_type(&self) -> TypeId {
+        self.refined_non_null_type
+    }
+}
+
 impl AssignmentCheck {
     pub fn new(statement: AstNodeId, target: TypeId, value: TypeId) -> Self {
         Self {
@@ -613,6 +653,70 @@ fn is_name_expression(expression: AstNodeId, arena: &AstArena) -> bool {
     arena
         .node(expression)
         .is_some_and(|node| node.kind == AstNodeKind::NameExpression)
+}
+
+pub fn select_m0019_eligible_null_tests(
+    null_tests: &[RecognizedNullTest],
+    resolutions: &ResolutionTable,
+    local_bindings: &[LocalBinding],
+    declaration_signatures: &[DeclarationSignature],
+    arena: &TypeArena,
+) -> (Vec<EligibleNullTestRefinement>, TypeCheckReport) {
+    let mut eligible = Vec::new();
+    let mut report = TypeCheckReport::new();
+
+    for null_test in null_tests {
+        let Some(resolved) = resolutions.get(null_test.name_expression()) else {
+            continue;
+        };
+        let matching_bindings: Vec<_> = local_bindings
+            .iter()
+            .filter(|binding| binding.key().name() == resolved.symbol())
+            .collect();
+
+        let [binding] = matching_bindings.as_slice() else {
+            if matching_bindings.len() > 1 {
+                report.record_diagnostic(TypeCheckDiagnostic::ambiguous_flow_rule(
+                    TypeRuleDiagnostic::AmbiguousLocalBindingFlow,
+                    null_test.name_expression(),
+                ));
+            }
+            continue;
+        };
+
+        match binding.kind() {
+            LocalBindingKind::Val => {}
+            LocalBindingKind::Var => {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_flow_rule(
+                    TypeRuleDiagnostic::MutableLocalRefinementDeferred,
+                    null_test.name_expression(),
+                ));
+                continue;
+            }
+        }
+
+        let Some(signature) = declaration_signatures
+            .iter()
+            .find(|signature| signature.declaration() == binding.binding())
+        else {
+            continue;
+        };
+        let Some(record) = arena.get(signature.ty()) else {
+            continue;
+        };
+        let TypeKind::Nullable(nullable) = record.kind() else {
+            continue;
+        };
+
+        eligible.push(EligibleNullTestRefinement::new(
+            *null_test,
+            (*binding).clone(),
+            signature.ty(),
+            nullable.base(),
+        ));
+    }
+
+    (eligible, report)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
