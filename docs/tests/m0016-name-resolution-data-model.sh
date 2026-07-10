@@ -92,12 +92,16 @@ require_text "$test_file" 'local_binding_index_allows_same_name_in_distinct_scop
 require_text "$test_file" 'duplicate_local_binding_key_preserves_existing_binding'
 require_text "$test_file" 'diagnostic_kinds_cover_accepted_adr0026_variants'
 require_text "$parser" 'pub struct ParsedDeclarationName'
+require_text "$parser" 'pub struct ParsedLocalBindingName'
 require_text "$parser" 'pub declaration_names: Vec<ParsedDeclarationName>'
+require_text "$parser" 'pub local_binding_names: Vec<ParsedLocalBindingName>'
 require_text "$parser_test" 'records_top_level_function_declaration_name_metadata'
 require_text "$parser_test" 'records_top_level_type_declaration_name_metadata'
 require_text "$parser_test" 'declaration_name_metadata_excludes_nested_declarations_and_missing_names'
+require_text "$parser_test" 'records_local_val_and_var_binding_name_metadata'
+require_text "$parser_test" 'local_binding_name_metadata_excludes_malformed_declarations'
 
 require_absent_text "$source" 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
-require_absent_text "$parser" 'DeclarationIndex|resolve_names|resolve_module|resolve_file|collect_declarations'
+require_absent_text "$parser" 'DeclarationIndex|LocalBindingIndex|LocalScopeId|resolve_names|resolve_module|resolve_file|collect_declarations'
 
 echo "m0016-data-model: name resolution data model validation passed"

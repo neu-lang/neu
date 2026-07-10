@@ -1,6 +1,6 @@
 use crate::ast::{AstArena, AstNodeKind};
 use crate::lexer::{self, Token, TokenKind};
-use crate::name_resolution::DeclarationKind;
+use crate::name_resolution::{DeclarationKind, LocalBindingKind};
 use crate::source::{ByteSpan, SourceFileId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -55,12 +55,21 @@ pub struct ParseOutput {
     pub diagnostics: Vec<Diagnostic>,
     pub lex_diagnostics: Vec<lexer::Diagnostic>,
     pub declaration_names: Vec<ParsedDeclarationName>,
+    pub local_binding_names: Vec<ParsedLocalBindingName>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedDeclarationName {
     pub declaration: crate::ast::AstNodeId,
     pub kind: DeclarationKind,
+    pub name: String,
+    pub name_span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedLocalBindingName {
+    pub binding: crate::ast::AstNodeId,
+    pub kind: LocalBindingKind,
     pub name: String,
     pub name_span: ByteSpan,
 }
@@ -81,6 +90,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         diagnostics: parser.diagnostics,
         lex_diagnostics: lex_output.diagnostics,
         declaration_names: parser.declaration_names,
+        local_binding_names: parser.local_binding_names,
     }
 }
 
@@ -92,6 +102,7 @@ struct Parser<'source> {
     arena: AstArena,
     diagnostics: Vec<Diagnostic>,
     declaration_names: Vec<ParsedDeclarationName>,
+    local_binding_names: Vec<ParsedLocalBindingName>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -106,6 +117,7 @@ impl<'source> Parser<'source> {
             arena: AstArena::new(),
             diagnostics: Vec::new(),
             declaration_names: Vec::new(),
+            local_binding_names: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -485,6 +497,14 @@ impl<'source> Parser<'source> {
     }
 
     fn parse_variable_declaration_statement(&mut self) {
+        let kind = match self
+            .current_kind()
+            .expect("variable declaration starts with val or var")
+        {
+            TokenKind::KwVal => LocalBindingKind::Val,
+            TokenKind::KwVar => LocalBindingKind::Var,
+            _ => unreachable!("variable declaration starts with val or var"),
+        };
         let start = self
             .current()
             .expect("variable declaration starts with val or var")
@@ -500,6 +520,10 @@ impl<'source> Parser<'source> {
             self.skip_to_statement_boundary();
             return;
         }
+        let name = self
+            .current()
+            .expect("variable declaration name exists")
+            .clone();
         self.advance();
 
         if self.current_kind() == Some(TokenKind::Colon) {
@@ -529,8 +553,15 @@ impl<'source> Parser<'source> {
         if self.current_kind() == Some(TokenKind::Semicolon) {
             let end = self.current().expect("semicolon exists").span.end();
             self.advance();
-            self.arena
+            let binding = self
+                .arena
                 .add_variable_declaration_statement(self.span(start, end));
+            self.local_binding_names.push(ParsedLocalBindingName {
+                binding,
+                kind,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                name_span: name.span,
+            });
         } else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedVariableDeclaration,

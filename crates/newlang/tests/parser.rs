@@ -1,5 +1,5 @@
 use newlang::ast::AstNodeKind;
-use newlang::name_resolution::DeclarationKind;
+use newlang::name_resolution::{DeclarationKind, LocalBindingKind};
 use newlang::parser::{parse_source, DiagnosticKind};
 use newlang::source::SourceFileId;
 
@@ -165,6 +165,46 @@ fn parses_adr0024_body_statements_and_expressions() {
     assert!(kinds.contains(&AstNodeKind::MemberExpression));
     assert!(kinds.contains(&AstNodeKind::BinaryExpression));
     assert!(kinds.contains(&AstNodeKind::NameExpression));
+}
+
+#[test]
+fn records_local_val_and_var_binding_name_metadata() {
+    let file = SourceFileId::from_raw(18);
+    let source = "fun run() { val answer: Int = compute(); var next = answer; }";
+    let output = parse_source(file, source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.local_binding_names.len(), 2);
+
+    let first = &output.local_binding_names[0];
+    let second = &output.local_binding_names[1];
+
+    assert_eq!(first.kind, LocalBindingKind::Val);
+    assert_eq!(first.name, "answer");
+    assert_eq!(
+        &source[first.name_span.start()..first.name_span.end()],
+        "answer"
+    );
+    assert_eq!(second.kind, LocalBindingKind::Var);
+    assert_eq!(second.name, "next");
+    assert_eq!(
+        &source[second.name_span.start()..second.name_span.end()],
+        "next"
+    );
+    assert_ne!(first.binding, second.binding);
+}
+
+#[test]
+fn local_binding_name_metadata_excludes_malformed_declarations() {
+    let output = parse_source(
+        SourceFileId::from_raw(19),
+        "fun broken() { val : Int = compute(); var ok = value; }",
+    );
+
+    assert_eq!(output.local_binding_names.len(), 1);
+    assert_eq!(output.local_binding_names[0].kind, LocalBindingKind::Var);
+    assert_eq!(output.local_binding_names[0].name, "ok");
 }
 
 #[test]
