@@ -87,6 +87,6 @@ the narrow enum-typed parameter subject required by that subset.
 
 ## Completion Checklist
 
-- [ ] Sealed sums are checked.
-- [ ] Exhaustiveness is checked.
-- [ ] Diagnostics identify missing cases.
+- [x] Sealed sums are checked.
+- [x] Exhaustiveness is checked.
+- [x] Diagnostics identify missing cases.

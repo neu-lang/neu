@@ -1,8 +1,8 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    analyze_duplicate_enum_variants, analyze_duplicate_match_arms, analyze_when_subjects,
-    bind_accepted_name_references, bind_local_name_references,
+    analyze_duplicate_enum_variants, analyze_duplicate_match_arms, analyze_match_exhaustiveness,
+    analyze_when_subjects, bind_accepted_name_references, bind_local_name_references,
     bind_package_qualified_type_references, bind_unqualified_function_references,
     bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
     build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
@@ -77,6 +77,80 @@ fn m0021_duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(diagnostics[0].node(), parsed.match_arms[1].pattern);
     assert_eq!(diagnostics[1].node(), parsed.match_arms[3].pattern);
+}
+
+#[test]
+fn m0021_exhaustiveness_reports_only_otherwise_valid_missing_coverage() {
+    let file = SourceFileId::from_raw(812);
+    let parsed = parse_source(
+        file,
+        "enum Signal { Red, Yellow } fun complete(signal: Signal) { when (signal) { Signal.Red -> 0; Signal.Yellow -> 1 } } fun wildcard(signal: Signal) { when (signal) { _ -> 0 } } fun missing(signal: Signal) { when (signal) { Signal.Red -> 0 } } fun duplicate(signal: Signal) { when (signal) { Signal.Red -> 0; Signal.Red -> 1 } }",
+    );
+    let metadata = ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [file]).unwrap();
+    let mut interner = SymbolInterner::new();
+    let variants = build_enum_variant_index(
+        &metadata,
+        &parsed.enum_variants,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let enum_types = resolve_enum_parameter_types(
+        &parsed.arena,
+        &metadata,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let bindings = build_scoped_binding_index(
+        &parsed.arena,
+        &parsed.function_parameters,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let names = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        bindings.index(),
+        &mut interner,
+    );
+    let subjects = analyze_when_subjects(
+        &parsed.when_expressions,
+        names.resolved_local_bindings(),
+        &enum_types,
+    );
+    let resolved = resolve_qualified_variant_arms(
+        &parsed.when_expressions,
+        &parsed.match_arms,
+        &parsed.qualified_case_patterns,
+        subjects.subjects(),
+        &variants,
+        &mut interner,
+    );
+    let duplicates = analyze_duplicate_match_arms(
+        &parsed.when_expressions,
+        &parsed.match_arms,
+        resolved.arms(),
+    );
+    let coverage = analyze_match_exhaustiveness(
+        &parsed.when_expressions,
+        &parsed.match_arms,
+        subjects.subjects(),
+        resolved.arms(),
+        &variants,
+        resolved.diagnostics(),
+        &duplicates,
+    );
+
+    assert_eq!(coverage.len(), 1);
+    assert_eq!(
+        coverage[0].kind(),
+        newlang::name_resolution::MatchDiagnosticKind::NonExhaustiveMatch
+    );
+    assert_eq!(coverage[0].node(), parsed.when_expressions[2].subject);
 }
 
 #[test]

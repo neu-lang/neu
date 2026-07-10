@@ -143,6 +143,7 @@ pub enum MatchDiagnosticKind {
     DuplicateEnumVariant,
     DuplicateMatchVariant,
     DuplicateMatchWildcard,
+    NonExhaustiveMatch,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -264,6 +265,66 @@ pub fn analyze_duplicate_match_arms(
                     entry.insert(arm.arm);
                 }
             }
+        }
+    }
+    diagnostics
+}
+
+pub fn analyze_match_exhaustiveness(
+    expressions: &[ParsedWhenExpression],
+    arms: &[ParsedMatchArm],
+    subjects: &[ResolvedWhenSubject],
+    resolved_arms: &[ResolvedVariantArm],
+    variants: &EnumVariantIndex,
+    resolution_diagnostics: &[MatchDiagnostic],
+    duplicate_diagnostics: &[MatchDiagnostic],
+) -> Vec<MatchDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for expression in expressions {
+        let Some(subject) = subjects
+            .iter()
+            .find(|subject| subject.expression == expression.expression)
+        else {
+            continue;
+        };
+        let expression_arms: Vec<_> = expression
+            .arms
+            .iter()
+            .filter_map(|arm_id| arms.iter().find(|arm| arm.arm == *arm_id))
+            .collect();
+        let has_prior_diagnostic = resolution_diagnostics
+            .iter()
+            .chain(duplicate_diagnostics)
+            .any(|diagnostic| {
+                diagnostic.node == expression.subject
+                    || expression_arms
+                        .iter()
+                        .any(|arm| arm.pattern == diagnostic.node)
+            });
+        if has_prior_diagnostic
+            || expression_arms
+                .iter()
+                .any(|arm| arm.pattern_kind == AstNodeKind::WildcardPattern)
+        {
+            continue;
+        }
+
+        let is_missing_variant = variants
+            .variants()
+            .iter()
+            .filter(|variant| variant.enum_declaration() == subject.enum_declaration)
+            .any(|variant| {
+                !expression_arms.iter().any(|arm| {
+                    resolved_arms.iter().any(|resolved| {
+                        resolved.arm == arm.arm && resolved.variant == variant.variant()
+                    })
+                })
+            });
+        if is_missing_variant {
+            diagnostics.push(MatchDiagnostic {
+                kind: MatchDiagnosticKind::NonExhaustiveMatch,
+                node: expression.subject,
+            });
         }
     }
     diagnostics
