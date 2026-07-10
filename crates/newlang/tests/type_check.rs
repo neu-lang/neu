@@ -18,16 +18,242 @@ use newlang::{
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
         type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
-        type_m0019_local_declaration_initializers, type_parser_literals,
-        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
-        AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement, ExpressionType,
-        KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
-        RecognizedNullTest, RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
+        type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
+        type_parser_literals, type_primitive_local_declarations,
+        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
+        type_unsupported_m0018_expressions, AmbiguousTypeRule, AssignmentCheck,
+        DeclarationSignature, EligibleNullTestRefinement, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
+        RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
+
+#[test]
+fn m0019_mutation_invalidation_classifies_only_exact_post_region_bare_name_initializer() {
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
+    let file = SourceFileId::from_raw(430);
+    let mut ast = AstArena::new();
+    ast.add_source_file(ByteSpan::new(file, 0, 380).unwrap());
+    let _enclosing_block = ast.add_block(ByteSpan::new(file, 0, 380).unwrap());
+    let then_block = ast.add_block(ByteSpan::new(file, 40, 100).unwrap());
+    let else_block = ast.add_block(ByteSpan::new(file, 110, 150).unwrap());
+    let _nested_block = ast.add_block(ByteSpan::new(file, 50, 90).unwrap());
+    let second_then_block = ast.add_block(ByteSpan::new(file, 200, 240).unwrap());
+    let before = ast.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let condition = ast.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let guarded_descendant = ast.add_name_expression(ByteSpan::new(file, 60, 65).unwrap());
+    let shadowed = ast.add_name_expression(ByteSpan::new(file, 70, 75).unwrap());
+    let sibling_else = ast.add_name_expression(ByteSpan::new(file, 120, 125).unwrap());
+    let after = ast.add_name_expression(ByteSpan::new(file, 170, 175).unwrap());
+    let second_condition = ast.add_name_expression(ByteSpan::new(file, 190, 195).unwrap());
+    let second_after = ast.add_name_expression(ByteSpan::new(file, 270, 275).unwrap());
+    let unrefined = ast.add_name_expression(ByteSpan::new(file, 290, 295).unwrap());
+    let grouped_name = ast.add_name_expression(ByteSpan::new(file, 320, 325).unwrap());
+    let grouped = ast.add_grouped_expression(ByteSpan::new(file, 318, 327).unwrap());
+    let if_expression = ast.add_if_expression(ByteSpan::new(file, 30, 150).unwrap());
+    let second_if_expression = ast.add_if_expression(ByteSpan::new(file, 190, 260).unwrap());
+    let annotation = ast.add_named_type(ByteSpan::new(file, 330, 333).unwrap());
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(431),
+            annotation: Some(annotation),
+            initializer: Some(before),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(432),
+            annotation: Some(annotation),
+            initializer: Some(guarded_descendant),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(433),
+            annotation: Some(annotation),
+            initializer: Some(shadowed),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(434),
+            annotation: Some(annotation),
+            initializer: Some(sibling_else),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(435),
+            annotation: Some(annotation),
+            initializer: Some(after),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(436),
+            annotation: Some(annotation),
+            initializer: Some(second_after),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(441),
+            annotation: Some(annotation),
+            initializer: Some(unrefined),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(439),
+            annotation: Some(annotation),
+            initializer: Some(grouped),
+        },
+    ];
+    let signatures = declarations
+        .each_ref()
+        .map(|declaration| DeclarationSignature::new(declaration.declaration, int));
+    let expression_types = [
+        ExpressionType::new(before, nullable_int),
+        ExpressionType::new(guarded_descendant, nullable_int),
+        ExpressionType::new(shadowed, nullable_int),
+        ExpressionType::new(sibling_else, nullable_int),
+        ExpressionType::new(after, nullable_int),
+        ExpressionType::new(second_after, nullable_int),
+        ExpressionType::new(unrefined, nullable_int),
+        ExpressionType::new(grouped_name, nullable_int),
+        ExpressionType::new(grouped, nullable_int),
+    ];
+    let outer_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(430)),
+        AstNodeId::from_raw(437),
+        LocalBindingKind::Immutable,
+    );
+    let shadow_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(1), SymbolId::from_raw(430)),
+        AstNodeId::from_raw(438),
+        LocalBindingKind::Immutable,
+    );
+    let unrefined_binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(431)),
+        AstNodeId::from_raw(440),
+        LocalBindingKind::Immutable,
+    );
+    let mut flow = TypeCheckReport::new();
+    flow.record_refinement(RefinementRecord::new(
+        then_block,
+        condition,
+        condition,
+        outer_binding.clone(),
+        nullable_int,
+        int,
+    ));
+    flow.record_refinement(RefinementRecord::new(
+        second_then_block,
+        second_condition,
+        second_condition,
+        outer_binding.clone(),
+        nullable_int,
+        int,
+    ));
+    flow.record_refined_expression_type(RefinedExpressionType::new(
+        guarded_descendant,
+        then_block,
+        nullable_int,
+        int,
+    ));
+    let resolved = [
+        ResolvedLocalBinding::new(before, outer_binding.clone()),
+        ResolvedLocalBinding::new(guarded_descendant, outer_binding.clone()),
+        ResolvedLocalBinding::new(shadowed, shadow_binding),
+        ResolvedLocalBinding::new(sibling_else, outer_binding.clone()),
+        ResolvedLocalBinding::new(after, outer_binding.clone()),
+        ResolvedLocalBinding::new(second_after, outer_binding.clone()),
+        ResolvedLocalBinding::new(unrefined, unrefined_binding),
+        ResolvedLocalBinding::new(grouped_name, outer_binding),
+    ];
+    let if_expressions = [
+        ParsedIfExpression {
+            expression: if_expression,
+            condition,
+            then_block,
+            else_block: Some(else_block),
+            span: ByteSpan::new(file, 30, 150).unwrap(),
+        },
+        ParsedIfExpression {
+            expression: second_if_expression,
+            condition: second_condition,
+            then_block: second_then_block,
+            else_block: None,
+            span: ByteSpan::new(file, 190, 260).unwrap(),
+        },
+    ];
+
+    let report = type_m0019_region_exit_refinement_invalidations(
+        &declarations,
+        &signatures,
+        &expression_types,
+        &flow,
+        &resolved,
+        &if_expressions,
+        &ast,
+        &types,
+    );
+
+    assert_eq!(
+        report.assignment_checks(),
+        &[AssignmentCheck::new(declarations[1].declaration, int, int)]
+    );
+    assert_eq!(report.diagnostics().len(), 7);
+    assert_eq!(
+        report.diagnostics()[3],
+        TypeCheckDiagnostic::invalidated_refinement(
+            TypeRuleDiagnostic::RegionExitInvalidatedRefinement,
+            after,
+            int,
+            nullable_int,
+        )
+    );
+    // The diagnostic is represented only by the later bare-name node: ADR-0031 has no secondary span.
+    assert_eq!(report.diagnostics()[3].node(), after);
+    assert_eq!(report.diagnostics()[3].actual_type(), Some(nullable_int));
+    assert_eq!(
+        ast.node(report.diagnostics()[3].node()).unwrap().span,
+        ByteSpan::new(file, 170, 175).unwrap()
+    );
+    assert!(report.refined_expression_types().is_empty());
+    assert_eq!(report.refined_expression_type(after), None);
+    assert_eq!(
+        report.diagnostics()[4],
+        TypeCheckDiagnostic::invalidated_refinement(
+            TypeRuleDiagnostic::RegionExitInvalidatedRefinement,
+            second_after,
+            int,
+            nullable_int,
+        )
+    );
+    assert_eq!(report.diagnostics()[4].node(), second_after);
+    assert_eq!(report.diagnostics()[4].actual_type(), Some(nullable_int));
+    assert_eq!(
+        ast.node(report.diagnostics()[4].node()).unwrap().span,
+        ByteSpan::new(file, 270, 275).unwrap()
+    );
+    assert_eq!(report.refined_expression_type(second_after), None);
+    assert!(report.diagnostics()[..3].iter().all(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::InvalidNullableUse
+            && diagnostic.rule() == TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    }));
+    assert_eq!(
+        report.diagnostics()[..3]
+            .iter()
+            .map(TypeCheckDiagnostic::node)
+            .collect::<Vec<_>>(),
+        vec![before, shadowed, sibling_else]
+    );
+    assert_eq!(
+        report.diagnostics()[5].kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+    assert_eq!(
+        report.diagnostics()[5].rule(),
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    );
+    assert_eq!(report.diagnostics()[5].node(), unrefined);
+    assert_eq!(
+        report.diagnostics()[6].kind(),
+        TypeCheckDiagnosticKind::TypeMismatch
+    );
+    assert_eq!(report.diagnostics()[6].node(), grouped);
+}
 
 #[test]
 fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {

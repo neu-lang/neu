@@ -1111,6 +1111,52 @@ pub fn type_m0019_local_declaration_initializers(
     ast_arena: &AstArena,
     type_arena: &TypeArena,
 ) -> TypeCheckReport {
+    type_m0019_local_declaration_initializers_with_region_exit_invalidations(
+        declarations,
+        declaration_signatures,
+        known_expression_types,
+        flow_report,
+        resolved_local_bindings,
+        None,
+        ast_arena,
+        type_arena,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn type_m0019_region_exit_refinement_invalidations(
+    declarations: &[ParsedLocalDeclaration],
+    declaration_signatures: &[DeclarationSignature],
+    known_expression_types: &[ExpressionType],
+    flow_report: &TypeCheckReport,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    if_expressions: &[ParsedIfExpression],
+    ast_arena: &AstArena,
+    type_arena: &TypeArena,
+) -> TypeCheckReport {
+    type_m0019_local_declaration_initializers_with_region_exit_invalidations(
+        declarations,
+        declaration_signatures,
+        known_expression_types,
+        flow_report,
+        resolved_local_bindings,
+        Some(if_expressions),
+        ast_arena,
+        type_arena,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn type_m0019_local_declaration_initializers_with_region_exit_invalidations(
+    declarations: &[ParsedLocalDeclaration],
+    declaration_signatures: &[DeclarationSignature],
+    known_expression_types: &[ExpressionType],
+    flow_report: &TypeCheckReport,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    if_expressions: Option<&[ParsedIfExpression]>,
+    ast_arena: &AstArena,
+    type_arena: &TypeArena,
+) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
 
     for signature in declaration_signatures {
@@ -1164,12 +1210,33 @@ pub fn type_m0019_local_declaration_initializers(
                 type_arena,
             )
         {
-            report.record_diagnostic(TypeCheckDiagnostic::invalid_nullable_use(
-                TypeRuleDiagnostic::NullableAssignmentWithoutRefinement,
-                initializer,
-                target_type,
-                original_initializer_type,
-            ));
+            let diagnostic = if if_expressions.is_some_and(|if_expressions| {
+                exact_m0019_region_exit_nullable_name_initializer(
+                    initializer,
+                    original_initializer_type,
+                    target_type,
+                    flow_report,
+                    resolved_local_bindings,
+                    if_expressions,
+                    ast_arena,
+                    type_arena,
+                )
+            }) {
+                TypeCheckDiagnostic::invalidated_refinement(
+                    TypeRuleDiagnostic::RegionExitInvalidatedRefinement,
+                    initializer,
+                    target_type,
+                    original_initializer_type,
+                )
+            } else {
+                TypeCheckDiagnostic::invalid_nullable_use(
+                    TypeRuleDiagnostic::NullableAssignmentWithoutRefinement,
+                    initializer,
+                    target_type,
+                    original_initializer_type,
+                )
+            };
+            report.record_diagnostic(diagnostic);
         } else {
             report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
                 initializer,
@@ -1297,6 +1364,81 @@ fn exact_m0019_nullable_name_initializer(
         .iter()
         .filter(|resolved| resolved.reference() == initializer);
     matching.next().is_some() && matching.next().is_none()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn exact_m0019_region_exit_nullable_name_initializer(
+    initializer: AstNodeId,
+    original_type: TypeId,
+    target_type: TypeId,
+    flow_report: &TypeCheckReport,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    if_expressions: &[ParsedIfExpression],
+    ast_arena: &AstArena,
+    type_arena: &TypeArena,
+) -> bool {
+    if ast_arena.node(initializer).map(|node| node.kind) != Some(AstNodeKind::NameExpression)
+        || nullable_base_type(original_type, type_arena) != Some(target_type)
+    {
+        return false;
+    }
+    let Some(initializer_span) = ast_arena.node(initializer).map(|node| node.span) else {
+        return false;
+    };
+
+    let mut matching_resolutions = resolved_local_bindings
+        .iter()
+        .filter(|resolved| resolved.reference() == initializer);
+    let Some(resolved) = matching_resolutions.next() else {
+        return false;
+    };
+    if matching_resolutions.next().is_some()
+        || resolved.binding().kind() != LocalBindingKind::Immutable
+    {
+        return false;
+    }
+
+    flow_report.refinements().iter().any(|refinement| {
+        if refinement.binding() != resolved.binding()
+            || refinement.binding().kind() != LocalBindingKind::Immutable
+            || refinement.original_nullable_type() != original_type
+            || refinement.refined_non_null_type() != target_type
+        {
+            return false;
+        }
+
+        let Some(if_expression) = if_expressions
+            .iter()
+            .find(|if_expression| if_expression.condition == refinement.originating_null_test())
+        else {
+            return false;
+        };
+        let is_refined_branch = refinement.region() == if_expression.then_block
+            || if_expression.else_block == Some(refinement.region());
+
+        is_refined_branch
+            && if_expression.span.file() == initializer_span.file()
+            && if_expression.span.end() <= initializer_span.start()
+            && m0019_immediate_containing_block(ast_arena, if_expression.span)
+                == m0019_immediate_containing_block(ast_arena, initializer_span)
+    })
+}
+
+fn m0019_immediate_containing_block(
+    arena: &AstArena,
+    span: crate::source::ByteSpan,
+) -> Option<AstNodeId> {
+    arena
+        .nodes()
+        .iter()
+        .filter(|node| {
+            node.kind == AstNodeKind::Block
+                && node.span.file() == span.file()
+                && node.span.start() <= span.start()
+                && span.end() <= node.span.end()
+        })
+        .min_by_key(|node| node.span.end() - node.span.start())
+        .map(|node| node.id)
 }
 
 fn nullable_base_type(ty: TypeId, arena: &TypeArena) -> Option<TypeId> {
