@@ -1,12 +1,13 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    bind_local_name_references, bind_unqualified_function_references,
-    bind_unqualified_type_references, build_declaration_index, build_local_binding_index,
-    build_local_scope_tree, build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert,
-    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
-    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult,
-    LocalScopeId, LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    bind_local_name_references, bind_package_qualified_type_references,
+    bind_unqualified_function_references, bind_unqualified_type_references,
+    build_declaration_index, build_local_binding_index, build_local_scope_tree,
+    build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
+    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
+    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
+    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
     ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
@@ -1345,5 +1346,135 @@ fn unqualified_type_reference_binding_does_not_treat_functions_as_type_fallback(
     assert_eq!(
         bound.diagnostics()[0].kind(),
         ResolutionDiagnosticKind::UnresolvedName
+    );
+}
+
+#[test]
+fn package_qualified_type_reference_binding_uses_explicit_package_namespace() {
+    let type_file = SourceFileId::from_raw(110);
+    let run_file = SourceFileId::from_raw(111);
+    let type_source = parse_source(type_file, "struct Box {}");
+    let run = parse_source(run_file, "fun run(): lib.Box;");
+    assert!(type_source.diagnostics.is_empty());
+    assert!(run.diagnostics.is_empty());
+    assert_eq!(run.type_name_references.len(), 1);
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (type_file, PackageNamespace::parse("lib").unwrap()),
+            (run_file, PackageNamespace::parse("app").unwrap()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = type_source.declaration_names.clone();
+    declarations.extend(run.declaration_names.clone());
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &declarations, &mut interner);
+
+    let bound = bind_package_qualified_type_references(
+        &metadata,
+        &run.type_name_references,
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.inserts().len(), 1);
+    assert_eq!(bound.table().resolved_names().len(), 1);
+    let resolved = bound.table().resolved_names()[0];
+    assert_eq!(resolved.reference(), run.type_name_references[0].reference);
+    assert_eq!(interner.resolve(resolved.symbol()), Some("Box"));
+}
+
+#[test]
+fn package_qualified_type_reference_binding_splits_nested_package_at_final_dot() {
+    let type_file = SourceFileId::from_raw(112);
+    let run_file = SourceFileId::from_raw(113);
+    let type_source = parse_source(type_file, "struct Result {}");
+    let run = parse_source(run_file, "fun run(): lib.core.Result;");
+    assert!(type_source.diagnostics.is_empty());
+    assert!(run.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (type_file, PackageNamespace::parse("lib.core").unwrap()),
+            (run_file, PackageNamespace::parse("app").unwrap()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = type_source.declaration_names.clone();
+    declarations.extend(run.declaration_names.clone());
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &declarations, &mut interner);
+
+    let bound = bind_package_qualified_type_references(
+        &metadata,
+        &run.type_name_references,
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.table().resolved_names().len(), 1);
+    assert_eq!(
+        interner.resolve(bound.table().resolved_names()[0].symbol()),
+        Some("Result")
+    );
+}
+
+#[test]
+fn package_qualified_type_reference_binding_ignores_unqualified_type_names() {
+    let file = SourceFileId::from_raw(114);
+    let parsed = parse_source(file, "struct Box {} fun run(): Box;");
+    assert!(parsed.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::root())],
+    )
+    .unwrap();
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+
+    let bound = bind_package_qualified_type_references(
+        &metadata,
+        &parsed.type_name_references,
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert!(bound.inserts().is_empty());
+    assert!(bound.diagnostics().is_empty());
+}
+
+#[test]
+fn package_qualified_type_reference_binding_rejects_missing_and_function_candidates() {
+    let file = SourceFileId::from_raw(115);
+    let parsed = parse_source(file, "fun Box(); fun run(): lib.Box;");
+    assert!(parsed.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::parse("lib").unwrap())],
+    )
+    .unwrap();
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+
+    let bound = bind_package_qualified_type_references(
+        &metadata,
+        &parsed.type_name_references,
+        declarations.index(),
+        &mut interner,
+    );
+
+    assert!(bound.table().resolved_names().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+    assert_eq!(
+        bound.diagnostics()[0].primary_span(),
+        parsed.type_name_references[0].name_span
     );
 }

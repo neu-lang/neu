@@ -642,6 +642,78 @@ pub fn bind_unqualified_type_references(
     }
 }
 
+#[derive(Debug)]
+pub struct PackageQualifiedTypeReferenceBind {
+    table: ResolutionTable,
+    inserts: Vec<ResolutionInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
+}
+
+impl PackageQualifiedTypeReferenceBind {
+    pub fn table(&self) -> &ResolutionTable {
+        &self.table
+    }
+
+    pub fn inserts(&self) -> &[ResolutionInsert] {
+        &self.inserts
+    }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn bind_package_qualified_type_references(
+    metadata: &ModuleMetadata,
+    references: &[ParsedTypeNameReference],
+    declarations: &DeclarationIndex,
+    interner: &mut SymbolInterner,
+) -> PackageQualifiedTypeReferenceBind {
+    let mut table = ResolutionTable::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for reference in references {
+        let Some((package_text, name_text)) = reference.name.rsplit_once('.') else {
+            continue;
+        };
+        if package_text.is_empty() {
+            continue;
+        }
+        let Ok(package) = PackageNamespace::parse(package_text) else {
+            diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::UnresolvedName,
+                reference.name_span,
+            ));
+            continue;
+        };
+
+        let name = interner.intern(name_text);
+        match declarations.lookup_top_level(TopLevelLookup::new(
+            metadata.name().clone(),
+            package,
+            name,
+            DeclarationKind::Type,
+            reference.name_span,
+        )) {
+            TopLevelLookupResult::Found(declaration) => {
+                let insert = table.insert(ResolvedName::new(
+                    reference.reference,
+                    declaration.key().name(),
+                ));
+                inserts.push(insert);
+            }
+            TopLevelLookupResult::Unresolved(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+
+    PackageQualifiedTypeReferenceBind {
+        table,
+        inserts,
+        diagnostics,
+    }
+}
+
 fn local_binding_is_visible(
     arena: &AstArena,
     binding: &LocalBinding,
