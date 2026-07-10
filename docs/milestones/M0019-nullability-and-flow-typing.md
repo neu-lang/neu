@@ -85,7 +85,6 @@ ADR-0006 defines nullable types. ADR-0011 permits flow-sensitive smart casts for
 
 ## Completion Checklist
 
-- [ ] Nullable checks pass.
-- [ ] Smart casts are tested.
-- [ ] Mutation invalidation is tested.
-
+- [x] Nullable checks pass.
+- [x] Smart casts are tested.
+- [x] Mutation invalidation is tested.
