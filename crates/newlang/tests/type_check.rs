@@ -17,13 +17,14 @@ use newlang::{
         record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
         type_m0018_accepted_expressions, type_m0018_core,
-        type_m0018_local_declaration_initializers, type_parser_literals,
-        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
-        AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement, ExpressionType,
-        KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
-        RecognizedNullTest, RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
+        type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
+        type_parser_literals, type_primitive_local_declarations,
+        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
+        type_unsupported_m0018_expressions, AmbiguousTypeRule, AssignmentCheck,
+        DeclarationSignature, EligibleNullTestRefinement, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
+        RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -1697,6 +1698,460 @@ fn assignment_statement_type_checking_rejects_null_for_non_nullable_targets() {
     assert_eq!(report.diagnostics()[0].node(), AstNodeId::from_raw(182));
     assert_eq!(report.diagnostics()[0].expected_type(), Some(int_id));
     assert_eq!(report.diagnostics()[0].actual_type(), Some(null_id));
+}
+
+#[test]
+fn assignment_statement_type_checking_keeps_nullable_to_base_as_m0018_type_mismatch() {
+    let mut arena = TypeArena::new();
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int_id = arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let value = AstNodeId::from_raw(343);
+    let assignments = [ParsedAssignmentStatement {
+        statement: AstNodeId::from_raw(344),
+        target: AstNodeId::from_raw(345),
+        value,
+    }];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(345), int_id),
+        ExpressionType::new(value, nullable_int_id),
+    ];
+
+    let report = type_assignment_statements(&assignments, &expression_types, &arena);
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::TypeMismatch
+    );
+    assert_eq!(report.diagnostics()[0].actual_type(), Some(nullable_int_id));
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_accepts_valid_refined_value() {
+    let mut type_arena = TypeArena::new();
+    let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let file = SourceFileId::from_raw(343);
+    let mut ast_arena = AstArena::new();
+    ast_arena.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let region = ast_arena.add_block(ByteSpan::new(file, 10, 60).unwrap());
+    let inside_value = ast_arena.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let outside_value = ast_arena.add_name_expression(ByteSpan::new(file, 70, 75).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(343)),
+        AstNodeId::from_raw(344),
+        LocalBindingKind::Val,
+    );
+    let resolved = [
+        ResolvedLocalBinding::new(inside_value, binding.clone()),
+        ResolvedLocalBinding::new(outside_value, binding.clone()),
+    ];
+    let mut flow_report = TypeCheckReport::new();
+    flow_report.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(345),
+        AstNodeId::from_raw(346),
+        binding,
+        nullable_int_id,
+        int_id,
+    ));
+    record_m0019_refined_expression_types(&mut flow_report, &ast_arena, &resolved);
+    let inside_statement = AstNodeId::from_raw(347);
+    let outside_statement = AstNodeId::from_raw(348);
+    let inside_target = AstNodeId::from_raw(349);
+    let outside_target = AstNodeId::from_raw(350);
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: inside_statement,
+            target: inside_target,
+            value: inside_value,
+        },
+        ParsedAssignmentStatement {
+            statement: outside_statement,
+            target: outside_target,
+            value: outside_value,
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(inside_target, int_id),
+        ExpressionType::new(inside_value, nullable_int_id),
+        ExpressionType::new(outside_target, int_id),
+        ExpressionType::new(outside_value, nullable_int_id),
+    ];
+
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &resolved,
+        &ast_arena,
+        &type_arena,
+    );
+
+    assert_eq!(
+        report.assignment_checks(),
+        &[AssignmentCheck::new(inside_statement, int_id, int_id)]
+    );
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(report.diagnostics()[0].node(), outside_value);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_reports_unrefined_nullable_to_base() {
+    let mut arena = TypeArena::new();
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int_id = arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let statement = AstNodeId::from_raw(347);
+    let target = AstNodeId::from_raw(348);
+    let value = AstNodeId::from_raw(349);
+    let assignments = [ParsedAssignmentStatement {
+        statement,
+        target,
+        value,
+    }];
+    let expression_types = [
+        ExpressionType::new(target, int_id),
+        ExpressionType::new(value, nullable_int_id),
+    ];
+
+    let flow_report = TypeCheckReport::new();
+    let ast_arena = AstArena::new();
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &[],
+        &ast_arena,
+        &arena,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    let diagnostic = &report.diagnostics()[0];
+    assert_eq!(
+        diagnostic.kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+    assert_eq!(
+        diagnostic.rule(),
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    );
+    assert_eq!(diagnostic.node(), value);
+    assert_eq!(diagnostic.expected_type(), Some(int_id));
+    assert_eq!(diagnostic.actual_type(), Some(nullable_int_id));
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_preserves_m0018_compatibility() {
+    let mut arena = TypeArena::new();
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let null_id = arena.insert(TypeRecord::primitive(PrimitiveType::Null));
+    let nullable_int_id = arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(350),
+            target: AstNodeId::from_raw(351),
+            value: AstNodeId::from_raw(352),
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(353),
+            target: AstNodeId::from_raw(354),
+            value: AstNodeId::from_raw(355),
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(356),
+            target: AstNodeId::from_raw(357),
+            value: AstNodeId::from_raw(358),
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(351), int_id),
+        ExpressionType::new(AstNodeId::from_raw(352), int_id),
+        ExpressionType::new(AstNodeId::from_raw(354), nullable_int_id),
+        ExpressionType::new(AstNodeId::from_raw(355), null_id),
+        ExpressionType::new(AstNodeId::from_raw(357), nullable_int_id),
+        ExpressionType::new(AstNodeId::from_raw(358), int_id),
+    ];
+
+    let flow_report = TypeCheckReport::new();
+    let ast_arena = AstArena::new();
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &[],
+        &ast_arena,
+        &arena,
+    );
+
+    assert!(report.diagnostics().is_empty());
+    assert_eq!(report.assignment_checks().len(), 3);
+    assert_eq!(report.assignment_checks()[0].value(), int_id);
+    assert_eq!(report.assignment_checks()[1].value(), null_id);
+    assert_eq!(report.assignment_checks()[2].value(), int_id);
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_keeps_other_mismatches() {
+    let mut arena = TypeArena::new();
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let string_id = arena.insert(TypeRecord::primitive(PrimitiveType::String));
+    let null_id = arena.insert(TypeRecord::primitive(PrimitiveType::Null));
+    let nullable_string_id = arena.insert(TypeRecord::nullable(NullableType::new(string_id)));
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(359),
+            target: AstNodeId::from_raw(360),
+            value: AstNodeId::from_raw(361),
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(362),
+            target: AstNodeId::from_raw(363),
+            value: AstNodeId::from_raw(364),
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(360), int_id),
+        ExpressionType::new(AstNodeId::from_raw(361), null_id),
+        ExpressionType::new(AstNodeId::from_raw(363), int_id),
+        ExpressionType::new(AstNodeId::from_raw(364), nullable_string_id),
+    ];
+
+    let flow_report = TypeCheckReport::new();
+    let ast_arena = AstArena::new();
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &[],
+        &ast_arena,
+        &arena,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 2);
+    assert!(report
+        .diagnostics()
+        .iter()
+        .all(|diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch));
+    assert_eq!(report.diagnostics()[0].actual_type(), Some(null_id));
+    assert_eq!(
+        report.diagnostics()[1].actual_type(),
+        Some(nullable_string_id)
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_ignores_inconsistent_refined_views() {
+    let mut type_arena = TypeArena::new();
+    let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let string_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::String));
+    let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let nullable_string_id = type_arena.insert(TypeRecord::nullable(NullableType::new(string_id)));
+    let file = SourceFileId::from_raw(365);
+    let mut ast_arena = AstArena::new();
+    ast_arena.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let region = ast_arena.add_block(ByteSpan::new(file, 10, 90).unwrap());
+    let first_value = ast_arena.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let second_value = ast_arena.add_name_expression(ByteSpan::new(file, 30, 35).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(365)),
+        AstNodeId::from_raw(366),
+        LocalBindingKind::Val,
+    );
+    let resolved = [
+        ResolvedLocalBinding::new(first_value, binding.clone()),
+        ResolvedLocalBinding::new(second_value, binding.clone()),
+    ];
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(367),
+            target: AstNodeId::from_raw(368),
+            value: first_value,
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(369),
+            target: AstNodeId::from_raw(370),
+            value: second_value,
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(368), int_id),
+        ExpressionType::new(first_value, nullable_int_id),
+        ExpressionType::new(AstNodeId::from_raw(370), int_id),
+        ExpressionType::new(second_value, nullable_int_id),
+    ];
+    let mut flow_report = TypeCheckReport::new();
+    flow_report.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(371),
+        AstNodeId::from_raw(372),
+        binding,
+        nullable_int_id,
+        int_id,
+    ));
+    flow_report.record_refined_expression_type(RefinedExpressionType::new(
+        first_value,
+        region,
+        nullable_string_id,
+        string_id,
+    ));
+    flow_report.record_refined_expression_type(RefinedExpressionType::new(
+        second_value,
+        region,
+        nullable_int_id,
+        string_id,
+    ));
+
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &resolved,
+        &ast_arena,
+        &type_arena,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 2);
+    assert!(report.diagnostics().iter().all(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::InvalidNullableUse
+            && diagnostic.rule() == TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    }));
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_rejects_duplicate_refined_views() {
+    let mut type_arena = TypeArena::new();
+    let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let file = SourceFileId::from_raw(373);
+    let mut ast_arena = AstArena::new();
+    ast_arena.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let region = ast_arena.add_block(ByteSpan::new(file, 10, 90).unwrap());
+    let value = ast_arena.add_name_expression(ByteSpan::new(file, 20, 25).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(373)),
+        AstNodeId::from_raw(374),
+        LocalBindingKind::Val,
+    );
+    let resolved = [ResolvedLocalBinding::new(value, binding.clone())];
+    let statement = AstNodeId::from_raw(375);
+    let target = AstNodeId::from_raw(376);
+    let assignments = [ParsedAssignmentStatement {
+        statement,
+        target,
+        value,
+    }];
+    let expression_types = [
+        ExpressionType::new(target, int_id),
+        ExpressionType::new(value, nullable_int_id),
+    ];
+    let mut flow_report = TypeCheckReport::new();
+    flow_report.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(377),
+        AstNodeId::from_raw(378),
+        binding,
+        nullable_int_id,
+        int_id,
+    ));
+    flow_report.record_refined_expression_type(RefinedExpressionType::new(
+        value,
+        region,
+        nullable_int_id,
+        int_id,
+    ));
+    flow_report.record_refined_expression_type(RefinedExpressionType::new(
+        value,
+        region,
+        nullable_int_id,
+        int_id,
+    ));
+
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &resolved,
+        &ast_arena,
+        &type_arena,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement
+    );
+}
+
+#[test]
+fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
+    let mut type_arena = TypeArena::new();
+    let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let file = SourceFileId::from_raw(381);
+    let mut ast_arena = AstArena::new();
+    ast_arena.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
+    let region = ast_arena.add_block(ByteSpan::new(file, 10, 50).unwrap());
+    let value = ast_arena.add_name_expression(ByteSpan::new(file, 70, 75).unwrap());
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), SymbolId::from_raw(381)),
+        AstNodeId::from_raw(382),
+        LocalBindingKind::Val,
+    );
+    let resolved = [ResolvedLocalBinding::new(value, binding.clone())];
+    let target = AstNodeId::from_raw(383);
+    let assignments = [ParsedAssignmentStatement {
+        statement: AstNodeId::from_raw(384),
+        target,
+        value,
+    }];
+    let expression_types = [
+        ExpressionType::new(target, int_id),
+        ExpressionType::new(value, nullable_int_id),
+    ];
+    let mut flow_report = TypeCheckReport::new();
+    flow_report.record_refinement(RefinementRecord::new(
+        region,
+        AstNodeId::from_raw(385),
+        AstNodeId::from_raw(386),
+        binding,
+        nullable_int_id,
+        int_id,
+    ));
+    flow_report.record_refined_expression_type(RefinedExpressionType::new(
+        value,
+        region,
+        nullable_int_id,
+        int_id,
+    ));
+
+    let report = type_m0019_assignment_statements(
+        &assignments,
+        &expression_types,
+        &flow_report,
+        &resolved,
+        &ast_arena,
+        &type_arena,
+    );
+
+    assert!(report.assignment_checks().is_empty());
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
 }
 
 #[test]

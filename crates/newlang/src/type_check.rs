@@ -1076,6 +1076,39 @@ pub fn type_assignment_statements(
     known_expression_types: &[ExpressionType],
     arena: &TypeArena,
 ) -> TypeCheckReport {
+    type_assignment_statements_with_refinements(
+        assignments,
+        known_expression_types,
+        None,
+        arena,
+        false,
+    )
+}
+
+pub fn type_m0019_assignment_statements(
+    assignments: &[ParsedAssignmentStatement],
+    known_expression_types: &[ExpressionType],
+    flow_report: &TypeCheckReport,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    ast_arena: &AstArena,
+    type_arena: &TypeArena,
+) -> TypeCheckReport {
+    type_assignment_statements_with_refinements(
+        assignments,
+        known_expression_types,
+        Some((flow_report, resolved_local_bindings, ast_arena)),
+        type_arena,
+        true,
+    )
+}
+
+fn type_assignment_statements_with_refinements(
+    assignments: &[ParsedAssignmentStatement],
+    known_expression_types: &[ExpressionType],
+    flow_context: Option<(&TypeCheckReport, &[ResolvedLocalBinding], &AstArena)>,
+    arena: &TypeArena,
+    diagnose_nullable_use: bool,
+) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
 
     for assignment in assignments {
@@ -1083,26 +1116,94 @@ pub fn type_assignment_statements(
         else {
             continue;
         };
-        let Some(value_type) = expression_type_in(known_expression_types, assignment.value) else {
+        let Some(original_value_type) =
+            expression_type_in(known_expression_types, assignment.value)
+        else {
             continue;
         };
+        let refined_value_type = valid_m0019_refined_value_type(
+            assignment.value,
+            original_value_type,
+            flow_context,
+            arena,
+        );
+        let effective_value_type = refined_value_type.unwrap_or(original_value_type);
 
-        if assignment_compatible(target_type, value_type, arena) {
+        if assignment_compatible(target_type, effective_value_type, arena) {
             report.record_assignment_check(AssignmentCheck::new(
                 assignment.statement,
                 target_type,
-                value_type,
+                effective_value_type,
+            ));
+        } else if diagnose_nullable_use
+            && refined_value_type.is_none()
+            && nullable_base_type(original_value_type, arena) == Some(target_type)
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::invalid_nullable_use(
+                TypeRuleDiagnostic::NullableAssignmentWithoutRefinement,
+                assignment.value,
+                target_type,
+                original_value_type,
             ));
         } else {
             report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
                 assignment.value,
                 target_type,
-                value_type,
+                effective_value_type,
             ));
         }
     }
 
     report
+}
+
+fn valid_m0019_refined_value_type(
+    expression: AstNodeId,
+    original_type: TypeId,
+    flow_context: Option<(&TypeCheckReport, &[ResolvedLocalBinding], &AstArena)>,
+    type_arena: &TypeArena,
+) -> Option<TypeId> {
+    let (flow_report, resolved_local_bindings, ast_arena) = flow_context?;
+    let mut matching = flow_report
+        .refined_expression_types()
+        .iter()
+        .filter(|entry| entry.expression() == expression);
+    let refined = matching.next()?;
+    if matching.next().is_some() || refined.original_nullable_type() != original_type {
+        return None;
+    }
+
+    let mut matching_refinements = flow_report
+        .refinements()
+        .iter()
+        .filter(|entry| entry.region() == refined.refinement());
+    let provenance = matching_refinements.next()?;
+    if matching_refinements.next().is_some()
+        || provenance.original_nullable_type() != refined.original_nullable_type()
+        || provenance.refined_non_null_type() != refined.refined_non_null_type()
+        || !m0019_expression_is_inside_refinement_region(ast_arena, expression, provenance.region())
+    {
+        return None;
+    }
+
+    let mut matching_resolutions = resolved_local_bindings
+        .iter()
+        .filter(|resolved| resolved.reference() == expression);
+    let resolved = matching_resolutions.next()?;
+    if matching_resolutions.next().is_some() || resolved.binding() != provenance.binding() {
+        return None;
+    }
+
+    let base = nullable_base_type(original_type, type_arena)?;
+    (refined.refined_non_null_type() == base).then_some(base)
+}
+
+fn nullable_base_type(ty: TypeId, arena: &TypeArena) -> Option<TypeId> {
+    let record = arena.get(ty)?;
+    let TypeKind::Nullable(nullable) = record.kind() else {
+        return None;
+    };
+    Some(nullable.base())
 }
 
 fn expression_type_in(
