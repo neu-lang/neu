@@ -559,6 +559,12 @@ call, `argument_type_mismatch` to the mismatching argument, and
 `recursive_call_unsupported` to the recursive call. Each recovery produces no
 successful call target or result type.
 
+## ADR-0052: Bootstrap Module Type Identity
+
+Every source file in one module compilation shares one TypeArena. TypeId is
+meaningful only inside that module arena; same-module direct-call compatibility
+uses those shared identities, while cross-module calls remain deferred.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves

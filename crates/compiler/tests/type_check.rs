@@ -29,10 +29,10 @@ use compiler::{
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_m0028_executable_core, type_m0028_executable_int_operators,
-        type_m0028_function_signatures, type_m0028_static_integer_diagnostics,
-        type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        type_unsupported_m0018_expressions,
+        type_m0028_function_signatures, type_m0028_function_signatures_in,
+        type_m0028_static_integer_diagnostics, type_parser_literals,
+        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
+        type_resolved_name_expressions, type_unsupported_m0018_expressions,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -3914,4 +3914,36 @@ fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
     assert_eq!(signatures[0].parameter_types().len(), 2);
     assert_eq!(signatures[0].return_type(), TypeId::from_raw(1));
     assert!(types.records().get(TypeId::from_raw(1).index()).is_some());
+}
+
+#[test]
+fn m0028_function_signatures_share_the_caller_owned_module_arena() {
+    let first = parse_source(
+        SourceFileId::from_raw(114),
+        "fun first(value: Int): Int { return value; }",
+    );
+    let second = parse_source(
+        SourceFileId::from_raw(115),
+        "fun second(): Int { return 1; }",
+    );
+    let mut types = TypeArena::new();
+
+    let first_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &first.function_declarations,
+        &first.function_parameters,
+        &first.type_name_references,
+    );
+    let second_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &second.function_declarations,
+        &second.function_parameters,
+        &second.type_name_references,
+    );
+
+    assert_eq!(types.records().len(), 5);
+    assert_eq!(
+        first_signatures[0].return_type(),
+        second_signatures[0].return_type()
+    );
 }

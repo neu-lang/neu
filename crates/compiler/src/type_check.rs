@@ -1002,7 +1002,18 @@ pub fn type_m0028_function_signatures(
     type_name_references: &[ParsedTypeNameReference],
 ) -> (TypeArena, Vec<FunctionSignature>) {
     let mut arena = TypeArena::new();
-    let primitives = PrimitiveTypeIds::insert_into(&mut arena);
+    let signatures =
+        type_m0028_function_signatures_in(&mut arena, functions, parameters, type_name_references);
+    (arena, signatures)
+}
+
+pub fn type_m0028_function_signatures_in(
+    arena: &mut TypeArena,
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+) -> Vec<FunctionSignature> {
+    let primitives = PrimitiveTypeIds::module_owned(arena);
     let is_int_annotation = |annotation| {
         type_name_references
             .iter()
@@ -1034,7 +1045,7 @@ pub fn type_m0028_function_signatures(
         });
     }
 
-    (arena, signatures)
+    signatures
 }
 
 pub fn recognize_m0019_null_tests(
@@ -1283,6 +1294,28 @@ impl PrimitiveTypeIds {
             string_id: arena.insert(TypeRecord::primitive(PrimitiveType::String)),
             unit_id: arena.insert(TypeRecord::primitive(PrimitiveType::Unit)),
             null_id: arena.insert(TypeRecord::primitive(PrimitiveType::Null)),
+        }
+    }
+
+    fn module_owned(arena: &mut TypeArena) -> Self {
+        if arena.records().is_empty() {
+            return Self::insert_into(arena);
+        }
+
+        let primitive = |expected| {
+            arena
+                .records()
+                .iter()
+                .position(|record| record.kind() == &TypeKind::Primitive(expected))
+                .map(TypeId::from_raw)
+                .expect("module TypeArena contains every bootstrap primitive")
+        };
+        Self {
+            bool_id: primitive(PrimitiveType::Bool),
+            int_id: primitive(PrimitiveType::Int),
+            string_id: primitive(PrimitiveType::String),
+            unit_id: primitive(PrimitiveType::Unit),
+            null_id: primitive(PrimitiveType::Null),
         }
     }
 
