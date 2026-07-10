@@ -1,5 +1,6 @@
 use newlang::ast::AstNodeKind;
 use newlang::name_resolution::{DeclarationKind, LocalBindingKind};
+use newlang::parser::ParsedBinaryOperator;
 use newlang::parser::{parse_source, DiagnosticKind, ParsedLiteralKind};
 use newlang::source::SourceFileId;
 
@@ -593,6 +594,81 @@ fn parses_trailing_expression_and_if_expression_body() {
     assert!(kinds.contains(&AstNodeKind::CallExpression));
     assert!(kinds.contains(&AstNodeKind::MemberExpression));
     assert!(kinds.contains(&AstNodeKind::ExpressionStatement));
+}
+
+#[test]
+fn m0019_records_binary_expression_metadata_for_flow_inputs() {
+    let output = parse_source(
+        SourceFileId::from_raw(90),
+        "fun check() { val maybe: String? = null; if (maybe != null) { val definite = maybe; } }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.binary_expressions.len(), 1);
+
+    let binary = &output.binary_expressions[0];
+    assert_eq!(binary.operator, ParsedBinaryOperator::NotEqual);
+    assert_eq!(
+        output.arena.node(binary.expression).unwrap().kind,
+        AstNodeKind::BinaryExpression
+    );
+    assert_eq!(
+        output.arena.node(binary.left).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+    assert_eq!(
+        output.arena.node(binary.right).unwrap().kind,
+        AstNodeKind::LiteralExpression
+    );
+    assert!(binary.span.start() < binary.span.end());
+}
+
+#[test]
+fn m0019_records_if_expression_condition_and_branch_metadata() {
+    let output = parse_source(
+        SourceFileId::from_raw(91),
+        "fun check() { if (null == maybe) { val fallback = \"missing\"; } else { val definite = maybe; } }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.if_expressions.len(), 1);
+
+    let if_expression = &output.if_expressions[0];
+    assert_eq!(
+        output.arena.node(if_expression.expression).unwrap().kind,
+        AstNodeKind::IfExpression
+    );
+    assert_eq!(
+        output.arena.node(if_expression.condition).unwrap().kind,
+        AstNodeKind::BinaryExpression
+    );
+    assert_eq!(
+        output.arena.node(if_expression.then_block).unwrap().kind,
+        AstNodeKind::Block
+    );
+    assert_eq!(
+        output
+            .arena
+            .node(if_expression.else_block.unwrap())
+            .unwrap()
+            .kind,
+        AstNodeKind::Block
+    );
+}
+
+#[test]
+fn m0019_records_if_expression_without_else_as_none() {
+    let output = parse_source(
+        SourceFileId::from_raw(92),
+        "fun check() { if (maybe != null) { val definite = maybe; } }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.if_expressions.len(), 1);
+    assert_eq!(output.if_expressions[0].else_block, None);
 }
 
 #[test]

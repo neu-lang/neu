@@ -60,6 +60,8 @@ pub struct ParseOutput {
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub grouped_expressions: Vec<ParsedGroupedExpression>,
+    pub binary_expressions: Vec<ParsedBinaryExpression>,
+    pub if_expressions: Vec<ParsedIfExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
 }
@@ -117,6 +119,41 @@ pub struct ParsedGroupedExpression {
     pub span: ByteSpan,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParsedBinaryOperator {
+    LogicalOr,
+    LogicalAnd,
+    Equal,
+    NotEqual,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedBinaryExpression {
+    pub expression: AstNodeId,
+    pub left: AstNodeId,
+    pub operator: ParsedBinaryOperator,
+    pub right: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedIfExpression {
+    pub expression: AstNodeId,
+    pub condition: AstNodeId,
+    pub then_block: AstNodeId,
+    pub else_block: Option<AstNodeId>,
+    pub span: ByteSpan,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedLocalDeclaration {
     pub declaration: AstNodeId,
@@ -152,6 +189,8 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
         grouped_expressions: parser.grouped_expressions,
+        binary_expressions: parser.binary_expressions,
+        if_expressions: parser.if_expressions,
         local_declarations: parser.local_declarations,
         assignment_statements: parser.assignment_statements,
     }
@@ -170,6 +209,8 @@ struct Parser<'source> {
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
     grouped_expressions: Vec<ParsedGroupedExpression>,
+    binary_expressions: Vec<ParsedBinaryExpression>,
+    if_expressions: Vec<ParsedIfExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
     assignment_statements: Vec<ParsedAssignmentStatement>,
     saw_package_or_import: bool,
@@ -191,6 +232,8 @@ impl<'source> Parser<'source> {
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
             grouped_expressions: Vec::new(),
+            binary_expressions: Vec::new(),
+            if_expressions: Vec::new(),
             local_declarations: Vec::new(),
             assignment_statements: Vec::new(),
             saw_package_or_import: false,
@@ -701,10 +744,11 @@ impl<'source> Parser<'source> {
 
     fn parse_binary_expression(&mut self, min_precedence: u8) -> Option<ByteSpan> {
         let mut left = self.parse_unary_expression()?;
-        while let Some((precedence, _)) = self.binary_operator() {
+        while let Some((precedence, operator)) = self.binary_operator() {
             if precedence < min_precedence {
                 break;
             }
+            let left_span = left;
             let operator_span = self.current().expect("operator token exists").span;
             self.advance();
             let Some(right) = self.parse_binary_expression(precedence + 1) else {
@@ -712,7 +756,20 @@ impl<'source> Parser<'source> {
                 return Some(left);
             };
             left = self.span(left.start(), right.end());
-            self.arena.add_binary_expression(left);
+            let expression = self.arena.add_binary_expression(left);
+            if let (Some(left_node), Some(right_node), Some(operator)) = (
+                self.latest_expression_node_for_span(left_span),
+                self.latest_expression_node_for_span(right),
+                parsed_binary_operator(operator),
+            ) {
+                self.record_binary_expression(ParsedBinaryExpression {
+                    expression,
+                    left: left_node,
+                    operator,
+                    right: right_node,
+                    span: left,
+                });
+            }
         }
         Some(left)
     }
@@ -876,6 +933,15 @@ impl<'source> Parser<'source> {
             .map(|node| node.id)
     }
 
+    fn latest_node_for_span(&self, span: ByteSpan, kind: AstNodeKind) -> Option<AstNodeId> {
+        self.arena
+            .nodes()
+            .iter()
+            .rev()
+            .find(|node| node.span == span && node.kind == kind)
+            .map(|node| node.id)
+    }
+
     fn parse_name_expression(&mut self) -> Option<ByteSpan> {
         let name = self.current()?.clone();
         let start = name.span.start();
@@ -921,6 +987,20 @@ impl<'source> Parser<'source> {
         self.grouped_expressions.insert(index, grouped);
     }
 
+    fn record_binary_expression(&mut self, binary: ParsedBinaryExpression) {
+        let index = self
+            .binary_expressions
+            .partition_point(|existing| existing.span.start() <= binary.span.start());
+        self.binary_expressions.insert(index, binary);
+    }
+
+    fn record_if_expression(&mut self, if_expression: ParsedIfExpression) {
+        let index = self
+            .if_expressions
+            .partition_point(|existing| existing.span.start() <= if_expression.span.start());
+        self.if_expressions.insert(index, if_expression);
+    }
+
     fn parse_if_expression(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
         self.advance();
@@ -933,14 +1013,15 @@ impl<'source> Parser<'source> {
             return None;
         }
         self.advance();
-        if self.parse_expression().is_none() {
+        let Some(condition_span) = self.parse_expression() else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
                 self.span_at(start),
             );
             self.skip_to_expression_boundary();
             return None;
-        }
+        };
+        let condition = self.latest_expression_node_for_span(condition_span);
         if self.current_kind() != Some(TokenKind::RightParen) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
@@ -951,7 +1032,9 @@ impl<'source> Parser<'source> {
         }
         self.advance();
         let then_block = self.parse_body_block()?;
+        let then_block_node = self.latest_node_for_span(then_block, AstNodeKind::Block);
         let mut end = then_block.end();
+        let mut else_block_node = None;
         if self.current_kind() == Some(TokenKind::KwElse) {
             self.advance();
             let Some(else_block) = self.parse_body_block() else {
@@ -962,9 +1045,19 @@ impl<'source> Parser<'source> {
                 return Some(self.span(start, end));
             };
             end = else_block.end();
+            else_block_node = self.latest_node_for_span(else_block, AstNodeKind::Block);
         }
         let span = self.span(start, end);
-        self.arena.add_if_expression(span);
+        let expression = self.arena.add_if_expression(span);
+        if let (Some(condition), Some(then_block)) = (condition, then_block_node) {
+            self.record_if_expression(ParsedIfExpression {
+                expression,
+                condition,
+                then_block,
+                else_block: else_block_node,
+                span,
+            });
+        }
         Some(span)
     }
 
@@ -1799,6 +1892,26 @@ fn parsed_literal_kind(kind: TokenKind) -> ParsedLiteralKind {
         TokenKind::KwNull => ParsedLiteralKind::Null,
         _ => unreachable!("parser literal metadata is only built for literal tokens"),
     }
+}
+
+fn parsed_binary_operator(kind: TokenKind) -> Option<ParsedBinaryOperator> {
+    let operator = match kind {
+        TokenKind::PipePipe => ParsedBinaryOperator::LogicalOr,
+        TokenKind::AmpAmp => ParsedBinaryOperator::LogicalAnd,
+        TokenKind::EqualEqual => ParsedBinaryOperator::Equal,
+        TokenKind::BangEqual => ParsedBinaryOperator::NotEqual,
+        TokenKind::Less => ParsedBinaryOperator::Less,
+        TokenKind::Greater => ParsedBinaryOperator::Greater,
+        TokenKind::LessEqual => ParsedBinaryOperator::LessEqual,
+        TokenKind::GreaterEqual => ParsedBinaryOperator::GreaterEqual,
+        TokenKind::Plus => ParsedBinaryOperator::Plus,
+        TokenKind::Minus => ParsedBinaryOperator::Minus,
+        TokenKind::Star => ParsedBinaryOperator::Star,
+        TokenKind::Slash => ParsedBinaryOperator::Slash,
+        TokenKind::Percent => ParsedBinaryOperator::Percent,
+        _ => return None,
+    };
+    Some(operator)
 }
 
 fn type_node_kind(kind: AstNodeKind) -> bool {
