@@ -510,6 +510,74 @@ fn local_binding_name_metadata_excludes_malformed_declarations() {
 }
 
 #[test]
+fn records_assignment_statement_metadata_for_type_checking() {
+    let output = parse_source(
+        SourceFileId::from_raw(33),
+        "fun run() { target = value; object.field = 1; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.assignment_statements.len(), 2);
+
+    let first = &output.assignment_statements[0];
+    assert_eq!(
+        output.arena.node(first.statement).unwrap().kind,
+        AstNodeKind::AssignmentStatement
+    );
+    assert_eq!(
+        output.arena.node(first.target).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+    assert_eq!(
+        output.arena.node(first.value).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+
+    let second = &output.assignment_statements[1];
+    assert_eq!(
+        output.arena.node(second.statement).unwrap().kind,
+        AstNodeKind::AssignmentStatement
+    );
+    assert_eq!(
+        output.arena.node(second.target).unwrap().kind,
+        AstNodeKind::MemberExpression
+    );
+    assert_eq!(
+        output.arena.node(second.value).unwrap().kind,
+        AstNodeKind::LiteralExpression
+    );
+    assert!(first.statement < second.statement);
+}
+
+#[test]
+fn assignment_statement_metadata_excludes_malformed_and_non_assignment_statements() {
+    let output = parse_source(
+        SourceFileId::from_raw(34),
+        "fun run() { broken = ; value; val local = 1; ok = true; }",
+    );
+
+    assert!(output
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedAssignment));
+    assert_eq!(output.assignment_statements.len(), 1);
+    let assignment = &output.assignment_statements[0];
+    assert_eq!(
+        output.arena.node(assignment.statement).unwrap().kind,
+        AstNodeKind::AssignmentStatement
+    );
+    assert_eq!(
+        output.arena.node(assignment.target).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+    assert_eq!(
+        output.arena.node(assignment.value).unwrap().kind,
+        AstNodeKind::LiteralExpression
+    );
+}
+
+#[test]
 fn parses_trailing_expression_and_if_expression_body() {
     let output = parse_source(
         SourceFileId::from_raw(9),

@@ -61,6 +61,7 @@ pub struct ParseOutput {
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub grouped_expressions: Vec<ParsedGroupedExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
+    pub assignment_statements: Vec<ParsedAssignmentStatement>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -123,6 +124,13 @@ pub struct ParsedLocalDeclaration {
     pub initializer: Option<AstNodeId>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedAssignmentStatement {
+    pub statement: AstNodeId,
+    pub target: AstNodeId,
+    pub value: AstNodeId,
+}
+
 impl ParseOutput {
     pub fn node_kinds(&self) -> Vec<AstNodeKind> {
         self.arena.nodes().iter().map(|node| node.kind).collect()
@@ -145,6 +153,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         literal_expressions: parser.literal_expressions,
         grouped_expressions: parser.grouped_expressions,
         local_declarations: parser.local_declarations,
+        assignment_statements: parser.assignment_statements,
     }
 }
 
@@ -162,6 +171,7 @@ struct Parser<'source> {
     literal_expressions: Vec<ParsedLiteralExpression>,
     grouped_expressions: Vec<ParsedGroupedExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
+    assignment_statements: Vec<ParsedAssignmentStatement>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -182,6 +192,7 @@ impl<'source> Parser<'source> {
             literal_expressions: Vec::new(),
             grouped_expressions: Vec::new(),
             local_declarations: Vec::new(),
+            assignment_statements: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -488,18 +499,30 @@ impl<'source> Parser<'source> {
                             }
                         }
                         Some(TokenKind::Equal) => {
+                            let target = self.latest_expression_node_for_span(expression_span);
                             self.advance();
-                            if self.parse_expression().is_none() {
+                            let Some(value_span) = self.parse_expression() else {
                                 self.diagnostic_current_or_span(
                                     DiagnosticKind::MalformedAssignment,
                                     expression_span,
                                 );
-                            }
+                                self.skip_to_statement_boundary();
+                                continue;
+                            };
+                            let value = self.latest_expression_node_for_span(value_span);
                             if self.current_kind() == Some(TokenKind::Semicolon) {
                                 let end = self.current().expect("semicolon exists").span.end();
                                 self.advance();
-                                self.arena
+                                let statement = self
+                                    .arena
                                     .add_assignment_statement(self.span(expression_start, end));
+                                if let (Some(target), Some(value)) = (target, value) {
+                                    self.assignment_statements.push(ParsedAssignmentStatement {
+                                        statement,
+                                        target,
+                                        value,
+                                    });
+                                }
                             } else {
                                 self.diagnostic_current_or_span(
                                     DiagnosticKind::MalformedAssignment,
