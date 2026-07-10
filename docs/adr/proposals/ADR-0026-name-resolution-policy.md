@@ -72,6 +72,193 @@ The draft direction is:
 - Cross-module lookup is deferred until module dependency metadata is accepted.
 - Member lookup, method lookup, constructor lookup, overload resolution, extension methods, and type-directed lookup are deferred.
 
+## Draft Concrete Resolution Model
+
+This section is a draft direction, not accepted semantics.
+
+M0016 should resolve a deliberately small set of syntactic names from already accepted AST output. Resolution should produce stable symbol references for accepted declaration and local binding positions, or a resolution diagnostic when a referenced name cannot be resolved without guessing.
+
+The draft model should be treated as a bootstrap model only. It must not activate imports, cross-module lookup, member lookup, overload resolution, extension method lookup, or type-directed lookup.
+
+## Draft Resolvable AST Node Kinds
+
+This section is a draft direction, not accepted semantics.
+
+Included name-reference nodes for M0016 should be:
+
+- simple identifier expression
+- qualified name expression when it is syntactically a package-qualified name
+- type name node in an accepted declaration, local binding, or explicit type annotation position
+- package-qualified name in an accepted type or expression name-reference position
+
+Excluded name-reference nodes for M0016 should be:
+
+- member access names
+- method call names
+- constructor call names
+- operator names
+- import path names
+- import alias names
+- package declaration names
+- field names
+- parameter names
+- pattern element names
+- generated or macro-created names
+
+## Draft Declaration And Binding Positions
+
+This section is a draft direction, not accepted semantics.
+
+Included declaration and binding positions for M0016 should be:
+
+- function declaration name
+- type declaration name
+- local `val` statement
+- local `var` statement
+
+Excluded declaration and binding positions for M0016 should be:
+
+- function parameters are excluded until accepted parameter AST representation exists
+- pattern bindings are excluded until accepted pattern binding, ownership, and scope rules exist
+- import aliases are excluded because imports remain syntax-only
+- member declarations are excluded because member lookup remains unsupported
+- fields are excluded because field syntax remains outside the bootstrap subset
+
+Top-level declarations should bind in the tuple `(module, package namespace, declaration name, declaration kind)`.
+
+Local `val` and `var` statements should bind in the nearest containing lexical block.
+
+## Draft Scope And Declaration Order
+
+This section is a draft direction, not accepted semantics.
+
+Declaration bodies introduce lexical scopes. Block expressions introduce lexical scopes for local statements inside the block.
+
+Top-level declarations in the same module and package namespace should be visible throughout that module/package namespace regardless of source-file order.
+
+local bindings are not visible before their declaration statement. A local binding should be visible after its declaration statement through the end of the containing lexical block, including nested child blocks unless shadowed by a nearer declaration.
+
+Nested declaration bodies should not inherit local bindings from the enclosing declaration body unless a later accepted closure or capture model defines that behavior.
+
+## Draft Shadowing And Duplicate Rules
+
+This section is a draft direction, not accepted semantics.
+
+An inner local declaration shadows an outer local declaration with the same name after the inner declaration statement.
+
+A local declaration shadows a top-level declaration with the same name inside the local declaration's visible range.
+
+Shadowing never chooses a less local declaration while a more local declaration is visible.
+
+A same-scope duplicate local binding should be rejected with `duplicate_name`.
+
+A same-module same-package duplicate top-level declaration with the same declaration kind should be rejected with `duplicate_name`.
+
+If multiple candidates remain after applying scope, package, and duplicate rules, resolution should report ambiguity instead of choosing by insertion order, source-file order, or parser traversal order.
+
+## Draft Lookup Rules
+
+This section is a draft direction, not accepted semantics.
+
+For an unqualified simple identifier expression, lookup order should be:
+
+1. Innermost local lexical scope outward.
+2. Current source file's package namespace in the current module.
+3. No implicit import, prelude, cross-module, member, overload, extension, or type-directed lookup.
+
+For a type name node, the same lookup order should apply unless a later accepted type namespace ADR defines separate value and type namespaces.
+
+For a package-qualified name, lookup should use the explicitly named package namespace in the current module only.
+
+Imports remain syntax-only and must not add lookup candidates.
+
+cross-module lookup remains unsupported because module dependency metadata is not yet accepted.
+
+member lookup remains unsupported.
+
+overload resolution remains unsupported.
+
+extension method lookup remains unsupported.
+
+type-directed lookup remains unsupported.
+
+## Draft Visibility Rule
+
+This section is a draft direction, not accepted semantics.
+
+M0016 should record the visibility metadata attached to resolved same-module top-level declarations, but visibility enforcement should be deferred until cross-module lookup and API boundary rules are accepted.
+
+Same-module lookup should not reject declarations solely because they are `private`, `internal`, `protected`, or `public`; those categories should remain metadata during the bootstrap resolution pass.
+
+## Draft Resolution Diagnostics
+
+This section is a draft direction, not accepted semantics.
+
+Diagnostic: `unresolved_name`
+
+- Primary span: the full source span of the unresolved name-reference node.
+- Recovery action: continue analysis with an unresolved-name placeholder so later diagnostics can avoid cascading resolution guesses.
+- Source-of-truth citation: accepted ADR-0026 section defining M0016 lookup order.
+- Safe suggestion policy: suggestions may mention names found in the same lookup tier only; suggestions must not imply import, cross-module, member, overload, extension, or type-directed lookup.
+
+Diagnostic: `duplicate_name`
+
+- Primary span: the later declaration or local binding that violates the duplicate rule.
+- Recovery action: keep the first declaration as the canonical candidate for subsequent lookup in the same scope and mark the duplicate declaration invalid.
+- Source-of-truth citation: accepted ADR-0026 section defining duplicate-name behavior.
+- Safe suggestion policy: suggest renaming only; do not suggest changing visibility, imports, or module/package placement.
+
+Diagnostic: `ambiguous_name`
+
+- Primary span: the ambiguous name-reference node.
+- Recovery action: continue analysis with an unresolved-name placeholder.
+- Source-of-truth citation: accepted ADR-0026 section defining ambiguity behavior.
+- Safe suggestion policy: list candidate declaration locations without selecting a winner or exposing compiler-internal table keys.
+
+Diagnostic: `unsupported_import_resolution`
+
+- Primary span: the import path or alias used as a lookup source.
+- Recovery action: ignore the import for M0016 lookup.
+- Source-of-truth citation: accepted ADR-0026 section deferring active imports.
+- Safe suggestion policy: state that import resolution is not part of M0016; do not suggest equivalent active-import syntax.
+
+Diagnostic: `unsupported_cross_module_lookup`
+
+- Primary span: the package-qualified name or other syntax that requires another module.
+- Recovery action: continue analysis with an unresolved-name placeholder.
+- Source-of-truth citation: accepted ADR-0026 section deferring cross-module lookup.
+- Safe suggestion policy: do not suggest adding dependencies or imports.
+
+Diagnostic: `unsupported_member_resolution`
+
+- Primary span: the member, method, constructor, overload, extension, or type-directed name requiring unsupported lookup.
+- Recovery action: leave the referenced name unresolved for M0016.
+- Source-of-truth citation: accepted ADR-0026 section deferring member and advanced lookup.
+- Safe suggestion policy: state that the lookup form is outside M0016; do not infer candidate members.
+
+## Draft Unsupported Forms
+
+This section is a draft direction, not accepted semantics.
+
+M0016 should reject or defer the following forms without inventing resolution behavior:
+
+- active imports
+- wildcard imports
+- grouped imports
+- import aliases
+- cross-module lookup
+- re-exports
+- member lookup
+- method lookup
+- constructor lookup
+- overload resolution
+- operator resolution
+- extension method lookup
+- type-directed lookup
+- associated type lookup
+- protocol or interface conformance lookup
+- macro or compile-time generated names
+
 ## Draft Lookup Order
 
 This section is a draft direction, not accepted semantics.
