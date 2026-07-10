@@ -80,7 +80,6 @@ The type system is nominal per ADR-0010, making stable names and symbols central
 
 ## Completion Checklist
 
-- [ ] Symbol identities are stable.
+- [x] Symbol identities are stable.
 - [ ] Name tables are tested.
 - [ ] Resolution policy is deferred.
-
