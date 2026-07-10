@@ -294,6 +294,43 @@ impl EntryPointReport {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReturnPathDiagnosticKind {
+    MissingReturn,
+    UnreachableReturn,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ReturnPathDiagnostic {
+    kind: ReturnPathDiagnosticKind,
+    node: AstNodeId,
+}
+
+impl ReturnPathDiagnostic {
+    fn new(kind: ReturnPathDiagnosticKind, node: AstNodeId) -> Self {
+        Self { kind, node }
+    }
+
+    pub fn kind(self) -> ReturnPathDiagnosticKind {
+        self.kind
+    }
+
+    pub fn node(self) -> AstNodeId {
+        self.node
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ReturnPathReport {
+    diagnostics: Vec<ReturnPathDiagnostic>,
+}
+
+impl ReturnPathReport {
+    pub fn diagnostics(&self) -> &[ReturnPathDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ExpressionType {
     expression: AstNodeId,
     ty: TypeId,
@@ -897,6 +934,45 @@ pub fn check_m0028_entry_point(
         }),
         diagnostics: Vec::new(),
     }
+}
+
+pub fn check_m0028_straight_line_returns(parsed: &ParseOutput) -> ReturnPathReport {
+    let mut diagnostics = Vec::new();
+    for function in &parsed.function_declarations {
+        let is_int_function = function.return_annotation.is_some_and(|annotation| {
+            parsed
+                .type_name_references
+                .iter()
+                .any(|reference| reference.reference == annotation && reference.name == "Int")
+        });
+        let Some(body) = function.body else {
+            continue;
+        };
+        if !is_int_function {
+            continue;
+        }
+
+        let direct_returns: Vec<_> = parsed
+            .return_statements
+            .iter()
+            .filter(|returned| returned.function == function.declaration && returned.block == body)
+            .collect();
+        let Some((first, later)) = direct_returns.split_first() else {
+            diagnostics.push(ReturnPathDiagnostic::new(
+                ReturnPathDiagnosticKind::MissingReturn,
+                function.declaration,
+            ));
+            continue;
+        };
+        let _ = first;
+        diagnostics.extend(later.iter().map(|returned| {
+            ReturnPathDiagnostic::new(
+                ReturnPathDiagnosticKind::UnreachableReturn,
+                returned.statement,
+            )
+        }));
+    }
+    ReturnPathReport { diagnostics }
 }
 
 pub fn recognize_m0019_null_tests(

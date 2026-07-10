@@ -18,9 +18,10 @@ use compiler::{
         AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement,
         EntryPointDiagnosticKind, EntryPointFile, ExpressionType, KnownSymbolType,
         LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
-        RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport, TypeRuleDiagnostic, build_m0020_capability_bound_records,
-        build_m0020_generic_parameter_types, check_m0028_entry_point, known_local_symbol_types,
+        RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
+        build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
+        check_m0028_entry_point, check_m0028_straight_line_returns, known_local_symbol_types,
         recognize_m0019_null_tests, record_m0019_branch_refinements,
         record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
@@ -3854,4 +3855,43 @@ fn m0028_entry_point_rejects_every_non_entry_main_shape() {
         }
         assert_eq!(report.entry_point(), None);
     }
+}
+
+#[test]
+fn m0028_straight_line_return_validation_reports_missing_and_unreachable_returns() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(112),
+        "fun valid(): Int { return 1; } fun missing(): Int { const value: Int = 1; } fun duplicate(): Int { return 1; return 2; } fun nested(): Int { if (true) { return 1; }; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let report = check_m0028_straight_line_returns(&parsed);
+    let kinds: Vec<_> = report
+        .diagnostics()
+        .iter()
+        .map(|diagnostic| diagnostic.kind())
+        .collect();
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|kind| **kind == ReturnPathDiagnosticKind::MissingReturn)
+            .count(),
+        2
+    );
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|kind| **kind == ReturnPathDiagnosticKind::UnreachableReturn)
+            .count(),
+        1
+    );
+    assert_eq!(
+        report
+            .diagnostics()
+            .iter()
+            .find(|diagnostic| diagnostic.kind() == ReturnPathDiagnosticKind::UnreachableReturn)
+            .unwrap()
+            .node(),
+        parsed.return_statements[2].statement
+    );
 }

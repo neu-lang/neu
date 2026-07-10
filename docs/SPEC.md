@@ -544,6 +544,14 @@ diagnostics carry either a source-file-qualified span or the explicit external
 input location, never a host path or arena-local node identity alone; recovery
 selects no entry point.
 
+## ADR-0050: Bootstrap Straight-Line Return Diagnostics
+
+Only explicit returns directly contained by an `Int` function's body block
+participate in bootstrap straight-line analysis. No direct return reports
+`missing_return` at the declaration; every direct return after the first
+reports `unreachable_return` at that return. Nested-block returns are deferred,
+neither satisfying nor producing these diagnostics.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves
