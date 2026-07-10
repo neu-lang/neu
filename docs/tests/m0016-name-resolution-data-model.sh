@@ -49,6 +49,8 @@ require_text "$source" 'pub struct DeclarationKey'
 require_text "$source" 'pub struct DeclaredName'
 require_text "$source" 'pub enum DeclarationInsert'
 require_text "$source" 'pub struct DeclarationIndex'
+require_text "$source" 'pub struct DeclarationIndexBuild'
+require_text "$source" 'pub fn build_declaration_index'
 require_text "$source" 'Function'
 require_text "$source" 'Type'
 require_text "$source" 'pub enum ResolutionDiagnosticKind'
@@ -64,6 +66,9 @@ require_text "$test_file" 'duplicate_resolved_name_insert_preserves_existing_rec
 require_text "$test_file" 'declaration_key_preserves_adr0026_top_level_tuple'
 require_text "$test_file" 'declaration_index_key_includes_module_package_and_kind'
 require_text "$test_file" 'duplicate_declaration_key_preserves_existing_declaration'
+require_text "$test_file" 'builds_declaration_index_from_parser_metadata_and_module_package'
+require_text "$test_file" 'declaration_index_builder_preserves_duplicate_insert_results'
+require_text "$test_file" 'declaration_index_builder_keeps_same_name_in_distinct_packages'
 require_text "$test_file" 'diagnostic_kinds_cover_accepted_adr0026_variants'
 require_text "$parser" 'pub struct ParsedDeclarationName'
 require_text "$parser" 'pub declaration_names: Vec<ParsedDeclarationName>'
@@ -71,7 +76,7 @@ require_text "$parser_test" 'records_top_level_function_declaration_name_metadat
 require_text "$parser_test" 'records_top_level_type_declaration_name_metadata'
 require_text "$parser_test" 'declaration_name_metadata_excludes_nested_declarations_and_missing_names'
 
-require_absent_text "$source" 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file|collect_declarations'
+require_absent_text "$source" 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
 require_absent_text "$parser" 'DeclarationIndex|resolve_names|resolve_module|resolve_file|collect_declarations'
 
 echo "m0016-data-model: name resolution data model validation passed"

@@ -1,12 +1,13 @@
 use newlang::ast::AstNodeId;
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
-    ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable,
-    ResolvedName,
+    build_declaration_index, DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind,
+    DeclaredName, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName,
 };
+use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
-use newlang::symbol::SymbolId;
+use newlang::symbol::{SymbolId, SymbolInterner};
 
 #[test]
 fn resolved_names_preserve_reference_symbol_and_insertion_order() {
@@ -209,4 +210,86 @@ fn duplicate_declaration_key_preserves_existing_declaration() {
     );
     assert_eq!(index.get(&key), Some(&existing));
     assert_eq!(index.declarations().len(), 1);
+}
+
+#[test]
+fn builds_declaration_index_from_parser_metadata_and_module_package() {
+    let file = SourceFileId::from_raw(21);
+    let parsed = parse_source(file, "fun main(); struct Box {}");
+    assert!(parsed.diagnostics.is_empty());
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::parse("demo.pkg").unwrap())],
+    )
+    .unwrap();
+    let mut interner = SymbolInterner::new();
+
+    let built = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+
+    assert_eq!(interner.symbols(), ["main", "Box"]);
+    assert_eq!(built.index().declarations().len(), 2);
+    assert_eq!(built.inserts().len(), 2);
+    assert!(built
+        .inserts()
+        .iter()
+        .all(|insert| matches!(insert, DeclarationInsert::Inserted(_))));
+    assert!(built.index().declarations().iter().all(|declaration| {
+        declaration.key().module().as_str() == "demo"
+            && declaration.key().package().as_str() == "demo.pkg"
+    }));
+}
+
+#[test]
+fn declaration_index_builder_preserves_duplicate_insert_results() {
+    let first_file = SourceFileId::from_raw(22);
+    let second_file = SourceFileId::from_raw(23);
+    let first = parse_source(first_file, "fun dup();");
+    let second = parse_source(second_file, "fun dup();");
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (first_file, PackageNamespace::root()),
+            (second_file, PackageNamespace::root()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = first.declaration_names.clone();
+    declarations.extend(second.declaration_names.clone());
+    let mut interner = SymbolInterner::new();
+
+    let built = build_declaration_index(&metadata, &declarations, &mut interner);
+
+    assert_eq!(built.index().declarations().len(), 1);
+    assert!(matches!(built.inserts()[0], DeclarationInsert::Inserted(_)));
+    assert!(matches!(
+        built.inserts()[1],
+        DeclarationInsert::Duplicate { .. }
+    ));
+}
+
+#[test]
+fn declaration_index_builder_keeps_same_name_in_distinct_packages() {
+    let first_file = SourceFileId::from_raw(24);
+    let second_file = SourceFileId::from_raw(25);
+    let first = parse_source(first_file, "fun shared();");
+    let second = parse_source(second_file, "fun shared();");
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (first_file, PackageNamespace::parse("one").unwrap()),
+            (second_file, PackageNamespace::parse("two").unwrap()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = first.declaration_names.clone();
+    declarations.extend(second.declaration_names.clone());
+    let mut interner = SymbolInterner::new();
+
+    let built = build_declaration_index(&metadata, &declarations, &mut interner);
+
+    assert_eq!(built.index().declarations().len(), 2);
+    assert!(built
+        .inserts()
+        .iter()
+        .all(|insert| matches!(insert, DeclarationInsert::Inserted(_))));
 }

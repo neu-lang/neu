@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
 use crate::ast::AstNodeId;
-use crate::module::{ModuleName, PackageNamespace};
+use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
+use crate::parser::ParsedDeclarationName;
 use crate::source::ByteSpan;
-use crate::symbol::SymbolId;
+use crate::symbol::{SymbolId, SymbolInterner};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum DeclarationKind {
@@ -115,6 +116,45 @@ impl DeclarationIndex {
     pub fn declarations(&self) -> &[DeclaredName] {
         &self.declarations
     }
+}
+
+#[derive(Debug)]
+pub struct DeclarationIndexBuild {
+    index: DeclarationIndex,
+    inserts: Vec<DeclarationInsert>,
+}
+
+impl DeclarationIndexBuild {
+    pub fn index(&self) -> &DeclarationIndex {
+        &self.index
+    }
+
+    pub fn inserts(&self) -> &[DeclarationInsert] {
+        &self.inserts
+    }
+}
+
+pub fn build_declaration_index(
+    metadata: &ModuleMetadata,
+    declarations: &[ParsedDeclarationName],
+    interner: &mut SymbolInterner,
+) -> DeclarationIndexBuild {
+    let mut index = DeclarationIndex::new();
+    let mut inserts = Vec::new();
+
+    for declaration in declarations {
+        let package = metadata
+            .packages()
+            .iter()
+            .find(|package| package.source_file() == declaration.name_span.file())
+            .map(|package| package.namespace().clone())
+            .unwrap_or_else(PackageNamespace::root);
+        let name = interner.intern(&declaration.name);
+        let key = DeclarationKey::new(metadata.name().clone(), package, name, declaration.kind);
+        inserts.push(index.insert(DeclaredName::new(key, declaration.declaration)));
+    }
+
+    DeclarationIndexBuild { index, inserts }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
