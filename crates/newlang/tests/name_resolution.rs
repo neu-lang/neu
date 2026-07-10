@@ -4,16 +4,49 @@ use newlang::name_resolution::{
     bind_accepted_name_references, bind_local_name_references,
     bind_package_qualified_type_references, bind_unqualified_function_references,
     bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
-    build_local_binding_index, build_local_scope_tree, build_scoped_local_binding_index,
-    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
-    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
-    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
-    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
-    TopLevelLookupResult,
+    build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
+    build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
+    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
+    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
+    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
 use newlang::symbol::{SymbolId, SymbolInterner};
+
+#[test]
+fn m0021_function_parameter_binding_uses_owning_body_scope() {
+    let file = SourceFileId::from_raw(802);
+    let parsed = parse_source(
+        file,
+        "fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+
+    let built = build_function_parameter_binding_index(
+        &parsed.arena,
+        &parsed.function_parameters,
+        &scopes,
+        &mut interner,
+    );
+
+    assert!(built.diagnostics().is_empty());
+    assert_eq!(built.index().bindings().len(), 1);
+    assert_eq!(
+        built.index().bindings()[0].binding(),
+        parsed.function_parameters[0].parameter
+    );
+    assert_eq!(
+        built.index().bindings()[0].kind(),
+        LocalBindingKind::Immutable
+    );
+    assert_eq!(
+        built.index().bindings()[0].key().scope(),
+        scopes.scopes()[0].id()
+    );
+}
 
 #[test]
 fn m0021_enum_variant_identity_preserves_enum_and_variant_source_order() {

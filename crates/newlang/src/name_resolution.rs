@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use crate::parser::{
-    ParsedDeclarationName, ParsedEnumVariant, ParsedLocalBindingName, ParsedNameReference,
-    ParsedTypeNameReference,
+    ParsedDeclarationName, ParsedEnumVariant, ParsedFunctionParameter, ParsedLocalBindingName,
+    ParsedNameReference, ParsedTypeNameReference,
 };
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
@@ -1050,6 +1050,60 @@ pub fn build_scoped_local_binding_index(
         inserts,
         diagnostics,
     }
+}
+
+pub fn build_function_parameter_binding_index(
+    arena: &AstArena,
+    parameters: &[ParsedFunctionParameter],
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut index = LocalBindingIndex::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for parameter in parameters {
+        let Some(scope) = function_body_scope(arena, scopes, parameter.function) else {
+            continue;
+        };
+        let name = interner.intern(&parameter.name);
+        let key = LocalBindingKey::new(scope, name);
+        let insert = index.insert(LocalBinding::new(
+            key,
+            parameter.parameter,
+            LocalBindingKind::Immutable,
+        ));
+        if matches!(insert, LocalBindingInsert::Duplicate { .. }) {
+            diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::DuplicateName,
+                parameter.name_span,
+            ));
+        }
+        inserts.push(insert);
+    }
+
+    LocalBindingIndexBuild {
+        index,
+        inserts,
+        diagnostics,
+    }
+}
+
+fn function_body_scope(
+    arena: &AstArena,
+    scopes: &LocalScopeTree,
+    function: AstNodeId,
+) -> Option<LocalScopeId> {
+    let function = arena.node(function)?;
+    scopes
+        .scopes()
+        .iter()
+        .find(|scope| {
+            arena.node(scope.owner()).is_some_and(|owner| {
+                owner.kind == AstNodeKind::Block && owner.span.start() == function.span.end()
+            })
+        })
+        .map(|scope| scope.id())
 }
 
 fn containing_block_scope(
