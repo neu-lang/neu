@@ -56,6 +56,7 @@ pub struct ParseOutput {
     pub lex_diagnostics: Vec<lexer::Diagnostic>,
     pub declaration_names: Vec<ParsedDeclarationName>,
     pub local_binding_names: Vec<ParsedLocalBindingName>,
+    pub name_references: Vec<ParsedNameReference>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -70,6 +71,13 @@ pub struct ParsedDeclarationName {
 pub struct ParsedLocalBindingName {
     pub binding: crate::ast::AstNodeId,
     pub kind: LocalBindingKind,
+    pub name: String,
+    pub name_span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedNameReference {
+    pub reference: crate::ast::AstNodeId,
     pub name: String,
     pub name_span: ByteSpan,
 }
@@ -91,6 +99,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         lex_diagnostics: lex_output.diagnostics,
         declaration_names: parser.declaration_names,
         local_binding_names: parser.local_binding_names,
+        name_references: parser.name_references,
     }
 }
 
@@ -103,6 +112,7 @@ struct Parser<'source> {
     diagnostics: Vec<Diagnostic>,
     declaration_names: Vec<ParsedDeclarationName>,
     local_binding_names: Vec<ParsedLocalBindingName>,
+    name_references: Vec<ParsedNameReference>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -118,6 +128,7 @@ impl<'source> Parser<'source> {
             diagnostics: Vec::new(),
             declaration_names: Vec::new(),
             local_binding_names: Vec::new(),
+            name_references: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -755,11 +766,17 @@ impl<'source> Parser<'source> {
     }
 
     fn parse_name_expression(&mut self) -> Option<ByteSpan> {
-        let start = self.current()?.span.start();
-        let end = self.current()?.span.end();
+        let name = self.current()?.clone();
+        let start = name.span.start();
+        let end = name.span.end();
         self.advance();
         let span = self.span(start, end);
-        self.arena.add_name_expression(span);
+        let reference = self.arena.add_name_expression(span);
+        self.name_references.push(ParsedNameReference {
+            reference,
+            name: self.text[name.span.start()..name.span.end()].to_owned(),
+            name_span: name.span,
+        });
         Some(span)
     }
 

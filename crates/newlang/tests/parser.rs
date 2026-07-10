@@ -168,6 +168,50 @@ fn parses_adr0024_body_statements_and_expressions() {
 }
 
 #[test]
+fn records_simple_identifier_expression_name_references() {
+    let file = SourceFileId::from_raw(20);
+    let source = "fun run() { val answer = compute(); answer; next + answer; }";
+    let output = parse_source(file, source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let names: Vec<_> = output
+        .name_references
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect();
+    assert_eq!(names, ["compute", "answer", "next", "answer"]);
+
+    let first = &output.name_references[0];
+    assert_eq!(
+        &source[first.name_span.start()..first.name_span.end()],
+        "compute"
+    );
+    assert_eq!(
+        output.arena.node(first.reference).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+}
+
+#[test]
+fn name_reference_metadata_excludes_member_import_and_package_names() {
+    let output = parse_source(
+        SourceFileId::from_raw(21),
+        "package demo.core import demo.io fun run() { logger.info(value); }",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    let names: Vec<_> = output
+        .name_references
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect();
+
+    assert_eq!(names, ["logger", "value"]);
+}
+
+#[test]
 fn records_local_val_and_var_binding_name_metadata() {
     let file = SourceFileId::from_raw(18);
     let source = "fun run() { val answer: Int = compute(); var next = answer; }";
