@@ -4,7 +4,8 @@ use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use crate::parser::{
     ParsedDeclarationName, ParsedEnumVariant, ParsedFunctionParameter, ParsedLocalBindingName,
-    ParsedNameReference, ParsedTypeNameReference,
+    ParsedMatchArm, ParsedNameReference, ParsedQualifiedCasePattern, ParsedTypeNameReference,
+    ParsedWhenExpression,
 };
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
@@ -138,6 +139,7 @@ pub struct EnumParameterTypeResolution {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MatchDiagnosticKind {
     InvalidMatchSubject,
+    UnknownMatchVariant,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -162,14 +164,29 @@ pub struct ResolvedWhenSubject {
 }
 
 impl ResolvedWhenSubject {
+    pub fn expression(self) -> AstNodeId {
+        self.expression
+    }
     pub fn enum_declaration(self) -> AstNodeId {
         self.enum_declaration
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResolvedVariantArm {
+    arm: AstNodeId,
+    variant: AstNodeId,
+}
+impl ResolvedVariantArm {
+    pub fn variant(self) -> AstNodeId {
+        self.variant
     }
 }
 
 #[derive(Debug, Default)]
 pub struct MatchAnalysisReport {
     subjects: Vec<ResolvedWhenSubject>,
+    arms: Vec<ResolvedVariantArm>,
     diagnostics: Vec<MatchDiagnostic>,
 }
 
@@ -177,9 +194,61 @@ impl MatchAnalysisReport {
     pub fn subjects(&self) -> &[ResolvedWhenSubject] {
         &self.subjects
     }
+    pub fn arms(&self) -> &[ResolvedVariantArm] {
+        &self.arms
+    }
     pub fn diagnostics(&self) -> &[MatchDiagnostic] {
         &self.diagnostics
     }
+}
+
+pub fn resolve_qualified_variant_arms(
+    expressions: &[ParsedWhenExpression],
+    arms: &[ParsedMatchArm],
+    patterns: &[ParsedQualifiedCasePattern],
+    subjects: &[ResolvedWhenSubject],
+    variants: &EnumVariantIndex,
+    interner: &mut SymbolInterner,
+) -> MatchAnalysisReport {
+    let mut report = MatchAnalysisReport::default();
+    for expression in expressions {
+        let Some(subject) = subjects
+            .iter()
+            .find(|subject| subject.expression() == expression.expression)
+        else {
+            continue;
+        };
+        for arm_id in &expression.arms {
+            let Some(arm) = arms.iter().find(|arm| arm.arm == *arm_id) else {
+                continue;
+            };
+            let Some(pattern) = patterns
+                .iter()
+                .find(|pattern| pattern.pattern == arm.pattern)
+            else {
+                continue;
+            };
+            let enum_name = interner.intern(&pattern.enum_name);
+            let variant_name = interner.intern(&pattern.variant_name);
+            let variant = variants.variants().iter().find(|variant| {
+                variant.enum_declaration() == subject.enum_declaration()
+                    && variant.enum_name() == enum_name
+                    && variant.variant_name() == variant_name
+            });
+            if let Some(variant) = variant {
+                report.arms.push(ResolvedVariantArm {
+                    arm: arm.arm,
+                    variant: variant.variant(),
+                });
+            } else {
+                report.diagnostics.push(MatchDiagnostic {
+                    kind: MatchDiagnosticKind::UnknownMatchVariant,
+                    node: arm.pattern,
+                });
+            }
+        }
+    }
+    report
 }
 
 pub fn analyze_when_subjects(

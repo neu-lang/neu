@@ -6,11 +6,11 @@ use newlang::name_resolution::{
     bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
     build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
     build_scoped_binding_index, build_scoped_local_binding_index, resolve_enum_parameter_types,
-    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
-    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
-    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
-    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
-    TopLevelLookupResult,
+    resolve_qualified_variant_arms, DeclarationIndex, DeclarationInsert, DeclarationKey,
+    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
+    LocalBindingKey, LocalBindingKind, LocalNameLookup, LocalNameLookupResult, LocalScopeId,
+    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -99,6 +99,118 @@ fn m0021_when_subject_analysis_accepts_enum_parameter_only() {
     assert_eq!(
         report.diagnostics()[0].node(),
         non_enum.when_expressions[0].subject
+    );
+}
+
+#[test]
+fn m0021_qualified_variant_arm_resolves_subject_enum_variant() {
+    let file = SourceFileId::from_raw(808);
+    let parsed = parse_source(
+        file,
+        "enum Signal { Red } fun code(signal: Signal) { when (signal) { Signal.Red -> 0 } }",
+    );
+    let metadata = ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [file]).unwrap();
+    let mut interner = SymbolInterner::new();
+    let variants = build_enum_variant_index(
+        &metadata,
+        &parsed.enum_variants,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let enum_types = resolve_enum_parameter_types(
+        &parsed.arena,
+        &metadata,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.declaration_names,
+        &mut interner,
+    );
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let bindings = build_scoped_binding_index(
+        &parsed.arena,
+        &parsed.function_parameters,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let names = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        bindings.index(),
+        &mut interner,
+    );
+    let subjects = analyze_when_subjects(
+        &parsed.when_expressions,
+        names.resolved_local_bindings(),
+        &enum_types,
+    );
+    let arms = resolve_qualified_variant_arms(
+        &parsed.when_expressions,
+        &parsed.match_arms,
+        &parsed.qualified_case_patterns,
+        subjects.subjects(),
+        &variants,
+        &mut interner,
+    );
+
+    assert!(arms.diagnostics().is_empty());
+    assert_eq!(arms.arms().len(), 1);
+    assert_eq!(arms.arms()[0].variant(), parsed.enum_variants[0].variant);
+
+    let other = parse_source(
+        SourceFileId::from_raw(809),
+        "enum Signal { Red } enum Other { Red } fun code(signal: Signal) { when (signal) { Other.Red -> 0 } }",
+    );
+    let other_file = SourceFileId::from_raw(809);
+    let other_metadata =
+        ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [other_file]).unwrap();
+    let variants = build_enum_variant_index(
+        &other_metadata,
+        &other.enum_variants,
+        &other.declaration_names,
+        &mut interner,
+    );
+    let enum_types = resolve_enum_parameter_types(
+        &other.arena,
+        &other_metadata,
+        &other.function_parameters,
+        &other.type_name_references,
+        &other.declaration_names,
+        &mut interner,
+    );
+    let scopes = build_local_scope_tree(&other.arena);
+    let bindings = build_scoped_binding_index(
+        &other.arena,
+        &other.function_parameters,
+        &other.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let names = bind_local_name_references(
+        &other.arena,
+        &other.name_references,
+        &scopes,
+        bindings.index(),
+        &mut interner,
+    );
+    let subjects = analyze_when_subjects(
+        &other.when_expressions,
+        names.resolved_local_bindings(),
+        &enum_types,
+    );
+    let arms = resolve_qualified_variant_arms(
+        &other.when_expressions,
+        &other.match_arms,
+        &other.qualified_case_patterns,
+        subjects.subjects(),
+        &variants,
+        &mut interner,
+    );
+    assert_eq!(arms.diagnostics().len(), 1);
+    assert_eq!(
+        arms.diagnostics()[0].kind(),
+        newlang::name_resolution::MatchDiagnosticKind::UnknownMatchVariant
     );
 }
 
