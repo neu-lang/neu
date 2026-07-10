@@ -462,6 +462,95 @@ pub fn bind_local_name_references(
     }
 }
 
+#[derive(Debug)]
+pub struct FunctionReferenceBind {
+    table: ResolutionTable,
+    inserts: Vec<ResolutionInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
+}
+
+impl FunctionReferenceBind {
+    pub fn table(&self) -> &ResolutionTable {
+        &self.table
+    }
+
+    pub fn inserts(&self) -> &[ResolutionInsert] {
+        &self.inserts
+    }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn bind_unqualified_function_references(
+    metadata: &ModuleMetadata,
+    arena: &AstArena,
+    references: &[ParsedNameReference],
+    scopes: &LocalScopeTree,
+    local_bindings: &LocalBindingIndex,
+    declarations: &DeclarationIndex,
+    interner: &mut SymbolInterner,
+) -> FunctionReferenceBind {
+    let mut table = ResolutionTable::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for reference in references {
+        let name = interner.intern(&reference.name);
+        let local_result = containing_block_scope(arena, scopes, reference.reference)
+            .map(|scope| {
+                local_bindings.lookup_local(
+                    scopes,
+                    arena,
+                    LocalNameLookup::new(scope, name, reference.name_span),
+                )
+            })
+            .unwrap_or_else(|| {
+                LocalNameLookupResult::Unresolved(ResolutionDiagnostic::new(
+                    ResolutionDiagnosticKind::UnresolvedName,
+                    reference.name_span,
+                ))
+            });
+
+        if let LocalNameLookupResult::Found(binding) = local_result {
+            let insert = table.insert(ResolvedName::new(reference.reference, binding.key().name()));
+            inserts.push(insert);
+            continue;
+        }
+
+        let package = metadata
+            .packages()
+            .iter()
+            .find(|package| package.source_file() == reference.name_span.file())
+            .map(|package| package.namespace().clone())
+            .unwrap_or_else(PackageNamespace::root);
+
+        match declarations.lookup_top_level(TopLevelLookup::new(
+            metadata.name().clone(),
+            package,
+            name,
+            DeclarationKind::Function,
+            reference.name_span,
+        )) {
+            TopLevelLookupResult::Found(declaration) => {
+                let insert = table.insert(ResolvedName::new(
+                    reference.reference,
+                    declaration.key().name(),
+                ));
+                inserts.push(insert);
+            }
+            TopLevelLookupResult::Unresolved(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+
+    FunctionReferenceBind {
+        table,
+        inserts,
+        diagnostics,
+    }
+}
+
 fn local_binding_is_visible(
     arena: &AstArena,
     binding: &LocalBinding,
