@@ -1128,6 +1128,35 @@ pub fn build_scoped_local_binding_index(
     }
 }
 
+pub fn build_scoped_binding_index(
+    arena: &AstArena,
+    parameters: &[ParsedFunctionParameter],
+    bindings: &[ParsedLocalBindingName],
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut result = build_function_parameter_binding_index(arena, parameters, scopes, interner);
+
+    for binding in bindings {
+        let Some(scope) = containing_block_scope(arena, scopes, binding.binding) else {
+            continue;
+        };
+        let key = LocalBindingKey::new(scope, interner.intern(&binding.name));
+        let insert = result
+            .index
+            .insert(LocalBinding::new(key, binding.binding, binding.kind));
+        if matches!(insert, LocalBindingInsert::Duplicate { .. }) {
+            result.diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::DuplicateName,
+                binding.name_span,
+            ));
+        }
+        result.inserts.push(insert);
+    }
+
+    result
+}
+
 pub fn build_function_parameter_binding_index(
     arena: &AstArena,
     parameters: &[ParsedFunctionParameter],

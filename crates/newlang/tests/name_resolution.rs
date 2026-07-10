@@ -5,10 +5,10 @@ use newlang::name_resolution::{
     bind_package_qualified_type_references, bind_unqualified_function_references,
     bind_unqualified_type_references, build_declaration_index, build_enum_variant_index,
     build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
-    build_scoped_local_binding_index, resolve_enum_parameter_types, DeclarationIndex,
-    DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName, LocalBinding,
-    LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalNameLookup,
-    LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
+    build_scoped_binding_index, build_scoped_local_binding_index, resolve_enum_parameter_types,
+    DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
+    LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
+    LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
     ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
     TopLevelLookupResult,
 };
@@ -46,6 +46,38 @@ fn m0021_function_parameter_binding_uses_owning_body_scope() {
     assert_eq!(
         built.index().bindings()[0].key().scope(),
         scopes.scopes()[0].id()
+    );
+}
+
+#[test]
+fn m0021_combined_binding_index_resolves_parameter_use() {
+    let file = SourceFileId::from_raw(805);
+    let parsed = parse_source(
+        file,
+        "fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+    );
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = build_scoped_binding_index(
+        &parsed.arena,
+        &parsed.function_parameters,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(
+        bound.table().resolved_names()[0].reference(),
+        parsed.when_expressions[0].subject
     );
 }
 
