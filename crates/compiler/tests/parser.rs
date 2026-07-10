@@ -367,6 +367,76 @@ fn parses_adr0024_body_statements_and_expressions() {
 }
 
 #[test]
+fn m0028_records_executable_binary_operator_metadata() {
+    let output = parse_source(
+        SourceFileId::from_raw(66),
+        "fun run() { a + b - c * d / e % f ** g << h >> i & j ^ k | l; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let operators: Vec<_> = output
+        .binary_expressions
+        .iter()
+        .map(|expression| expression.operator)
+        .collect();
+    assert!(operators.contains(&ParsedBinaryOperator::Plus));
+    assert!(operators.contains(&ParsedBinaryOperator::Minus));
+    assert!(operators.contains(&ParsedBinaryOperator::Star));
+    assert!(operators.contains(&ParsedBinaryOperator::Slash));
+    assert!(operators.contains(&ParsedBinaryOperator::Percent));
+    assert!(operators.contains(&ParsedBinaryOperator::Exponent));
+    assert!(operators.contains(&ParsedBinaryOperator::ShiftLeft));
+    assert!(operators.contains(&ParsedBinaryOperator::ShiftRight));
+    assert!(operators.contains(&ParsedBinaryOperator::BitwiseAnd));
+    assert!(operators.contains(&ParsedBinaryOperator::BitwiseXor));
+    assert!(operators.contains(&ParsedBinaryOperator::BitwiseOr));
+}
+
+#[test]
+fn m0028_parses_executable_unary_operators() {
+    let output = parse_source(
+        SourceFileId::from_raw(67),
+        "fun run() { const a = +value; const b = -value; const c = ~value; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let unary_count = output
+        .arena
+        .nodes()
+        .iter()
+        .filter(|node| node.kind == AstNodeKind::UnaryExpression)
+        .count();
+    assert_eq!(unary_count, 3);
+}
+
+#[test]
+fn m0028_parses_exponentiation_right_associatively() {
+    let output = parse_source(SourceFileId::from_raw(68), "fun run() { a ** b ** c; }");
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.binary_expressions.len(), 2);
+
+    let outer = output
+        .binary_expressions
+        .iter()
+        .find(|expression| expression.span.start() == 12)
+        .expect("outer exponent expression recorded");
+    let inner = output
+        .binary_expressions
+        .iter()
+        .find(|expression| expression.expression == outer.right)
+        .expect("right operand exponent expression recorded");
+
+    assert_eq!(outer.operator, ParsedBinaryOperator::Exponent);
+    assert_eq!(inner.operator, ParsedBinaryOperator::Exponent);
+}
+
+#[test]
 fn records_simple_identifier_expression_name_references() {
     let file = SourceFileId::from_raw(20);
     let source = "fun run() { const answer = compute(); answer; next + answer; }";

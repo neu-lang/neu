@@ -15,6 +15,10 @@ public enum State {}
 public fun choose() {
     const outer = one();
 
+    const arithmetic = +one() + -two() * ~mask() / three() % four() ** power();
+    const shifted = arithmetic << shiftLeft() >> shiftRight();
+    const bits = shifted & mask() ^ toggle() | fallback();
+
     if (ready) {
         const inner = outer;
     } else {

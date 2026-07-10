@@ -198,6 +198,18 @@ pub enum ParsedBinaryOperator {
     Star,
     Slash,
     Percent,
+    Exponent,
+    ShiftLeft,
+    ShiftRight,
+    BitwiseAnd,
+    BitwiseXor,
+    BitwiseOr,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BinaryAssociativity {
+    Left,
+    Right,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1039,14 +1051,18 @@ impl<'source> Parser<'source> {
 
     fn parse_binary_expression(&mut self, min_precedence: u8) -> Option<ByteSpan> {
         let mut left = self.parse_unary_expression()?;
-        while let Some((precedence, operator)) = self.binary_operator() {
+        while let Some((precedence, associativity, operator)) = self.binary_operator() {
             if precedence < min_precedence {
                 break;
             }
             let left_span = left;
             let operator_span = self.current().expect("operator token exists").span;
             self.advance();
-            let Some(right) = self.parse_binary_expression(precedence + 1) else {
+            let next_min_precedence = match associativity {
+                BinaryAssociativity::Left => precedence + 1,
+                BinaryAssociativity::Right => precedence,
+            };
+            let Some(right) = self.parse_binary_expression(next_min_precedence) else {
                 self.diagnostic(DiagnosticKind::MalformedBinaryExpression, operator_span);
                 return Some(left);
             };
@@ -1071,7 +1087,7 @@ impl<'source> Parser<'source> {
 
     fn parse_unary_expression(&mut self) -> Option<ByteSpan> {
         match self.current_kind() {
-            Some(TokenKind::Bang | TokenKind::Minus) => {
+            Some(TokenKind::Bang | TokenKind::Plus | TokenKind::Minus | TokenKind::Tilde) => {
                 let start = self.current().expect("unary operator exists").span.start();
                 self.advance();
                 let operand = self.parse_unary_expression()?;
@@ -1714,8 +1730,8 @@ impl<'source> Parser<'source> {
                         return;
                     }
                 }
-                Some(TokenKind::Greater) => {
-                    self.advance();
+                Some(TokenKind::Greater | TokenKind::GreaterGreater) => {
+                    self.consume_generic_greater();
                     return;
                 }
                 _ => {
@@ -1852,9 +1868,10 @@ impl<'source> Parser<'source> {
                         return self.previous_span().map(|span| span.end());
                     }
                 }
-                Some(TokenKind::Greater) => {
-                    let end = self.current().expect("greater token exists").span.end();
-                    self.advance();
+                Some(TokenKind::Greater | TokenKind::GreaterGreater) => {
+                    let end = self
+                        .consume_generic_greater()
+                        .expect("generic greater token exists");
                     return Some(end);
                 }
                 _ => {
@@ -2030,21 +2047,28 @@ impl<'source> Parser<'source> {
         matches!(kind, TokenKind::Identifier | TokenKind::LeftParen)
     }
 
-    fn binary_operator(&self) -> Option<(u8, TokenKind)> {
+    fn binary_operator(&self) -> Option<(u8, BinaryAssociativity, TokenKind)> {
         let kind = self.current_kind()?;
-        let precedence = match kind {
-            TokenKind::PipePipe => 1,
-            TokenKind::AmpAmp => 2,
-            TokenKind::EqualEqual | TokenKind::BangEqual => 3,
+        let (precedence, associativity) = match kind {
+            TokenKind::PipePipe => (1, BinaryAssociativity::Left),
+            TokenKind::AmpAmp => (2, BinaryAssociativity::Left),
+            TokenKind::Pipe => (3, BinaryAssociativity::Left),
+            TokenKind::Caret => (4, BinaryAssociativity::Left),
+            TokenKind::Amp => (5, BinaryAssociativity::Left),
+            TokenKind::EqualEqual | TokenKind::BangEqual => (6, BinaryAssociativity::Left),
             TokenKind::Less
             | TokenKind::Greater
             | TokenKind::LessEqual
-            | TokenKind::GreaterEqual => 4,
-            TokenKind::Plus | TokenKind::Minus => 5,
-            TokenKind::Star | TokenKind::Slash | TokenKind::Percent => 6,
+            | TokenKind::GreaterEqual => (7, BinaryAssociativity::Left),
+            TokenKind::LessLess | TokenKind::GreaterGreater => (8, BinaryAssociativity::Left),
+            TokenKind::Plus | TokenKind::Minus => (9, BinaryAssociativity::Left),
+            TokenKind::Star | TokenKind::Slash | TokenKind::Percent => {
+                (10, BinaryAssociativity::Left)
+            }
+            TokenKind::StarStar => (11, BinaryAssociativity::Right),
             _ => return None,
         };
-        Some((precedence, kind))
+        Some((precedence, associativity, kind))
     }
 
     fn skip_to_type_boundary(&mut self) {
@@ -2278,6 +2302,27 @@ impl<'source> Parser<'source> {
         self.index += 1;
     }
 
+    fn consume_generic_greater(&mut self) -> Option<usize> {
+        let token = self.tokens.get_mut(self.index)?;
+        match token.kind {
+            TokenKind::Greater => {
+                let end = token.span.end();
+                self.index += 1;
+                Some(end)
+            }
+            TokenKind::GreaterGreater => {
+                let start = token.span.start();
+                let first_end = start + 1;
+                let original_end = token.span.end();
+                token.kind = TokenKind::Greater;
+                token.span =
+                    ByteSpan::new(self.file, first_end, original_end).expect("split >> span");
+                Some(first_end)
+            }
+            _ => None,
+        }
+    }
+
     fn is_eof(&self) -> bool {
         self.index >= self.tokens.len()
     }
@@ -2342,6 +2387,12 @@ fn parsed_binary_operator(kind: TokenKind) -> Option<ParsedBinaryOperator> {
         TokenKind::Star => ParsedBinaryOperator::Star,
         TokenKind::Slash => ParsedBinaryOperator::Slash,
         TokenKind::Percent => ParsedBinaryOperator::Percent,
+        TokenKind::StarStar => ParsedBinaryOperator::Exponent,
+        TokenKind::LessLess => ParsedBinaryOperator::ShiftLeft,
+        TokenKind::GreaterGreater => ParsedBinaryOperator::ShiftRight,
+        TokenKind::Amp => ParsedBinaryOperator::BitwiseAnd,
+        TokenKind::Caret => ParsedBinaryOperator::BitwiseXor,
+        TokenKind::Pipe => ParsedBinaryOperator::BitwiseOr,
         _ => return None,
     };
     Some(operator)

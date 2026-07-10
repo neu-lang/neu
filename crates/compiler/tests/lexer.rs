@@ -148,6 +148,27 @@ fn lexes_operators_and_delimiters_with_longest_match() {
 }
 
 #[test]
+fn m0028_lexes_executable_operator_tokens() {
+    assert_eq!(
+        kinds("** << >> ~ ^ & | + - * / %"),
+        vec![
+            TokenKind::StarStar,
+            TokenKind::LessLess,
+            TokenKind::GreaterGreater,
+            TokenKind::Tilde,
+            TokenKind::Caret,
+            TokenKind::Amp,
+            TokenKind::Pipe,
+            TokenKind::Plus,
+            TokenKind::Minus,
+            TokenKind::Star,
+            TokenKind::Slash,
+            TokenKind::Percent,
+        ]
+    );
+}
+
+#[test]
 fn reports_lexical_errors_with_precise_spans() {
     assert_eq!(
         diagnostic_texts("\"bad\\q\""),
