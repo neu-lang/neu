@@ -10,7 +10,8 @@ M0021
 
 ## Goal
 
-Implement sealed sum type checking and exhaustive pattern matching for approved forms.
+Implement the ADR-0033 bootstrap subset: no-payload enum variants and
+exhaustive expression-level `when` checking.
 
 ## Motivation
 
@@ -18,7 +19,8 @@ Algebraic data and exhaustive matching are central to safe domain modeling and e
 
 ## Background
 
-ADR-0012 selects sealed sum types with exhaustive pattern matching integrated with smart casts.
+ADR-0012 selects sealed sums; ADR-0033 defines the first parser-backed finite
+coverage subset without payloads or implicit smart casts.
 
 ## Prerequisites
 
@@ -33,44 +35,43 @@ ADR-0012 selects sealed sum types with exhaustive pattern matching integrated wi
 
 ## Outputs
 
-- Sealed sum type semantic checks.
-- Exhaustiveness checker.
-- Pattern typing diagnostics.
+- Enum variant metadata and identity checks.
+- Exhaustiveness checker for qualified no-payload variant arms.
+- ADR-0033 diagnostics.
 
 ## Scope
 
-- Approved sealed sum declarations.
-- Approved exhaustive match forms.
+- Identifier-only enum variants.
+- `when` expressions with qualified variant or wildcard arms.
 
 ## Out of Scope
 
 - Open class hierarchies.
-- Pattern matching syntax not approved by grammar ledger.
+- Payloads, destructuring, generic enums, nullable coverage, and implicit smart casts.
 - Optimization of match lowering.
 
 ## Deliverables
 
-- Exhaustiveness analysis.
+- Enum and match parser metadata.
 - Positive exhaustive-match tests.
-- Negative non-exhaustive tests.
+- Negative duplicate, unknown, and non-exhaustive tests.
 - Diagnostic snapshots.
 
 ## Acceptance Criteria
 
-- Exhaustive approved matches pass.
-- Non-exhaustive approved matches fail with diagnostics.
-- Smart-cast interaction is tested for approved cases.
+- Exhaustive qualified-variant matches pass.
+- Non-exhaustive and duplicate/unknown matches diagnose.
+- Unsupported payload and destructuring forms remain rejected or blocked.
 
 ## Test Strategy
 
-- Positive sealed sum fixtures.
-- Negative exhaustiveness fixtures.
+- Positive enum/when fixtures.
+- Negative coverage fixtures.
 - Diagnostic snapshots.
 
 ## Risks
 
-- Variant evolution rules may be unspecified.
-- Pattern grammar may be incomplete.
+- Payload, destructuring, and nullable coverage are intentionally deferred.
 
 ## Estimated Effort
 
@@ -87,4 +88,3 @@ ADR-0012 selects sealed sum types with exhaustive pattern matching integrated wi
 - [ ] Sealed sums are checked.
 - [ ] Exhaustiveness is checked.
 - [ ] Diagnostics identify missing cases.
-

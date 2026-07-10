@@ -6,7 +6,7 @@
 - Milestone: `M0021`
 - Milestone File: `docs/milestones/M0021-algebraic-data-and-exhaustiveness.md`
 - Specification: `docs/SPEC.md`
-- Status: `blocked`
+- Status: `complete`
 - Owner: `Language Designer`
 
 ## Objective
@@ -30,10 +30,11 @@ scope, coverage algorithm, and diagnostics needed to implement M0021.
 
 ## Required Resolution
 
-Language Designer must provide an accepted ADR or SPEC revision defining a
-small parser-backed sealed-sum and match subset, exhaustiveness behavior, and
-diagnostics. No implementation or tests may infer Kotlin behavior.
+ADR-0033 is accepted and defines the small parser-backed enum/`when` subset,
+exhaustiveness behavior, and diagnostics. Payloads and destructuring remain
+deferred.
 
 ## Execution Log
 
 - 2026-07-10 agent=Main phase=blocker-recorded result=blocked evidence=accepted source defers enum variants and match/when syntax. handoff=Language-Designer
+- 2026-07-10 agent=Main phase=resolution-accepted result=pass evidence=user accepted ADR-0033; source of truth updated. handoff=Task-Decomposer

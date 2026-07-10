@@ -30,3 +30,9 @@ subset before implementation or tests encode accepted/rejected programs.
 - `docs/adr/ADR-0012-pattern-matching-and-algebraic-data.md`
 - `docs/adr/ADR-0022-declaration-syntax.md`
 - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
+
+## Resolution
+
+Resolved by accepted ADR-0033 for the bootstrap no-payload enum and
+expression-level `when` subset. Other algebraic-data and match forms remain
+deferred.

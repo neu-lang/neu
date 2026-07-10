@@ -133,8 +133,8 @@ bootstrap compiler. The accepted declaration shell covers source-file ordering,
 package declarations, import declarations, visibility modifiers, functions,
 structs, enums or sealed sums, interfaces, and declaration bodies. Function
 parameter contents, concrete return type syntax, fields, properties,
-constructors, enum variants, expression bodies, and statement bodies are
-deferred until future accepted ADRs or spec updates.
+constructors, expression bodies, and statement bodies are deferred until future
+accepted ADRs or spec updates. ADR-0033 accepts its narrow enum-variant subset.
 
 ## ADR-0023: Type And Generic Syntax
 
@@ -167,9 +167,10 @@ controls directly spelling-dependent parser dispatch and recovery. `val` is an
 ordinary identifier, including as the binding name after `const` or `var`, and
 old declaration-introducer use receives only ordinary parser diagnostics and
 recovery.
-Unsafe block syntax, coroutine syntax, match or `when` syntax, loops,
+Unsafe block syntax, coroutine syntax, loops,
 `break` and `continue`, indexing, lambdas, destructuring declarations, labels,
-error propagation syntax, and advanced pattern forms remain deferred.
+error propagation syntax, and advanced pattern forms remain deferred. ADR-0033
+accepts its narrow expression-level `when` subset.
 
 ## ADR-0025: Module Package And Visibility Model
 
@@ -278,3 +279,14 @@ deferred until ownership and thread-capability semantics provide their required
 inputs. M0021 depends only on the representation boundary. A later
 post-M0024 milestone must introduce enforcement through a separate accepted
 semantic decision.
+
+## ADR-0033: Bootstrap Sealed Sums And Exhaustive Match
+
+M0021 accepts closed no-payload `enum` variants and expression-level `when`.
+Enum variants are identifier-only and scoped to their declaring module/package.
+`when (subject) { Enum.Variant -> expression; _ -> expression; }` uses only
+qualified variant patterns or a wildcard. A match is exhaustive only when it
+covers each declared variant once or has exactly one wildcard. Duplicate,
+unknown, and missing variants, duplicate wildcards, and non-enum subjects
+diagnose under ADR-0033; payloads, destructuring, generic enums, nullable
+coverage, implicit smart casts, and arm-result type unification remain deferred.

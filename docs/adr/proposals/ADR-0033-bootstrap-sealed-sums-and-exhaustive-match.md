@@ -1,11 +1,11 @@
 # ADR-0033: Bootstrap Sealed Sums And Exhaustive Match
 
-Status: Draft proposal - not accepted source of truth
+Status: Accepted as `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`
 
 ## Non-Authority Notice
 
-This proposal does not authorize parser, type-checker, or diagnostic changes.
-The active blocker is `docs/ambiguities/M0021-sealed-sum-exhaustiveness.md`.
+This proposal is retained as design history. The accepted ADR is the only
+implementation authority.
 
 ## Question
 
