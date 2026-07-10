@@ -321,3 +321,25 @@ lower to HIR. Calls, returns, captures, `when` subject evaluation, branch move
 joins, destructuring, member or partial moves, destructors, borrowing,
 coroutine frames, FFI, layout, cloning, generic copyability, and user-declared
 copy remain deferred.
+
+## ADR-0036: Bootstrap Borrow And Lifetime Analysis
+
+M0023 uses a metadata-only bootstrap borrow model. It adds no source-level
+borrow syntax, reference types, dereference operators, function parameter
+borrowing, method receivers, member borrows, closure captures, coroutine
+borrows, unsafe references, or FFI references.
+
+Borrow input records contain a borrow node, borrowed local binding, borrow kind
+(`shared` or `exclusive`), and region node. Shared borrows may overlap other
+shared borrows of the same local in the same region. An exclusive borrow
+conflicts with any other shared or exclusive borrow of the same local in the
+same region. M0023 overlap is exact region-node equality only; nested, sibling,
+non-lexical, loop, path-sensitive, and control-flow-sensitive overlap rules are
+deferred.
+
+Lifetime escape input records contain an escape node, borrowed local binding,
+borrow node, borrow region, and use region. A `lifetime_escape` diagnostic is
+reported when the use region differs from the borrow region. `borrow_conflict`
+diagnoses on the later conflicting borrow with the earlier borrow as secondary
+span. `lifetime_escape` diagnoses on the escape node with the original borrow
+as secondary span.
