@@ -248,6 +248,62 @@ fn literal_expression_metadata_excludes_non_literal_expressions() {
 }
 
 #[test]
+fn records_grouped_expression_metadata_for_type_checking() {
+    let output = parse_source(
+        SourceFileId::from_raw(31),
+        "fun run() { val answer = (42); val nested = ((answer)); }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.grouped_expressions.len(), 3);
+
+    let first = &output.grouped_expressions[0];
+    assert_eq!(
+        output.arena.node(first.expression).unwrap().kind,
+        AstNodeKind::GroupedExpression
+    );
+    assert_eq!(
+        output.arena.node(first.inner).unwrap().kind,
+        AstNodeKind::LiteralExpression
+    );
+
+    let outer_nested = &output.grouped_expressions[1];
+    let inner_nested = &output.grouped_expressions[2];
+    assert_eq!(
+        output.arena.node(outer_nested.expression).unwrap().kind,
+        AstNodeKind::GroupedExpression
+    );
+    assert_eq!(outer_nested.inner, inner_nested.expression);
+    assert_eq!(
+        output.arena.node(inner_nested.inner).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+}
+
+#[test]
+fn grouped_expression_metadata_excludes_malformed_groups() {
+    let output = parse_source(
+        SourceFileId::from_raw(32),
+        "fun run() { val broken = (42; val ok = (true); }",
+    );
+
+    assert!(output
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::UnexpectedTokenInExpression));
+    assert_eq!(output.grouped_expressions.len(), 1);
+    assert_eq!(
+        output
+            .arena
+            .node(output.grouped_expressions[0].inner)
+            .unwrap()
+            .kind,
+        AstNodeKind::LiteralExpression
+    );
+}
+
+#[test]
 fn name_reference_metadata_excludes_member_import_and_package_names() {
     let output = parse_source(
         SourceFileId::from_raw(21),

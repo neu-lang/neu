@@ -59,6 +59,7 @@ pub struct ParseOutput {
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
+    pub grouped_expressions: Vec<ParsedGroupedExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
 }
 
@@ -109,6 +110,13 @@ pub struct ParsedLiteralExpression {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedGroupedExpression {
+    pub expression: crate::ast::AstNodeId,
+    pub inner: crate::ast::AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedLocalDeclaration {
     pub declaration: AstNodeId,
     pub annotation: Option<AstNodeId>,
@@ -135,6 +143,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
+        grouped_expressions: parser.grouped_expressions,
         local_declarations: parser.local_declarations,
     }
 }
@@ -151,6 +160,7 @@ struct Parser<'source> {
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
+    grouped_expressions: Vec<ParsedGroupedExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
@@ -170,6 +180,7 @@ impl<'source> Parser<'source> {
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
+            grouped_expressions: Vec::new(),
             local_declarations: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
@@ -869,8 +880,22 @@ impl<'source> Parser<'source> {
         let end = self.current().expect("right paren exists").span.end();
         self.advance();
         let span = self.span(start, end);
-        self.arena.add_grouped_expression(span);
+        let expression = self.arena.add_grouped_expression(span);
+        if let Some(inner) = self.latest_expression_node_for_span(inner) {
+            self.record_grouped_expression(ParsedGroupedExpression {
+                expression,
+                inner,
+                span,
+            });
+        }
         Some(span)
+    }
+
+    fn record_grouped_expression(&mut self, grouped: ParsedGroupedExpression) {
+        let index = self
+            .grouped_expressions
+            .partition_point(|existing| existing.span.start() <= grouped.span.start());
+        self.grouped_expressions.insert(index, grouped);
     }
 
     fn parse_if_expression(&mut self) -> Option<ByteSpan> {
