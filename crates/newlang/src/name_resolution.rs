@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::AstNodeId;
+use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use crate::parser::{ParsedDeclarationName, ParsedLocalBindingName};
 use crate::source::ByteSpan;
@@ -223,6 +223,38 @@ impl LocalScopeTree {
     pub fn scopes(&self) -> &[LocalScope] {
         &self.scopes
     }
+}
+
+pub fn build_local_scope_tree(arena: &AstArena) -> LocalScopeTree {
+    let mut scope_owners: Vec<_> = arena
+        .nodes()
+        .iter()
+        .filter(|node| matches!(node.kind, AstNodeKind::Block | AstNodeKind::DeclarationBody))
+        .collect();
+    scope_owners.sort_by_key(|node| (node.span.start(), std::cmp::Reverse(node.span.end())));
+
+    let mut tree = LocalScopeTree::new();
+    let mut owner_scopes: Vec<(&crate::ast::AstNode, LocalScopeId)> = Vec::new();
+
+    for owner in scope_owners {
+        let parent = if owner.kind == AstNodeKind::Block {
+            owner_scopes
+                .iter()
+                .rev()
+                .find(|(candidate, _)| {
+                    candidate.kind == AstNodeKind::Block
+                        && candidate.span.start() < owner.span.start()
+                        && owner.span.end() < candidate.span.end()
+                })
+                .map(|(_, scope)| *scope)
+        } else {
+            None
+        };
+        let scope = tree.add_scope(owner.id, parent);
+        owner_scopes.push((owner, scope));
+    }
+
+    tree
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -1,11 +1,11 @@
-use newlang::ast::AstNodeId;
+use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    build_declaration_index, build_local_binding_index, DeclarationIndex, DeclarationInsert,
-    DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
-    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalScopeId, LocalScopeTree,
-    ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable,
-    ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    build_declaration_index, build_local_binding_index, build_local_scope_tree, DeclarationIndex,
+    DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName, LocalBinding,
+    LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalScopeId,
+    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
+    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -599,4 +599,56 @@ fn local_scope_tree_unknown_scope_id_returns_none() {
     tree.add_scope(AstNodeId::from_raw(90), None);
 
     assert_eq!(tree.get(LocalScopeId::from_raw(99)), None);
+}
+
+#[test]
+fn builds_local_scope_tree_for_parser_blocks_in_source_order() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(50),
+        "fun choose() { if (ready) { val inner = one(); } else { val other = two(); } }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let tree = build_local_scope_tree(&parsed.arena);
+
+    assert_eq!(tree.scopes().len(), 3);
+    assert!(tree.scopes()[0].parent().is_none());
+    assert_eq!(tree.scopes()[1].parent(), Some(LocalScopeId::from_raw(0)));
+    assert_eq!(tree.scopes()[2].parent(), Some(LocalScopeId::from_raw(0)));
+    let owners: Vec<_> = tree.scopes().iter().map(|scope| scope.owner()).collect();
+    assert!(
+        parsed.arena.node(owners[0]).unwrap().span.start()
+            < parsed.arena.node(owners[1]).unwrap().span.start()
+    );
+    assert!(
+        parsed.arena.node(owners[1]).unwrap().span.start()
+            < parsed.arena.node(owners[2]).unwrap().span.start()
+    );
+}
+
+#[test]
+fn local_scope_tree_builder_keeps_declaration_bodies_as_roots() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(51),
+        "struct Outer { struct Inner { fun run(); } }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let tree = build_local_scope_tree(&parsed.arena);
+
+    assert_eq!(tree.scopes().len(), 2);
+    assert!(tree.scopes().iter().all(|scope| scope.parent().is_none()));
+}
+
+#[test]
+fn local_scope_tree_builder_ignores_non_scope_owner_nodes() {
+    let file = SourceFileId::from_raw(52);
+    let mut arena = AstArena::new();
+    arena.add_source_file(ByteSpan::new(file, 0, 20).unwrap());
+    arena.add_name_expression(ByteSpan::new(file, 1, 5).unwrap());
+    arena.add_variable_declaration_statement(ByteSpan::new(file, 6, 15).unwrap());
+
+    let tree = build_local_scope_tree(&arena);
+
+    assert!(tree.scopes().is_empty());
 }
