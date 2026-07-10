@@ -86,7 +86,6 @@ ADR-0008 selects structured concurrency. ADR-0009 restricts borrows across suspe
 
 ## Completion Checklist
 
-- [ ] Structured scope checks exist.
-- [ ] Suspension borrow checks exist.
-- [ ] Runtime scheduling remains out of scope.
-
+- [x] Structured scope checks exist.
+- [x] Suspension borrow checks exist.
+- [x] Runtime scheduling remains out of scope.
