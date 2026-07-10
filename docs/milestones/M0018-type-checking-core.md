@@ -84,6 +84,6 @@ ADR-0010 establishes nominal types and constrained generics. This milestone impl
 
 ## Completion Checklist
 
-- [ ] Well-typed fixtures pass.
-- [ ] Ill-typed fixtures diagnose.
+- [x] Well-typed fixtures pass.
+- [x] Ill-typed fixtures diagnose.
 - [x] Ambiguous type rules are blocked.
