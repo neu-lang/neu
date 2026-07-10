@@ -403,6 +403,65 @@ pub fn build_local_binding_index(
     }
 }
 
+pub fn build_scoped_local_binding_index(
+    arena: &AstArena,
+    bindings: &[ParsedLocalBindingName],
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut index = LocalBindingIndex::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for binding in bindings {
+        let Some(scope) = containing_block_scope(arena, scopes, binding.binding) else {
+            continue;
+        };
+        let name = interner.intern(&binding.name);
+        let key = LocalBindingKey::new(scope, name);
+        let insert = index.insert(LocalBinding::new(key, binding.binding, binding.kind));
+        if matches!(insert, LocalBindingInsert::Duplicate { .. }) {
+            diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::DuplicateName,
+                binding.name_span,
+            ));
+        }
+        inserts.push(insert);
+    }
+
+    LocalBindingIndexBuild {
+        index,
+        inserts,
+        diagnostics,
+    }
+}
+
+fn containing_block_scope(
+    arena: &AstArena,
+    scopes: &LocalScopeTree,
+    binding: AstNodeId,
+) -> Option<LocalScopeId> {
+    let binding_span = arena.node(binding)?.span;
+    scopes
+        .scopes()
+        .iter()
+        .filter(|scope| {
+            let Some(owner) = arena.node(scope.owner()) else {
+                return false;
+            };
+            owner.kind == AstNodeKind::Block
+                && owner.span.start() <= binding_span.start()
+                && binding_span.end() <= owner.span.end()
+        })
+        .min_by_key(|scope| {
+            let owner = arena
+                .node(scope.owner())
+                .expect("scope owner should exist after filter");
+            owner.span.end() - owner.span.start()
+        })
+        .map(|scope| scope.id())
+}
+
 #[derive(Debug)]
 pub struct DeclarationIndexBuild {
     index: DeclarationIndex,

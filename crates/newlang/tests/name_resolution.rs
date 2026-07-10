@@ -1,11 +1,12 @@
 use newlang::ast::{AstArena, AstNodeId};
 use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
-    build_declaration_index, build_local_binding_index, build_local_scope_tree, DeclarationIndex,
-    DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName, LocalBinding,
-    LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalScopeId,
-    LocalScopeTree, ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert,
-    ResolutionTable, ResolvedName, TopLevelLookup, TopLevelLookupResult,
+    build_declaration_index, build_local_binding_index, build_local_scope_tree,
+    build_scoped_local_binding_index, DeclarationIndex, DeclarationInsert, DeclarationKey,
+    DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex, LocalBindingInsert,
+    LocalBindingKey, LocalBindingKind, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
+    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
+    TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -651,4 +652,89 @@ fn local_scope_tree_builder_ignores_non_scope_owner_nodes() {
     let tree = build_local_scope_tree(&arena);
 
     assert!(tree.scopes().is_empty());
+}
+
+#[test]
+fn scoped_local_binding_builder_assigns_nearest_block_scope() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(60),
+        "fun run() { val outer = one(); if (ready) { val inner = outer; } }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    assert_eq!(built.index().bindings().len(), 2);
+    assert_eq!(
+        built.index().bindings()[0].key().scope(),
+        LocalScopeId::from_raw(0)
+    );
+    assert_eq!(
+        built.index().bindings()[1].key().scope(),
+        LocalScopeId::from_raw(1)
+    );
+    assert!(built.diagnostics().is_empty());
+}
+
+#[test]
+fn scoped_local_binding_builder_allows_nested_shadowing() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(61),
+        "fun run() { val same = one(); if (ready) { var same = two(); } }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    assert_eq!(built.index().bindings().len(), 2);
+    assert!(built.diagnostics().is_empty());
+    assert_eq!(built.index().bindings()[0].kind(), LocalBindingKind::Val);
+    assert_eq!(built.index().bindings()[1].kind(), LocalBindingKind::Var);
+}
+
+#[test]
+fn scoped_local_binding_builder_reports_same_block_duplicates() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(62),
+        "fun run() { val same = one(); var same = two(); }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+
+    let built = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    assert_eq!(built.index().bindings().len(), 1);
+    assert!(matches!(
+        built.inserts()[1],
+        LocalBindingInsert::Duplicate { .. }
+    ));
+    assert_eq!(built.diagnostics().len(), 1);
+    assert_eq!(
+        built.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::DuplicateName
+    );
+    assert_eq!(
+        built.diagnostics()[0].primary_span(),
+        parsed.local_binding_names[1].name_span
+    );
 }
