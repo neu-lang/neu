@@ -338,6 +338,25 @@ fn primitive_local_declaration_annotations_do_not_synthesize_unknown_signatures(
     );
     assert_eq!(report.expression_types(), &[]);
     assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(report.diagnostics().len(), 2);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::MissingAnnotationType
+    );
+    assert_eq!(report.diagnostics()[0].node(), inferred);
+    assert_eq!(
+        report.diagnostics()[1].kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[1].rule(),
+        TypeRuleDiagnostic::MissingAnnotationType
+    );
+    assert_eq!(report.diagnostics()[1].node(), custom);
 }
 
 #[test]
@@ -397,12 +416,21 @@ fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
     let custom_declaration = parsed.local_declarations[2].declaration;
     let later_declaration = parsed.local_declarations[3].declaration;
 
-    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(report.diagnostics().len(), 2);
     let diagnostic = &report.diagnostics()[0];
     assert_eq!(diagnostic.kind(), TypeCheckDiagnosticKind::TypeMismatch);
     assert_eq!(diagnostic.node(), ready_initializer);
     assert_eq!(diagnostic.expected_type(), Some(TypeId::from_raw(0)));
     assert_eq!(diagnostic.actual_type(), Some(TypeId::from_raw(1)));
+    assert_eq!(
+        report.diagnostics()[1].kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[1].rule(),
+        TypeRuleDiagnostic::MissingAnnotationType
+    );
+    assert_eq!(report.diagnostics()[1].node(), custom_declaration);
 
     assert_eq!(
         report.assignment_check(count_declaration),
@@ -452,7 +480,7 @@ fn resolved_name_expression_typing_records_known_symbol_types_in_resolution_orde
 }
 
 #[test]
-fn resolved_name_expression_typing_skips_unknown_symbols() {
+fn resolved_name_expression_typing_reports_unknown_symbol_types() {
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(
         AstNodeId::from_raw(80),
@@ -479,6 +507,16 @@ fn resolved_name_expression_typing_skips_unknown_symbols() {
         None,
         "missing resolution entries must not synthesize expression types"
     );
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::MissingResolvedNameType
+    );
+    assert_eq!(report.diagnostics()[0].node(), AstNodeId::from_raw(80));
 }
 
 #[test]
@@ -867,7 +905,7 @@ fn accepted_expression_composition_types_nested_groups_when_inner_becomes_known(
 }
 
 #[test]
-fn accepted_expression_composition_skips_unknown_names_and_groups() {
+fn accepted_expression_composition_reports_unknown_resolved_name_types() {
     let unknown_name = AstNodeId::from_raw(210);
     let unknown_group = AstNodeId::from_raw(211);
     let grouped = [ParsedGroupedExpression {
@@ -882,7 +920,16 @@ fn accepted_expression_composition_skips_unknown_names_and_groups() {
 
     assert_eq!(report.expression_type(unknown_name), None);
     assert_eq!(report.expression_type(unknown_group), None);
-    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::MissingResolvedNameType
+    );
+    assert_eq!(report.diagnostics()[0].node(), unknown_name);
     assert_eq!(report.declaration_signatures(), &[]);
     assert_eq!(report.assignment_checks(), &[]);
 }
@@ -960,12 +1007,21 @@ fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers()
     let unknown_declaration = parsed.local_declarations[2].declaration;
     let skipped_declaration = parsed.local_declarations[3].declaration;
 
-    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(report.diagnostics().len(), 2);
     assert_eq!(
         report.diagnostics()[0].kind(),
         TypeCheckDiagnosticKind::TypeMismatch
     );
     assert_eq!(report.diagnostics()[0].node(), bad_initializer);
+    assert_eq!(
+        report.diagnostics()[1].kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[1].rule(),
+        TypeRuleDiagnostic::MissingAnnotationType
+    );
+    assert_eq!(report.diagnostics()[1].node(), unknown_declaration);
     assert_eq!(
         report.diagnostics()[0].expected_type(),
         Some(TypeId::from_raw(2))

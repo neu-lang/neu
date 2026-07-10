@@ -407,21 +407,19 @@ pub fn type_primitive_local_declarations(
     let mut report = TypeCheckReport::new();
 
     for declaration in declarations {
-        let Some(annotation) = declaration.annotation else {
-            continue;
-        };
-        let Some(type_name) = type_name_references
-            .iter()
-            .find(|reference| reference.reference == annotation)
+        let Some(annotation_type) =
+            primitive_annotation_type(declaration, type_name_references, primitives)
         else {
+            report.record_diagnostic(TypeCheckDiagnostic::unresolved_type_rule(
+                TypeRuleDiagnostic::MissingAnnotationType,
+                declaration.declaration,
+            ));
             continue;
         };
-        if let Some(ty) = primitives.type_for_primitive_name(type_name.name.as_str()) {
-            report.record_declaration_signature(DeclarationSignature::new(
-                declaration.declaration,
-                ty,
-            ));
-        }
+        report.record_declaration_signature(DeclarationSignature::new(
+            declaration.declaration,
+            annotation_type,
+        ));
     }
 
     (arena, report)
@@ -448,6 +446,10 @@ pub fn type_primitive_local_initializer_declarations(
         let Some(annotation_type) =
             primitive_annotation_type(declaration, type_name_references, primitives)
         else {
+            report.record_diagnostic(TypeCheckDiagnostic::unresolved_type_rule(
+                TypeRuleDiagnostic::MissingAnnotationType,
+                declaration.declaration,
+            ));
             continue;
         };
         report.record_declaration_signature(DeclarationSignature::new(
@@ -503,6 +505,10 @@ pub fn type_resolved_name_expressions(
             .iter()
             .find(|known| known.symbol() == resolved.symbol())
         else {
+            report.record_diagnostic(TypeCheckDiagnostic::unresolved_type_rule(
+                TypeRuleDiagnostic::MissingResolvedNameType,
+                resolved.reference(),
+            ));
             continue;
         };
         report.record_expression_type(ExpressionType::new(resolved.reference(), known.ty()));
@@ -649,6 +655,10 @@ fn type_m0018_accepted_expressions_with_primitives(
             .iter()
             .find(|known| known.symbol() == resolved.symbol())
         else {
+            report.record_diagnostic(TypeCheckDiagnostic::unresolved_type_rule(
+                TypeRuleDiagnostic::MissingResolvedNameType,
+                resolved.reference(),
+            ));
             continue;
         };
         report.record_expression_type(ExpressionType::new(resolved.reference(), known.ty()));
@@ -698,6 +708,10 @@ pub fn type_m0018_local_declaration_initializers(
         let Some(annotation_type) =
             primitive_annotation_type(declaration, type_name_references, primitives)
         else {
+            report.record_diagnostic(TypeCheckDiagnostic::unresolved_type_rule(
+                TypeRuleDiagnostic::MissingAnnotationType,
+                declaration.declaration,
+            ));
             continue;
         };
         report.record_declaration_signature(DeclarationSignature::new(
