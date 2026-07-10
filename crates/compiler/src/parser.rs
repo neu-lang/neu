@@ -805,6 +805,11 @@ impl<'source> Parser<'source> {
                 Some(TokenKind::KwConst | TokenKind::KwVar | TokenKind::KwReturn) => {
                     self.parse_statement();
                 }
+                Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
+                    self.diagnostic_current(DiagnosticKind::MalformedCoroutineConstruct);
+                    self.advance();
+                    self.skip_deferred_construct();
+                }
                 Some(kind) if self.can_start_expression_kind(kind) => {
                     let checkpoint = self.index;
                     let expression_start = self.current().map_or(start, |token| token.span.start());
@@ -884,11 +889,6 @@ impl<'source> Parser<'source> {
                     self.advance();
                     self.skip_deferred_construct();
                 }
-                Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
-                    self.diagnostic_current(DiagnosticKind::MalformedCoroutineConstruct);
-                    self.advance();
-                    self.skip_deferred_construct();
-                }
                 Some(_) => {
                     self.diagnostic_current(DiagnosticKind::UnexpectedTokenInStatement);
                     self.advance();
@@ -908,6 +908,11 @@ impl<'source> Parser<'source> {
                 self.parse_variable_declaration_statement()
             }
             Some(TokenKind::KwReturn) => self.parse_return_statement(),
+            Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
+                self.diagnostic_current(DiagnosticKind::MalformedCoroutineConstruct);
+                self.advance();
+                self.skip_deferred_construct();
+            }
             Some(_) => {
                 self.diagnostic_current(DiagnosticKind::MissingStatement);
                 self.skip_to_statement_boundary();

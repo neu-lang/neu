@@ -984,6 +984,24 @@ fn rejects_deferred_body_forms() {
 }
 
 #[test]
+fn m0024_unspecified_concurrency_forms_remain_blocked() {
+    let output = parse_source(
+        SourceFileId::from_raw(83),
+        "fun concurrent() { async { run(); } while (ready) { run(); } }",
+    );
+
+    let kinds: Vec<_> = output
+        .diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.kind)
+        .collect();
+
+    assert!(kinds.contains(&DiagnosticKind::MalformedCoroutineConstruct));
+    assert!(kinds.contains(&DiagnosticKind::UnsupportedStatementForm));
+    assert!(output.when_expressions.is_empty());
+}
+
+#[test]
 fn records_top_level_function_declaration_name_metadata() {
     let output = parse_source(SourceFileId::from_raw(12), "public fun main(): Int;");
 
