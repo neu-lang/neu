@@ -1,8 +1,12 @@
 use compiler::{
     ast::AstNodeId,
     module::{ModuleName, PackageNamespace},
+    name_resolution::{LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId},
     symbol::SymbolId,
-    thread::{ThreadCapability, satisfies_thread_capability},
+    thread::{
+        ThreadBoundary, ThreadCapability, ThreadCapture, ThreadDiagnostic, ThreadDiagnosticKind,
+        analyze_thread_boundaries, satisfies_thread_capability,
+    },
     types::{
         GenericParameterType, NominalTypeIdentity, NullableType, PrimitiveType, TypeArena, TypeId,
         TypeRecord,
@@ -115,4 +119,131 @@ fn m0024_nominal_generic_and_missing_types_satisfy_no_capabilities() {
             ThreadCapability::Share
         ));
     }
+}
+
+#[test]
+fn m0024_boundary_analysis_reports_missing_capabilities() {
+    let mut arena = TypeArena::new();
+    let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
+    let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nominal_ty = arena.insert(TypeRecord::nominal(NominalTypeIdentity::new(
+        ModuleName::parse("demo.domain").unwrap(),
+        PackageNamespace::parse("model").unwrap(),
+        AstNodeId::from_raw(70),
+        SymbolId::from_raw(80),
+    )));
+    let boundary = AstNodeId::from_raw(1000);
+    let string_binding = local_binding(10, 100);
+    let int_binding = local_binding(11, 101);
+    let nominal_binding = local_binding(12, 102);
+    let captures = vec![
+        ThreadCapture::new(
+            AstNodeId::from_raw(1001),
+            string_binding.clone(),
+            string_ty,
+            ThreadCapability::Send,
+        ),
+        ThreadCapture::new(
+            AstNodeId::from_raw(1002),
+            string_binding.clone(),
+            string_ty,
+            ThreadCapability::Share,
+        ),
+        ThreadCapture::new(
+            AstNodeId::from_raw(1003),
+            int_binding,
+            int_ty,
+            ThreadCapability::Share,
+        ),
+        ThreadCapture::new(
+            AstNodeId::from_raw(1004),
+            nominal_binding.clone(),
+            nominal_ty,
+            ThreadCapability::Send,
+        ),
+    ];
+
+    let diagnostics = analyze_thread_boundaries(&[ThreadBoundary::new(boundary, captures)], &arena);
+
+    assert_eq!(
+        diagnostics,
+        [
+            ThreadDiagnostic::missing_thread_capability(
+                AstNodeId::from_raw(1002),
+                boundary,
+                string_binding,
+                string_ty,
+                ThreadCapability::Share,
+            ),
+            ThreadDiagnostic::missing_thread_capability(
+                AstNodeId::from_raw(1004),
+                boundary,
+                nominal_binding,
+                nominal_ty,
+                ThreadCapability::Send,
+            ),
+        ]
+    );
+    assert_eq!(
+        diagnostics[0].kind(),
+        ThreadDiagnosticKind::MissingThreadCapability
+    );
+}
+
+#[test]
+fn m0024_boundary_diagnostics_preserve_order_and_spans() {
+    let mut arena = TypeArena::new();
+    let generic_ty = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+        AstNodeId::from_raw(90),
+        SymbolId::from_raw(91),
+    )));
+    let missing_ty = TypeId::from_raw(999);
+    let first_boundary = AstNodeId::from_raw(2000);
+    let second_boundary = AstNodeId::from_raw(3000);
+    let first_binding = local_binding(20, 200);
+    let second_binding = local_binding(21, 201);
+
+    let diagnostics = analyze_thread_boundaries(
+        &[
+            ThreadBoundary::new(
+                first_boundary,
+                vec![ThreadCapture::new(
+                    AstNodeId::from_raw(2001),
+                    first_binding.clone(),
+                    generic_ty,
+                    ThreadCapability::Send,
+                )],
+            ),
+            ThreadBoundary::new(
+                second_boundary,
+                vec![ThreadCapture::new(
+                    AstNodeId::from_raw(3001),
+                    second_binding.clone(),
+                    missing_ty,
+                    ThreadCapability::Share,
+                )],
+            ),
+        ],
+        &arena,
+    );
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0].capture(), AstNodeId::from_raw(2001));
+    assert_eq!(diagnostics[0].boundary(), first_boundary);
+    assert_eq!(diagnostics[0].binding(), &first_binding);
+    assert_eq!(diagnostics[0].ty(), generic_ty);
+    assert_eq!(diagnostics[0].required(), ThreadCapability::Send);
+    assert_eq!(diagnostics[1].capture(), AstNodeId::from_raw(3001));
+    assert_eq!(diagnostics[1].boundary(), second_boundary);
+    assert_eq!(diagnostics[1].binding(), &second_binding);
+    assert_eq!(diagnostics[1].ty(), missing_ty);
+    assert_eq!(diagnostics[1].required(), ThreadCapability::Share);
+}
+
+fn local_binding(binding_raw: usize, symbol_raw: usize) -> LocalBinding {
+    LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(1), SymbolId::from_raw(symbol_raw)),
+        AstNodeId::from_raw(binding_raw),
+        LocalBindingKind::Immutable,
+    )
 }
