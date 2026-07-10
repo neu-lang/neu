@@ -58,6 +58,7 @@ pub struct ParseOutput {
     pub local_binding_names: Vec<ParsedLocalBindingName>,
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
+    pub literal_expressions: Vec<ParsedLiteralExpression>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -90,6 +91,22 @@ pub struct ParsedTypeNameReference {
     pub name_span: ByteSpan,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParsedLiteralKind {
+    BoolTrue,
+    BoolFalse,
+    AcceptedInteger,
+    AcceptedString,
+    Null,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedLiteralExpression {
+    pub expression: crate::ast::AstNodeId,
+    pub kind: ParsedLiteralKind,
+    pub span: ByteSpan,
+}
+
 impl ParseOutput {
     pub fn node_kinds(&self) -> Vec<AstNodeKind> {
         self.arena.nodes().iter().map(|node| node.kind).collect()
@@ -109,6 +126,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         local_binding_names: parser.local_binding_names,
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
+        literal_expressions: parser.literal_expressions,
     }
 }
 
@@ -123,6 +141,7 @@ struct Parser<'source> {
     local_binding_names: Vec<ParsedLocalBindingName>,
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
+    literal_expressions: Vec<ParsedLiteralExpression>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -140,6 +159,7 @@ impl<'source> Parser<'source> {
             local_binding_names: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
+            literal_expressions: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -750,9 +770,15 @@ impl<'source> Parser<'source> {
                 | TokenKind::KwFalse
                 | TokenKind::KwNull,
             ) => {
-                let span = self.current().expect("literal token exists").span;
+                let token = self.current().expect("literal token exists").clone();
+                let span = token.span;
                 self.advance();
-                self.arena.add_literal_expression(span);
+                let expression = self.arena.add_literal_expression(span);
+                self.literal_expressions.push(ParsedLiteralExpression {
+                    expression,
+                    kind: parsed_literal_kind(token.kind),
+                    span,
+                });
                 Some(span)
             }
             Some(TokenKind::Identifier) => self.parse_name_expression(),
@@ -1671,5 +1697,18 @@ impl<'source> Parser<'source> {
 
     fn span(&self, start: usize, end: usize) -> ByteSpan {
         ByteSpan::new(self.file, start, end).expect("parser creates ordered spans")
+    }
+}
+
+fn parsed_literal_kind(kind: TokenKind) -> ParsedLiteralKind {
+    match kind {
+        TokenKind::KwTrue => ParsedLiteralKind::BoolTrue,
+        TokenKind::KwFalse => ParsedLiteralKind::BoolFalse,
+        TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex => {
+            ParsedLiteralKind::AcceptedInteger
+        }
+        TokenKind::String => ParsedLiteralKind::AcceptedString,
+        TokenKind::KwNull => ParsedLiteralKind::Null,
+        _ => unreachable!("parser literal metadata is only built for literal tokens"),
     }
 }

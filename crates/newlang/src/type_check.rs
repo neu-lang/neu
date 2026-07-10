@@ -1,5 +1,6 @@
 use crate::{
     ast::AstNodeId,
+    parser::{ParsedLiteralExpression, ParsedLiteralKind},
     types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
 
@@ -272,4 +273,24 @@ pub fn type_literal_expressions(inputs: &[LiteralExpressionInput]) -> (TypeArena
     }
 
     (arena, report)
+}
+
+pub fn type_parser_literals(literals: &[ParsedLiteralExpression]) -> (TypeArena, TypeCheckReport) {
+    let inputs: Vec<_> = literals
+        .iter()
+        .map(|literal| {
+            LiteralExpressionInput::new(literal.expression, literal_kind_from_parser(literal.kind))
+        })
+        .collect();
+    type_literal_expressions(&inputs)
+}
+
+fn literal_kind_from_parser(kind: ParsedLiteralKind) -> LiteralKind {
+    match kind {
+        ParsedLiteralKind::BoolTrue => LiteralKind::BoolTrue,
+        ParsedLiteralKind::BoolFalse => LiteralKind::BoolFalse,
+        ParsedLiteralKind::AcceptedInteger => LiteralKind::AcceptedInteger,
+        ParsedLiteralKind::AcceptedString => LiteralKind::AcceptedString,
+        ParsedLiteralKind::Null => LiteralKind::Null,
+    }
 }

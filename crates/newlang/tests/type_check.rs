@@ -1,9 +1,11 @@
 use newlang::{
     ast::AstNodeId,
+    parser::parse_source,
+    source::SourceFileId,
     type_check::{
-        type_literal_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
-        ExpressionType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport,
+        type_literal_expressions, type_parser_literals, AmbiguousTypeRule, AssignmentCheck,
+        DeclarationSignature, ExpressionType, LiteralExpressionInput, LiteralKind,
+        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
     },
     types::{PrimitiveType, TypeId, TypeKind},
 };
@@ -165,4 +167,44 @@ fn literal_expression_typing_does_not_synthesize_missing_expression_types() {
         Some(TypeId::from_raw(2))
     );
     assert_eq!(report.expression_type(AstNodeId::from_raw(51)), None);
+}
+
+#[test]
+fn parser_literal_metadata_types_to_adr0027_primitives() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(60),
+        "fun run() { val a = true; val b = 7; val c = \"text\"; val d = null; }",
+    );
+
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (arena, report) = type_parser_literals(&parsed.literal_expressions);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.expression_types().len(), 4);
+    assert_eq!(arena.records().len(), 5);
+
+    let literal_nodes: Vec<_> = parsed
+        .literal_expressions
+        .iter()
+        .map(|literal| literal.expression)
+        .collect();
+    assert_eq!(
+        report.expression_type(literal_nodes[0]),
+        Some(TypeId::from_raw(0))
+    );
+    assert_eq!(
+        report.expression_type(literal_nodes[1]),
+        Some(TypeId::from_raw(1))
+    );
+    assert_eq!(
+        report.expression_type(literal_nodes[2]),
+        Some(TypeId::from_raw(2))
+    );
+    assert_eq!(
+        report.expression_type(literal_nodes[3]),
+        Some(TypeId::from_raw(4))
+    );
+    assert_eq!(report.expression_type(AstNodeId::from_raw(999)), None);
 }

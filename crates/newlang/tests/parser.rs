@@ -1,6 +1,6 @@
 use newlang::ast::AstNodeKind;
 use newlang::name_resolution::{DeclarationKind, LocalBindingKind};
-use newlang::parser::{parse_source, DiagnosticKind};
+use newlang::parser::{parse_source, DiagnosticKind, ParsedLiteralKind};
 use newlang::source::SourceFileId;
 
 #[test]
@@ -192,6 +192,59 @@ fn records_simple_identifier_expression_name_references() {
         output.arena.node(first.reference).unwrap().kind,
         AstNodeKind::NameExpression
     );
+}
+
+#[test]
+fn records_literal_expression_metadata_for_type_checking() {
+    let file = SourceFileId::from_raw(27);
+    let source =
+        "fun run() { val a = true; val b = false; val c = 42; val d = \"ok\"; val e = null; }";
+    let output = parse_source(file, source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let literals: Vec<_> = output
+        .literal_expressions
+        .iter()
+        .map(|literal| literal.kind)
+        .collect();
+    assert_eq!(
+        literals,
+        [
+            ParsedLiteralKind::BoolTrue,
+            ParsedLiteralKind::BoolFalse,
+            ParsedLiteralKind::AcceptedInteger,
+            ParsedLiteralKind::AcceptedString,
+            ParsedLiteralKind::Null,
+        ]
+    );
+
+    let texts: Vec<_> = output
+        .literal_expressions
+        .iter()
+        .map(|literal| &source[literal.span.start()..literal.span.end()])
+        .collect();
+    assert_eq!(texts, ["true", "false", "42", "\"ok\"", "null"]);
+
+    for literal in &output.literal_expressions {
+        assert_eq!(
+            output.arena.node(literal.expression).unwrap().kind,
+            AstNodeKind::LiteralExpression
+        );
+    }
+}
+
+#[test]
+fn literal_expression_metadata_excludes_non_literal_expressions() {
+    let output = parse_source(
+        SourceFileId::from_raw(28),
+        "fun run() { val item = compute(); val other = item; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert!(output.literal_expressions.is_empty());
 }
 
 #[test]
