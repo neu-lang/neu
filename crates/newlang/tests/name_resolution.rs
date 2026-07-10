@@ -3,9 +3,9 @@ use newlang::module::{ModuleName, PackageNamespace};
 use newlang::name_resolution::{
     build_declaration_index, build_local_binding_index, DeclarationIndex, DeclarationInsert,
     DeclarationKey, DeclarationKind, DeclaredName, LocalBinding, LocalBindingIndex,
-    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionDiagnostic,
-    ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable, ResolvedName, TopLevelLookup,
-    TopLevelLookupResult,
+    LocalBindingInsert, LocalBindingKey, LocalBindingKind, LocalScopeId, LocalScopeTree,
+    ResolutionDiagnostic, ResolutionDiagnosticKind, ResolutionInsert, ResolutionTable,
+    ResolvedName, TopLevelLookup, TopLevelLookupResult,
 };
 use newlang::parser::parse_source;
 use newlang::source::{ByteSpan, SourceFileId};
@@ -561,4 +561,42 @@ fn local_binding_index_builder_reports_same_scope_duplicates() {
         built.diagnostics()[0].primary_span(),
         parsed.local_binding_names[1].name_span
     );
+}
+
+#[test]
+fn local_scope_tree_allocates_stable_ids_in_insertion_order() {
+    let mut tree = LocalScopeTree::new();
+    let root_owner = AstNodeId::from_raw(70);
+    let child_owner = AstNodeId::from_raw(71);
+
+    let root = tree.add_scope(root_owner, None);
+    let child = tree.add_scope(child_owner, Some(root));
+
+    assert_eq!(root.index(), 0);
+    assert_eq!(child.index(), 1);
+    assert_eq!(tree.scopes()[0].id(), root);
+    assert_eq!(tree.scopes()[1].id(), child);
+}
+
+#[test]
+fn local_scope_tree_preserves_owner_and_parent() {
+    let mut tree = LocalScopeTree::new();
+    let root_owner = AstNodeId::from_raw(80);
+    let child_owner = AstNodeId::from_raw(81);
+
+    let root = tree.add_scope(root_owner, None);
+    let child = tree.add_scope(child_owner, Some(root));
+
+    assert_eq!(tree.get(root).unwrap().owner(), root_owner);
+    assert_eq!(tree.get(root).unwrap().parent(), None);
+    assert_eq!(tree.get(child).unwrap().owner(), child_owner);
+    assert_eq!(tree.get(child).unwrap().parent(), Some(root));
+}
+
+#[test]
+fn local_scope_tree_unknown_scope_id_returns_none() {
+    let mut tree = LocalScopeTree::new();
+    tree.add_scope(AstNodeId::from_raw(90), None);
+
+    assert_eq!(tree.get(LocalScopeId::from_raw(99)), None);
 }

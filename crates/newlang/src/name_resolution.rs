@@ -176,6 +176,56 @@ impl LocalScopeId {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LocalScope {
+    id: LocalScopeId,
+    owner: AstNodeId,
+    parent: Option<LocalScopeId>,
+}
+
+impl LocalScope {
+    pub fn new(id: LocalScopeId, owner: AstNodeId, parent: Option<LocalScopeId>) -> Self {
+        Self { id, owner, parent }
+    }
+
+    pub fn id(self) -> LocalScopeId {
+        self.id
+    }
+
+    pub fn owner(self) -> AstNodeId {
+        self.owner
+    }
+
+    pub fn parent(self) -> Option<LocalScopeId> {
+        self.parent
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct LocalScopeTree {
+    scopes: Vec<LocalScope>,
+}
+
+impl LocalScopeTree {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_scope(&mut self, owner: AstNodeId, parent: Option<LocalScopeId>) -> LocalScopeId {
+        let id = LocalScopeId::from_raw(self.scopes.len());
+        self.scopes.push(LocalScope::new(id, owner, parent));
+        id
+    }
+
+    pub fn get(&self, id: LocalScopeId) -> Option<&LocalScope> {
+        self.scopes.get(id.index())
+    }
+
+    pub fn scopes(&self) -> &[LocalScope] {
+        &self.scopes
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LocalBindingKind {
     Val,
     Var,
