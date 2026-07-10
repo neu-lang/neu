@@ -1,6 +1,8 @@
 use crate::{
     ast::AstNodeId,
-    parser::{ParsedLiteralExpression, ParsedLiteralKind},
+    parser::{
+        ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference,
+    },
     types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
 
@@ -258,6 +260,17 @@ impl PrimitiveTypeIds {
             LiteralKind::Null => self.null_id,
         }
     }
+
+    fn type_for_primitive_name(self, name: &str) -> Option<TypeId> {
+        match name {
+            "Bool" => Some(self.bool_id),
+            "Int" => Some(self.int_id),
+            "String" => Some(self.string_id),
+            "Unit" => Some(self.unit_id),
+            "Null" => Some(self.null_id),
+            _ => None,
+        }
+    }
 }
 
 pub fn type_literal_expressions(inputs: &[LiteralExpressionInput]) -> (TypeArena, TypeCheckReport) {
@@ -293,4 +306,33 @@ fn literal_kind_from_parser(kind: ParsedLiteralKind) -> LiteralKind {
         ParsedLiteralKind::AcceptedString => LiteralKind::AcceptedString,
         ParsedLiteralKind::Null => LiteralKind::Null,
     }
+}
+
+pub fn type_primitive_local_declarations(
+    declarations: &[ParsedLocalDeclaration],
+    type_name_references: &[ParsedTypeNameReference],
+) -> (TypeArena, TypeCheckReport) {
+    let mut arena = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut arena);
+    let mut report = TypeCheckReport::new();
+
+    for declaration in declarations {
+        let Some(annotation) = declaration.annotation else {
+            continue;
+        };
+        let Some(type_name) = type_name_references
+            .iter()
+            .find(|reference| reference.reference == annotation)
+        else {
+            continue;
+        };
+        if let Some(ty) = primitives.type_for_primitive_name(type_name.name.as_str()) {
+            report.record_declaration_signature(DeclarationSignature::new(
+                declaration.declaration,
+                ty,
+            ));
+        }
+    }
+
+    (arena, report)
 }

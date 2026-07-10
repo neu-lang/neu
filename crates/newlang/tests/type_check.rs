@@ -3,9 +3,10 @@ use newlang::{
     parser::parse_source,
     source::SourceFileId,
     type_check::{
-        type_literal_expressions, type_parser_literals, AmbiguousTypeRule, AssignmentCheck,
-        DeclarationSignature, ExpressionType, LiteralExpressionInput, LiteralKind,
-        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
+        type_literal_expressions, type_parser_literals, type_primitive_local_declarations,
+        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType,
+        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport,
     },
     types::{PrimitiveType, TypeId, TypeKind},
 };
@@ -207,4 +208,74 @@ fn parser_literal_metadata_types_to_adr0027_primitives() {
         Some(TypeId::from_raw(4))
     );
     assert_eq!(report.expression_type(AstNodeId::from_raw(999)), None);
+}
+
+#[test]
+fn primitive_local_declaration_annotations_record_declaration_signatures() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(61),
+        "fun run() { val ready: Bool = true; val count: Int = 1; val label: String = \"x\"; val done: Unit; val absent: Null = null; }",
+    );
+
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (arena, report) =
+        type_primitive_local_declarations(&parsed.local_declarations, &parsed.type_name_references);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.expression_types(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(arena.records().len(), 5);
+
+    let declarations: Vec<_> = parsed
+        .local_declarations
+        .iter()
+        .map(|declaration| declaration.declaration)
+        .collect();
+    assert_eq!(
+        report.declaration_signatures(),
+        &[
+            DeclarationSignature::new(declarations[0], TypeId::from_raw(0)),
+            DeclarationSignature::new(declarations[1], TypeId::from_raw(1)),
+            DeclarationSignature::new(declarations[2], TypeId::from_raw(2)),
+            DeclarationSignature::new(declarations[3], TypeId::from_raw(3)),
+            DeclarationSignature::new(declarations[4], TypeId::from_raw(4)),
+        ]
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(0)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Bool)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(4)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Null)
+    );
+}
+
+#[test]
+fn primitive_local_declaration_annotations_do_not_synthesize_unknown_signatures() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(62),
+        "fun run() { val inferred = true; val custom: UserId = value; val count: Int = 1; }",
+    );
+
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) =
+        type_primitive_local_declarations(&parsed.local_declarations, &parsed.type_name_references);
+
+    let inferred = parsed.local_declarations[0].declaration;
+    let custom = parsed.local_declarations[1].declaration;
+    let count = parsed.local_declarations[2].declaration;
+
+    assert_eq!(report.declaration_signature(inferred), None);
+    assert_eq!(report.declaration_signature(custom), None);
+    assert_eq!(
+        report.declaration_signature(count),
+        Some(TypeId::from_raw(1))
+    );
+    assert_eq!(report.expression_types(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
 }
