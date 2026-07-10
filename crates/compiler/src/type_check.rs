@@ -1688,9 +1688,27 @@ fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bo
 }
 
 pub fn type_unsupported_m0018_expressions(arena: &AstArena) -> TypeCheckReport {
+    type_unsupported_expressions(arena, None)
+}
+
+fn type_unsupported_expressions(
+    arena: &AstArena,
+    executable_operators: Option<(&[ParsedUnaryExpression], &[ParsedBinaryExpression])>,
+) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
 
     for node in arena.nodes() {
+        if executable_operators.is_some_and(|(unary, binary)| {
+            unary
+                .iter()
+                .any(|expression| expression.expression == node.id)
+                || binary.iter().any(|expression| {
+                    expression.expression == node.id
+                        && is_m0028_executable_int_operator(expression.operator)
+                })
+        }) {
+            continue;
+        }
         let Some(rule) = unsupported_expression_rule(node.kind) else {
             continue;
         };
@@ -1722,6 +1740,57 @@ pub fn type_m0018_core(
     resolutions: &ResolutionTable,
     local_bindings: &[LocalBinding],
 ) -> (TypeArena, TypeCheckReport) {
+    type_core(
+        arena,
+        declarations,
+        type_name_references,
+        literals,
+        grouped_expressions,
+        assignments,
+        resolutions,
+        local_bindings,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn type_m0028_executable_core(
+    arena: &AstArena,
+    declarations: &[ParsedLocalDeclaration],
+    type_name_references: &[ParsedTypeNameReference],
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    unary_expressions: &[ParsedUnaryExpression],
+    binary_expressions: &[ParsedBinaryExpression],
+    assignments: &[ParsedAssignmentStatement],
+    resolutions: &ResolutionTable,
+    local_bindings: &[LocalBinding],
+) -> (TypeArena, TypeCheckReport) {
+    type_core(
+        arena,
+        declarations,
+        type_name_references,
+        literals,
+        grouped_expressions,
+        assignments,
+        resolutions,
+        local_bindings,
+        Some((unary_expressions, binary_expressions)),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn type_core(
+    arena: &AstArena,
+    declarations: &[ParsedLocalDeclaration],
+    type_name_references: &[ParsedTypeNameReference],
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    assignments: &[ParsedAssignmentStatement],
+    resolutions: &ResolutionTable,
+    local_bindings: &[LocalBinding],
+    executable_operators: Option<(&[ParsedUnaryExpression], &[ParsedBinaryExpression])>,
+) -> (TypeArena, TypeCheckReport) {
     let mut type_arena = TypeArena::new();
     let primitives = PrimitiveTypeIds::insert_into(&mut type_arena);
     let mut report = TypeCheckReport::new();
@@ -1751,6 +1820,17 @@ pub fn type_m0018_core(
         primitives,
         &mut report,
     );
+
+    if let Some((unary_expressions, binary_expressions)) = executable_operators {
+        let operator_report = type_m0028_executable_int_operators(
+            unary_expressions,
+            binary_expressions,
+            grouped_expressions,
+            report.expression_types(),
+            primitives.int_id,
+        );
+        merge_type_check_report(&mut report, operator_report);
+    }
 
     for declaration in declarations {
         let Some(annotation_type) = report.declaration_signature(declaration.declaration) else {
@@ -1782,7 +1862,7 @@ pub fn type_m0018_core(
         type_assignment_statements(assignments, report.expression_types(), &type_arena);
     merge_type_check_report(&mut report, assignment_report);
 
-    let unsupported_report = type_unsupported_m0018_expressions(arena);
+    let unsupported_report = type_unsupported_expressions(arena, executable_operators);
     merge_type_check_report(&mut report, unsupported_report);
 
     (type_arena, report)

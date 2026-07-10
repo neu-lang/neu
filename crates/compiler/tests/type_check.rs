@@ -25,7 +25,7 @@ use compiler::{
         type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
-        type_m0028_executable_int_operators, type_parser_literals,
+        type_m0028_executable_core, type_m0028_executable_int_operators, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions,
     },
@@ -3549,4 +3549,125 @@ fn m0028_executable_int_operators_do_not_type_unknown_operands() {
         report.expression_type(parsed.binary_expressions[0].expression),
         None
     );
+}
+
+#[test]
+fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(93),
+        "fun run() { const value: Int = (1 + 2) * 3; var next: Int = value; next = next << 1; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let value_symbol = SymbolId::from_raw(93);
+    let next_symbol = SymbolId::from_raw(94);
+    let mut resolutions = ResolutionTable::new();
+    for reference in &parsed.name_references {
+        let symbol = match reference.name.as_str() {
+            "value" => value_symbol,
+            "next" => next_symbol,
+            other => panic!("unexpected reference {other}"),
+        };
+        resolutions.insert(ResolvedName::new(reference.reference, symbol));
+    }
+    let bindings = [
+        LocalBinding::new(
+            LocalBindingKey::new(LocalScopeId::from_raw(0), value_symbol),
+            parsed.local_declarations[0].declaration,
+            LocalBindingKind::Immutable,
+        ),
+        LocalBinding::new(
+            LocalBindingKey::new(LocalScopeId::from_raw(0), next_symbol),
+            parsed.local_declarations[1].declaration,
+            LocalBindingKind::Var,
+        ),
+    ];
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &resolutions,
+        &bindings,
+    );
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.assignment_checks().len(), 3);
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .all(|diagnostic| diagnostic.rule() != TypeRuleDiagnostic::BinaryExpressionDeferred)
+    );
+}
+
+#[test]
+fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(94),
+        "fun run() { const bad: Int = true + 1; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    assert!(report.diagnostics().iter().any(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch
+            && diagnostic.expected_type() == Some(TypeId::from_raw(1))
+            && diagnostic.actual_type() == Some(TypeId::from_raw(0))
+    }));
+    assert!(
+        report.diagnostics().iter().all(|diagnostic| {
+            diagnostic.rule() != TypeRuleDiagnostic::BinaryExpressionDeferred
+        })
+    );
+}
+
+#[test]
+fn m0028_core_keeps_non_executable_operators_deferred() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(95),
+        "fun run() { const logical = !true; const comparison = 1 == 2; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    let rules: Vec<_> = report
+        .diagnostics()
+        .iter()
+        .map(|diagnostic| diagnostic.rule())
+        .collect();
+    assert!(rules.contains(&TypeRuleDiagnostic::UnaryExpressionDeferred));
+    assert!(rules.contains(&TypeRuleDiagnostic::BinaryExpressionDeferred));
 }

@@ -110,6 +110,6 @@ runtime behavior for arithmetic, exponentiation, bitwise, and shift operators.
 ## Completion Checklist
 
 - [x] Executable operators parse.
-- [ ] Executable operators type-check.
+- [x] Executable operators type-check.
 - [ ] Entry, call, and return checks exist.
 - [ ] Unsupported executable forms are rejected before HIR.
