@@ -4,15 +4,16 @@ use newlang::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
         ResolvedName,
     },
-    parser::parse_source,
+    parser::{parse_source, ParsedGroupedExpression},
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
-        known_local_symbol_types, type_literal_expressions, type_parser_literals,
-        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
-        ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport,
+        known_local_symbol_types, type_grouped_expressions, type_literal_expressions,
+        type_parser_literals, type_primitive_local_declarations,
+        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
+        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport,
     },
     types::{PrimitiveType, TypeId, TypeKind},
 };
@@ -487,5 +488,104 @@ fn known_local_symbol_types_skip_unsignatured_bindings_and_orphan_signatures() {
     assert_eq!(
         known,
         [KnownSymbolType::new(typed_symbol, TypeId::from_raw(0))]
+    );
+}
+
+#[test]
+fn grouped_expression_typing_propagates_inner_expression_types() {
+    let grouped = [
+        ParsedGroupedExpression {
+            expression: AstNodeId::from_raw(110),
+            inner: AstNodeId::from_raw(111),
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(70), 0, 4).unwrap(),
+        },
+        ParsedGroupedExpression {
+            expression: AstNodeId::from_raw(112),
+            inner: AstNodeId::from_raw(113),
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(70), 5, 9).unwrap(),
+        },
+    ];
+    let known = [
+        ExpressionType::new(AstNodeId::from_raw(113), TypeId::from_raw(2)),
+        ExpressionType::new(AstNodeId::from_raw(111), TypeId::from_raw(1)),
+    ];
+
+    let report = type_grouped_expressions(&grouped, &known);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(
+        report.expression_types(),
+        &[
+            ExpressionType::new(AstNodeId::from_raw(110), TypeId::from_raw(1)),
+            ExpressionType::new(AstNodeId::from_raw(112), TypeId::from_raw(2)),
+        ]
+    );
+}
+
+#[test]
+fn grouped_expression_typing_skips_unknown_inner_expressions() {
+    let grouped = [
+        ParsedGroupedExpression {
+            expression: AstNodeId::from_raw(120),
+            inner: AstNodeId::from_raw(121),
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(71), 0, 4).unwrap(),
+        },
+        ParsedGroupedExpression {
+            expression: AstNodeId::from_raw(122),
+            inner: AstNodeId::from_raw(123),
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(71), 5, 9).unwrap(),
+        },
+    ];
+    let known = [ExpressionType::new(
+        AstNodeId::from_raw(123),
+        TypeId::from_raw(0),
+    )];
+
+    let report = type_grouped_expressions(&grouped, &known);
+
+    assert_eq!(
+        report.expression_types(),
+        &[ExpressionType::new(
+            AstNodeId::from_raw(122),
+            TypeId::from_raw(0)
+        )]
+    );
+    assert_eq!(report.expression_type(AstNodeId::from_raw(120)), None);
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+}
+
+#[test]
+fn grouped_expression_typing_supports_already_typed_nested_groups() {
+    let inner_group = AstNodeId::from_raw(130);
+    let outer_group = AstNodeId::from_raw(131);
+    let literal = AstNodeId::from_raw(132);
+    let grouped = [
+        ParsedGroupedExpression {
+            expression: inner_group,
+            inner: literal,
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(72), 1, 5).unwrap(),
+        },
+        ParsedGroupedExpression {
+            expression: outer_group,
+            inner: inner_group,
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(72), 0, 6).unwrap(),
+        },
+    ];
+    let known = [
+        ExpressionType::new(literal, TypeId::from_raw(4)),
+        ExpressionType::new(inner_group, TypeId::from_raw(4)),
+    ];
+
+    let report = type_grouped_expressions(&grouped, &known);
+
+    assert_eq!(
+        report.expression_types(),
+        &[
+            ExpressionType::new(inner_group, TypeId::from_raw(4)),
+            ExpressionType::new(outer_group, TypeId::from_raw(4)),
+        ]
     );
 }

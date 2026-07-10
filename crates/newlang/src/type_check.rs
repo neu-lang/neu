@@ -2,7 +2,8 @@ use crate::{
     ast::AstNodeId,
     name_resolution::{LocalBinding, ResolutionTable},
     parser::{
-        ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference,
+        ParsedGroupedExpression, ParsedLiteralExpression, ParsedLiteralKind,
+        ParsedLocalDeclaration, ParsedTypeNameReference,
     },
     symbol::SymbolId,
     types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
@@ -487,4 +488,23 @@ pub fn known_local_symbol_types(
     }
 
     known
+}
+
+pub fn type_grouped_expressions(
+    grouped_expressions: &[ParsedGroupedExpression],
+    known_expression_types: &[ExpressionType],
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+
+    for grouped in grouped_expressions {
+        let Some(inner) = known_expression_types
+            .iter()
+            .find(|entry| entry.expression() == grouped.inner)
+        else {
+            continue;
+        };
+        report.record_expression_type(ExpressionType::new(grouped.expression, inner.ty()));
+    }
+
+    report
 }
