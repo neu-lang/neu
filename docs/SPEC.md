@@ -444,3 +444,142 @@ or more required metadata categories. The FFI declaration node is primary, and
 the diagnostic lists the missing categories. Safe-wrapper status is metadata
 only in M0026 and does not affect source visibility, type checking, or call
 lowering.
+
+## ADR-0040: Bootstrap Program Entry Point
+
+The first executable subset accepts exactly one top-level `main` function in
+the compiler-selected root module entry package. It has no parameters, declares
+return type `Int`, has a body, and returns an `Int` on every reachable path.
+The language-level result of `main` maps to the process exit code for bootstrap
+executables. The first executable smoke must use a non-negative `Int` in
+`0..255`; other result mappings are deferred. CLI arguments are deferred.
+
+Entry diagnostics include `missing_entry_point`, `duplicate_entry_point`,
+`invalid_entry_point_signature`, and `missing_return`.
+
+## ADR-0041: Bootstrap Function Call And Return Semantics
+
+The first executable subset accepts direct calls to resolved top-level
+functions in the same module/package. A call is well-typed when the callee
+resolves to exactly one function, argument count matches parameter count, each
+argument is assignment-compatible with its parameter type, and the call
+expression type is the callee return type. Direct and mutual recursion are
+deferred and rejected.
+
+Arguments evaluate left-to-right before callee entry. Bootstrap parameter
+passing is by value. Only explicit `return expression;` returns a value in the
+first executable subset. Implicit trailing-expression returns are deferred for
+runtime semantics. Functions returning `Int` must explicitly return an `Int` on
+every reachable accepted path.
+
+Call and return diagnostics include `invalid_call_target`,
+`argument_count_mismatch`, `argument_type_mismatch`,
+`recursive_call_unsupported`, `return_type_mismatch`, `missing_return`, and
+`unreachable_return`.
+
+## ADR-0042: Bootstrap Minimal Executable Subset
+
+The first runnable smoke subset includes package declarations, top-level
+functions with explicit `Int` parameter and return types, the ADR-0040 `main`
+form, `Int` locals, local `const` and `var` declarations, assignments to local
+`var` bindings, integer literals, bare local-name expressions, parenthesized
+expressions, unary arithmetic and bitwise operations `+`, `-`, and `~` on
+`Int`, binary arithmetic operations `+`, `-`, `*`, `/`, `%`, and `**` on
+`Int`, binary bitwise operations `&`, `|`, and `^` on `Int`, binary shift
+operations `<<` and `>>` on `Int`, direct same-module top-level function
+calls, and explicit `return expression;`.
+
+The required runnable shape uses helper functions that exercise `Int`
+arithmetic and bitwise operations and `main` returning the helper result as the
+process exit code.
+Classes, structs at runtime, interfaces, enums at runtime, generics, nullable
+runtime representation, heap allocation, destructuring, pattern matching,
+loops, broader branching, coroutines, unsafe, FFI, printing, strings, standard
+library calls, scheduler/runtime work, exceptions or panics as language
+constructs, closures, methods, member access, arrays, and target-pack APIs are
+deferred. Unsupported parsed forms must fail before backend lowering with
+`unsupported_executable_form` or a more specific existing diagnostic. M0028
+must add parser and type-checker support for executable operators not already
+covered by ADR-0024 before HIR lowering consumes executable fixtures.
+
+## ADR-0043: Bootstrap Integer Runtime Semantics
+
+For the bootstrap executable subset, `Int` is a signed 64-bit two's-complement
+integer with range `-9223372036854775808..9223372036854775807`. Integer
+literals in executable code must fit this range or report
+`integer_literal_out_of_range`.
+
+Unary `+` returns its `Int` operand. Unary `-` produces arithmetic negation and
+overflows for `-9223372036854775808`. Unary `~` produces bitwise complement.
+Binary arithmetic operations `+`, `-`, `*`, `/`, `%`, and `**` evaluate the
+left operand before the right operand and produce `Int`. Division truncates
+toward zero. Remainder has the same sign as the dividend. `**` requires a
+non-negative exponent. Bitwise `&`, `|`, and `^` operate on the
+two's-complement representation. Shifts `<<` and `>>` require a shift count in
+`0..63`, and `>>` is arithmetic right shift. Statically provable overflow
+reports `integer_overflow`; known division or modulo by zero reports
+`division_by_zero`; known negative exponent reports `negative_exponent`; known
+invalid shift count reports `invalid_shift_count`. Equivalent runtime failures
+trap and must not silently wrap or continue. Wrapping, saturating, unchecked
+arithmetic, numeric casts, unsigned integers, fixed-width aliases, floats,
+machine-word integers, rotates, population count, and bit-scan intrinsics are
+deferred.
+
+## ADR-0044: Bootstrap HIR Runtime Contract
+
+Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves
+function identity, package/module identity, entry classification, parameter
+order and types, return type, local binding identity and mutability, expression
+types, direct callee identity, left-to-right operand and argument order,
+explicit returns, source spans, required ownership and safety facts, already
+produced or proven-absent safety diagnostics, and unsupported-form markers for
+constructs excluded by ADR-0042. HIR must reject unchecked, unresolved, or
+unsupported AST input rather than represent it as executable HIR.
+
+## ADR-0045: Bootstrap MIR Runtime Contract
+
+Bootstrap MIR is backend-independent and contains function definitions, ordered
+parameters, return types, local slots, temporaries, basic blocks, ordered
+instructions, one terminator per block, source mapping, `Int` constants, local
+load/store, checked or trapping `Int` arithmetic, exponentiation, bitwise, and
+shift operations, direct calls, unconditional branches, conditional branches
+only where already needed, return terminators, and trap terminators.
+
+Cleanup and destruction are a bootstrap boundary. The first executable subset
+has only `Int` runtime values, so there are no user-defined destructors, heap
+resources, async cancellation cleanups, or FFI cleanup edges. MIR must reserve
+a later cleanup insertion boundary without inventing cleanup semantics.
+
+## ADR-0046: Bootstrap ABI And Calling Convention
+
+The bootstrap backend assumes the current host target for the initial smoke.
+Cross-target behavior is deferred to M0033. `Int` lowers to a signed 64-bit
+integer value. Unsupported runtime types must not reach ABI lowering.
+
+Bootstrap language functions use an internal Neu calling convention that may be
+implemented with Cranelift's platform-default call convention for the initial
+host target. This is not a stable external ABI. Bootstrap symbol names are
+deterministic internal symbols derived from module identity, package namespace,
+and function name and must be collision-free for the bootstrap subset.
+
+Language `main` is not the raw platform entry symbol. The object/link pipeline
+must arrange a bootstrap executable entry path that calls language `main`.
+
+## ADR-0047: Bootstrap Object Link Runtime Model
+
+The first object/link pipeline targets the current host object's native format
+only. Cross-object formats and target packs are deferred to M0033.
+
+The first runnable program requires no Neu standard library. It may use a tiny
+bootstrap runtime shim whose only responsibilities are participating in the
+entry path, calling compiled language `main`, mapping a non-negative `Int` in
+`0..255` to the process exit status, and trapping on bootstrap runtime traps
+such as checked integer overflow, division/modulo by zero, negative exponent,
+or invalid shift count. The shim is not a language standard library and must
+not provide printing, allocation, CLI arguments, scheduling, panics as a
+language feature, exceptions, FFI helpers, or platform APIs.
+
+M0032 must use the planned bundled linker path for the initial host target. Any
+temporary host-tool dependency must be documented as a blocker or explicit
+limitation and must not be presented as satisfying Go-like target-pack
+semantics.

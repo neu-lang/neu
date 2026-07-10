@@ -1,12 +1,12 @@
-# M0031: Target Packs And Cross Compilation Smoke
+# M0033: Target Packs And Cross Compilation Smoke
 
 ## Title
 
-M0031: Target Packs And Cross Compilation Smoke
+M0033: Target Packs And Cross Compilation Smoke
 
 ## Identifier
 
-M0031
+M0033
 
 ## Goal
 
@@ -22,11 +22,11 @@ ADR-0020 selects bundled target packs with explicit target triples, standard lay
 
 ## Prerequisites
 
-- M0030
+- M0032
 
 ## Inputs
 
-- Object and linker pipeline from M0030.
+- Object and linker pipeline from M0032.
 - `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
 - Build system and CI from M0002.
 
@@ -87,4 +87,3 @@ ADR-0020 selects bundled target packs with explicit target triples, standard lay
 - [ ] Target metadata exists.
 - [ ] Explicit target selection works.
 - [ ] Cross-compilation smoke path is tested.
-

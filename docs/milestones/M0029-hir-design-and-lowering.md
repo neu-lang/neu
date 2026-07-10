@@ -1,12 +1,12 @@
-# M0027: HIR Design And Lowering
+# M0029: HIR Design And Lowering
 
 ## Title
 
-M0027: HIR Design And Lowering
+M0029: HIR Design And Lowering
 
 ## Identifier
 
-M0027
+M0029
 
 ## Goal
 
@@ -22,11 +22,12 @@ The expected compiler architecture includes AST, semantic checks, HIR, MIR, and 
 
 ## Prerequisites
 
-- M0026
+- M0028
 
 ## Inputs
 
-- Checked AST from M0018-M0026.
+- Checked AST from M0018-M0028.
+- Executable HIR contract from ADR-0044.
 - Source span model from M0005.
 - Diagnostic contract from M0004.
 
@@ -56,6 +57,7 @@ The expected compiler architecture includes AST, semantic checks, HIR, MIR, and 
 ## Acceptance Criteria
 
 - Approved checked fixtures lower to HIR.
+- Executable-subset fixtures preserve ADR-0044 runtime facts.
 - HIR preserves source mapping sufficient for diagnostics.
 - Ill-formed unchecked input is not accepted as a HIR source.
 
@@ -85,4 +87,3 @@ The expected compiler architecture includes AST, semantic checks, HIR, MIR, and 
 - [ ] HIR model exists.
 - [ ] Checked AST lowers to HIR.
 - [ ] Source mapping is preserved.
-

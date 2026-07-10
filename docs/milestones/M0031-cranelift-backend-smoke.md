@@ -1,12 +1,12 @@
-# M0029: Cranelift Backend Smoke
+# M0031: Cranelift Backend Smoke
 
 ## Title
 
-M0029: Cranelift Backend Smoke
+M0031: Cranelift Backend Smoke
 
 ## Identifier
 
-M0029
+M0031
 
 ## Goal
 
@@ -22,12 +22,14 @@ Project context selects Cranelift initially and LLVM optionally later.
 
 ## Prerequisites
 
-- M0028
+- M0030
 
 ## Inputs
 
-- MIR from M0028.
+- MIR from M0030.
 - Target assumptions from ADR-0020.
+- Integer runtime semantics from ADR-0043.
+- ABI assumptions from ADR-0046.
 - Build skeleton from M0002.
 
 ## Outputs
@@ -56,6 +58,8 @@ Project context selects Cranelift initially and LLVM optionally later.
 ## Acceptance Criteria
 
 - A spec-backed minimal program reaches Cranelift emission.
+- Cranelift lowering covers ADR-0043 arithmetic, exponentiation, bitwise, and
+  shift operations for the executable subset.
 - Unsupported MIR constructs fail with clear diagnostics or internal unsupported markers in tests.
 - No source semantics are introduced in backend code.
 
@@ -67,7 +71,7 @@ Project context selects Cranelift initially and LLVM optionally later.
 
 ## Risks
 
-- Minimal executable semantics may depend on under-specified entry point rules.
+- Minimal executable semantics depend on ADR-0040 through ADR-0047.
 - ABI details may require ambiguity reports.
 
 ## Estimated Effort
@@ -86,4 +90,3 @@ Project context selects Cranelift initially and LLVM optionally later.
 - [ ] Cranelift path exists.
 - [ ] Smoke backend test passes.
 - [ ] Unsupported constructs are explicit.
-

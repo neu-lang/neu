@@ -44,20 +44,22 @@ Source of truth: `docs/SPEC.md` and `docs/adr/`. This roadmap does not modify la
 - M0025: Coroutine Scope And Suspension Analysis
 - M0026: Unsafe And FFI Boundary Analysis
 
-### Phase 4: Intermediate Representations
+### Phase 4: Executable Semantics And Intermediate Representations
 
-- M0027: HIR Design And Lowering
-- M0028: MIR Design And Lowering
+- M0027: Executable Semantics Planning
+- M0028: Executable Expression Frontend Completion
+- M0029: HIR Design And Lowering
+- M0030: MIR Design And Lowering
 
 ### Phase 5: Backend And Portability
 
-- M0029: Cranelift Backend Smoke
-- M0030: Object And Bundled Linker Pipeline
-- M0031: Target Packs And Cross Compilation Smoke
+- M0031: Cranelift Backend Smoke
+- M0032: Object And Bundled Linker Pipeline
+- M0033: Target Packs And Cross Compilation Smoke
 
 ### Phase 6: Release Hardening
 
-- M0032: Milestone Release Hardening
+- M0034: Milestone Release Hardening
 
 ## Milestone Ordering
 
@@ -87,12 +89,14 @@ Source of truth: `docs/SPEC.md` and `docs/adr/`. This roadmap does not modify la
 24. M0024 Thread Safety Capability Analysis
 25. M0025 Coroutine Scope And Suspension Analysis
 26. M0026 Unsafe And FFI Boundary Analysis
-27. M0027 HIR Design And Lowering
-28. M0028 MIR Design And Lowering
-29. M0029 Cranelift Backend Smoke
-30. M0030 Object And Bundled Linker Pipeline
-31. M0031 Target Packs And Cross Compilation Smoke
-32. M0032 Milestone Release Hardening
+27. M0027 Executable Semantics Planning
+28. M0028 Executable Expression Frontend Completion
+29. M0029 HIR Design And Lowering
+30. M0030 MIR Design And Lowering
+31. M0031 Cranelift Backend Smoke
+32. M0032 Object And Bundled Linker Pipeline
+33. M0033 Target Packs And Cross Compilation Smoke
+34. M0034 Milestone Release Hardening
 
 ## Dependency Graph
 
@@ -129,6 +133,8 @@ M0001
   -> M0030
   -> M0031
   -> M0032
+  -> M0033
+  -> M0034
 ```
 
 Each milestone may depend only on earlier milestones. No milestone depends on later work.
@@ -141,15 +147,15 @@ Each milestone may depend only on earlier milestones. No milestone depends on la
 | Phase 1 | M0006-M0013 | 18-32 working days |
 | Phase 2 | M0014-M0021 | 22-36 working days |
 | Phase 3 | M0022-M0026 | 18-25 working days |
-| Phase 4 | M0027-M0028 | 6-10 working days |
-| Phase 5 | M0029-M0031 | 9-15 working days |
-| Phase 6 | M0032 | 3-5 working days |
+| Phase 4 | M0027-M0030 | 13-22 working days |
+| Phase 5 | M0031-M0033 | 9-15 working days |
+| Phase 6 | M0034 | 3-5 working days |
 
-Total critical-path estimate: 85-138 working days for one serial implementation lane.
+Total critical-path estimate: 92-150 working days for one serial implementation lane.
 
 ## Project Critical Path
 
-The critical path is the full milestone chain from M0001 through M0032 because every phase builds on the prior phase's architecture and validation surface. Parallel work should be limited to review, test design, and ambiguity resolution for future milestones. Implementation should remain strictly ordered until the frontend contracts stabilize.
+The critical path is the full milestone chain from M0001 through M0034 because every phase builds on the prior phase's architecture and validation surface. Parallel work should be limited to review, test design, and ambiguity resolution for future milestones. Implementation should remain strictly ordered until the frontend contracts stabilize.
 
 Critical path checkpoints:
 
@@ -157,8 +163,11 @@ Critical path checkpoints:
 - M0013 proves the parser can produce AST for the accepted syntax subset.
 - M0018 proves typed frontend behavior exists before safety passes.
 - M0025 proves ownership, borrow, thread, and coroutine analyses can coexist.
-- M0028 proves backend-independent lowering exists.
-- M0031 proves Go-like target-pack direction is viable.
+- M0027 proves executable semantics are source-of-truth decisions, not backend
+  inventions.
+- M0028 proves the frontend accepts and rejects the first executable subset.
+- M0030 proves backend-independent lowering exists.
+- M0033 proves Go-like target-pack direction is viable.
 
 ## Optional Milestones
 

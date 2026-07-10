@@ -1,12 +1,12 @@
-# M0030: Object And Bundled Linker Pipeline
+# M0032: Object And Bundled Linker Pipeline
 
 ## Title
 
-M0030: Object And Bundled Linker Pipeline
+M0032: Object And Bundled Linker Pipeline
 
 ## Identifier
 
-M0030
+M0032
 
 ## Goal
 
@@ -22,13 +22,14 @@ ADR-0020 requires no hidden host dependency for ordinary builds.
 
 ## Prerequisites
 
-- M0029
+- M0031
 
 ## Inputs
 
-- Cranelift backend from M0029.
+- Cranelift backend from M0031.
 - Build system from M0002.
 - `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
+- `docs/adr/ADR-0047-bootstrap-object-link-runtime-model.md`
 
 ## Outputs
 
@@ -57,6 +58,7 @@ ADR-0020 requires no hidden host dependency for ordinary builds.
 
 - Compiler can produce an object file for the initial smoke program.
 - Compiler can produce an executable for the initial host target without hidden host linker dependency.
+- Executable smoke returns the ADR-0040 `main` result as the process exit code.
 - main-task build check confirms documented toolchain inputs.
 
 ## Test Strategy
@@ -86,4 +88,3 @@ ADR-0020 requires no hidden host dependency for ordinary builds.
 - [ ] Object emission works.
 - [ ] Bundled linker path works for host smoke.
 - [ ] Hidden host dependencies are documented or eliminated.
-

@@ -1,12 +1,12 @@
-# M0028: MIR Design And Lowering
+# M0030: MIR Design And Lowering
 
 ## Title
 
-M0028: MIR Design And Lowering
+M0030: MIR Design And Lowering
 
 ## Identifier
 
-M0028
+M0030
 
 ## Goal
 
@@ -22,12 +22,13 @@ The expected architecture places MIR before optimization and backend code genera
 
 ## Prerequisites
 
-- M0027
+- M0029
 
 ## Inputs
 
-- HIR from M0027.
+- HIR from M0029.
 - Type and safety information from M0018-M0026.
+- MIR runtime contract from ADR-0045.
 - `docs/adr/ADR-0019-compile-time-evaluation-and-metaprogramming.md`
 
 ## Outputs
@@ -56,6 +57,8 @@ The expected architecture places MIR before optimization and backend code genera
 ## Acceptance Criteria
 
 - Approved HIR fixtures lower to MIR.
+- Executable-subset MIR represents ADR-0043 arithmetic and ADR-0045 runtime
+  operations.
 - MIR represents control flow without source-language ambiguity.
 - MIR remains independent of Cranelift-specific APIs.
 
@@ -86,4 +89,3 @@ The expected architecture places MIR before optimization and backend code genera
 - [ ] MIR model exists.
 - [ ] HIR lowers to MIR.
 - [ ] MIR is backend-independent.
-

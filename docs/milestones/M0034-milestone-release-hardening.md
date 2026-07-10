@@ -1,12 +1,12 @@
-# M0032: Milestone Release Hardening
+# M0034: Milestone Release Hardening
 
 ## Title
 
-M0032: Milestone Release Hardening
+M0034: Milestone Release Hardening
 
 ## Identifier
 
-M0032
+M0034
 
 ## Goal
 
@@ -22,11 +22,11 @@ Before declaring a milestone release, the compiler must be audited against the s
 
 ## Prerequisites
 
-- M0031
+- M0033
 
 ## Inputs
 
-- All completed milestones M0001-M0031.
+- All completed milestones M0001-M0033.
 - `docs/SPEC.md`
 - `docs/adr/`
 - `main task rules`
@@ -96,4 +96,3 @@ Before declaring a milestone release, the compiler must be audited against the s
 - [ ] Diagnostic report is complete.
 - [ ] Build report is complete.
 - [ ] Deferred decisions are listed.
-
