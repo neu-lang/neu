@@ -25,16 +25,19 @@ require_absent_text() {
 }
 
 proposal=docs/adr/proposals/ADR-0025-module-package-visibility-model.md
+accepted=docs/adr/ADR-0025-module-package-visibility-model.md
 ambiguity=docs/ambiguities/M0014-module-package-visibility-model.md
 decision=docs/adr/proposals/reviews/ADR-0025-chief-architect-decision.md
 task=docs/tasks/M0014-004-module-package-visibility-concrete-draft.md
 
 require_file "$proposal"
+require_file "$accepted"
 require_file "$ambiguity"
 require_file "$decision"
 require_file "$task"
 
 require_text "$proposal" '^Status: Draft proposal - not accepted source of truth$'
+require_text "$accepted" '^Status: Accepted$'
 require_text "$proposal" '^## Concrete Draft Model$'
 require_text "$proposal" '^### Module Identity$'
 require_text "$proposal" '^### Source File Assignment$'
@@ -58,11 +61,11 @@ require_text "$proposal" 'invalid_package_namespace'
 require_text "$proposal" 'unsupported_visibility_category'
 require_text "$proposal" 'duplicate_visibility_metadata'
 
-require_text "$ambiguity" 'Status: `open`'
-require_text "$decision" '^Decision: pending-revision$'
+require_text "$ambiguity" 'Status: `resolved`'
+require_text "$decision" '^Decision: approved$'
 require_text "$task" 'Status: `complete`'
 
-require_absent_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
+require_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
 require_absent_text crates/newlang/src/lib.rs 'pub mod module|pub mod modules|pub mod name_resolution'
 
 echo "m0014-concrete-draft: module package and visibility concrete draft validation passed"

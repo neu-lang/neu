@@ -2,7 +2,7 @@
 set -eu
 
 fail() {
-  echo "m0014-blocked: $*" >&2
+  echo "m0014-authority: $*" >&2
   exit 1
 }
 
@@ -46,13 +46,14 @@ require_text "$task" 'Milestone: `M0014`'
 require_text "$task" 'Language Designer to draft a non-authoritative module, package, namespace, and visibility model proposal'
 
 require_text "$ambiguity" '^# Ambiguity Report: M0014 Module, Package, And Visibility Model$'
-require_text "$ambiguity" 'Status: `open`'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0014`'
+require_text "$ambiguity" 'Resolution Source: `docs/adr/ADR-0025-module-package-visibility-model.md`'
 require_text "$ambiguity" 'module identity'
 require_text "$ambiguity" 'package-to-module mapping'
 require_text "$ambiguity" 'default visibility'
 require_text "$ambiguity" '`internal` meaning'
-require_text "$ambiguity" 'No implementation may define module identity'
+require_text "$ambiguity" 'Implementation may define module identity, package-to-module mapping, default visibility, `internal` meaning, and visibility diagnostics only as specified by accepted ADR-0025'
 
 require_text "$adr" 'Modules as explicit compilation and visibility units'
 require_text "$adr" 'Public/private/internal visibility must be specified'
@@ -60,6 +61,7 @@ require_text "$spec" '^## ADR-0017: Modules, Visibility, And API Evolution$'
 require_text "$spec" 'Modules are explicit compilation and visibility units'
 
 require_text "$milestone" 'M0014'
+require_text "$milestone" '\[x\] Module, package, and visibility source of truth is accepted'
 require_text "$milestone" '\[ \] Module identity exists'
 require_text "$milestone" '\[ \] Visibility metadata is represented'
 require_text "$milestone" '\[x\] Unspecified visibility rules are recorded'
@@ -70,4 +72,4 @@ require_absent_path crates/newlang/src/name_resolution.rs
 require_absent_text crates/newlang/src/lib.rs 'pub mod module|pub mod modules|pub mod name_resolution'
 require_absent_text crates/newlang/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
 
-echo "m0014-blocked: module package and visibility model ambiguity validation passed"
+echo "m0014-authority: module package and visibility model authority validation passed"

@@ -81,6 +81,7 @@ ADR-0017 selects modules as explicit compilation and visibility units, containin
 
 ## Completion Checklist
 
+- [x] Module, package, and visibility source of truth is accepted.
 - [ ] Module identity exists.
 - [ ] Visibility metadata is represented.
 - [x] Unspecified visibility rules are recorded.

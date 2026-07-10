@@ -29,10 +29,12 @@ require_absent_text() {
 }
 
 proposal=docs/adr/proposals/ADR-0025-module-package-visibility-model.md
+accepted=docs/adr/ADR-0025-module-package-visibility-model.md
 ambiguity=docs/ambiguities/M0014-module-package-visibility-model.md
 task=docs/tasks/M0014-002-module-package-visibility-model-proposal.md
 
 require_file "$proposal"
+require_file "$accepted"
 require_file "$ambiguity"
 require_file "$task"
 
@@ -57,12 +59,12 @@ require_text "$proposal" 'private'
 require_text "$proposal" 'internal'
 require_text "$proposal" 'not rely on Kotlin, Rust, Go, file paths, or existing compiler behavior as implicit authority'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$accepted" '^Status: Accepted$'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0014`'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path docs/adr/ADR-0025-module-package-visibility-model.md
-require_absent_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
+require_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
 require_absent_path crates/newlang/src/module.rs
 require_absent_path crates/newlang/src/modules.rs
 require_absent_path crates/newlang/src/name_resolution.rs

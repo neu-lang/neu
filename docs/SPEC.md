@@ -161,3 +161,30 @@ for expression grammar, statement grammar, block grammar, and pattern grammar.
 Unsafe block syntax, coroutine syntax, match or `when` syntax, loops,
 `break` and `continue`, indexing, lambdas, destructuring declarations, labels,
 error propagation syntax, and advanced pattern forms remain deferred.
+
+## ADR-0025: Module Package And Visibility Model
+
+The bootstrap frontend uses explicit module names supplied by compiler invocation or tests. A module name is a dot-separated sequence of ADR-0021 identifiers.
+Host paths are not module identity. Each parsed source file belongs to exactly
+one module per frontend invocation.
+
+Packages are namespaces inside modules. Package declarations use ADR-0022
+qualified names. Files without package declarations belong to the root package,
+represented by the empty package path. Imports remain syntax only for M0014 and
+do not create module dependencies.
+
+Visibility categories are `public`, `internal`, and `private`. Default visibility is `internal`. `public` means visible to other modules subject to
+later dependency and name resolution rules. `internal` means visible within the
+same module. `private` means visible only within the declaring source file.
+Package and import declarations have no visibility metadata.
+
+Each declaration with visibility scope has exactly one effective visibility
+category and records whether that category was explicit or defaulted.
+
+M0014 module metadata includes module name, ordered source file identities, package namespace per source file, and effective visibility metadata. It does
+not include module dependencies, target triples, package manager metadata,
+manifest paths, artifact hashes, resolved symbols, or imported names.
+
+ADR-0025 defines required diagnostics for missing module identity, invalid
+module identity, ambiguous source-module assignment, invalid package namespace,
+unsupported visibility categories, and duplicate visibility metadata.

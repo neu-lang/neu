@@ -1,6 +1,6 @@
 # ADR-0025 Chief Architect Decision
 
-Decision: pending-revision
+Decision: approved
 
 ## Reviewed Artifact
 
@@ -10,18 +10,20 @@ Decision: pending-revision
 
 ## Current Decision
 
-ADR-0025 is not accepted.
+ADR-0025 is accepted.
 
-M0014 remains blocked for implementation until the proposal is revised into concrete accepted source of truth.
+The accepted source of truth is `docs/adr/ADR-0025-module-package-visibility-model.md`, with the summary incorporated into `docs/SPEC.md`.
+
+M0014 ambiguity is resolved. Implementation may proceed only against the accepted ADR-0025 model.
 
 ## Required Review Dependencies
 
-- Language Lawyer review.
-- Build Engineer review.
-- Spec Compliance Auditor review.
-- Simplicity Guardian review.
+- Language Lawyer review completed.
+- Build Engineer review completed.
+- Spec Compliance Auditor review completed.
+- Simplicity Guardian review completed.
 
-## Acceptance Blockers
+## Resolved Acceptance Blockers
 
 - Exact `private` visibility semantics.
 - Default visibility for omitted modifiers.
@@ -34,6 +36,6 @@ M0014 remains blocked for implementation until the proposal is revised into conc
 
 ## Consequences
 
-- `docs/ambiguities/M0014-module-package-visibility-model.md` remains open.
-- M0014 module metadata implementation may not proceed.
-- The next safe task is to revise ADR-0025 into a concrete draft model.
+- `docs/ambiguities/M0014-module-package-visibility-model.md` is resolved.
+- M0014 module metadata implementation may proceed only for accepted ADR-0025 semantics.
+- Module dependencies, manifest syntax, target-pack artifact compatibility, and name resolution remain deferred.

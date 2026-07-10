@@ -7,9 +7,11 @@
 - Related Milestone: `M0014`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-10`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
 - Blocking milestone: `M0014`
+- Resolution Source: `docs/adr/ADR-0025-module-package-visibility-model.md`
+- Resolved Date: `2026-07-10`
 
 ## Ambiguous Or Missing Authority
 
@@ -61,12 +63,14 @@ ADR-0017 states that modules are explicit compilation and visibility units and t
 
 ## Recommended Resolution Path
 
-- [ ] Language Designer drafts a module, package, namespace, and visibility semantics ADR or `docs/SPEC.md` revision.
-- [ ] Language Lawyer audits consistency with ADR-0017, ADR-0022, and future name resolution.
-- [ ] Build Engineer reviews module identity compatibility with target packs and cross compilation.
-- [ ] Spec Compliance Auditor confirms tests compare against accepted source of truth.
-- [ ] Chief Architect approves final source-of-truth update.
+- [x] Language Designer drafts a module, package, namespace, and visibility semantics ADR or `docs/SPEC.md` revision.
+- [x] Language Lawyer audits consistency with ADR-0017, ADR-0022, and future name resolution.
+- [x] Build Engineer reviews module identity compatibility with target packs and cross compilation.
+- [x] Spec Compliance Auditor confirms tests compare against accepted source of truth.
+- [x] Chief Architect approves final source-of-truth update.
 
 ## Temporary Rule
 
-No implementation may define module identity, package-to-module mapping, default visibility, `internal` meaning, module dependency format, or visibility diagnostics beyond recording this ambiguity until accepted source of truth resolves M0014.
+Implementation may define module identity, package-to-module mapping, default visibility, `internal` meaning, and visibility diagnostics only as specified by accepted ADR-0025.
+
+Module dependency format remains deferred.
