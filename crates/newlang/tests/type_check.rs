@@ -17,7 +17,7 @@ use newlang::{
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
         ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport,
+        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -48,6 +48,55 @@ fn ambiguous_type_rules_cover_m0018_blockers() {
     ];
 
     assert_eq!(blockers.len(), 5);
+}
+
+#[test]
+fn unresolved_type_rule_diagnostic_preserves_rule_and_node_without_types() {
+    let node = AstNodeId::from_raw(18);
+
+    let diagnostic =
+        TypeCheckDiagnostic::unresolved_type_rule(TypeRuleDiagnostic::MissingAnnotationType, node);
+
+    assert_eq!(
+        diagnostic.kind(),
+        TypeCheckDiagnosticKind::UnresolvedTypeRule
+    );
+    assert_eq!(diagnostic.rule(), TypeRuleDiagnostic::MissingAnnotationType);
+    assert_eq!(diagnostic.node(), node);
+    assert_eq!(diagnostic.expected_type(), None);
+    assert_eq!(diagnostic.actual_type(), None);
+}
+
+#[test]
+fn unsupported_type_rule_diagnostic_preserves_rule_and_node_without_types() {
+    let node = AstNodeId::from_raw(19);
+
+    let diagnostic =
+        TypeCheckDiagnostic::unsupported_type_rule(TypeRuleDiagnostic::DirectCallDeferred, node);
+
+    assert_eq!(
+        diagnostic.kind(),
+        TypeCheckDiagnosticKind::UnsupportedTypeRule
+    );
+    assert_eq!(diagnostic.rule(), TypeRuleDiagnostic::DirectCallDeferred);
+    assert_eq!(diagnostic.node(), node);
+    assert_eq!(diagnostic.expected_type(), None);
+    assert_eq!(diagnostic.actual_type(), None);
+}
+
+#[test]
+fn type_rule_diagnostic_identifiers_cover_adr0027_examples() {
+    let rules = [
+        TypeRuleDiagnostic::MissingAnnotationType,
+        TypeRuleDiagnostic::MissingResolvedNameType,
+        TypeRuleDiagnostic::DirectCallDeferred,
+        TypeRuleDiagnostic::FunctionTypeApplicationDeferred,
+        TypeRuleDiagnostic::MemberExpressionDeferred,
+        TypeRuleDiagnostic::BinaryExpressionDeferred,
+        TypeRuleDiagnostic::IfValueDeferred,
+    ];
+
+    assert_eq!(rules.len(), 7);
 }
 
 #[test]

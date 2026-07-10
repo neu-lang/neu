@@ -21,13 +21,33 @@ pub enum AmbiguousTypeRule {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TypeCheckDiagnosticKind {
     AmbiguousTypeRule,
+    UnresolvedTypeRule,
+    UnsupportedTypeRule,
     TypeMismatch,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TypeRuleDiagnostic {
+    Ambiguous(AmbiguousTypeRule),
+    MissingAnnotationType,
+    MissingResolvedNameType,
+    DirectCallDeferred,
+    FunctionTypeApplicationDeferred,
+    MemberExpressionDeferred,
+    BinaryExpressionDeferred,
+    IfValueDeferred,
+}
+
+impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
+    fn eq(&self, other: &AmbiguousTypeRule) -> bool {
+        matches!(self, Self::Ambiguous(rule) if rule == other)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeCheckDiagnostic {
     kind: TypeCheckDiagnosticKind,
-    rule: AmbiguousTypeRule,
+    rule: TypeRuleDiagnostic,
     node: AstNodeId,
     expected_type: Option<TypeId>,
     actual_type: Option<TypeId>,
@@ -37,6 +57,26 @@ impl TypeCheckDiagnostic {
     pub fn ambiguous_type_rule(rule: AmbiguousTypeRule, node: AstNodeId) -> Self {
         Self {
             kind: TypeCheckDiagnosticKind::AmbiguousTypeRule,
+            rule: TypeRuleDiagnostic::Ambiguous(rule),
+            node,
+            expected_type: None,
+            actual_type: None,
+        }
+    }
+
+    pub fn unresolved_type_rule(rule: TypeRuleDiagnostic, node: AstNodeId) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::UnresolvedTypeRule,
+            rule,
+            node,
+            expected_type: None,
+            actual_type: None,
+        }
+    }
+
+    pub fn unsupported_type_rule(rule: TypeRuleDiagnostic, node: AstNodeId) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::UnsupportedTypeRule,
             rule,
             node,
             expected_type: None,
@@ -47,7 +87,7 @@ impl TypeCheckDiagnostic {
     pub fn type_mismatch(node: AstNodeId, expected_type: TypeId, actual_type: TypeId) -> Self {
         Self {
             kind: TypeCheckDiagnosticKind::TypeMismatch,
-            rule: AmbiguousTypeRule::AssignmentCompatibility,
+            rule: TypeRuleDiagnostic::Ambiguous(AmbiguousTypeRule::AssignmentCompatibility),
             node,
             expected_type: Some(expected_type),
             actual_type: Some(actual_type),
@@ -58,7 +98,7 @@ impl TypeCheckDiagnostic {
         self.kind
     }
 
-    pub fn rule(&self) -> AmbiguousTypeRule {
+    pub fn rule(&self) -> TypeRuleDiagnostic {
         self.rule
     }
 
