@@ -7,7 +7,7 @@
 - Related Milestone: `M0024`
 - Filed By: `main task`
 - Date: `2026-07-11`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
@@ -78,23 +78,24 @@ Missing rules:
 
 ## Recommended Resolution Path
 
-- [ ] main-task language review determines whether existing text resolves it.
-- [ ] main-task semantic design drafts ADR or spec revision if new semantics are required.
-- [ ] main-task adversarial check reviews soundness risk.
-- [ ] main-task diagnostics check reviews diagnostic consequences.
-- [ ] main-task simplicity check reviews complexity.
-- [ ] main task approves final resolution.
+- [x] main-task language review determines whether existing text resolves it.
+- [x] main-task semantic design drafts ADR or spec revision if new semantics are required.
+- [x] main-task adversarial check reviews soundness risk.
+- [x] main-task diagnostics check reviews diagnostic consequences.
+- [x] main-task simplicity check reviews complexity.
+- [x] main task approves final resolution.
 
 ## Temporary Rule
 
-No implementation may proceed on M0024 thread-safety capability analysis until
-the source of truth defines a bootstrap capability and boundary-checking subset.
+Implementation may proceed on M0024 thread-safety capability analysis against
+ADR-0037's metadata-only bootstrap capability and boundary-checking subset.
 
 ## Resolution
 
 - Decision:
-  - pending
+  - Accepted `docs/adr/ADR-0037-bootstrap-thread-capability-analysis.md`.
 - Source of truth updated:
-  - pending
+  - `docs/adr/ADR-0037-bootstrap-thread-capability-analysis.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - pending
+  - 2026-07-11

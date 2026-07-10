@@ -33,12 +33,12 @@ the absence of approved synchronization abstractions.
 
 ## Required Resolution
 
-An accepted ADR or spec revision must define a bootstrap thread-safety
-capability subset before implementation can proceed. At minimum it must
-identify supported capability names, type-category derivation rules, boundary
-and capture records, missing-capability diagnostics, and how to block
-unspecified concurrency forms.
+ADR-0037 is accepted and defines the M0024 metadata-only bootstrap
+thread-capability subset, including `Send` and `Share`, type-category
+derivation rules, boundary and capture records, `missing_thread_capability`, and
+explicit deferral of source-level concurrency forms.
 
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=blocker-recorded result=blocked evidence=ADR-0014 selects send/share capability direction but does not define testable M0024 boundary or diagnostic semantics. handoff=Language-Designer
+- 2026-07-11 agent=Main phase=resolution-accepted result=pass evidence=ADR-0037 accepted; SPEC and ambiguity report updated. handoff=Task-Decomposer

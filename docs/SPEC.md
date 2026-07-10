@@ -343,3 +343,29 @@ reported when the use region differs from the borrow region. `borrow_conflict`
 diagnoses on the later conflicting borrow with the earlier borrow as secondary
 span. `lifetime_escape` diagnoses on the escape node with the original borrow
 as secondary span.
+
+## ADR-0037: Bootstrap Thread Capability Analysis
+
+M0024 uses a metadata-only bootstrap thread-capability model. It adds no
+source-level task spawning, detached threads, async blocks, coroutine bodies,
+closures, synchronization primitives, atomics, locks, generic capability
+enforcement, user-declared capability implementations, or unsafe capability
+overrides.
+
+M0024 defines `Send` for values that may transfer across an approved concurrent
+boundary and `Share` for values that may be shared across an approved
+concurrent boundary without exclusive transfer. `Bool`, `Int`, `Unit`, and
+`Null` satisfy both capabilities. `String` satisfies `Send` but not `Share`.
+Nullable types satisfy a capability only when their non-null base type satisfies
+that capability. Current-module nominal user-defined types, generic parameter
+types, unsupported types, unresolved types, and absent type information satisfy
+neither capability in M0024.
+
+Boundary input records contain a boundary node and ordered capture records.
+Capture records contain a capture node, captured local binding, captured type,
+and required capability. A `missing_thread_capability` diagnostic is reported
+when a capture's type does not satisfy the required capability. The capture node
+is primary and the boundary node is secondary. Because M0024 has no approved
+synchronization abstractions, shared mutable state is not accepted through a
+`Share` capture; mutable captures may only be modeled as `Send` transfers when
+the type satisfies `Send`.
