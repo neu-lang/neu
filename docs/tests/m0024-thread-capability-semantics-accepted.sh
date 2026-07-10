@@ -47,7 +47,6 @@ require_text "$ambiguity" 'Accepted `docs/adr/ADR-0037-bootstrap-thread-capabili
 require_text "$task" 'Status: `complete`'
 require_text "$task" 'ADR-0037 accepted'
 
-require_absent_path crates/compiler/src/thread.rs
 require_absent_path crates/compiler/src/concurrency.rs
 
 echo "m0024-thread-capability-semantics: accepted source-of-truth validation passed"

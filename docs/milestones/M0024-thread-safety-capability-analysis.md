@@ -84,7 +84,6 @@ ADR-0014 selects compile-time send/share capabilities, derived where sound and e
 
 ## Completion Checklist
 
-- [ ] Capability model exists.
+- [x] Capability model exists.
 - [ ] Invalid cross-boundary captures diagnose.
 - [ ] Unspecified concurrency forms are blocked.
-
