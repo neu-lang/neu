@@ -182,6 +182,42 @@ fn m0020_generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
 }
 
 #[test]
+fn m0021_enum_variants_preserve_enclosing_enum_order_and_spans() {
+    let file = SourceFileId::from_raw(202);
+    let output = parse_source(file, "enum Signal { Red, Yellow; Green }");
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.enum_variants.len(), 3);
+    assert!(output.node_kinds().contains(&AstNodeKind::EnumVariant));
+
+    let declaration = output.declaration_names[0].declaration;
+    assert_eq!(output.enum_variants[0].enum_declaration, declaration);
+    assert_eq!(output.enum_variants[0].name, "Red");
+    assert_eq!(
+        output.enum_variants[0].name_span,
+        ByteSpan::new(file, 14, 17).unwrap()
+    );
+    assert_eq!(output.enum_variants[1].name, "Yellow");
+    assert_eq!(output.enum_variants[2].name, "Green");
+    assert!(output
+        .enum_variants
+        .iter()
+        .all(|variant| variant.enum_declaration == declaration));
+}
+
+#[test]
+fn m0021_enum_variants_exclude_empty_and_payload_shaped_entries() {
+    let empty = parse_source(SourceFileId::from_raw(203), "enum Empty {}");
+    assert!(empty.diagnostics.is_empty());
+    assert!(empty.enum_variants.is_empty());
+
+    let payload = parse_source(SourceFileId::from_raw(204), "enum Bad { Value(Int) }");
+    assert!(!payload.diagnostics.is_empty());
+    assert!(payload.enum_variants.is_empty());
+}
+
+#[test]
 fn reports_malformed_type_and_generic_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(7),

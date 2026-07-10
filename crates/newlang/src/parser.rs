@@ -65,6 +65,7 @@ pub struct ParseOutput {
     pub local_declarations: Vec<ParsedLocalDeclaration>,
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
     pub generic_parameters: Vec<ParsedGenericParameter>,
+    pub enum_variants: Vec<ParsedEnumVariant>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -80,6 +81,14 @@ pub struct ParsedGenericParameter {
     pub name: String,
     pub name_span: ByteSpan,
     pub capability_bounds: Vec<ParsedCapabilityBound>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedEnumVariant {
+    pub enum_declaration: AstNodeId,
+    pub variant: AstNodeId,
+    pub name: String,
+    pub name_span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -210,6 +219,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         local_declarations: parser.local_declarations,
         assignment_statements: parser.assignment_statements,
         generic_parameters: parser.generic_parameters,
+        enum_variants: parser.enum_variants,
     }
 }
 
@@ -231,6 +241,7 @@ struct Parser<'source> {
     local_declarations: Vec<ParsedLocalDeclaration>,
     assignment_statements: Vec<ParsedAssignmentStatement>,
     generic_parameters: Vec<ParsedGenericParameter>,
+    enum_variants: Vec<ParsedEnumVariant>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -247,6 +258,7 @@ impl<'source> Parser<'source> {
             declaration_names: Vec::new(),
             local_binding_names: Vec::new(),
             generic_parameters: Vec::new(),
+            enum_variants: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
@@ -470,7 +482,11 @@ impl<'source> Parser<'source> {
         };
         self.record_declaration_name(declaration, DeclarationKind::Type, &name, in_body);
         self.saw_top_level_declaration |= !in_body;
-        self.parse_declaration_body();
+        if kind == AstNodeKind::EnumDeclaration {
+            self.parse_enum_body(declaration);
+        } else {
+            self.parse_declaration_body();
+        }
     }
 
     fn record_declaration_name(
@@ -503,6 +519,58 @@ impl<'source> Parser<'source> {
                 return;
             }
             self.parse_declaration(true);
+        }
+    }
+
+    fn parse_enum_body(&mut self, declaration: AstNodeId) {
+        let left_brace = self
+            .current()
+            .expect("enum body starts with left brace")
+            .span;
+        self.arena.add_declaration_body(left_brace);
+        self.advance();
+
+        while !self.is_eof() {
+            match self.current_kind() {
+                Some(TokenKind::RightBrace) => {
+                    self.advance();
+                    return;
+                }
+                Some(TokenKind::Identifier) => {
+                    let name = self.current().expect("enum variant name exists").clone();
+                    self.advance();
+                    match self.current_kind() {
+                        Some(TokenKind::Comma | TokenKind::Semicolon | TokenKind::RightBrace) => {
+                            let variant = self.arena.add_enum_variant(name.span);
+                            self.enum_variants.push(ParsedEnumVariant {
+                                enum_declaration: declaration,
+                                variant,
+                                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                                name_span: name.span,
+                            });
+                            if self.current_kind() != Some(TokenKind::RightBrace) {
+                                self.advance();
+                            }
+                        }
+                        _ => {
+                            self.diagnostic_current_or_span(
+                                DiagnosticKind::UnexpectedTokenInDeclarationBody,
+                                name.span,
+                            );
+                            self.skip_to_enum_variant_boundary();
+                        }
+                    }
+                }
+                Some(TokenKind::Comma | TokenKind::Semicolon) => {
+                    self.diagnostic_current(DiagnosticKind::UnexpectedTokenInDeclarationBody);
+                    self.advance();
+                }
+                Some(_) => {
+                    self.diagnostic_current(DiagnosticKind::UnexpectedTokenInDeclarationBody);
+                    self.skip_to_enum_variant_boundary();
+                }
+                None => return,
+            }
         }
     }
 
@@ -1677,6 +1745,21 @@ impl<'source> Parser<'source> {
                     | TokenKind::Semicolon
             ) || self.is_declaration_starter()
             {
+                return;
+            }
+            self.advance();
+        }
+    }
+
+    fn skip_to_enum_variant_boundary(&mut self) {
+        while let Some(kind) = self.current_kind() {
+            if matches!(
+                kind,
+                TokenKind::Comma | TokenKind::Semicolon | TokenKind::RightBrace
+            ) {
+                if kind != TokenKind::RightBrace {
+                    self.advance();
+                }
                 return;
             }
             self.advance();
