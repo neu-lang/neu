@@ -122,6 +122,7 @@ impl DeclarationIndex {
 pub struct DeclarationIndexBuild {
     index: DeclarationIndex,
     inserts: Vec<DeclarationInsert>,
+    diagnostics: Vec<ResolutionDiagnostic>,
 }
 
 impl DeclarationIndexBuild {
@@ -132,6 +133,10 @@ impl DeclarationIndexBuild {
     pub fn inserts(&self) -> &[DeclarationInsert] {
         &self.inserts
     }
+
+    pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
+        &self.diagnostics
+    }
 }
 
 pub fn build_declaration_index(
@@ -141,6 +146,7 @@ pub fn build_declaration_index(
 ) -> DeclarationIndexBuild {
     let mut index = DeclarationIndex::new();
     let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
 
     for declaration in declarations {
         let package = metadata
@@ -151,10 +157,21 @@ pub fn build_declaration_index(
             .unwrap_or_else(PackageNamespace::root);
         let name = interner.intern(&declaration.name);
         let key = DeclarationKey::new(metadata.name().clone(), package, name, declaration.kind);
-        inserts.push(index.insert(DeclaredName::new(key, declaration.declaration)));
+        let insert = index.insert(DeclaredName::new(key, declaration.declaration));
+        if matches!(insert, DeclarationInsert::Duplicate { .. }) {
+            diagnostics.push(ResolutionDiagnostic::new(
+                ResolutionDiagnosticKind::DuplicateName,
+                declaration.name_span,
+            ));
+        }
+        inserts.push(insert);
     }
 
-    DeclarationIndexBuild { index, inserts }
+    DeclarationIndexBuild {
+        index,
+        inserts,
+        diagnostics,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

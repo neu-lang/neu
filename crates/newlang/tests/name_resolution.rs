@@ -265,6 +265,15 @@ fn declaration_index_builder_preserves_duplicate_insert_results() {
         built.inserts()[1],
         DeclarationInsert::Duplicate { .. }
     ));
+    assert_eq!(built.diagnostics().len(), 1);
+    assert_eq!(
+        built.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::DuplicateName
+    );
+    assert_eq!(
+        built.diagnostics()[0].primary_span(),
+        second.declaration_names[0].name_span
+    );
 }
 
 #[test]
@@ -288,8 +297,41 @@ fn declaration_index_builder_keeps_same_name_in_distinct_packages() {
     let built = build_declaration_index(&metadata, &declarations, &mut interner);
 
     assert_eq!(built.index().declarations().len(), 2);
+    assert!(built.diagnostics().is_empty());
     assert!(built
         .inserts()
         .iter()
         .all(|insert| matches!(insert, DeclarationInsert::Inserted(_))));
+}
+
+#[test]
+fn duplicate_declaration_diagnostics_do_not_replace_existing_declaration() {
+    let first_file = SourceFileId::from_raw(26);
+    let second_file = SourceFileId::from_raw(27);
+    let first = parse_source(first_file, "struct Thing {}");
+    let second = parse_source(second_file, "struct Thing {}");
+    let metadata = newlang::module::ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [
+            (first_file, PackageNamespace::root()),
+            (second_file, PackageNamespace::root()),
+        ],
+    )
+    .unwrap();
+    let mut declarations = first.declaration_names.clone();
+    declarations.extend(second.declaration_names.clone());
+    let mut interner = SymbolInterner::new();
+
+    let built = build_declaration_index(&metadata, &declarations, &mut interner);
+
+    assert_eq!(built.index().declarations().len(), 1);
+    assert_eq!(
+        built.index().declarations()[0].declaration(),
+        first.declaration_names[0].declaration
+    );
+    assert_eq!(built.diagnostics().len(), 1);
+    assert_eq!(
+        built.diagnostics()[0].primary_span(),
+        second.declaration_names[0].name_span
+    );
 }
