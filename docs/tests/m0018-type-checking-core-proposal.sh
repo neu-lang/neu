@@ -35,7 +35,7 @@ task=docs/tasks/M0018-002-type-checking-core-proposal.md
 source=crates/newlang/src/type_check.rs
 
 require_file "$proposal"
-require_absent_path "$accepted"
+require_file "$accepted"
 require_file "$ambiguity"
 require_file "$task"
 require_file "$source"
@@ -65,9 +65,10 @@ require_text "$proposal" 'unsupported_type_rule'
 require_text "$proposal" 'ambiguous_type_rule'
 require_text "$proposal" 'not rely on Kotlin, Rust, Go, current parser behavior, current test behavior, or current type_check behavior as implicit authority'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$accepted" '^Status: Accepted$'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$task" 'Status: `(review|complete)`'
-require_absent_text docs/SPEC.md '^## ADR-0027: Type Checking Core$'
+require_text docs/SPEC.md '^## ADR-0027: Type Checking Core$'
 require_absent_text "$source" 'check_expression|check_declaration|infer_type|literal_type|resolve_call|check_assignment|TypedExpression|TypedProgram|WellTyped'
 
 echo "m0018-proposal: type checking core proposal validation passed"

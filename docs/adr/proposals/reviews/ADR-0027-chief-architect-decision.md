@@ -6,15 +6,17 @@
 - Milestone: `M0018`
 - Decider: `Chief Architect`
 - Date: `2026-07-10`
-- Decision: pending revision
+- Decision: approved
 
 ## Decision
 
-ADR-0027 remains a draft proposal and is not accepted source of truth.
+ADR-0027 is accepted.
 
-Do not implement M0018 type checking from this proposal, from the review artifacts, or from current compiler behavior.
+The accepted source of truth is `docs/adr/ADR-0027-type-checking-core.md`, with the summary incorporated into `docs/SPEC.md`.
 
-## Required Before Acceptance
+M0018 ambiguity is resolved. Implementation may proceed only against the accepted ADR-0027 model.
+
+## Resolved Acceptance Blockers
 
 - Resolve the typed output shape.
 - Define or explicitly defer primitive scalar categories.
@@ -23,12 +25,12 @@ Do not implement M0018 type checking from this proposal, from the review artifac
 - Define whether direct function calls are included or deferred.
 - Define whether structural function type application is included or deferred.
 - Define diagnostic primary spans, recovery actions, source-of-truth citations, and safe suggestion policies.
-- Update the ambiguity report only after accepted source of truth exists.
+- Resolve the M0018 ambiguity report.
 
 ## Rationale
 
-The proposal is useful direction, but the current text is still too broad and contains conditional wording that would let implementation agents guess important semantics.
+The concrete draft is narrow enough for M0018 implementation and explicitly defers calls, function type application, overloads, conversions, generic solving, ownership, borrow checking, HIR, MIR, and backend behavior.
 
 ## Boundary
 
-M0018 remains blocked for well-typed and ill-typed fixture implementation until ADR-0027 is revised and accepted.
+M0018 well-typed and ill-typed fixture implementation may proceed only for accepted ADR-0027 semantics.

@@ -7,8 +7,10 @@
 - Related Milestone: `M0018`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-10`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
+- Resolution Source: `docs/adr/ADR-0027-type-checking-core.md`
+- Resolved Date: `2026-07-10`
 
 ## Ambiguous Or Missing Authority
 
@@ -64,22 +66,23 @@ M0017 risks state "Primitive type set may be unspecified."
 
 ## Recommended Resolution Path
 
-- [ ] Language Lawyer determines whether existing text resolves it.
-- [ ] Language Designer drafts ADR or spec revision if new semantics are required.
-- [ ] Adversarial Engineer reviews soundness risk.
-- [ ] Diagnostics Engineer reviews diagnostic consequences.
-- [ ] Simplicity Guardian reviews complexity.
-- [ ] Chief Architect approves final resolution.
+- [x] Language Lawyer determines whether existing text resolves it.
+- [x] Language Designer drafts ADR or spec revision if new semantics are required.
+- [x] Adversarial Engineer reviews soundness risk.
+- [x] Diagnostics Engineer reviews diagnostic consequences.
+- [x] Simplicity Guardian reviews complexity.
+- [x] Chief Architect approves final resolution.
 
 ## Temporary Rule
 
-No implementation may proceed on literal typing, primitive scalar categories, assignment compatibility, call resolution, or function type application until the source of truth is updated or the ambiguity is ruled non-blocking by Chief Architect.
+Implementation may define type checking only as specified by accepted ADR-0027.
 
 ## Resolution
 
 - Decision:
-  - pending
+  - ADR-0027 accepted a small bootstrap type-checking core with primitive type-checking identities, literal typing, exact assignment compatibility, diagnostic obligations, and explicit deferrals.
 - Source of truth updated:
-  - pending
+  - `docs/adr/ADR-0027-type-checking-core.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - pending
+  - `2026-07-10`
