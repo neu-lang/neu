@@ -405,6 +405,7 @@ pub enum LocalNameLookupResult {
 pub struct LocalReferenceBind {
     table: ResolutionTable,
     inserts: Vec<ResolutionInsert>,
+    resolved_local_bindings: Vec<ResolvedLocalBinding>,
     diagnostics: Vec<ResolutionDiagnostic>,
 }
 
@@ -417,8 +418,32 @@ impl LocalReferenceBind {
         &self.inserts
     }
 
+    pub fn resolved_local_bindings(&self) -> &[ResolvedLocalBinding] {
+        &self.resolved_local_bindings
+    }
+
     pub fn diagnostics(&self) -> &[ResolutionDiagnostic] {
         &self.diagnostics
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedLocalBinding {
+    reference: AstNodeId,
+    binding: LocalBinding,
+}
+
+impl ResolvedLocalBinding {
+    pub fn new(reference: AstNodeId, binding: LocalBinding) -> Self {
+        Self { reference, binding }
+    }
+
+    pub fn reference(&self) -> AstNodeId {
+        self.reference
+    }
+
+    pub fn binding(&self) -> &LocalBinding {
+        &self.binding
     }
 }
 
@@ -431,6 +456,7 @@ pub fn bind_local_name_references(
 ) -> LocalReferenceBind {
     let mut table = ResolutionTable::new();
     let mut inserts = Vec::new();
+    let mut resolved_local_bindings = Vec::new();
     let mut diagnostics = Vec::new();
 
     for reference in references {
@@ -449,6 +475,10 @@ pub fn bind_local_name_references(
             LocalNameLookup::new(scope, name, reference.name_span),
         ) {
             LocalNameLookupResult::Found(binding) => {
+                resolved_local_bindings.push(ResolvedLocalBinding::new(
+                    reference.reference,
+                    binding.clone(),
+                ));
                 let insert =
                     table.insert(ResolvedName::new(reference.reference, binding.key().name()));
                 inserts.push(insert);
@@ -460,6 +490,7 @@ pub fn bind_local_name_references(
     LocalReferenceBind {
         table,
         inserts,
+        resolved_local_bindings,
         diagnostics,
     }
 }

@@ -927,6 +927,124 @@ fn local_reference_binding_records_visible_local_resolution() {
 }
 
 #[test]
+fn m0019_local_binding_resolution_identity_records_exact_binding() {
+    let source = "fun run() { val value = 1; value; }";
+    let file = SourceFileId::from_raw(83);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.resolved_local_bindings().len(), 1);
+    let resolved = &bound.resolved_local_bindings()[0];
+    assert_eq!(resolved.reference(), parsed.name_references[0].reference);
+    assert_eq!(resolved.binding(), &locals.index().bindings()[0]);
+}
+
+#[test]
+fn m0019_local_binding_resolution_identity_distinguishes_nested_shadowing() {
+    let source = "fun run() { val same = 1; if (ready) { same; val same = 2; same; }; same; }";
+    let file = SourceFileId::from_raw(84);
+    let parsed = parse_source(file, source);
+    assert!(
+        parsed.diagnostics.is_empty(),
+        "unexpected parser diagnostics: {:?}",
+        parsed.diagnostics
+    );
+    let same_references = parsed
+        .name_references
+        .iter()
+        .filter(|reference| reference.name == "same")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(same_references.len(), 3);
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    assert_eq!(locals.index().bindings().len(), 2);
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &same_references,
+        &scopes,
+        locals.index(),
+        &mut interner,
+    );
+
+    assert!(bound.diagnostics().is_empty());
+    assert_eq!(bound.resolved_local_bindings().len(), 3);
+    assert_eq!(
+        bound.resolved_local_bindings()[0].binding(),
+        &locals.index().bindings()[0]
+    );
+    assert_eq!(
+        bound.resolved_local_bindings()[1].binding(),
+        &locals.index().bindings()[1]
+    );
+    assert_eq!(
+        bound.resolved_local_bindings()[2].binding(),
+        &locals.index().bindings()[0]
+    );
+    assert_eq!(
+        bound
+            .resolved_local_bindings()
+            .iter()
+            .map(|resolved| resolved.reference())
+            .collect::<Vec<_>>(),
+        same_references
+            .iter()
+            .map(|reference| reference.reference)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn m0019_local_binding_resolution_identity_skips_unresolved_uses() {
+    let source = "fun run() { missing; }";
+    let file = SourceFileId::from_raw(85);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty());
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let locals = LocalBindingIndex::new();
+
+    let bound = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        &locals,
+        &mut interner,
+    );
+
+    assert!(bound.resolved_local_bindings().is_empty());
+    assert_eq!(bound.diagnostics().len(), 1);
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        ResolutionDiagnosticKind::UnresolvedName
+    );
+}
+
+#[test]
 fn local_reference_binding_reports_reference_before_declaration() {
     let source = "fun run() { value; val value = 1; }";
     let file = SourceFileId::from_raw(81);
