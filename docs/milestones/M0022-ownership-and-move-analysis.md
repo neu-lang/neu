@@ -84,7 +84,6 @@ ADR-0001 selects single-owner affine ownership. ADR-0005 defines primitive copy 
 
 ## Completion Checklist
 
-- [ ] Move analysis runs after type checking.
-- [ ] Use-after-move is diagnosed.
-- [ ] Copyability is tested.
-
+- [x] Move analysis runs after type checking.
+- [x] Use-after-move is diagnosed.
+- [x] Copyability is tested.

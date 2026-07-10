@@ -6,8 +6,8 @@ use newlang::{
     },
     ownership::{
         OwnershipCategory, OwnershipDiagnostic, OwnershipDiagnosticKind, OwnershipTransfer,
-        OwnershipTransferKind, analyze_use_after_move, classify_ownership_category,
-        collect_ownership_transfers,
+        OwnershipTransferKind, analyze_ownership, analyze_use_after_move,
+        classify_ownership_category, collect_ownership_transfers,
     },
     parser::{ParsedAssignmentStatement, ParsedLocalDeclaration},
     symbol::SymbolId,
@@ -168,6 +168,57 @@ fn m0022_use_after_move_diagnostics_report_later_uses_and_origin() {
     assert_eq!(diagnostics[0].kind(), OwnershipDiagnosticKind::UseAfterMove);
     assert_eq!(diagnostics[0].node(), AstNodeId::from_raw(110));
     assert_eq!(diagnostics[0].move_origin(), AstNodeId::from_raw(100));
+}
+
+#[test]
+fn m0022_ownership_report_combines_transfers_and_diagnostics_after_type_checking() {
+    let mut arena = TypeArena::new();
+    let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
+    let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let moved = local_binding(10, 100);
+    let copied = local_binding(11, 101);
+    let declarations = [
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(200),
+            annotation: None,
+            initializer: Some(AstNodeId::from_raw(300)),
+        },
+        ParsedLocalDeclaration {
+            declaration: AstNodeId::from_raw(201),
+            annotation: None,
+            initializer: Some(AstNodeId::from_raw(301)),
+        },
+    ];
+    let assignments = [];
+    let resolved = [
+        ResolvedLocalBinding::new(AstNodeId::from_raw(300), moved.clone()),
+        ResolvedLocalBinding::new(AstNodeId::from_raw(301), copied.clone()),
+        ResolvedLocalBinding::new(AstNodeId::from_raw(310), moved.clone()),
+        ResolvedLocalBinding::new(AstNodeId::from_raw(311), copied.clone()),
+    ];
+    let signatures = [
+        DeclarationSignature::new(moved.binding(), string_ty),
+        DeclarationSignature::new(copied.binding(), int_ty),
+    ];
+
+    let report = analyze_ownership(&declarations, &assignments, &resolved, &signatures, &arena);
+
+    assert_eq!(
+        report.transfers(),
+        &[OwnershipTransfer::new(
+            OwnershipTransferKind::LocalInitializer,
+            AstNodeId::from_raw(200),
+            AstNodeId::from_raw(300),
+            moved,
+        )]
+    );
+    assert_eq!(
+        report.diagnostics(),
+        &[OwnershipDiagnostic::use_after_move(
+            AstNodeId::from_raw(310),
+            AstNodeId::from_raw(300),
+        )]
+    );
 }
 
 fn local_binding(binding_raw: usize, symbol_raw: usize) -> LocalBinding {

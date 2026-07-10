@@ -193,3 +193,45 @@ pub fn analyze_use_after_move(
 
     diagnostics
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipReport {
+    transfers: Vec<OwnershipTransfer>,
+    diagnostics: Vec<OwnershipDiagnostic>,
+}
+
+impl OwnershipReport {
+    pub fn new(transfers: Vec<OwnershipTransfer>, diagnostics: Vec<OwnershipDiagnostic>) -> Self {
+        Self {
+            transfers,
+            diagnostics,
+        }
+    }
+
+    pub fn transfers(&self) -> &[OwnershipTransfer] {
+        &self.transfers
+    }
+
+    pub fn diagnostics(&self) -> &[OwnershipDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn analyze_ownership(
+    declarations: &[ParsedLocalDeclaration],
+    assignments: &[ParsedAssignmentStatement],
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    declaration_signatures: &[DeclarationSignature],
+    types: &TypeArena,
+) -> OwnershipReport {
+    let transfers = collect_ownership_transfers(
+        declarations,
+        assignments,
+        resolved_local_bindings,
+        declaration_signatures,
+        types,
+    );
+    let diagnostics = analyze_use_after_move(resolved_local_bindings, &transfers);
+
+    OwnershipReport::new(transfers, diagnostics)
+}
