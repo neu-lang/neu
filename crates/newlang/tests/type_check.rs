@@ -1,15 +1,18 @@
 use newlang::{
     ast::AstNodeId,
-    name_resolution::{ResolutionTable, ResolvedName},
+    name_resolution::{
+        LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
+        ResolvedName,
+    },
     parser::parse_source,
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
-        type_literal_expressions, type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport,
+        known_local_symbol_types, type_literal_expressions, type_parser_literals,
+        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
+        type_resolved_name_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
+        ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport,
     },
     types::{PrimitiveType, TypeId, TypeKind},
 };
@@ -421,5 +424,68 @@ fn resolved_name_expression_typing_skips_unknown_symbols() {
         report.expression_type(AstNodeId::from_raw(82)),
         None,
         "missing resolution entries must not synthesize expression types"
+    );
+}
+
+#[test]
+fn known_local_symbol_types_are_derived_from_declaration_signatures() {
+    let scope = LocalScopeId::from_raw(1);
+    let first_symbol = SymbolId::from_raw(20);
+    let second_symbol = SymbolId::from_raw(21);
+    let bindings = [
+        LocalBinding::new(
+            LocalBindingKey::new(scope, first_symbol),
+            AstNodeId::from_raw(90),
+            LocalBindingKind::Val,
+        ),
+        LocalBinding::new(
+            LocalBindingKey::new(scope, second_symbol),
+            AstNodeId::from_raw(91),
+            LocalBindingKind::Var,
+        ),
+    ];
+    let signatures = [
+        DeclarationSignature::new(AstNodeId::from_raw(91), TypeId::from_raw(2)),
+        DeclarationSignature::new(AstNodeId::from_raw(90), TypeId::from_raw(1)),
+    ];
+
+    let known = known_local_symbol_types(&bindings, &signatures);
+
+    assert_eq!(
+        known,
+        [
+            KnownSymbolType::new(first_symbol, TypeId::from_raw(1)),
+            KnownSymbolType::new(second_symbol, TypeId::from_raw(2)),
+        ]
+    );
+}
+
+#[test]
+fn known_local_symbol_types_skip_unsignatured_bindings_and_orphan_signatures() {
+    let scope = LocalScopeId::from_raw(2);
+    let typed_symbol = SymbolId::from_raw(30);
+    let untyped_symbol = SymbolId::from_raw(31);
+    let bindings = [
+        LocalBinding::new(
+            LocalBindingKey::new(scope, typed_symbol),
+            AstNodeId::from_raw(100),
+            LocalBindingKind::Val,
+        ),
+        LocalBinding::new(
+            LocalBindingKey::new(scope, untyped_symbol),
+            AstNodeId::from_raw(101),
+            LocalBindingKind::Val,
+        ),
+    ];
+    let signatures = [
+        DeclarationSignature::new(AstNodeId::from_raw(100), TypeId::from_raw(0)),
+        DeclarationSignature::new(AstNodeId::from_raw(999), TypeId::from_raw(4)),
+    ];
+
+    let known = known_local_symbol_types(&bindings, &signatures);
+
+    assert_eq!(
+        known,
+        [KnownSymbolType::new(typed_symbol, TypeId::from_raw(0))]
     );
 }

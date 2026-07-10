@@ -1,6 +1,6 @@
 use crate::{
     ast::AstNodeId,
-    name_resolution::ResolutionTable,
+    name_resolution::{LocalBinding, ResolutionTable},
     parser::{
         ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference,
     },
@@ -468,4 +468,23 @@ pub fn type_resolved_name_expressions(
     }
 
     report
+}
+
+pub fn known_local_symbol_types(
+    bindings: &[LocalBinding],
+    signatures: &[DeclarationSignature],
+) -> Vec<KnownSymbolType> {
+    let mut known = Vec::new();
+
+    for binding in bindings {
+        let Some(signature) = signatures
+            .iter()
+            .find(|signature| signature.declaration() == binding.binding())
+        else {
+            continue;
+        };
+        known.push(KnownSymbolType::new(binding.key().name(), signature.ty()));
+    }
+
+    known
 }
