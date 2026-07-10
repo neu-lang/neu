@@ -59,6 +59,7 @@ pub struct ParseOutput {
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
+    pub integer_literals: Vec<ParsedIntegerLiteral>,
     pub grouped_expressions: Vec<ParsedGroupedExpression>,
     pub unary_expressions: Vec<ParsedUnaryExpression>,
     pub binary_expressions: Vec<ParsedBinaryExpression>,
@@ -178,6 +179,13 @@ pub struct ParsedLiteralExpression {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedIntegerLiteral {
+    pub expression: AstNodeId,
+    pub value: Option<u64>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedGroupedExpression {
     pub expression: crate::ast::AstNodeId,
     pub inner: crate::ast::AstNodeId,
@@ -280,6 +288,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
+        integer_literals: parser.integer_literals,
         grouped_expressions: parser.grouped_expressions,
         unary_expressions: parser.unary_expressions,
         binary_expressions: parser.binary_expressions,
@@ -307,6 +316,7 @@ struct Parser<'source> {
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
+    integer_literals: Vec<ParsedIntegerLiteral>,
     grouped_expressions: Vec<ParsedGroupedExpression>,
     unary_expressions: Vec<ParsedUnaryExpression>,
     binary_expressions: Vec<ParsedBinaryExpression>,
@@ -343,6 +353,7 @@ impl<'source> Parser<'source> {
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
+            integer_literals: Vec::new(),
             grouped_expressions: Vec::new(),
             unary_expressions: Vec::new(),
             binary_expressions: Vec::new(),
@@ -1234,6 +1245,19 @@ impl<'source> Parser<'source> {
                     kind: parsed_literal_kind(token.kind),
                     span,
                 });
+                if matches!(
+                    token.kind,
+                    TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex
+                ) {
+                    self.integer_literals.push(ParsedIntegerLiteral {
+                        expression,
+                        value: parsed_integer_value(
+                            token.kind,
+                            &self.text[span.start()..span.end()],
+                        ),
+                        span,
+                    });
+                }
                 Some(span)
             }
             Some(TokenKind::Identifier) => self.parse_name_expression(),
@@ -2408,6 +2432,24 @@ fn parsed_literal_kind(kind: TokenKind) -> ParsedLiteralKind {
         TokenKind::KwNull => ParsedLiteralKind::Null,
         _ => unreachable!("parser literal metadata is only built for literal tokens"),
     }
+}
+
+fn parsed_integer_value(kind: TokenKind, text: &str) -> Option<u64> {
+    let (radix, digits) = match kind {
+        TokenKind::IntDecimal => (10, text),
+        TokenKind::IntBinary => (
+            2,
+            text.strip_prefix("0b")
+                .or_else(|| text.strip_prefix("0B"))?,
+        ),
+        TokenKind::IntHex => (
+            16,
+            text.strip_prefix("0x")
+                .or_else(|| text.strip_prefix("0X"))?,
+        ),
+        _ => return None,
+    };
+    u64::from_str_radix(&digits.replace('_', ""), radix).ok()
 }
 
 fn parsed_binary_operator(kind: TokenKind) -> Option<ParsedBinaryOperator> {

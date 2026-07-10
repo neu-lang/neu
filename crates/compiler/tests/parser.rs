@@ -534,6 +534,32 @@ fn records_literal_expression_metadata_for_type_checking() {
 }
 
 #[test]
+fn m0028_records_integer_literal_values_without_truncation() {
+    let output = parse_source(
+        SourceFileId::from_raw(96),
+        "fun run() { const decimal = 1_000; const binary = 0b10_10; const hexadecimal = 0x7f; const minimumMagnitude = 9223372036854775808; const tooLarge = 18446744073709551616; }",
+    );
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let values: Vec<_> = output
+        .integer_literals
+        .iter()
+        .map(|literal| literal.value)
+        .collect();
+    assert_eq!(
+        values,
+        [
+            Some(1_000),
+            Some(10),
+            Some(127),
+            Some(9_223_372_036_854_775_808),
+            None,
+        ]
+    );
+}
+
+#[test]
 fn literal_expression_metadata_excludes_non_literal_expressions() {
     let output = parse_source(
         SourceFileId::from_raw(28),
