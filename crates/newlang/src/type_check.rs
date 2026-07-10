@@ -24,6 +24,10 @@ pub enum TypeCheckDiagnosticKind {
     UnresolvedTypeRule,
     UnsupportedTypeRule,
     TypeMismatch,
+    InvalidNullableUse,
+    InvalidatedRefinement,
+    UnsupportedFlowRule,
+    AmbiguousFlowRule,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,6 +41,17 @@ pub enum TypeRuleDiagnostic {
     BinaryExpressionDeferred,
     UnaryExpressionDeferred,
     IfValueDeferred,
+    NullableValueWithoutRefinement,
+    NullableAssignmentWithoutRefinement,
+    AssignmentInvalidatedRefinement,
+    RegionExitInvalidatedRefinement,
+    MutableLocalRefinementDeferred,
+    BooleanCombinationRefinementDeferred,
+    MemberRefinementDeferred,
+    CallResultRefinementDeferred,
+    ExclusiveBorrowRefinementDeferred,
+    AmbiguousLocalBindingFlow,
+    AmbiguousNullTestRegion,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -92,6 +107,56 @@ impl TypeCheckDiagnostic {
             node,
             expected_type: Some(expected_type),
             actual_type: Some(actual_type),
+        }
+    }
+
+    pub fn invalid_nullable_use(
+        rule: TypeRuleDiagnostic,
+        node: AstNodeId,
+        expected_type: TypeId,
+        actual_type: TypeId,
+    ) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::InvalidNullableUse,
+            rule,
+            node,
+            expected_type: Some(expected_type),
+            actual_type: Some(actual_type),
+        }
+    }
+
+    pub fn invalidated_refinement(
+        rule: TypeRuleDiagnostic,
+        node: AstNodeId,
+        expected_type: TypeId,
+        actual_type: TypeId,
+    ) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::InvalidatedRefinement,
+            rule,
+            node,
+            expected_type: Some(expected_type),
+            actual_type: Some(actual_type),
+        }
+    }
+
+    pub fn unsupported_flow_rule(rule: TypeRuleDiagnostic, node: AstNodeId) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::UnsupportedFlowRule,
+            rule,
+            node,
+            expected_type: None,
+            actual_type: None,
+        }
+    }
+
+    pub fn ambiguous_flow_rule(rule: TypeRuleDiagnostic, node: AstNodeId) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::AmbiguousFlowRule,
+            rule,
+            node,
+            expected_type: None,
+            actual_type: None,
         }
     }
 
@@ -161,6 +226,100 @@ pub struct AssignmentCheck {
     statement: AstNodeId,
     target: TypeId,
     value: TypeId,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RefinementRecord {
+    region: AstNodeId,
+    binding_use: AstNodeId,
+    originating_null_test: AstNodeId,
+    binding: LocalBinding,
+    original_nullable_type: TypeId,
+    refined_non_null_type: TypeId,
+}
+
+impl RefinementRecord {
+    pub fn new(
+        region: AstNodeId,
+        binding_use: AstNodeId,
+        originating_null_test: AstNodeId,
+        binding: LocalBinding,
+        original_nullable_type: TypeId,
+        refined_non_null_type: TypeId,
+    ) -> Self {
+        Self {
+            region,
+            binding_use,
+            originating_null_test,
+            binding,
+            original_nullable_type,
+            refined_non_null_type,
+        }
+    }
+
+    pub fn region(&self) -> AstNodeId {
+        self.region
+    }
+
+    pub fn binding_use(&self) -> AstNodeId {
+        self.binding_use
+    }
+
+    pub fn originating_null_test(&self) -> AstNodeId {
+        self.originating_null_test
+    }
+
+    pub fn binding(&self) -> &LocalBinding {
+        &self.binding
+    }
+
+    pub fn original_nullable_type(&self) -> TypeId {
+        self.original_nullable_type
+    }
+
+    pub fn refined_non_null_type(&self) -> TypeId {
+        self.refined_non_null_type
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RefinedExpressionType {
+    expression: AstNodeId,
+    refinement: AstNodeId,
+    original_nullable_type: TypeId,
+    refined_non_null_type: TypeId,
+}
+
+impl RefinedExpressionType {
+    pub fn new(
+        expression: AstNodeId,
+        refinement: AstNodeId,
+        original_nullable_type: TypeId,
+        refined_non_null_type: TypeId,
+    ) -> Self {
+        Self {
+            expression,
+            refinement,
+            original_nullable_type,
+            refined_non_null_type,
+        }
+    }
+
+    pub fn expression(self) -> AstNodeId {
+        self.expression
+    }
+
+    pub fn refinement(self) -> AstNodeId {
+        self.refinement
+    }
+
+    pub fn original_nullable_type(self) -> TypeId {
+        self.original_nullable_type
+    }
+
+    pub fn refined_non_null_type(self) -> TypeId {
+        self.refined_non_null_type
+    }
 }
 
 impl AssignmentCheck {
@@ -239,6 +398,8 @@ pub struct TypeCheckReport {
     expression_types: Vec<ExpressionType>,
     declaration_signatures: Vec<DeclarationSignature>,
     assignment_checks: Vec<AssignmentCheck>,
+    refinements: Vec<RefinementRecord>,
+    refined_expression_types: Vec<RefinedExpressionType>,
     diagnostics: Vec<TypeCheckDiagnostic>,
 }
 
@@ -248,6 +409,8 @@ impl TypeCheckReport {
             expression_types: Vec::new(),
             declaration_signatures: Vec::new(),
             assignment_checks: Vec::new(),
+            refinements: Vec::new(),
+            refined_expression_types: Vec::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -295,6 +458,35 @@ impl TypeCheckReport {
 
     pub fn record_assignment_check(&mut self, assignment_check: AssignmentCheck) {
         self.assignment_checks.push(assignment_check);
+    }
+
+    pub fn record_refinement(&mut self, refinement: RefinementRecord) {
+        self.refinements.push(refinement);
+    }
+
+    pub fn refinements(&self) -> &[RefinementRecord] {
+        &self.refinements
+    }
+
+    pub fn refinement(&self, region: AstNodeId) -> Option<&RefinementRecord> {
+        self.refinements
+            .iter()
+            .find(|entry| entry.region() == region)
+    }
+
+    pub fn record_refined_expression_type(&mut self, refined_type: RefinedExpressionType) {
+        self.refined_expression_types.push(refined_type);
+    }
+
+    pub fn refined_expression_types(&self) -> &[RefinedExpressionType] {
+        &self.refined_expression_types
+    }
+
+    pub fn refined_expression_type(&self, expression: AstNodeId) -> Option<TypeId> {
+        self.refined_expression_types
+            .iter()
+            .find(|entry| entry.expression() == expression)
+            .map(|entry| entry.refined_non_null_type())
     }
 
     pub fn record_diagnostic(&mut self, diagnostic: TypeCheckDiagnostic) {

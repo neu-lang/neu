@@ -95,6 +95,6 @@ require_text "$accepted" '^Status: Accepted$'
 require_text "$ambiguity" 'Status: `resolved`'
 require_text "$task" 'Status: `(in_progress|review|complete)`'
 require_text docs/SPEC.md '^## ADR-0028: Nullability And Flow Typing$'
-require_absent_text "$source" 'FlowRefinement|SmartCast|invalid_nullable_use|invalidated_refinement|unsupported_flow_rule|ambiguous_flow_rule'
+require_absent_text "$source" 'recognize_null_test|apply_smart_cast|check_nullable_use|walk_if_branch'
 
 echo "m0019-concrete-draft: concrete nullability and flow typing draft validation passed"

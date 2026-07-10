@@ -19,11 +19,146 @@ use newlang::{
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
         AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport, TypeRuleDiagnostic,
+        LiteralExpressionInput, LiteralKind, RefinedExpressionType, RefinementRecord,
+        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
+
+#[test]
+fn m0019_flow_diagnostic_constructors_preserve_rule_node_and_types() {
+    let node = AstNodeId::from_raw(190);
+    let expected = TypeId::from_raw(1);
+    let actual = TypeId::from_raw(2);
+
+    let invalid_nullable = TypeCheckDiagnostic::invalid_nullable_use(
+        TypeRuleDiagnostic::NullableValueWithoutRefinement,
+        node,
+        expected,
+        actual,
+    );
+    assert_eq!(
+        invalid_nullable.kind(),
+        TypeCheckDiagnosticKind::InvalidNullableUse
+    );
+    assert_eq!(
+        invalid_nullable.rule(),
+        TypeRuleDiagnostic::NullableValueWithoutRefinement
+    );
+    assert_eq!(invalid_nullable.node(), node);
+    assert_eq!(invalid_nullable.expected_type(), Some(expected));
+    assert_eq!(invalid_nullable.actual_type(), Some(actual));
+
+    let invalidated = TypeCheckDiagnostic::invalidated_refinement(
+        TypeRuleDiagnostic::RegionExitInvalidatedRefinement,
+        node,
+        expected,
+        actual,
+    );
+    assert_eq!(
+        invalidated.kind(),
+        TypeCheckDiagnosticKind::InvalidatedRefinement
+    );
+
+    let unsupported = TypeCheckDiagnostic::unsupported_flow_rule(
+        TypeRuleDiagnostic::BooleanCombinationRefinementDeferred,
+        node,
+    );
+    assert_eq!(
+        unsupported.kind(),
+        TypeCheckDiagnosticKind::UnsupportedFlowRule
+    );
+    assert_eq!(unsupported.expected_type(), None);
+    assert_eq!(unsupported.actual_type(), None);
+
+    let ambiguous = TypeCheckDiagnostic::ambiguous_flow_rule(
+        TypeRuleDiagnostic::AmbiguousLocalBindingFlow,
+        node,
+    );
+    assert_eq!(ambiguous.kind(), TypeCheckDiagnosticKind::AmbiguousFlowRule);
+}
+
+#[test]
+fn m0019_flow_rule_diagnostic_identifiers_cover_adr0028_examples() {
+    let rules = [
+        TypeRuleDiagnostic::NullableValueWithoutRefinement,
+        TypeRuleDiagnostic::NullableAssignmentWithoutRefinement,
+        TypeRuleDiagnostic::AssignmentInvalidatedRefinement,
+        TypeRuleDiagnostic::RegionExitInvalidatedRefinement,
+        TypeRuleDiagnostic::MutableLocalRefinementDeferred,
+        TypeRuleDiagnostic::BooleanCombinationRefinementDeferred,
+        TypeRuleDiagnostic::MemberRefinementDeferred,
+        TypeRuleDiagnostic::CallResultRefinementDeferred,
+        TypeRuleDiagnostic::ExclusiveBorrowRefinementDeferred,
+        TypeRuleDiagnostic::AmbiguousLocalBindingFlow,
+        TypeRuleDiagnostic::AmbiguousNullTestRegion,
+    ];
+
+    assert_eq!(rules.len(), 11);
+}
+
+#[test]
+fn m0019_type_check_report_records_flow_refinements_in_insertion_order() {
+    let binding = LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(1), SymbolId::from_raw(2)),
+        AstNodeId::from_raw(191),
+        LocalBindingKind::Val,
+    );
+    let first = RefinementRecord::new(
+        AstNodeId::from_raw(192),
+        AstNodeId::from_raw(193),
+        AstNodeId::from_raw(194),
+        binding.clone(),
+        TypeId::from_raw(10),
+        TypeId::from_raw(11),
+    );
+    let second = RefinementRecord::new(
+        AstNodeId::from_raw(195),
+        AstNodeId::from_raw(196),
+        AstNodeId::from_raw(197),
+        binding,
+        TypeId::from_raw(12),
+        TypeId::from_raw(13),
+    );
+    let mut report = TypeCheckReport::new();
+
+    report.record_refinement(first.clone());
+    report.record_refinement(second.clone());
+
+    assert_eq!(report.refinements(), &[first.clone(), second]);
+    assert_eq!(report.refinement(AstNodeId::from_raw(192)), Some(&first));
+    assert_eq!(first.originating_null_test(), AstNodeId::from_raw(194));
+    assert_eq!(first.original_nullable_type(), TypeId::from_raw(10));
+    assert_eq!(first.refined_non_null_type(), TypeId::from_raw(11));
+}
+
+#[test]
+fn m0019_type_check_report_records_refined_expression_types_as_per_use_views() {
+    let first = RefinedExpressionType::new(
+        AstNodeId::from_raw(200),
+        AstNodeId::from_raw(201),
+        TypeId::from_raw(20),
+        TypeId::from_raw(21),
+    );
+    let second = RefinedExpressionType::new(
+        AstNodeId::from_raw(202),
+        AstNodeId::from_raw(203),
+        TypeId::from_raw(22),
+        TypeId::from_raw(23),
+    );
+    let mut report = TypeCheckReport::new();
+
+    report.record_refined_expression_type(first);
+    report.record_refined_expression_type(second);
+
+    assert_eq!(report.refined_expression_types(), &[first, second]);
+    assert_eq!(
+        report.refined_expression_type(AstNodeId::from_raw(200)),
+        Some(TypeId::from_raw(21))
+    );
+    assert_eq!(first.original_nullable_type(), TypeId::from_raw(20));
+    assert_eq!(first.refined_non_null_type(), TypeId::from_raw(21));
+}
 
 #[test]
 fn ambiguous_type_rule_diagnostic_preserves_rule_and_node() {
