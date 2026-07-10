@@ -70,7 +70,7 @@ M0016 requires approved local, module, and declaration name resolution, duplicat
 ## Recommended Resolution Path
 
 - [ ] Language Lawyer determines whether existing text resolves it.
-- [ ] Language Designer drafts a name-resolution policy ADR or `docs/SPEC.md` revision.
+- [x] Language Designer drafts a name-resolution policy ADR or `docs/SPEC.md` revision.
 - [ ] Adversarial Engineer reviews soundness risk.
 - [ ] Diagnostics Engineer reviews unresolved-name and duplicate-name diagnostics.
 - [ ] Simplicity Guardian reviews the bootstrap subset for overreach.
