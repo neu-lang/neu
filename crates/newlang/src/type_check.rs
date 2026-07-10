@@ -18,6 +18,7 @@ pub enum AmbiguousTypeRule {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TypeCheckDiagnosticKind {
     AmbiguousTypeRule,
+    TypeMismatch,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,6 +26,8 @@ pub struct TypeCheckDiagnostic {
     kind: TypeCheckDiagnosticKind,
     rule: AmbiguousTypeRule,
     node: AstNodeId,
+    expected_type: Option<TypeId>,
+    actual_type: Option<TypeId>,
 }
 
 impl TypeCheckDiagnostic {
@@ -33,6 +36,18 @@ impl TypeCheckDiagnostic {
             kind: TypeCheckDiagnosticKind::AmbiguousTypeRule,
             rule,
             node,
+            expected_type: None,
+            actual_type: None,
+        }
+    }
+
+    pub fn type_mismatch(node: AstNodeId, expected_type: TypeId, actual_type: TypeId) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::TypeMismatch,
+            rule: AmbiguousTypeRule::AssignmentCompatibility,
+            node,
+            expected_type: Some(expected_type),
+            actual_type: Some(actual_type),
         }
     }
 
@@ -46,6 +61,14 @@ impl TypeCheckDiagnostic {
 
     pub fn node(&self) -> AstNodeId {
         self.node
+    }
+
+    pub fn expected_type(&self) -> Option<TypeId> {
+        self.expected_type
+    }
+
+    pub fn actual_type(&self) -> Option<TypeId> {
+        self.actual_type
     }
 }
 
@@ -210,6 +233,10 @@ impl TypeCheckReport {
         self.assignment_checks.push(assignment_check);
     }
 
+    pub fn record_diagnostic(&mut self, diagnostic: TypeCheckDiagnostic) {
+        self.diagnostics.push(diagnostic);
+    }
+
     pub fn assignment_checks(&self) -> &[AssignmentCheck] {
         &self.assignment_checks
     }
@@ -335,4 +362,69 @@ pub fn type_primitive_local_declarations(
     }
 
     (arena, report)
+}
+
+pub fn type_primitive_local_initializer_declarations(
+    declarations: &[ParsedLocalDeclaration],
+    type_name_references: &[ParsedTypeNameReference],
+    literals: &[ParsedLiteralExpression],
+) -> (TypeArena, TypeCheckReport) {
+    let mut arena = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut arena);
+    let mut report = TypeCheckReport::new();
+
+    for literal in literals {
+        let kind = literal_kind_from_parser(literal.kind);
+        report.record_expression_type(ExpressionType::new(
+            literal.expression,
+            primitives.type_for_literal(kind),
+        ));
+    }
+
+    for declaration in declarations {
+        let Some(annotation_type) =
+            primitive_annotation_type(declaration, type_name_references, primitives)
+        else {
+            continue;
+        };
+        report.record_declaration_signature(DeclarationSignature::new(
+            declaration.declaration,
+            annotation_type,
+        ));
+
+        let Some(initializer) = declaration.initializer else {
+            continue;
+        };
+        let Some(initializer_type) = report.expression_type(initializer) else {
+            continue;
+        };
+
+        if initializer_type == annotation_type {
+            report.record_assignment_check(AssignmentCheck::new(
+                declaration.declaration,
+                annotation_type,
+                initializer_type,
+            ));
+        } else {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                initializer,
+                annotation_type,
+                initializer_type,
+            ));
+        }
+    }
+
+    (arena, report)
+}
+
+fn primitive_annotation_type(
+    declaration: &ParsedLocalDeclaration,
+    type_name_references: &[ParsedTypeNameReference],
+    primitives: PrimitiveTypeIds,
+) -> Option<TypeId> {
+    let annotation = declaration.annotation?;
+    let type_name = type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)?;
+    primitives.type_for_primitive_name(type_name.name.as_str())
 }
