@@ -68,6 +68,9 @@ pub struct ParseOutput {
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
     pub generic_parameters: Vec<ParsedGenericParameter>,
     pub function_parameters: Vec<ParsedFunctionParameter>,
+    pub function_declarations: Vec<ParsedFunctionDeclaration>,
+    pub return_statements: Vec<ParsedReturnStatement>,
+    pub call_expressions: Vec<ParsedCallExpression>,
     pub enum_variants: Vec<ParsedEnumVariant>,
     pub when_expressions: Vec<ParsedWhenExpression>,
     pub match_arms: Vec<ParsedMatchArm>,
@@ -96,6 +99,30 @@ pub struct ParsedFunctionParameter {
     pub name: String,
     pub name_span: ByteSpan,
     pub annotation: AstNodeId,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedFunctionDeclaration {
+    pub declaration: AstNodeId,
+    pub body: Option<AstNodeId>,
+    pub return_annotation: Option<AstNodeId>,
+    pub parameters: Vec<AstNodeId>,
+    pub top_level: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedReturnStatement {
+    pub statement: AstNodeId,
+    pub function: AstNodeId,
+    pub value: Option<AstNodeId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedCallExpression {
+    pub expression: AstNodeId,
+    pub function: AstNodeId,
+    pub callee: AstNodeId,
+    pub arguments: Vec<AstNodeId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,6 +324,9 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         assignment_statements: parser.assignment_statements,
         generic_parameters: parser.generic_parameters,
         function_parameters: parser.function_parameters,
+        function_declarations: parser.function_declarations,
+        return_statements: parser.return_statements,
+        call_expressions: parser.call_expressions,
         enum_variants: parser.enum_variants,
         when_expressions: parser.when_expressions,
         match_arms: parser.match_arms,
@@ -325,12 +355,16 @@ struct Parser<'source> {
     assignment_statements: Vec<ParsedAssignmentStatement>,
     generic_parameters: Vec<ParsedGenericParameter>,
     function_parameters: Vec<ParsedFunctionParameter>,
+    function_declarations: Vec<ParsedFunctionDeclaration>,
+    return_statements: Vec<ParsedReturnStatement>,
+    call_expressions: Vec<ParsedCallExpression>,
     enum_variants: Vec<ParsedEnumVariant>,
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
     qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
+    current_function: Option<AstNodeId>,
 }
 
 impl<'source> Parser<'source> {
@@ -346,6 +380,9 @@ impl<'source> Parser<'source> {
             local_binding_names: Vec::new(),
             generic_parameters: Vec::new(),
             function_parameters: Vec::new(),
+            function_declarations: Vec::new(),
+            return_statements: Vec::new(),
+            call_expressions: Vec::new(),
             enum_variants: Vec::new(),
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
@@ -362,6 +399,7 @@ impl<'source> Parser<'source> {
             assignment_statements: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
+            current_function: None,
         }
     }
 
@@ -502,12 +540,14 @@ impl<'source> Parser<'source> {
             Vec::new()
         };
 
+        let mut return_annotation = None;
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
-            if self.parse_type().is_none() {
+            let Some(return_span) = self.parse_type() else {
                 self.skip_to_declaration_boundary(in_body);
                 return;
-            }
+            };
+            return_annotation = self.latest_type_node_for_span(return_span);
         }
 
         match self.current_kind() {
@@ -521,6 +561,16 @@ impl<'source> Parser<'source> {
                     in_body,
                 );
                 self.saw_top_level_declaration |= !in_body;
+                self.function_declarations.push(ParsedFunctionDeclaration {
+                    declaration,
+                    body: None,
+                    return_annotation,
+                    parameters: parameters
+                        .into_iter()
+                        .map(|parameter| parameter.parameter)
+                        .collect(),
+                    top_level: !in_body,
+                });
                 self.advance();
             }
             Some(TokenKind::LeftBrace) => {
@@ -535,8 +585,23 @@ impl<'source> Parser<'source> {
                     in_body,
                 );
                 self.saw_top_level_declaration |= !in_body;
+                let parameter_nodes = parameters
+                    .iter()
+                    .map(|parameter| parameter.parameter)
+                    .collect();
                 self.record_function_parameters(declaration, parameters);
-                self.parse_body_block();
+                let previous_function = self.current_function.replace(declaration);
+                let body = self
+                    .parse_body_block()
+                    .and_then(|span| self.latest_node_for_span(span, AstNodeKind::Block));
+                self.current_function = previous_function;
+                self.function_declarations.push(ParsedFunctionDeclaration {
+                    declaration,
+                    body,
+                    return_annotation,
+                    parameters: parameter_nodes,
+                    top_level: !in_body,
+                });
             }
             _ => {
                 self.diagnostic_current_or_span(
@@ -1053,19 +1118,30 @@ impl<'source> Parser<'source> {
         let start = self.current().expect("return token exists").span.start();
         self.advance();
 
-        if self.current_kind() != Some(TokenKind::Semicolon) && self.parse_expression().is_none() {
+        let value = if self.current_kind() == Some(TokenKind::Semicolon) {
+            None
+        } else if let Some(span) = self.parse_expression() {
+            self.latest_expression_node_for_span(span)
+        } else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedReturnStatement,
                 self.span_at(start),
             );
             self.skip_to_statement_boundary();
             return;
-        }
+        };
 
         if self.current_kind() == Some(TokenKind::Semicolon) {
             let end = self.current().expect("semicolon exists").span.end();
             self.advance();
-            self.arena.add_return_statement(self.span(start, end));
+            let statement = self.arena.add_return_statement(self.span(start, end));
+            if let Some(function) = self.current_function {
+                self.return_statements.push(ParsedReturnStatement {
+                    statement,
+                    function,
+                    value,
+                });
+            }
         } else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedReturnStatement,
@@ -1147,7 +1223,8 @@ impl<'source> Parser<'source> {
             match self.current_kind() {
                 Some(TokenKind::LeftParen) => {
                     let start = span.start();
-                    let Some(end) = self.parse_argument_list() else {
+                    let callee = self.latest_expression_node_for_span(span);
+                    let Some((end, arguments)) = self.parse_argument_list() else {
                         self.diagnostic_current_or_span(
                             DiagnosticKind::MalformedCallExpression,
                             span,
@@ -1155,7 +1232,17 @@ impl<'source> Parser<'source> {
                         return Some(span);
                     };
                     span = self.span(start, end);
-                    self.arena.add_call_expression(span);
+                    let expression = self.arena.add_call_expression(span);
+                    if let (Some(function), Some(callee), Some(arguments)) =
+                        (self.current_function, callee, arguments)
+                    {
+                        self.call_expressions.push(ParsedCallExpression {
+                            expression,
+                            function,
+                            callee,
+                            arguments,
+                        });
+                    }
                 }
                 Some(TokenKind::Dot) => {
                     let start = span.start();
@@ -1185,7 +1272,7 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn parse_argument_list(&mut self) -> Option<usize> {
+    fn parse_argument_list(&mut self) -> Option<(usize, Option<Vec<AstNodeId>>)> {
         if self.current_kind() != Some(TokenKind::LeftParen) {
             return None;
         }
@@ -1193,14 +1280,24 @@ impl<'source> Parser<'source> {
         if self.current_kind() == Some(TokenKind::RightParen) {
             let end = self.current().expect("right paren exists").span.end();
             self.advance();
-            return Some(end);
+            return Some((end, Some(Vec::new())));
         }
+        let mut arguments = Vec::new();
         loop {
-            if self.parse_expression().is_none() {
+            let Some(argument_span) = self.parse_expression() else {
                 self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
                 self.skip_to_expression_boundary();
-                return self.previous_span().map(|span| span.end());
-            }
+                return self.previous_span().map(|span| (span.end(), None));
+            };
+            let Some(argument) = self.latest_expression_node_for_span(argument_span) else {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedCallExpression,
+                    argument_span,
+                );
+                self.skip_to_expression_boundary();
+                return self.previous_span().map(|span| (span.end(), None));
+            };
+            arguments.push(argument);
             match self.current_kind() {
                 Some(TokenKind::Comma) => {
                     self.advance();
@@ -1208,18 +1305,18 @@ impl<'source> Parser<'source> {
                         self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
                         let end = self.current().expect("right paren exists").span.end();
                         self.advance();
-                        return Some(end);
+                        return Some((end, None));
                     }
                 }
                 Some(TokenKind::RightParen) => {
                     let end = self.current().expect("right paren exists").span.end();
                     self.advance();
-                    return Some(end);
+                    return Some((end, Some(arguments)));
                 }
                 _ => {
                     self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
                     self.skip_to_expression_boundary();
-                    return self.previous_span().map(|span| span.end());
+                    return self.previous_span().map(|span| (span.end(), None));
                 }
             }
         }

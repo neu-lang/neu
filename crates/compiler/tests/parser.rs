@@ -1190,3 +1190,74 @@ fn declaration_name_metadata_excludes_nested_declarations_and_missing_names() {
             .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingDeclarationName)
     );
 }
+
+#[test]
+fn m0028_records_executable_function_return_and_call_metadata() {
+    let output = parse_source(
+        SourceFileId::from_raw(100),
+        "fun helper(value: Int): Int { return value + 1; } fun main(): Int { return helper(1, 2 + 3); } fun external(): Int;",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.function_declarations.len(), 3);
+
+    let helper = &output.function_declarations[0];
+    assert!(helper.top_level);
+    assert!(helper.body.is_some());
+    assert!(helper.return_annotation.is_some());
+    assert_eq!(helper.parameters.len(), 1);
+
+    let main = &output.function_declarations[1];
+    assert!(main.top_level);
+    assert!(main.body.is_some());
+    assert!(main.return_annotation.is_some());
+    assert!(main.parameters.is_empty());
+
+    let external = &output.function_declarations[2];
+    assert!(external.top_level);
+    assert_eq!(external.body, None);
+    assert!(external.return_annotation.is_some());
+
+    assert_eq!(output.return_statements.len(), 2);
+    assert_eq!(output.return_statements[0].function, helper.declaration);
+    assert!(output.return_statements[0].value.is_some());
+    assert_eq!(output.return_statements[1].function, main.declaration);
+    assert!(output.return_statements[1].value.is_some());
+
+    assert_eq!(output.call_expressions.len(), 1);
+    let call = &output.call_expressions[0];
+    assert_eq!(call.function, main.declaration);
+    assert_eq!(call.arguments.len(), 2);
+    assert_eq!(
+        output.arena.node(call.callee).unwrap().kind,
+        AstNodeKind::NameExpression
+    );
+    assert_eq!(
+        output.arena.node(call.arguments[0]).unwrap().kind,
+        AstNodeKind::LiteralExpression
+    );
+    assert_eq!(
+        output.arena.node(call.arguments[1]).unwrap().kind,
+        AstNodeKind::BinaryExpression
+    );
+    assert!(
+        output.arena.node(call.arguments[0]).unwrap().span.start()
+            < output.arena.node(call.arguments[1]).unwrap().span.start()
+    );
+}
+
+#[test]
+fn m0028_executable_metadata_excludes_malformed_function_and_call_records() {
+    let output = parse_source(
+        SourceFileId::from_raw(101),
+        "fun broken(: Int) { return; } fun run(): Int { return helper(,); }",
+    );
+
+    assert!(output.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == DiagnosticKind::MalformedDeclarationHeader
+            || diagnostic.kind == DiagnosticKind::MalformedCallExpression
+    }));
+    assert!(output.function_declarations.len() <= 1);
+    assert!(output.call_expressions.is_empty());
+}
