@@ -6,7 +6,7 @@
 - Milestone: `M0019`
 - Decider: `Chief Architect`
 - Date: `2026-07-10`
-- Decision: `request revision before acceptance`
+- Decision: `approved`
 
 ## Inputs Read
 
@@ -21,11 +21,11 @@
 
 ## Decision
 
-Decision: request revision before acceptance.
+Decision: approved.
 
-ADR-0028 is directionally approved as a narrow M0019 design, but it is not accepted source of truth.
+ADR-0028 is accepted as the M0019 nullability and flow-typing source of truth.
 
-Implementation may not proceed against ADR-0028 until accepted by a later task that moves the ADR into the accepted ADR set, updates `docs/SPEC.md`, and resolves `docs/ambiguities/M0019-nullability-and-flow-typing.md`.
+M0019 ambiguity is resolved by `docs/adr/ADR-0028-nullability-and-flow-typing.md` and `docs/SPEC.md`.
 
 ## Required Revision Scope
 
@@ -38,10 +38,10 @@ Implementation may not proceed against ADR-0028 until accepted by a later task t
 
 ## Implementation Authority
 
-Implementation may not proceed against ADR-0028 until accepted.
+Implementation may proceed only against the accepted ADR-0028 model.
 
-The only currently accepted M0019-relevant behavior remains ADR-0027 nullable assignment compatibility.
+ADR-0028 is accepted. ADR-0027 nullable assignment compatibility remains part of the accepted input model.
 
 ## Next Step
 
-Create a revision task for ADR-0028 that incorporates the required review findings into a concrete acceptance-ready draft.
+Create implementation tasks for the accepted M0019 subset.

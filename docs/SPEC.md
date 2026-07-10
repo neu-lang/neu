@@ -218,3 +218,17 @@ Assignment compatibility is exact type identity, except `Null` is assignment-com
 Direct function declaration calls and structural function type application are deferred for M0018. Overload resolution, implicit numeric conversion, member lookup, generic constraint solving, ownership and move analysis, borrow checking, HIR lowering, MIR lowering, and backend behavior remain deferred.
 
 Type checking diagnostics include `type_mismatch`, `unresolved_type_rule`, `unsupported_type_rule`, and `ambiguous_type_rule`. Diagnostics define primary spans, recovery actions, source-of-truth citations, safe suggestion policies, and stable rule identifiers where required.
+
+## ADR-0028: Nullability And Flow Typing
+
+M0019 defines a narrow nullability and flow-typing subset for local immutable null refinements.
+
+Null-test recognition is a flow-specific condition recognizer for direct comparisons between one simple local name expression and `null`; it does not require general binary expression type checking, overload resolution, user-defined equality, implicit conversion, or Boolean operator typing.
+
+Refinements apply only to eligible immutable local bindings with known nullable wrapper types. `x != null` and `null != x` refine inside the then branch block. `x == null` and `null == x` refine inside the else branch block when an else branch exists. Refinements start at the first statement or optional trailing expression in the refined branch and end at that branch's closing brace.
+
+Refined output remains side-table metadata. Declaration signatures and original local binding types preserve the original nullable type; refined expression type entries are per-use views inside guarded regions.
+
+M0019 diagnoses nullable use where a nullable expression is required to be non-null without an active refinement. Flow diagnostics include `invalid_nullable_use`, `invalidated_refinement`, `unsupported_flow_rule`, and `ambiguous_flow_rule`.
+
+Member nullable access, safe-call operators, force unwrap operators, boolean-combination refinement, negated-condition refinement, patterns, type-test smart casts, parameter refinements, top-level declaration refinements, mutable binding refinements, exclusive-borrow refinements, alias analysis, function call effects, member mutation effects, coroutine suspension effects, unsafe and FFI nullability, generic nullable constraints, HIR, MIR, and backend behavior remain deferred.

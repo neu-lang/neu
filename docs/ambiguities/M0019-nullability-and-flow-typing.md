@@ -7,8 +7,10 @@
 - Related Milestone: `M0019`
 - Filed By: `Language Lawyer`
 - Date: `2026-07-10`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `Language Designer`
+- Resolution Source: `docs/adr/ADR-0028-nullability-and-flow-typing.md`
+- Resolved Date: `2026-07-10`
 
 ## Ambiguous Or Missing Authority
 
@@ -85,24 +87,25 @@ Missing concrete rules:
 
 ## Recommended Resolution Path
 
-- [ ] Language Lawyer determines whether existing text resolves it.
-- [ ] Language Designer drafts ADR or spec revision if new semantics are required.
-- [ ] Adversarial Engineer reviews soundness risk.
-- [ ] Diagnostics Engineer reviews diagnostic consequences.
-- [ ] Simplicity Guardian reviews complexity.
-- [ ] Chief Architect approves final resolution.
+- [x] Language Lawyer determines whether existing text resolves it.
+- [x] Language Designer drafts ADR or spec revision if new semantics are required.
+- [x] Adversarial Engineer reviews soundness risk.
+- [x] Diagnostics Engineer reviews diagnostic consequences.
+- [x] Simplicity Guardian reviews complexity.
+- [x] Chief Architect approves final resolution.
 
 ## Temporary Rule
 
-No implementation may proceed on M0019 nullability checks, flow refinement tracking, smart-cast eligibility, mutation invalidation, or related diagnostics until the source of truth is updated or the ambiguity is ruled non-blocking by Chief Architect.
+Implementation may define nullability and flow typing only as specified by accepted ADR-0028.
 
 M0018 nullable assignment compatibility remains valid because it is explicitly accepted by ADR-0027.
 
 ## Resolution
 
 - Decision:
-  - Pending.
+  - ADR-0028 accepted a narrow M0019 nullability and flow-typing subset with direct null-test recognition, branch-scoped immutable local refinements, side-table refined output, diagnostics, and explicit deferrals.
 - Source of truth updated:
-  - Pending.
+  - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
+  - `docs/SPEC.md`
 - Date resolved:
-  - Pending.
+  - `2026-07-10`

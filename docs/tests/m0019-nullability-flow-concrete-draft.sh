@@ -35,7 +35,7 @@ task=docs/tasks/M0019-004-nullability-flow-concrete-draft.md
 source=crates/newlang/src/type_check.rs
 
 require_file "$proposal"
-require_absent_path "$accepted"
+require_file "$accepted"
 require_file "$ambiguity"
 require_file "$task"
 require_file "$source"
@@ -91,9 +91,10 @@ require_text "$proposal" 'HIR lowering'
 require_text "$proposal" 'MIR lowering'
 require_text "$proposal" 'backend code generation'
 
-require_text "$ambiguity" 'Status: `open`'
+require_text "$accepted" '^Status: Accepted$'
+require_text "$ambiguity" 'Status: `resolved`'
 require_text "$task" 'Status: `(in_progress|review|complete)`'
-require_absent_text docs/SPEC.md '^## ADR-0028: Nullability And Flow Typing$'
+require_text docs/SPEC.md '^## ADR-0028: Nullability And Flow Typing$'
 require_absent_text "$source" 'FlowRefinement|SmartCast|invalid_nullable_use|invalidated_refinement|unsupported_flow_rule|ambiguous_flow_rule'
 
 echo "m0019-concrete-draft: concrete nullability and flow typing draft validation passed"
