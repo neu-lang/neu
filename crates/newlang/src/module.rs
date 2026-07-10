@@ -1,7 +1,7 @@
 use crate::ast::{AstNodeId, AstNodeKind};
 use crate::source::SourceFileId;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ModuleName(String);
 
 impl ModuleName {
@@ -30,7 +30,7 @@ impl ModuleName {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct PackageNamespace(String);
 
 impl PackageNamespace {
