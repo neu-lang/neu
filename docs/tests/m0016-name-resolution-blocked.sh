@@ -65,10 +65,12 @@ require_text "$spec" '^## ADR-0025: Module Package And Visibility Model$'
 require_text "$spec" 'later dependency and name resolution rules'
 require_text "$spec" '^## ADR-0026: Name Resolution Policy$'
 
-require_absent_path crates/newlang/src/name_resolution.rs
+require_file crates/newlang/src/name_resolution.rs
 require_absent_path crates/newlang/src/resolution.rs
-require_absent_path crates/newlang/tests/name_resolution.rs
-require_absent_text crates/newlang/src/lib.rs 'pub mod name_resolution|pub mod resolution'
+require_file crates/newlang/tests/name_resolution.rs
+require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
+require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
 require_absent_text crates/newlang/src/symbol.rs 'ImportResolver|VisibilityEnforcement|LookupDiagnostic|ScopeStack|ResolutionPolicy'
 require_absent_text crates/newlang/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
 

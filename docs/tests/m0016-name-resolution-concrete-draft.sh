@@ -86,8 +86,10 @@ require_text "$ambiguity" 'Blocking milestone: `M0016`'
 require_text "$task" 'Status: `complete`'
 
 require_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
-require_absent_path crates/newlang/src/name_resolution.rs
+require_file crates/newlang/src/name_resolution.rs
 require_absent_path crates/newlang/src/resolution.rs
-require_absent_text crates/newlang/src/lib.rs 'pub mod name_resolution|pub mod resolution'
+require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
+require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
 
 echo "m0016-concrete-draft: concrete name resolution draft validation passed"

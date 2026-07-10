@@ -109,9 +109,11 @@ require_text "$decision" 'M0016 ambiguity is resolved'
 require_text "$milestone" '\[x\] Name resolution source of truth is accepted'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path crates/newlang/src/name_resolution.rs
+require_file crates/newlang/src/name_resolution.rs
 require_absent_path crates/newlang/src/resolution.rs
-require_absent_text crates/newlang/src/lib.rs 'pub mod name_resolution|pub mod resolution'
+require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
+require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
 require_absent_text crates/newlang/src/parser.rs 'NameResolution|ResolvedName|UnresolvedName|ImportResolver|LookupScope'
 
 echo "m0016-accepted: name resolution policy accepted ADR validation passed"
