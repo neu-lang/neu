@@ -1,5 +1,6 @@
 use newlang::{
     ast::AstNodeId,
+    ast::AstNodeKind,
     name_resolution::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
         ResolvedName,
@@ -8,6 +9,7 @@ use newlang::{
         parse_source, ParsedAssignmentStatement, ParsedGroupedExpression, ParsedLiteralExpression,
         ParsedLiteralKind,
     },
+    source::ByteSpan,
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
@@ -15,9 +17,10 @@ use newlang::{
         type_literal_expressions, type_m0018_accepted_expressions,
         type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
-        ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
+        type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
+        AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport, TypeRuleDiagnostic,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -93,10 +96,107 @@ fn type_rule_diagnostic_identifiers_cover_adr0027_examples() {
         TypeRuleDiagnostic::FunctionTypeApplicationDeferred,
         TypeRuleDiagnostic::MemberExpressionDeferred,
         TypeRuleDiagnostic::BinaryExpressionDeferred,
+        TypeRuleDiagnostic::UnaryExpressionDeferred,
         TypeRuleDiagnostic::IfValueDeferred,
     ];
 
-    assert_eq!(rules.len(), 7);
+    assert_eq!(rules.len(), 8);
+}
+
+#[test]
+fn unsupported_expression_diagnostics_report_adr0027_deferred_forms() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(85),
+        "fun run() { val answer: Int = compute(); next = next + 1; logger.info(next); if (ready) { val inner = next; } else { val other = answer; } }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let report = type_unsupported_m0018_expressions(&parsed.arena);
+
+    assert_eq!(report.expression_types(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(report.diagnostics().len(), 5);
+
+    let diagnostics: Vec<_> = report
+        .diagnostics()
+        .iter()
+        .map(|diagnostic| (diagnostic.kind(), diagnostic.rule()))
+        .collect();
+    assert_eq!(
+        diagnostics,
+        [
+            (
+                TypeCheckDiagnosticKind::UnsupportedTypeRule,
+                TypeRuleDiagnostic::DirectCallDeferred,
+            ),
+            (
+                TypeCheckDiagnosticKind::UnsupportedTypeRule,
+                TypeRuleDiagnostic::BinaryExpressionDeferred,
+            ),
+            (
+                TypeCheckDiagnosticKind::UnsupportedTypeRule,
+                TypeRuleDiagnostic::MemberExpressionDeferred,
+            ),
+            (
+                TypeCheckDiagnosticKind::UnsupportedTypeRule,
+                TypeRuleDiagnostic::DirectCallDeferred,
+            ),
+            (
+                TypeCheckDiagnosticKind::UnsupportedTypeRule,
+                TypeRuleDiagnostic::IfValueDeferred,
+            ),
+        ]
+    );
+
+    for diagnostic in report.diagnostics() {
+        assert_eq!(diagnostic.expected_type(), None);
+        assert_eq!(diagnostic.actual_type(), None);
+    }
+}
+
+#[test]
+fn unsupported_expression_diagnostics_ignore_accepted_and_non_expression_nodes() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(86),
+        "fun run() { val source: Int = 1; val copy: Int = (source); copy = source; return; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    assert!(parsed
+        .arena
+        .nodes()
+        .iter()
+        .any(|node| node.kind == AstNodeKind::ReturnStatement));
+
+    let report = type_unsupported_m0018_expressions(&parsed.arena);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.expression_types(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+}
+
+#[test]
+fn unsupported_expression_diagnostics_report_unary_expression_nodes() {
+    let file = SourceFileId::from_raw(87);
+    let mut arena = newlang::ast::AstArena::new();
+    arena.add_source_file(ByteSpan::new(file, 0, 1).unwrap());
+    let unary = arena.add_unary_expression(ByteSpan::new(file, 2, 6).unwrap());
+
+    let report = type_unsupported_m0018_expressions(&arena);
+
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        TypeCheckDiagnosticKind::UnsupportedTypeRule
+    );
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::UnaryExpressionDeferred
+    );
+    assert_eq!(report.diagnostics()[0].node(), unary);
 }
 
 #[test]

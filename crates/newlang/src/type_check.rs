@@ -1,5 +1,5 @@
 use crate::{
-    ast::AstNodeId,
+    ast::{AstArena, AstNodeId, AstNodeKind},
     name_resolution::{LocalBinding, ResolutionTable},
     parser::{
         ParsedAssignmentStatement, ParsedGroupedExpression, ParsedLiteralExpression,
@@ -35,6 +35,7 @@ pub enum TypeRuleDiagnostic {
     FunctionTypeApplicationDeferred,
     MemberExpressionDeferred,
     BinaryExpressionDeferred,
+    UnaryExpressionDeferred,
     IfValueDeferred,
 }
 
@@ -615,6 +616,30 @@ fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bo
         (TypeKind::Nullable(_), TypeKind::Primitive(PrimitiveType::Null)) => true,
         (TypeKind::Nullable(nullable), _) => nullable.base() == value,
         _ => false,
+    }
+}
+
+pub fn type_unsupported_m0018_expressions(arena: &AstArena) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+
+    for node in arena.nodes() {
+        let Some(rule) = unsupported_expression_rule(node.kind) else {
+            continue;
+        };
+        report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(rule, node.id));
+    }
+
+    report
+}
+
+fn unsupported_expression_rule(kind: AstNodeKind) -> Option<TypeRuleDiagnostic> {
+    match kind {
+        AstNodeKind::CallExpression => Some(TypeRuleDiagnostic::DirectCallDeferred),
+        AstNodeKind::MemberExpression => Some(TypeRuleDiagnostic::MemberExpressionDeferred),
+        AstNodeKind::BinaryExpression => Some(TypeRuleDiagnostic::BinaryExpressionDeferred),
+        AstNodeKind::UnaryExpression => Some(TypeRuleDiagnostic::UnaryExpressionDeferred),
+        AstNodeKind::IfExpression => Some(TypeRuleDiagnostic::IfValueDeferred),
+        _ => None,
     }
 }
 
