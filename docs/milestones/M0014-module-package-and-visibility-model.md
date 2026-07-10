@@ -83,5 +83,4 @@ ADR-0017 selects modules as explicit compilation and visibility units, containin
 
 - [ ] Module identity exists.
 - [ ] Visibility metadata is represented.
-- [ ] Unspecified visibility rules are recorded.
-
+- [x] Unspecified visibility rules are recorded.
