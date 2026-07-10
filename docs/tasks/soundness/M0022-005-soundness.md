@@ -6,7 +6,7 @@
 
 Inputs read: `docs/tasks/M0022-005-ownership-analysis-report.md`,
 `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`,
-`crates/newlang/src/ownership.rs`, and `crates/newlang/tests/ownership.rs`.
+`crates/compiler/src/ownership.rs`, and `crates/compiler/tests/ownership.rs`.
 
 Attack checked: ownership analysis must use type-check outputs rather than
 guessing categories from syntax. The entry point requires declaration

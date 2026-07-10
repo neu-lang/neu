@@ -19,9 +19,9 @@ transfer moves that binding.
 - `docs/SPEC.md`, “ADR-0035: Bootstrap Ownership And Move Analysis”.
 - `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`,
   “Move Sites”, “Move-State Model”, and “Diagnostics And Recovery”.
-- `crates/newlang/src/ownership.rs`: ownership categories and transfer
+- `crates/compiler/src/ownership.rs`: ownership categories and transfer
   records.
-- `crates/newlang/src/name_resolution.rs`: `ResolvedLocalBinding` and local
+- `crates/compiler/src/name_resolution.rs`: `ResolvedLocalBinding` and local
   binding identity.
 
 ## Scope
@@ -62,7 +62,7 @@ transfer moves that binding.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=transfer records from M0022-003 are available. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test ownership failed with unresolved ownership diagnostic API imports. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test ownership failed with unresolved ownership diagnostic API imports. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=analyze_use_after_move reports later resolved local uses with transfer source origin. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0022-004-soundness.md. handoff=Reviewer

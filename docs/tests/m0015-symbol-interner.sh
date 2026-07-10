@@ -26,9 +26,9 @@ require_absent_text() {
 
 task=docs/tasks/M0015-001-symbol-interner.md
 milestone=docs/milestones/M0015-symbol-interning-and-name-tables.md
-symbol_src=crates/newlang/src/symbol.rs
-symbol_tests=crates/newlang/tests/symbol.rs
-lib=crates/newlang/src/lib.rs
+symbol_src=crates/compiler/src/symbol.rs
+symbol_tests=crates/compiler/tests/symbol.rs
+lib=crates/compiler/src/lib.rs
 
 require_file "$task"
 require_file "$milestone"
@@ -55,6 +55,6 @@ require_text "$symbol_tests" 'unknown_symbol_ids_do_not_resolve'
 require_text "$symbol_tests" 'symbols_preserve_exact_text_and_insertion_order'
 
 require_absent_text "$symbol_src" 'Scope|Import|Visibility|TypeCheck|Overload|Resolution|ModuleMetadata|PackageNamespace'
-require_absent_text crates/newlang/src/parser.rs 'SymbolInterner|SymbolId|symbol::'
+require_absent_text crates/compiler/src/parser.rs 'SymbolInterner|SymbolId|symbol::'
 
 echo "m0015-symbol-interner: symbol interner validation passed"

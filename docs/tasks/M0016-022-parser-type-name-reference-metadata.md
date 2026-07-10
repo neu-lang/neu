@@ -55,8 +55,8 @@ ADR-0026 includes type name nodes in accepted declaration, local binding, and ex
 ## Required Inputs
 
 - `docs/adr/ADR-0026-name-resolution-policy.md`
-- `crates/newlang/src/parser.rs`
-- `crates/newlang/tests/parser.rs`
+- `crates/compiler/src/parser.rs`
+- `crates/compiler/tests/parser.rs`
 
 ## Required Tests
 
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to update before implementation:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -102,9 +102,9 @@ Add `ParsedTypeNameReference` to parser output and populate it when `parse_named
 
 ## Execution Commands
 
-- Generate tests: `update crates/newlang/tests/parser.rs && update docs/tests/m0016-name-resolution-data-model.sh`
-- Verify tests fail: `cargo test -p newlang --test parser`
-- Ordinary tests: `cargo test -p newlang --test parser && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+- Generate tests: `update crates/compiler/tests/parser.rs && update docs/tests/m0016-name-resolution-data-model.sh`
+- Verify tests fail: `cargo test -p compiler --test parser`
+- Ordinary tests: `cargo test -p compiler --test parser && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0016-022-parser-type-name-reference-metadata.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0016-022-parser-type-name-reference-metadata.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh && docs/tests/m0016-name-resolution-blocked.sh && docs/tests/m0015-name-table-infrastructure.sh && docs/tests/m0002-workspace-ci.sh`
@@ -112,10 +112,10 @@ Add `ParsedTypeNameReference` to parser output and populate it when `parse_named
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0016-022-parser-type-name-reference-metadata.md`
 
@@ -139,9 +139,9 @@ Add `ParsedTypeNameReference` to parser output and populate it when `parse_named
 ```text
 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 parser type-name reference metadata task.
 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated parser tests and M0016 data-model validator before adding ParsedTypeNameReference.
-2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test -p newlang --test parser failed before implementation because ParseOutput.type_name_references was missing.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test -p compiler --test parser failed before implementation because ParseOutput.type_name_references was missing.
 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added ParsedTypeNameReference metadata for NamedType nodes while preserving source encounter order across generic arguments.
-2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test -p newlang --test parser, M0016 data-model validator, and M0016 accepted-state validator passed.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test -p compiler --test parser, M0016 data-model validator, and M0016 accepted-state validator passed.
 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found metadata-only behavior with no type binding.
 2026-07-10 main_task=main-task review phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
@@ -154,4 +154,4 @@ Add `ParsedTypeNameReference` to parser output and populate it when `parse_named
 - Required Context:
   - This task file
   - `docs/adr/ADR-0026-name-resolution-policy.md`
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`

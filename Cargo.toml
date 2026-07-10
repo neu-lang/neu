@@ -1,8 +1,8 @@
 [workspace]
-members = ["crates/newlang"]
+members = ["crates/compiler"]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://example.invalid/newlang"
+repository = "https://example.invalid/neu"

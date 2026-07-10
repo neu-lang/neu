@@ -126,8 +126,8 @@ Add fixture metadata and expected token/diagnostic examples only. Do not add com
 ## Forbidden Changes
 
 - Do not implement lexer code.
-- Do not add `crates/newlang/src/lexer.rs`.
-- Do not add `crates/newlang/src/token.rs`.
+- Do not add `crates/compiler/src/lexer.rs`.
+- Do not add `crates/compiler/src/token.rs`.
 - Do not add parser, AST, HIR, MIR, or backend code.
 - Do not encode parser precedence or expression grammar.
 - Do not cite Kotlin as source of truth.

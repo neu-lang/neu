@@ -26,8 +26,8 @@ require_absent_text() {
 
 adr=docs/adr/ADR-0023-type-and-generic-syntax.md
 task=docs/tasks/M0012-007-type-ast-shell.md
-ast=crates/newlang/src/ast.rs
-ast_tests=crates/newlang/tests/ast.rs
+ast=crates/compiler/src/ast.rs
+ast_tests=crates/compiler/tests/ast.rs
 
 require_file "$adr"
 require_file "$task"

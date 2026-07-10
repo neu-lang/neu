@@ -17,11 +17,11 @@
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0019-parser-flow-metadata.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test parser`: pass
+  - `cargo test -p compiler --test parser`: pass
   - `sh docs/tests/m0019-parser-flow-metadata.sh`: pass
 
 ## Safety Invariants Checked
@@ -61,7 +61,7 @@ Outcome: pass
   - `docs/tests/m0019-parser-flow-metadata.sh`
 - Tests run:
   - `docs/scripts/adversarial-check.sh docs/tasks/M0019-007-parser-flow-metadata.md`
-  - `cargo test -p newlang --test parser`
+  - `cargo test -p compiler --test parser`
   - `sh docs/tests/m0019-parser-flow-metadata.sh`
 - Result:
   - pass

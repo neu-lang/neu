@@ -55,9 +55,9 @@ M0012 has accepted syntax authority, fixtures, and AST shell nodes. The next par
 - ADRs:
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
 - Existing files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/parser.rs`
   - `tests/fixtures/parser/types/*.fixture.toml`
   - `tests/fixtures/parser/generics/*.fixture.toml`
 
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - focused Rust parser tests in `crates/newlang/tests/parser.rs`
+  - focused Rust parser tests in `crates/compiler/tests/parser.rs`
   - `docs/tests/m0012-type-generic-parser-implementation.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -103,7 +103,7 @@ Extend the existing parser with the smallest recursive-descent type parser neede
 
 ## Execution Commands
 
-- Generate tests: `update crates/newlang/tests/parser.rs and create docs/tests/m0012-type-generic-parser-implementation.sh`
+- Generate tests: `update crates/compiler/tests/parser.rs and create docs/tests/m0012-type-generic-parser-implementation.sh`
 - Verify tests fail: `cargo test --workspace --all-targets parses_type_and_generic_syntax -- --nocapture`
 - Ordinary tests: `cargo test --workspace --all-targets parser -- --nocapture && docs/tests/m0012-type-generic-parser-implementation.sh`
 - Adversarial tests: `docs/tests/m0012-type-generic-parser-implementation.sh`
@@ -113,10 +113,10 @@ Extend the existing parser with the smallest recursive-descent type parser neede
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0012-type-generic-parser-implementation.sh`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0012-008-type-generic-parser-implementation.md`
   - `docs/milestones/M0012-type-and-generic-syntax-parser.md`

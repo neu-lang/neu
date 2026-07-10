@@ -66,7 +66,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0019-local-binding-resolution-identity.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -92,9 +92,9 @@ Extend the existing local reference binding result with passive records captured
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/name_resolution.rs and create docs/tests/m0019-local-binding-resolution-identity.sh`
-- Verify tests fail: `cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity`
-- Ordinary tests: `cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity && sh docs/tests/m0019-local-binding-resolution-identity.sh`
+- Generate tests: `edit crates/compiler/tests/name_resolution.rs and create docs/tests/m0019-local-binding-resolution-identity.sh`
+- Verify tests fail: `cargo test -p compiler --test name_resolution m0019_local_binding_resolution_identity`
+- Ordinary tests: `cargo test -p compiler --test name_resolution m0019_local_binding_resolution_identity && sh docs/tests/m0019-local-binding-resolution-identity.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-011-local-binding-resolution-identity.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-011-local-binding-resolution-identity.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-local-binding-resolution-identity.sh && sh docs/tests/m0019-branch-refinement-records.sh && sh docs/tests/m0019-null-test-eligibility.sh && sh docs/tests/m0019-null-test-recognition.sh && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -102,10 +102,10 @@ Extend the existing local reference binding result with passive records captured
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0019-local-binding-resolution-identity.sh`
 - Implementation files:
-  - `crates/newlang/src/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-011-local-binding-resolution-identity.md`
   - `docs/tasks/reviews/M0019-011-review.md`
@@ -127,7 +127,7 @@ Extend the existing local reference binding result with passive records captured
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created prerequisite task for shadowing-safe local binding identity output.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added exact-binding, nested-shadowing, unresolved-use tests and a docs validator before implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity` failed because resolved-local identity output was absent; docs validator failed for the missing record type.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test name_resolution m0019_local_binding_resolution_identity` failed because resolved-local identity output was absent; docs validator failed for the missing record type.
 - 2026-07-10 main_task=main-task test work phase=fixture-correction result=pass notes=Replaced unsupported boolean-literal condition text with an accepted name-expression condition; identity assertions and tested behavior were unchanged.
 - 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added passive resolved-local records captured directly from successful local lookup results without changing lookup or general resolution behavior.
 - 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=Focused M0019 identity tests, the 57-test name-resolution suite, docs validator, and `git diff --check` passed; `cargo fmt --all` normalized the new fixture.
@@ -144,4 +144,4 @@ Extend the existing local reference binding result with passive records captured
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`

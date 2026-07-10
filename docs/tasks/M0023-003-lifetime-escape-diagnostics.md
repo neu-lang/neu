@@ -19,7 +19,7 @@ diagnostics.
 - `docs/SPEC.md`, “ADR-0036: Bootstrap Borrow And Lifetime Analysis”.
 - `docs/adr/ADR-0036-bootstrap-borrow-and-lifetime-analysis.md`,
   “Lifetime Escape Records” and “Diagnostics And Recovery”.
-- `crates/newlang/src/borrow.rs`: borrow records and diagnostics.
+- `crates/compiler/src/borrow.rs`: borrow records and diagnostics.
 
 ## Scope
 
@@ -55,7 +55,7 @@ diagnostics.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=ADR-0036 accepted and borrow conflict records exist. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test borrow failed with unresolved LifetimeEscapeRecord, analyze_lifetime_escapes, and lifetime_escape diagnostic API. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test borrow failed with unresolved LifetimeEscapeRecord, analyze_lifetime_escapes, and lifetime_escape diagnostic API. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=LifetimeEscapeRecord and analyze_lifetime_escapes implemented exact region-equality rule. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0023-003-soundness.md. handoff=Reviewer

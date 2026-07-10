@@ -63,7 +63,7 @@ require_text "$task" 'Status: `complete`'
 require_file docs/adr/ADR-0024-expression-statement-pattern-syntax.md
 require_text docs/adr/ADR-0024-expression-statement-pattern-syntax.md '^Status: Accepted$'
 require_text docs/SPEC.md '^## ADR-0024: Expression Statement And Pattern Syntax$'
-require_absent_text crates/newlang/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
-require_absent_text crates/newlang/src/ast.rs 'When|Match|UnsafeBlock|Coroutine'
+require_absent_text crates/compiler/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
+require_absent_text crates/compiler/src/ast.rs 'When|Match|UnsafeBlock|Coroutine'
 
 echo "m0013-proposal: expression statement and pattern syntax proposal validation passed"

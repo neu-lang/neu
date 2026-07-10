@@ -28,8 +28,8 @@ task=docs/tasks/M0017-002-nullable-type-representation.md
 milestone=docs/milestones/M0017-type-representation.md
 adr_null=docs/adr/ADR-0006-nullability-and-absence.md
 adr_syntax=docs/adr/ADR-0023-type-and-generic-syntax.md
-source=crates/newlang/src/types.rs
-test_file=crates/newlang/tests/types.rs
+source=crates/compiler/src/types.rs
+test_file=crates/compiler/tests/types.rs
 
 require_file "$task"
 require_file "$milestone"
@@ -56,6 +56,6 @@ require_text "$test_file" 'nullable_record_storage_preserves_insertion_order'
 require_absent_text "$source" 'smart_cast|flow_typ|FlowType|MutationInvalidation|NullCheck|NullLiteral|FfiNull|PlatformNull'
 require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|OwnershipCapability|Cranelift|LLVM'
 
-cargo test -p newlang --test types
+cargo test -p compiler --test types
 
 echo "m0017-nullable-type-representation: nullable type representation validation passed"

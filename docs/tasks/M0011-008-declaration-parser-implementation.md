@@ -33,7 +33,7 @@ M0011 requires declaration fixtures to parse to AST and invalid declarations to 
 
 ## Scope
 
-- Add `crates/newlang/src/parser.rs`.
+- Add `crates/compiler/src/parser.rs`.
 - Export the parser module.
 - Parse ADR-0022 package declarations, import declarations, visibility modifiers, function declarations, struct declarations, enum declarations, interface declarations, and declaration bodies.
 - Emit ADR-0022 declaration diagnostics with primary spans.
@@ -55,8 +55,8 @@ M0011 requires declaration fixtures to parse to AST and invalid declarations to 
 - ADRs:
   - `docs/adr/ADR-0022-declaration-syntax.md`
 - Existing files:
-  - `crates/newlang/src/lexer.rs`
-  - `crates/newlang/src/ast.rs`
+  - `crates/compiler/src/lexer.rs`
+  - `crates/compiler/src/ast.rs`
   - `tests/fixtures/parser/declarations/*.fixture.toml`
 
 ## Required Tests
@@ -75,11 +75,11 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0011-declaration-parser-implementation.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `newlang::parser` does not exist.
+  - `compiler::parser` does not exist.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -103,7 +103,7 @@ Add a small token-stream parser that builds flat AST declaration shell nodes and
 
 Commands may be `blocked: <reason>` until the project has the relevant harness.
 
-- Generate tests: `create crates/newlang/tests/parser.rs and docs/tests/m0011-declaration-parser-implementation.sh`
+- Generate tests: `create crates/compiler/tests/parser.rs and docs/tests/m0011-declaration-parser-implementation.sh`
 - Verify tests fail: `cargo test --workspace --all-targets parser`
 - Ordinary tests: `cargo test --workspace --all-targets parser && docs/tests/m0011-declaration-parser-implementation.sh`
 - Adversarial tests: `docs/tests/m0011-declaration-parser-implementation.sh`
@@ -113,12 +113,12 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0011-declaration-parser-implementation.sh`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/ast.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/ast.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0011-008-declaration-parser-implementation.md`
   - `docs/milestones/M0011-declaration-parser.md`
@@ -145,8 +145,8 @@ Append entries as the task progresses.
 ```text
 2026-07-09 main_task=<main task> phase=<phase> result=<result> notes=<notes>
 2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0011 declaration parser implementation task.
-2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Added crates/newlang/tests/parser.rs and docs/tests/m0011-declaration-parser-implementation.sh before parser implementation.
-2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test --workspace --all-targets parser failed because newlang::parser was missing.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Added crates/compiler/tests/parser.rs and docs/tests/m0011-declaration-parser-implementation.sh before parser implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test --workspace --all-targets parser failed because compiler::parser was missing.
 2026-07-09 main_task=main-task implementation phase=implementation result=pass notes=Added flat ADR-0022 parser over lexer tokens with parser diagnostics and AST declaration shell output.
 2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets passed and parser implementation validator reached only task-completion guard before status update.
 2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0011-008-soundness.md after ordinary-tests evidence.

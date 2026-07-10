@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - Changed files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/source.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/source.rs`
   - `docs/tests/m0005-source-spans.sh`
 - Ordinary test results:
   - Focused source tests passed.

@@ -16,8 +16,8 @@ require_text() {
   grep -Eq -- "$pattern" "$file" || fail "missing expected pattern in $file: $pattern"
 }
 
-source=crates/newlang/src/name_resolution.rs
-tests=crates/newlang/tests/name_resolution.rs
+source=crates/compiler/src/name_resolution.rs
+tests=crates/compiler/tests/name_resolution.rs
 task=docs/tasks/M0019-011-local-binding-resolution-identity.md
 
 require_file "$source"

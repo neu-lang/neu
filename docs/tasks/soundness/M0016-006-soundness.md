@@ -17,9 +17,9 @@
   - `docs/adr/ADR-0026-name-resolution-policy.md`
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - Changed files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
   - M0016 authority validators
 - Ordinary test results:
@@ -50,23 +50,23 @@ Outcome: pass
 Attack: Silently replace an existing resolved reference.
 Expected result: Duplicate inserts preserve the existing record and report the attempted duplicate.
 Actual result: ResolutionTable returns ResolutionInsert::Duplicate and keeps the original record.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Omit an accepted ADR-0026 diagnostic variant.
 Expected result: Data model represents unresolved, duplicate, ambiguous, unsupported import, unsupported cross-module, and unsupported member diagnostics.
 Actual result: ResolutionDiagnosticKind covers all six variants.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 ```
 
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
-  - `cargo test -p newlang --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+  - `cargo test -p compiler --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Result:
   - `pass`
 

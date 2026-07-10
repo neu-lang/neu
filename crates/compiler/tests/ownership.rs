@@ -1,4 +1,4 @@
-use newlang::{
+use compiler::{
     ast::AstNodeId,
     module::{ModuleName, PackageNamespace},
     name_resolution::{

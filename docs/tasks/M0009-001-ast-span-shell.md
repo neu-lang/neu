@@ -56,7 +56,7 @@ M0009 needs an AST target before parser implementation, but M0008 shows concrete
   - `docs/adr/ADR-0021-lexical-grammar.md`
 - Existing files:
   - `docs/syntax/grammar-authority-ledger.md`
-  - `crates/newlang/src/source.rs`
+  - `crates/compiler/src/source.rs`
 
 ## Required Tests
 
@@ -77,16 +77,16 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/tests/m0009-ast-data-model.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `newlang::ast` does not exist yet.
+  - `compiler::ast` does not exist yet.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Add `crates/newlang/src/ast.rs`, export it from `lib.rs`, and document the AST shell in `docs/ast/data-model.md`.
+Add `crates/compiler/src/ast.rs`, export it from `lib.rs`, and document the AST shell in `docs/ast/data-model.md`.
 
 ## Acceptance Criteria
 
@@ -103,7 +103,7 @@ Add `crates/newlang/src/ast.rs`, export it from `lib.rs`, and document the AST s
 
 ## Execution Commands
 
-- Generate tests: `create crates/newlang/tests/ast.rs && create docs/tests/m0009-ast-data-model.sh`
+- Generate tests: `create crates/compiler/tests/ast.rs && create docs/tests/m0009-ast-data-model.sh`
 - Verify tests fail: `cargo test --workspace --all-targets ast`
 - Ordinary tests: `cargo test --workspace --all-targets && docs/tests/m0009-ast-data-model.sh`
 - Adversarial tests: `docs/tests/m0009-ast-data-model.sh`
@@ -113,11 +113,11 @@ Add `crates/newlang/src/ast.rs`, export it from `lib.rs`, and document the AST s
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/tests/m0009-ast-data-model.sh`
 - Implementation files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/ast.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/ast.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0009-001-ast-span-shell.md`
   - `docs/ast/data-model.md`
@@ -143,7 +143,7 @@ Append entries as the task progresses.
 ```text
 2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0009 AST span shell task.
 2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created AST tests and M0009 validator before adding ast module.
-2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Rust tests failed as expected because newlang::ast did not exist.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Rust tests failed as expected because compiler::ast did not exist.
 2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets and M0009 AST validator passed after adding syntax-independent AST shell.
 2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Validation confirms no parser code, no concrete syntax nodes, and no semantic analysis concepts were added.
 2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved AST shell against M0008 grammar constraints and M0009 acceptance criteria.
@@ -157,4 +157,4 @@ Append entries as the task progresses.
 - Required Context:
   - This task file
   - `docs/syntax/grammar-authority-ledger.md`
-  - `crates/newlang/src/source.rs`
+  - `crates/compiler/src/source.rs`

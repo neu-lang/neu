@@ -17,8 +17,8 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0026-name-resolution-policy.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Ordinary test results:
   - `cargo test --workspace --all-targets`: pass, 166 tests
 
@@ -66,7 +66,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Tests run:
   - `cargo test --workspace --all-targets`
   - `docs/scripts/adversarial-check.sh docs/tasks/M0018-021-unresolved-type-rule-diagnostics.md`

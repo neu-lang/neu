@@ -18,8 +18,8 @@
   - `docs/adr/ADR-0026-name-resolution-policy.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tasks/M0018-019-accepted-local-initializer-checks.md`
 - Ordinary test results:
   - `cargo test --workspace --all-targets`: pass, 163 tests
@@ -74,7 +74,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Tests run:
   - `cargo test --workspace --all-targets`
   - `docs/scripts/adversarial-check.sh docs/tasks/M0018-019-accepted-local-initializer-checks.md`

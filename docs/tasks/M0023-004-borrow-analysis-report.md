@@ -21,7 +21,7 @@ over ADR-0036 borrow records and lifetime escape records.
   Records”, “Lifetime Escape Records”, and “Diagnostics And Recovery”.
 - `docs/milestones/M0023-borrow-and-lifetime-analysis.md`, completion
   checklist.
-- `crates/newlang/src/borrow.rs`: borrow records, lifetime escape records, and
+- `crates/compiler/src/borrow.rs`: borrow records, lifetime escape records, and
   diagnostics.
 
 ## Scope
@@ -57,7 +57,7 @@ over ADR-0036 borrow records and lifetime escape records.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=M0023-002 and M0023-003 diagnostic analyzers are available. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test borrow failed with unresolved analyze_borrow import. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test borrow failed with unresolved analyze_borrow import. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=BorrowReport and analyze_borrow compose conflict and lifetime escape diagnostics. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0023-004-soundness.md. handoff=Reviewer

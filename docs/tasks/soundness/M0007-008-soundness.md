@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0021-lexical-grammar.md`
 - Changed files:
-  - `crates/newlang/src/lexer.rs`
-  - `crates/newlang/tests/lexer.rs`
+  - `crates/compiler/src/lexer.rs`
+  - `crates/compiler/tests/lexer.rs`
   - `docs/tests/m0007-lexer-implementation.sh`
 - Ordinary test results:
   - `cargo test --workspace --all-targets` passed.
@@ -66,7 +66,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/lexer.rs`
+  - `crates/compiler/tests/lexer.rs`
   - `docs/tests/m0007-lexer-implementation.sh`
 - Tests run:
   - `cargo test --workspace --all-targets`

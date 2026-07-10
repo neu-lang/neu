@@ -45,7 +45,7 @@ require_text docs/lexer/token-model.md 'deferred'
 require_text docs/lexer/token-model.md 'No token category may be implemented from Kotlin precedent alone'
 
 require_text docs/ambiguities/M0006-lexical-grammar.md 'Detailed lexical grammar is missing'
-require_text docs/ambiguities/M0006-lexical-grammar.md 'Language Designer'
+require_text docs/ambiguities/M0006-lexical-grammar.md 'main-task semantic design'
 require_text docs/ambiguities/M0006-lexical-grammar.md 'M0007'
 require_text docs/ambiguities/M0006-lexical-grammar.md 'guessing'
 
@@ -57,6 +57,6 @@ require_text tests/fixtures/lexer/M0006-inert.fixture.toml '^lexical_grammar_sta
 
 require_absent_text tests/fixtures/lexer/M0006-inert.fixture.toml 'source_text|expected_tokens|token_stream|keyword|identifier|literal|operator|delimiter'
 
-require_absent_path crates/newlang/src/token.rs
+require_absent_path crates/compiler/src/token.rs
 
 echo "m0006: token model and lexer fixture metadata validation passed"

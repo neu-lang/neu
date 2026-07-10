@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/tests/m0013-expression-statement-pattern-ast-shell.sh`
   - `docs/ast/data-model.md`
   - validator updates.
@@ -43,7 +43,7 @@
 Attack: Encode value typing, flow facts, ownership state, or borrow state in AST shell nodes.
 Expected result: AST shell has node kind and span only.
 Actual result: AST nodes still contain only id, kind, and span.
-Source of truth: crates/newlang/src/ast.rs
+Source of truth: crates/compiler/src/ast.rs
 Outcome: pass
 ```
 
@@ -58,7 +58,7 @@ Outcome: pass
 ```text
 Attack: Introduce parser behavior before parser implementation task.
 Expected result: parser source has no body parser APIs.
-Actual result: `crates/newlang/src/parser.rs` was not extended with expression, statement, block, pattern, match, coroutine, or unsafe parser APIs.
+Actual result: `crates/compiler/src/parser.rs` was not extended with expression, statement, block, pattern, match, coroutine, or unsafe parser APIs.
 Source of truth: docs/tests/m0013-expression-statement-pattern-ast-shell.sh
 Outcome: pass
 ```
@@ -67,7 +67,7 @@ Outcome: pass
 
 - Tests added:
   - `docs/tests/m0013-expression-statement-pattern-ast-shell.sh`
-  - focused Rust AST shell test in `crates/newlang/tests/ast.rs`
+  - focused Rust AST shell test in `crates/compiler/tests/ast.rs`
 - Tests run:
   - `cargo test --workspace --all-targets ast -- --nocapture`
   - `docs/tests/m0013-expression-statement-pattern-ast-shell.sh`

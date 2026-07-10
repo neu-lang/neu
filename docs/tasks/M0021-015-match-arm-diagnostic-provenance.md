@@ -19,9 +19,9 @@ source match pattern, scoped to its containing `when` expression.
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Diagnostics And Recovery”.
-- `crates/newlang/src/name_resolution.rs`: `ResolvedVariantArm` and duplicate
+- `crates/compiler/src/name_resolution.rs`: `ResolvedVariantArm` and duplicate
   match-arm analysis.
-- `crates/newlang/tests/name_resolution.rs`: M0021 resolution tests.
+- `crates/compiler/tests/name_resolution.rs`: M0021 resolution tests.
 
 ## Scope
 

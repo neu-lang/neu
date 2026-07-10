@@ -17,8 +17,8 @@
   - `docs/adr/ADR-0026-name-resolution-policy.md`
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - Changed files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Ordinary test results:
   - Name-resolution tests, M0016 data-model validator, and M0016 accepted-state validator passed.
@@ -42,29 +42,29 @@
 Attack: Emit duplicate diagnostics on the original declaration instead of the later attempted declaration.
 Expected result: Diagnostic primary span is the later duplicate declaration name span.
 Actual result: Tests compare duplicate diagnostic primary span with the second parsed declaration name span.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Replace the existing declaration when emitting a duplicate diagnostic.
 Expected result: Existing declaration remains in the index.
 Actual result: Tests confirm the index retains the first declaration after a duplicate.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Emit duplicate diagnostics for same-name declarations in distinct packages.
 Expected result: Different package namespaces are distinct keys and produce no diagnostics.
 Actual result: Tests confirm distinct-package same-name declarations both insert and diagnostics are empty.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 ```
 
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
-  - `cargo test -p newlang --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+  - `cargo test -p compiler --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Result:
   - `pass`
 

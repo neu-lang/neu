@@ -17,11 +17,11 @@
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
   - `docs/adr/ADR-0027-type-checking-core.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-flow-output-data-model.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test type_check`: pass
+  - `cargo test -p compiler --test type_check`: pass
   - `sh docs/tests/m0019-flow-output-data-model.sh`: pass
 
 ## Safety Invariants Checked
@@ -69,7 +69,7 @@ Outcome: pass
   - `docs/tests/m0019-flow-output-data-model.sh`
 - Tests run:
   - `docs/scripts/adversarial-check.sh docs/tasks/M0019-006-flow-output-data-model.md`
-  - `cargo test -p newlang --test type_check`
+  - `cargo test -p compiler --test type_check`
   - `sh docs/tests/m0019-flow-output-data-model.sh`
 - Result:
   - pass

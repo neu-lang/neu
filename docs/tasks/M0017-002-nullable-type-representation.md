@@ -70,11 +70,11 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-nullable-type-representation.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `newlang::types::NullableType` and `TypeKind::Nullable` do not exist yet.
+  - `compiler::types::NullableType` and `TypeKind::Nullable` do not exist yet.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -96,9 +96,9 @@ Add `NullableType` as a wrapper over `TypeId`, add `TypeKind::Nullable`, and add
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/types.rs and create docs/tests/m0017-nullable-type-representation.sh`
-- Verify tests fail: `cargo test -p newlang --test types`
-- Ordinary tests: `cargo test -p newlang --test types && sh docs/tests/m0017-nullable-type-representation.sh`
+- Generate tests: `edit crates/compiler/tests/types.rs and create docs/tests/m0017-nullable-type-representation.sh`
+- Verify tests fail: `cargo test -p compiler --test types`
+- Ordinary tests: `cargo test -p compiler --test types && sh docs/tests/m0017-nullable-type-representation.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0017-002-nullable-type-representation.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0017-002-nullable-type-representation.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0017-nullable-type-representation.sh`
@@ -106,10 +106,10 @@ Add `NullableType` as a wrapper over `TypeId`, add `TypeKind::Nullable`, and add
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-nullable-type-representation.sh`
 - Implementation files:
-  - `crates/newlang/src/types.rs`
+  - `crates/compiler/src/types.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0017-type-representation.md`
   - `docs/tasks/M0017-002-nullable-type-representation.md`
@@ -134,8 +134,8 @@ Add `NullableType` as a wrapper over `TypeId`, add `TypeKind::Nullable`, and add
 ## Execution Log
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and scopes nullable representation without flow typing.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `NullableType`, `TypeKind::Nullable`, and `TypeRecord::nullable` did not exist.
-- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` passed after adding nullable representation; validator initially failed only because the milestone checklist had not yet been updated.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test types` failed because `NullableType`, `TypeKind::Nullable`, and `TypeRecord::nullable` did not exist.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p compiler --test types` passed after adding nullable representation; validator initially failed only because the milestone checklist had not yet been updated.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-002-nullable-type-representation.md` created a passing soundness report.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-002-nullable-type-representation.md` created review and concrete review approved after source-of-truth comparison.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-nullable-type-representation.sh`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

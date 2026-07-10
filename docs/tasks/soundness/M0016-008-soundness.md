@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0026-name-resolution-policy.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Ordinary test results:
   - Parser tests, M0016 data-model validator, and M0016 accepted-state validator passed.
@@ -41,13 +41,13 @@
 Attack: Accidentally record nested/member declaration names as top-level names.
 Expected result: Nested declarations inside declaration bodies are excluded from parser declaration-name metadata.
 Actual result: Parser test records only the top-level struct name and excludes nested function and enum names.
-Source of truth: crates/newlang/tests/parser.rs
+Source of truth: crates/compiler/tests/parser.rs
 Outcome: pass
 
 Attack: Create declaration metadata for missing names.
 Expected result: Missing declaration names produce diagnostics but no declaration-name metadata.
 Actual result: Parser test includes a missing function name and metadata excludes it.
-Source of truth: crates/newlang/tests/parser.rs
+Source of truth: crates/compiler/tests/parser.rs
 Outcome: pass
 
 Attack: Populate declaration index or implement lookup in the parser.
@@ -60,10 +60,10 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
-  - `cargo test -p newlang --test parser && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+  - `cargo test -p compiler --test parser && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Result:
   - `pass`
 

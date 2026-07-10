@@ -26,8 +26,8 @@ require_absent_text() {
 
 adr=docs/adr/ADR-0024-expression-statement-pattern-syntax.md
 task=docs/tasks/M0013-008-expression-statement-pattern-parser-implementation.md
-parser=crates/newlang/src/parser.rs
-parser_tests=crates/newlang/tests/parser.rs
+parser=crates/compiler/src/parser.rs
+parser_tests=crates/compiler/tests/parser.rs
 milestone=docs/milestones/M0013-expression-statement-and-pattern-parser.md
 
 require_file "$adr"

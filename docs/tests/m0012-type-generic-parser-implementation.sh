@@ -24,8 +24,8 @@ require_absent_text() {
   fi
 }
 
-parser=crates/newlang/src/parser.rs
-parser_tests=crates/newlang/tests/parser.rs
+parser=crates/compiler/src/parser.rs
+parser_tests=crates/compiler/tests/parser.rs
 task=docs/tasks/M0012-008-type-generic-parser-implementation.md
 milestone=docs/milestones/M0012-type-and-generic-syntax-parser.md
 

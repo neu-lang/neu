@@ -1,5 +1,5 @@
-use newlang::module::ModuleName;
-use newlang::symbol::{
+use compiler::module::ModuleName;
+use compiler::symbol::{
     NameTable, NameTableEntry, NameTableInsert, NameTableKey, SymbolId, SymbolInterner,
 };
 

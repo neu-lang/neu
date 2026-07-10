@@ -78,10 +78,10 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0015-symbol-interner.sh`
-  - `crates/newlang/tests/symbol.rs`
+  - `crates/compiler/tests/symbol.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `crates/newlang/src/symbol.rs` and `newlang::symbol` do not exist.
+  - `crates/compiler/src/symbol.rs` and `compiler::symbol` do not exist.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -103,7 +103,7 @@ Implement a small deterministic interner backed by insertion-ordered storage and
 
 ## Execution Commands
 
-- Generate tests: `create docs/tests/m0015-symbol-interner.sh and crates/newlang/tests/symbol.rs`
+- Generate tests: `create docs/tests/m0015-symbol-interner.sh and crates/compiler/tests/symbol.rs`
 - Verify tests fail: `docs/tests/m0015-symbol-interner.sh`
 - Ordinary tests: `cargo test --workspace --all-targets symbol -- --nocapture && docs/tests/m0015-symbol-interner.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0015-001-symbol-interner.md`
@@ -114,10 +114,10 @@ Implement a small deterministic interner backed by insertion-ordered storage and
 
 - Test files:
   - `docs/tests/m0015-symbol-interner.sh`
-  - `crates/newlang/tests/symbol.rs`
+  - `crates/compiler/tests/symbol.rs`
 - Implementation files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/symbol.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/symbol.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0015-symbol-interning-and-name-tables.md`
   - `docs/tasks/M0015-001-symbol-interner.md`
@@ -142,7 +142,7 @@ Implement a small deterministic interner backed by insertion-ordered storage and
 ```text
 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0015 symbol interner task.
 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0015-symbol-interner.sh and Rust symbol tests before implementation.
-2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0015-symbol-interner.sh failed before implementation because crates/newlang/src/symbol.rs was missing.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0015-symbol-interner.sh failed before implementation because crates/compiler/src/symbol.rs was missing.
 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added SymbolId and SymbolInterner with stable exact-text interning and resolution only.
 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets symbol -- --nocapture and docs/tests/m0015-symbol-interner.sh passed.
 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0015-001-soundness.md after ordinary-test evidence.

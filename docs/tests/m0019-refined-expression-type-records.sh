@@ -16,8 +16,8 @@ require_text() {
   grep -Eq -- "$pattern" "$file" || fail "missing expected pattern in $file: $pattern"
 }
 
-source=crates/newlang/src/type_check.rs
-tests=crates/newlang/tests/type_check.rs
+source=crates/compiler/src/type_check.rs
+tests=crates/compiler/tests/type_check.rs
 task=docs/tasks/M0019-012-refined-expression-type-records.md
 
 require_file "$source"

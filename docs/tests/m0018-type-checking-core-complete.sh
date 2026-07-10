@@ -25,8 +25,8 @@ require_absent_text() {
 }
 
 milestone=docs/milestones/M0018-type-checking-core.md
-source=crates/newlang/src/type_check.rs
-tests=crates/newlang/tests/type_check.rs
+source=crates/compiler/src/type_check.rs
+tests=crates/compiler/tests/type_check.rs
 
 require_file "$milestone"
 require_file "$source"

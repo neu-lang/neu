@@ -1,5 +1,5 @@
-use newlang::ast::{AstArena, AstNodeKind};
-use newlang::source::{ByteSpan, SourceFileId};
+use compiler::ast::{AstArena, AstNodeKind};
+use compiler::source::{ByteSpan, SourceFileId};
 
 #[test]
 fn source_file_root_node_preserves_span() {
@@ -34,7 +34,7 @@ fn ast_node_ids_are_stable_in_insertion_order() {
 fn invalid_ast_node_ids_are_rejected() {
     let arena = AstArena::new();
 
-    assert!(arena.node(newlang::ast::AstNodeId::from_raw(99)).is_none());
+    assert!(arena.node(compiler::ast::AstNodeId::from_raw(99)).is_none());
 }
 
 #[test]

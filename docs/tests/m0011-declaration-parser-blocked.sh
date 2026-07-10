@@ -33,7 +33,7 @@ require_file "$milestone"
 require_text "$task" '^# Task: M0011-001 Record Declaration Parser Syntax Blocker$'
 require_text "$task" 'Status: `blocked`'
 require_text "$task" 'Milestone: `M0011`'
-require_text "$task" 'Language Designer drafts declaration syntax ADR'
+require_text "$task" 'main-task semantic design drafts declaration syntax ADR'
 require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0011`'
 require_text "$ambiguity" 'Parser implementation may accept only the concrete declaration syntax defined by `docs/adr/ADR-0022-declaration-syntax.md`'

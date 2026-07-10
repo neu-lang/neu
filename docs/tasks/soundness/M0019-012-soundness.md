@@ -16,12 +16,12 @@
 - ADRs:
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-refined-expression-type-records.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test type_check m0019_refined_expression_type_records`: pass
-  - `cargo test -p newlang --test type_check`: pass
+  - `cargo test -p compiler --test type_check m0019_refined_expression_type_records`: pass
+  - `cargo test -p compiler --test type_check`: pass
   - `sh docs/tests/m0019-refined-expression-type-records.sh`: pass
 
 ## Safety Invariants Checked
@@ -73,10 +73,10 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Tests run:
-  - `cargo test -p newlang --test type_check m0019_refined_expression_type_records`
-  - `cargo test -p newlang --test type_check`
+  - `cargo test -p compiler --test type_check m0019_refined_expression_type_records`
+  - `cargo test -p compiler --test type_check`
   - `sh docs/tests/m0019-refined-expression-type-records.sh`
   - `docs/scripts/adversarial-check.sh docs/tasks/M0019-012-refined-expression-type-records.md`
 - Result:

@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/`
 - Changed files:
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/ast/data-model.md`
 - Ordinary test results:
   - `cargo test --workspace --all-targets` passed.
@@ -60,7 +60,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/tests/m0009-ast-data-model.sh`
 - Tests run:
   - `cargo test --workspace --all-targets`

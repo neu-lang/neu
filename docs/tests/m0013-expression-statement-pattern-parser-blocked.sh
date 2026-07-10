@@ -33,13 +33,13 @@ require_file "$task"
 require_file "$ambiguity"
 require_file "$ledger"
 require_file "$milestone"
-require_file crates/newlang/src/parser.rs
-require_file crates/newlang/src/ast.rs
+require_file crates/compiler/src/parser.rs
+require_file crates/compiler/src/ast.rs
 
 require_text "$task" '^# Task: M0013-001 Record expression statement and pattern syntax blocker$'
 require_text "$task" 'Status: `complete`'
 require_text "$task" 'Milestone: `M0013`'
-require_text "$task" 'Language Designer to draft a non-authoritative syntax proposal'
+require_text "$task" 'main-task semantic design to draft a non-authoritative syntax proposal'
 
 require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0013`'
@@ -61,7 +61,7 @@ require_text "$milestone" '\[x\] Expression fixtures pass'
 require_text "$milestone" '\[x\] Statement fixtures pass'
 require_text "$milestone" '\[x\] Pattern fixtures pass'
 
-require_absent_text crates/newlang/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
-require_absent_text crates/newlang/src/ast.rs 'When|Match|UnsafeBlock|Coroutine'
+require_absent_text crates/compiler/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
+require_absent_text crates/compiler/src/ast.rs 'When|Match|UnsafeBlock|Coroutine'
 
 echo "m0013-authority: expression statement and pattern syntax authority resolved while implementation remains deferred"

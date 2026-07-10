@@ -18,7 +18,7 @@ Implement ADR-0036 borrow records and exact-region borrow conflict diagnostics.
 - `docs/SPEC.md`, “ADR-0036: Bootstrap Borrow And Lifetime Analysis”.
 - `docs/adr/ADR-0036-bootstrap-borrow-and-lifetime-analysis.md`, “Borrow
   Records” and “Diagnostics And Recovery”.
-- `crates/newlang/src/name_resolution.rs`: `LocalBinding` identity.
+- `crates/compiler/src/name_resolution.rs`: `LocalBinding` identity.
 
 ## Scope
 
@@ -55,7 +55,7 @@ Implement ADR-0036 borrow records and exact-region borrow conflict diagnostics.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=ADR-0036 accepted and M0023 unblocked. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test borrow failed with unresolved newlang::borrow import. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test borrow failed with unresolved compiler::borrow import. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=BorrowRecord, BorrowDiagnostic, and analyze_borrow_conflicts implemented. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0023-002-soundness.md. handoff=Reviewer

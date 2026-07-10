@@ -130,8 +130,8 @@ Add fixture metadata and examples only. Do not add parser source, AST nodes, par
 - Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
-- Do not add type parser APIs to `crates/newlang/src/parser.rs`.
-- Do not add type AST nodes to `crates/newlang/src/ast.rs`.
+- Do not add type parser APIs to `crates/compiler/src/parser.rs`.
+- Do not add type AST nodes to `crates/compiler/src/ast.rs`.
 - Do not add executable Rust parser tests.
 
 ## Ambiguities And Dependencies

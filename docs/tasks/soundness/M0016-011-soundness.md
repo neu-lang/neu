@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0026-name-resolution-policy.md`
 - Changed files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Ordinary test results:
   - Name-resolution tests, M0016 data-model validator, and M0016 accepted-state validator passed.
@@ -41,29 +41,29 @@
 Attack: Return a declaration from a different package.
 Expected result: Lookup requires exact package namespace.
 Actual result: Tests query the wrong package and receive Unresolved.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Return a declaration with the wrong declaration kind.
 Expected result: Lookup requires exact declaration kind.
 Actual result: Tests query the wrong kind and receive Unresolved.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Hide missing top-level names without a diagnostic.
 Expected result: Missing lookup returns unresolved_name with the query span.
 Actual result: Tests confirm Unresolved diagnostic kind and primary span.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 ```
 
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
-  - `cargo test -p newlang --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+  - `cargo test -p compiler --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Result:
   - `pass`
 

@@ -8,7 +8,7 @@
 
 - `docs/SPEC.md`, "ADR-0033: Bootstrap Sealed Sums And Exhaustive Match".
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`, "Decision" and "Diagnostics And Recovery".
-- Parser and AST changes in `crates/newlang/src/`.
+- Parser and AST changes in `crates/compiler/src/`.
 - Parser tests and the task's ordinary-test evidence.
 
 ## Attacks And Results
@@ -22,7 +22,7 @@
 
 ## Evidence
 
-- `cargo test -p newlang --test parser`
+- `cargo test -p compiler --test parser`
 - `sh docs/tests/m0021-when-expression-parser-metadata.sh`
 
 ## Findings

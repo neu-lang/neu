@@ -66,6 +66,6 @@ require_text "$decision" '^Decision: approved$'
 require_text "$task" 'Status: `complete`'
 
 require_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
-require_absent_text crates/newlang/src/lib.rs 'pub mod modules|pub mod name_resolution'
+require_absent_text crates/compiler/src/lib.rs 'pub mod modules|pub mod name_resolution'
 
 echo "m0014-concrete-draft: module package and visibility concrete draft validation passed"

@@ -72,7 +72,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-flow-output-data-model.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -98,9 +98,9 @@ Extend the existing type-checking report data structures only. Keep behavior pas
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/type_check.rs and create docs/tests/m0019-flow-output-data-model.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_flow`
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_flow && sh docs/tests/m0019-flow-output-data-model.sh`
+- Generate tests: `edit crates/compiler/tests/type_check.rs and create docs/tests/m0019-flow-output-data-model.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_flow`
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_flow && sh docs/tests/m0019-flow-output-data-model.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-006-flow-output-data-model.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-006-flow-output-data-model.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0019-nullability-flow-accepted.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -108,10 +108,10 @@ Extend the existing type-checking report data structures only. Keep behavior pas
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-flow-output-data-model.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-006-flow-output-data-model.md`
   - `docs/tasks/reviews/M0019-006-review.md`
@@ -136,8 +136,8 @@ Extend the existing type-checking report data structures only. Keep behavior pas
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 flow output data model task.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added focused Rust tests and docs validator before implementing flow output data model.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check m0019_flow` failed because flow diagnostic and refinement output data model APIs were missing.
-- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=Added passive M0019 flow diagnostic, refinement, and refined expression output data model; `cargo test -p newlang --test type_check`, `cargo test -p newlang --test type_check m0019_flow`, and `sh docs/tests/m0019-flow-output-data-model.sh` passed.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test type_check m0019_flow` failed because flow diagnostic and refinement output data model APIs were missing.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=Added passive M0019 flow diagnostic, refinement, and refined expression output data model; `cargo test -p compiler --test type_check`, `cargo test -p compiler --test type_check m0019_flow`, and `sh docs/tests/m0019-flow-output-data-model.sh` passed.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-006-flow-output-data-model.md` created a passing soundness report.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0019-006-flow-output-data-model.md` created review report; concrete review approved data-model-only scope.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0019-flow-output-data-model.sh`, M0019 accepted validator chain, and `sh docs/tests/m0002-workspace-ci.sh` passed. Examples skipped because this task adds no source-language behavior.
@@ -149,4 +149,4 @@ Extend the existing type-checking report data structures only. Keep behavior pas
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`

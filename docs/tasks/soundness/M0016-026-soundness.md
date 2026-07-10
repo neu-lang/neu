@@ -20,7 +20,7 @@
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Ordinary test results:
   - `docs/tests/m0016-name-resolution-data-model.sh`: pass
-  - `cargo test -p newlang --test name_resolution`: pass
+  - `cargo test -p compiler --test name_resolution`: pass
   - `docs/tests/m0016-name-resolution-policy-accepted.sh`: pass
 
 ## Safety Invariants Checked
@@ -53,7 +53,7 @@ Outcome: pass
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
   - `docs/tests/m0016-name-resolution-data-model.sh`
-  - `cargo test -p newlang --test name_resolution`
+  - `cargo test -p compiler --test name_resolution`
 - Result:
   - pass
 

@@ -32,7 +32,7 @@ proposal=docs/adr/proposals/ADR-0027-type-checking-core.md
 accepted=docs/adr/ADR-0027-type-checking-core.md
 ambiguity=docs/ambiguities/M0018-type-checking-core.md
 task=docs/tasks/M0018-004-type-checking-core-concrete-draft.md
-source=crates/newlang/src/type_check.rs
+source=crates/compiler/src/type_check.rs
 
 require_file "$proposal"
 require_file "$accepted"

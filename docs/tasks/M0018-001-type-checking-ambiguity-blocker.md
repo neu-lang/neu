@@ -67,7 +67,7 @@ Tests must be created before implementation.
   - The blocked rule categories cover M0018 and M0017 known risks.
   - Blocking diagnostics are separate from successful type checking output.
 - Negative tests:
-  - Focused Rust tests fail before implementation because `newlang::type_check` does not exist.
+  - Focused Rust tests fail before implementation because `compiler::type_check` does not exist.
 - Diagnostic tests:
   - Unit tests check diagnostic kind, blocked rule, and primary AST node.
 - Adversarial tests:
@@ -76,11 +76,11 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0018-type-checking-ambiguity-blocker.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `newlang::type_check` does not exist yet.
+  - `compiler::type_check` does not exist yet.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -102,9 +102,9 @@ Add a diagnostic-only `type_check` module with `AmbiguousTypeRule`, `TypeCheckDi
 
 ## Execution Commands
 
-- Generate tests: `create crates/newlang/tests/type_check.rs docs/tests/m0018-type-checking-ambiguity-blocker.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check`
-- Ordinary tests: `cargo test -p newlang --test type_check && sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`
+- Generate tests: `create crates/compiler/tests/type_check.rs docs/tests/m0018-type-checking-ambiguity-blocker.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check`
+- Ordinary tests: `cargo test -p compiler --test type_check && sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`
@@ -112,11 +112,11 @@ Add a diagnostic-only `type_check` module with `AmbiguousTypeRule`, `TypeCheckDi
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0018-type-checking-ambiguity-blocker.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/src/lib.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/src/lib.rs`
 - Documentation or checklist files:
   - `docs/ambiguities/M0018-type-checking-core.md`
   - `docs/milestones/M0018-type-checking-core.md`
@@ -143,8 +143,8 @@ Add a diagnostic-only `type_check` module with `AmbiguousTypeRule`, `TypeCheckDi
 ## Execution Log
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0018 and blocks ambiguous type rules before checking implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check` failed because `newlang::type_check` did not exist.
-- 2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check` passed after adding diagnostic-only ambiguous type rule blocking; validator initially failed only because the milestone checklist had not yet been updated.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test type_check` failed because `compiler::type_check` did not exist.
+- 2026-07-10 main_task=Language-Lawyer phase=ordinary-tests result=pass notes=`cargo test -p compiler --test type_check` passed after adding diagnostic-only ambiguous type rule blocking; validator initially failed only because the milestone checklist had not yet been updated.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md` created a passing soundness report.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0018-001-type-checking-ambiguity-blocker.md` created review and concrete review approved after source-of-truth comparison.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

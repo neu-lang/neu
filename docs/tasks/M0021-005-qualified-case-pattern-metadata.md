@@ -18,8 +18,8 @@ case patterns, without resolving or diagnosing them.
 
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`, “Decision”.
-- `crates/newlang/src/parser.rs`: pattern and `when` parsing.
-- Validation: `cargo test -p newlang --test parser m0021_qualified_case_pattern`;
+- `crates/compiler/src/parser.rs`: pattern and `when` parsing.
+- Validation: `cargo test -p compiler --test parser m0021_qualified_case_pattern`;
   `cargo fmt --all --check`; `git diff --check`.
 
 ## Scope

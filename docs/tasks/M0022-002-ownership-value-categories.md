@@ -17,9 +17,9 @@ Implement the ADR-0035 value-category classifier for existing type identities.
 
 - `docs/SPEC.md`, “ADR-0035: Bootstrap Ownership And Move Analysis”.
 - `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`, “Decision”.
-- `crates/newlang/src/types.rs`: `PrimitiveType`, `TypeKind`, `TypeRecord`,
+- `crates/compiler/src/types.rs`: `PrimitiveType`, `TypeKind`, `TypeRecord`,
   and `TypeArena`.
-- `crates/newlang/tests/types.rs`: existing type-identity coverage patterns.
+- `crates/compiler/tests/types.rs`: existing type-identity coverage patterns.
 
 ## Scope
 
@@ -53,7 +53,7 @@ Implement the ADR-0035 value-category classifier for existing type identities.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=ADR-0035 accepted and M0022 implementation unblocked. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test ownership failed with unresolved import newlang::ownership. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test ownership failed with unresolved import compiler::ownership. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=ownership category enum and classifier added over TypeArena records. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0022-002-soundness.md. handoff=Reviewer

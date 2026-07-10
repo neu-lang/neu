@@ -72,7 +72,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-refined-expression-type-records.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -98,9 +98,9 @@ Add a focused flow-report enrichment function that evaluates resolved local name
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/type_check.rs and create docs/tests/m0019-refined-expression-type-records.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_refined_expression_type_records`
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_refined_expression_type_records && sh docs/tests/m0019-refined-expression-type-records.sh`
+- Generate tests: `edit crates/compiler/tests/type_check.rs and create docs/tests/m0019-refined-expression-type-records.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_refined_expression_type_records`
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_refined_expression_type_records && sh docs/tests/m0019-refined-expression-type-records.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-012-refined-expression-type-records.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-012-refined-expression-type-records.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-refined-expression-type-records.sh && sh docs/tests/m0019-local-binding-resolution-identity.sh && sh docs/tests/m0019-branch-refinement-records.sh && sh docs/tests/m0019-null-test-eligibility.sh && sh docs/tests/m0019-null-test-recognition.sh && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -108,10 +108,10 @@ Add a focused flow-report enrichment function that evaluates resolved local name
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-refined-expression-type-records.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-012-refined-expression-type-records.md`
   - `docs/tasks/reviews/M0019-012-review.md`
@@ -151,5 +151,5 @@ Add a focused flow-report enrichment function that evaluates resolved local name
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/src/name_resolution.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/src/name_resolution.rs`

@@ -1,5 +1,5 @@
-use newlang::lexer::{DiagnosticKind, TokenKind, lex};
-use newlang::source::SourceFileId;
+use compiler::lexer::{DiagnosticKind, TokenKind, lex};
+use compiler::source::SourceFileId;
 
 fn kinds(source: &str) -> Vec<TokenKind> {
     lex(SourceFileId::from_raw(0), source)

@@ -6,7 +6,7 @@
 
 Inputs read: `docs/tasks/M0022-004-use-after-move-diagnostics.md`,
 `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`,
-`crates/newlang/src/ownership.rs`, and `crates/newlang/tests/ownership.rs`.
+`crates/compiler/src/ownership.rs`, and `crates/compiler/tests/ownership.rs`.
 
 Attack checked: the transfer source use itself must not be diagnosed. The
 analyzer diagnoses only uses whose node id is later than the transfer source.

@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
   - validator updates.
 - Ordinary test results:
@@ -42,7 +42,7 @@
 Attack: Encode type checking, ownership, borrowing, or flow facts in parser output.
 Expected result: parser creates syntax-only AST nodes and diagnostics.
 Actual result: parser output still uses flat AstArena node kinds and DiagnosticKind values only.
-Source of truth: crates/newlang/src/parser.rs
+Source of truth: crates/compiler/src/parser.rs
 Outcome: pass
 ```
 
@@ -50,7 +50,7 @@ Outcome: pass
 Attack: Accept deferred syntax through the body parser.
 Expected result: loop, unsafe, coroutine-like, when, indexing, and lambda-like forms remain rejected or diagnosed.
 Actual result: parser tests cover deferred forms and validator rejects deferred parser APIs.
-Source of truth: crates/newlang/tests/parser.rs and docs/tests/m0013-expression-statement-pattern-parser-implementation.sh
+Source of truth: crates/compiler/tests/parser.rs and docs/tests/m0013-expression-statement-pattern-parser-implementation.sh
 Outcome: pass
 ```
 
@@ -74,7 +74,7 @@ Outcome: pass
 
 - Tests added:
   - `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
-  - focused Rust parser tests in `crates/newlang/tests/parser.rs`
+  - focused Rust parser tests in `crates/compiler/tests/parser.rs`
 - Tests run:
   - `cargo test --workspace --test parser -- --nocapture`
   - `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`

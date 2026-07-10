@@ -75,7 +75,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-refinement-aware-assignment-checking.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -101,9 +101,9 @@ Reuse the existing assignment compatibility predicate through a shared internal 
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/type_check.rs and create docs/tests/m0019-refinement-aware-assignment-checking.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_refinement_aware_assignment`
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_refinement_aware_assignment && sh docs/tests/m0019-refinement-aware-assignment-checking.sh`
+- Generate tests: `edit crates/compiler/tests/type_check.rs and create docs/tests/m0019-refinement-aware-assignment-checking.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_refinement_aware_assignment`
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_refinement_aware_assignment && sh docs/tests/m0019-refinement-aware-assignment-checking.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-013-refinement-aware-assignment-checking.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-013-refinement-aware-assignment-checking.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-refinement-aware-assignment-checking.sh && sh docs/tests/m0019-refined-expression-type-records.sh && sh docs/tests/m0019-local-binding-resolution-identity.sh && sh docs/tests/m0019-branch-refinement-records.sh && sh docs/tests/m0019-null-test-eligibility.sh && sh docs/tests/m0019-null-test-recognition.sh && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -111,16 +111,16 @@ Reuse the existing assignment compatibility predicate through a shared internal 
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-refinement-aware-assignment-checking.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-013-refinement-aware-assignment-checking.md`
   - `docs/tasks/reviews/M0019-013-review.md`
   - `docs/tasks/soundness/M0019-013-soundness.md`
 - Example files, if the compiler-supported surface changes:
-  - `examples/current/accepted_nullability_flow.nl`
+  - `examples/current/accepted_nullability_flow.neu`
   - `examples/current/README.md`
 
 ## Forbidden Changes
@@ -164,4 +164,4 @@ Reuse the existing assignment compatibility predicate through a shared internal 
   - This task file
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`

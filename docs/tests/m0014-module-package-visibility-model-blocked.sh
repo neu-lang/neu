@@ -43,7 +43,7 @@ require_file "$spec"
 require_text "$task" '^# Task: M0014-001 Record module package and visibility model blocker$'
 require_text "$task" 'Status: `complete`'
 require_text "$task" 'Milestone: `M0014`'
-require_text "$task" 'Language Designer to draft a non-authoritative module, package, namespace, and visibility model proposal'
+require_text "$task" 'main-task semantic design to draft a non-authoritative module, package, namespace, and visibility model proposal'
 
 require_text "$ambiguity" '^# Ambiguity Report: M0014 Module, Package, And Visibility Model$'
 require_text "$ambiguity" 'Status: `resolved`'
@@ -66,9 +66,9 @@ require_text "$milestone" '\[x\] Module identity exists'
 require_text "$milestone" '\[x\] Visibility metadata is represented'
 require_text "$milestone" '\[x\] Unspecified visibility rules are recorded'
 
-require_absent_path crates/newlang/src/modules.rs
-require_absent_path crates/newlang/src/name_resolution.rs
-require_absent_text crates/newlang/src/lib.rs 'pub mod modules|pub mod name_resolution'
-require_absent_text crates/newlang/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
+require_absent_path crates/compiler/src/modules.rs
+require_absent_path crates/compiler/src/name_resolution.rs
+require_absent_text crates/compiler/src/lib.rs 'pub mod modules|pub mod name_resolution'
+require_absent_text crates/compiler/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
 
 echo "m0014-authority: module package and visibility model authority validation passed"

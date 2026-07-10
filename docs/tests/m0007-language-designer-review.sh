@@ -50,6 +50,6 @@ require_text "$review" 'diagnostic-facing lexical rules'
 require_text "$review" 'not accepted source of truth'
 require_text "$review" 'must not implement lexer behavior'
 
-require_absent_path crates/newlang/src/token.rs
+require_absent_path crates/compiler/src/token.rs
 
 echo "m0007-language-designer: lexical grammar ownership review validation passed"

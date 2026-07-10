@@ -65,7 +65,7 @@ require_text "$ambiguity" 'Blocking milestone: `M0014`'
 require_text "$task" 'Status: `complete`'
 
 require_text docs/SPEC.md '^## ADR-0025: Module Package And Visibility Model$'
-require_absent_path crates/newlang/src/modules.rs
-require_absent_path crates/newlang/src/name_resolution.rs
+require_absent_path crates/compiler/src/modules.rs
+require_absent_path crates/compiler/src/name_resolution.rs
 
 echo "m0014-proposal: module package and visibility model proposal validation passed"

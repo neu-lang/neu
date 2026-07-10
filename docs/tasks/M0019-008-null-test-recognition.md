@@ -69,7 +69,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-null-test-recognition.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -95,9 +95,9 @@ Implement a passive recognizer over `ParsedBinaryExpression` and `ParsedLiteralE
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/type_check.rs and create docs/tests/m0019-null-test-recognition.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_null_test`
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_null_test && sh docs/tests/m0019-null-test-recognition.sh`
+- Generate tests: `edit crates/compiler/tests/type_check.rs and create docs/tests/m0019-null-test-recognition.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_null_test`
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_null_test && sh docs/tests/m0019-null-test-recognition.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-008-null-test-recognition.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-008-null-test-recognition.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-null-test-recognition.sh && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -105,10 +105,10 @@ Implement a passive recognizer over `ParsedBinaryExpression` and `ParsedLiteralE
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-null-test-recognition.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-008-null-test-recognition.md`
   - `docs/tasks/reviews/M0019-008-review.md`
@@ -131,9 +131,9 @@ Implement a passive recognizer over `ParsedBinaryExpression` and `ParsedLiteralE
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 null-test recognition task.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added focused null-test recognition tests and docs validator before implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check m0019_null_test` failed before implementation due to unresolved recognizer imports.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test type_check m0019_null_test` failed before implementation due to unresolved recognizer imports.
 - 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added passive null-test records and recognizer over parser binary/literal metadata only.
-- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check m0019_null_test`, `cargo test -p newlang --test type_check`, and `sh docs/tests/m0019-null-test-recognition.sh` passed.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p compiler --test type_check m0019_null_test`, `cargo test -p compiler --test type_check`, and `sh docs/tests/m0019-null-test-recognition.sh` passed.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-008-null-test-recognition.md` passed and concrete soundness report recorded.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared changes against `docs/SPEC.md`, ADR-0028, and M0019; approved pending final CI.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, and listed docs validators passed.
@@ -146,4 +146,4 @@ Implement a passive recognizer over `ParsedBinaryExpression` and `ParsedLiteralE
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`

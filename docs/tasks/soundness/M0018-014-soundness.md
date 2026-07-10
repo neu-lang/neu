@@ -17,8 +17,8 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/tests/parser.rs`
 - Ordinary test results:
   - `cargo test --workspace --all-targets`: pass, 148 tests
 
@@ -66,7 +66,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
 - Tests run:
   - `cargo test --workspace --all-targets`
   - `docs/scripts/adversarial-check.sh docs/tasks/M0018-014-parser-grouped-expression-metadata.md`

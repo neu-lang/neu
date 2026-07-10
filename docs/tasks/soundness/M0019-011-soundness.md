@@ -16,12 +16,12 @@
 - ADRs:
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
 - Changed files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0019-local-binding-resolution-identity.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity`: pass
-  - `cargo test -p newlang --test name_resolution`: pass
+  - `cargo test -p compiler --test name_resolution m0019_local_binding_resolution_identity`: pass
+  - `cargo test -p compiler --test name_resolution`: pass
   - `sh docs/tests/m0019-local-binding-resolution-identity.sh`: pass
 
 ## Safety Invariants Checked
@@ -63,10 +63,10 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
 - Tests run:
-  - `cargo test -p newlang --test name_resolution m0019_local_binding_resolution_identity`
-  - `cargo test -p newlang --test name_resolution`
+  - `cargo test -p compiler --test name_resolution m0019_local_binding_resolution_identity`
+  - `cargo test -p compiler --test name_resolution`
   - `sh docs/tests/m0019-local-binding-resolution-identity.sh`
   - `docs/scripts/adversarial-check.sh docs/tasks/M0019-011-local-binding-resolution-identity.md`
 - Result:

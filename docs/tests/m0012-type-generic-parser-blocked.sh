@@ -37,13 +37,13 @@ require_file "$task"
 require_file "$ambiguity"
 require_file "$ledger"
 require_file "$milestone"
-require_file crates/newlang/src/parser.rs
-require_file crates/newlang/tests/parser.rs
+require_file crates/compiler/src/parser.rs
+require_file crates/compiler/tests/parser.rs
 
 require_text "$task" '^# Task: M0012-001 Record type and generic syntax parser blocker$'
 require_text "$task" 'Status: `blocked`'
 require_text "$task" 'Milestone: `M0012`'
-require_text "$task" 'Language Designer drafts type and generic syntax ADR'
+require_text "$task" 'main-task semantic design drafts type and generic syntax ADR'
 
 require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Blocking milestone: `M0012`'

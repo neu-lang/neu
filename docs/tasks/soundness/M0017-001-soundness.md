@@ -18,12 +18,12 @@
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`
 - Changed files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/types.rs`
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-type-identity-model.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test types`: pass
+  - `cargo test -p compiler --test types`: pass
   - `sh docs/tests/m0017-type-identity-model.sh`: pass
 
 ## Safety Invariants Checked

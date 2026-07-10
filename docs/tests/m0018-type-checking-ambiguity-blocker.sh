@@ -27,9 +27,9 @@ require_absent_text() {
 task=docs/tasks/M0018-001-type-checking-ambiguity-blocker.md
 milestone=docs/milestones/M0018-type-checking-core.md
 ambiguity=docs/ambiguities/M0018-type-checking-core.md
-source=crates/newlang/src/type_check.rs
-lib=crates/newlang/src/lib.rs
-test_file=crates/newlang/tests/type_check.rs
+source=crates/compiler/src/type_check.rs
+lib=crates/compiler/src/lib.rs
+test_file=crates/compiler/tests/type_check.rs
 
 require_file "$task"
 require_file "$milestone"
@@ -61,6 +61,6 @@ require_text "$test_file" 'type_check_report_records_blockers_without_successful
 require_absent_text "$source" 'check_expression|check_declaration|infer_type|literal_type|resolve_call|check_assignment|TypedExpression|TypedProgram|WellTyped'
 require_absent_text "$source" 'Ownership|Borrow|FlowType|Hir|Mir|Cranelift|LLVM'
 
-cargo test -p newlang --test type_check
+cargo test -p compiler --test type_check
 
 echo "m0018-type-checking-ambiguity-blocker: type checking ambiguity blocker validation passed"

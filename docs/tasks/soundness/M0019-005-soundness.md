@@ -56,7 +56,7 @@ Outcome: pass
 ```text
 Attack: Sneak compiler implementation into the acceptance task.
 Expected result: Rejected.
-Actual result: Validators confirm flow implementation identifiers are absent from `crates/newlang/src/type_check.rs`.
+Actual result: Validators confirm flow implementation identifiers are absent from `crates/compiler/src/type_check.rs`.
 Source of truth: docs/tasks/M0019-005-accept-nullability-flow-adr.md.
 Outcome: pass
 ```

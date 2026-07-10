@@ -1,4 +1,4 @@
-use newlang::{
+use compiler::{
     ast::{AstArena, AstNodeId, AstNodeKind},
     name_resolution::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
@@ -779,7 +779,7 @@ fn m0019_refined_expression_type_records_active_exact_binding_uses() {
         .collect::<Vec<_>>();
     assert_eq!(maybe_references.len(), 3);
     let scopes = build_local_scope_tree(&parsed.arena);
-    let mut interner = newlang::symbol::SymbolInterner::new();
+    let mut interner = compiler::symbol::SymbolInterner::new();
     let locals = build_scoped_local_binding_index(
         &parsed.arena,
         &parsed.local_binding_names,
@@ -848,7 +848,7 @@ fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bound
         .collect::<Vec<_>>();
     assert_eq!(maybe_references.len(), 5);
     let scopes = build_local_scope_tree(&parsed.arena);
-    let mut interner = newlang::symbol::SymbolInterner::new();
+    let mut interner = compiler::symbol::SymbolInterner::new();
     let locals = build_scoped_local_binding_index(
         &parsed.arena,
         &parsed.local_binding_names,
@@ -1275,7 +1275,7 @@ fn unsupported_expression_diagnostics_ignore_accepted_and_non_expression_nodes()
 #[test]
 fn unsupported_expression_diagnostics_report_unary_expression_nodes() {
     let file = SourceFileId::from_raw(87);
-    let mut arena = newlang::ast::AstArena::new();
+    let mut arena = compiler::ast::AstArena::new();
     arena.add_source_file(ByteSpan::new(file, 0, 1).unwrap());
     let unary = arena.add_unary_expression(ByteSpan::new(file, 2, 6).unwrap());
 
@@ -1782,12 +1782,12 @@ fn grouped_expression_typing_propagates_inner_expression_types() {
         ParsedGroupedExpression {
             expression: AstNodeId::from_raw(110),
             inner: AstNodeId::from_raw(111),
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(70), 0, 4).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(70), 0, 4).unwrap(),
         },
         ParsedGroupedExpression {
             expression: AstNodeId::from_raw(112),
             inner: AstNodeId::from_raw(113),
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(70), 5, 9).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(70), 5, 9).unwrap(),
         },
     ];
     let known = [
@@ -1815,12 +1815,12 @@ fn grouped_expression_typing_skips_unknown_inner_expressions() {
         ParsedGroupedExpression {
             expression: AstNodeId::from_raw(120),
             inner: AstNodeId::from_raw(121),
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(71), 0, 4).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(71), 0, 4).unwrap(),
         },
         ParsedGroupedExpression {
             expression: AstNodeId::from_raw(122),
             inner: AstNodeId::from_raw(123),
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(71), 5, 9).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(71), 5, 9).unwrap(),
         },
     ];
     let known = [ExpressionType::new(
@@ -1851,12 +1851,12 @@ fn grouped_expression_typing_supports_already_typed_nested_groups() {
         ParsedGroupedExpression {
             expression: inner_group,
             inner: literal,
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(72), 1, 5).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(72), 1, 5).unwrap(),
         },
         ParsedGroupedExpression {
             expression: outer_group,
             inner: inner_group,
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(72), 0, 6).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(72), 0, 6).unwrap(),
         },
     ];
     let known = [
@@ -3083,12 +3083,12 @@ fn accepted_expression_composition_records_literals_names_and_groups() {
     let literals = [ParsedLiteralExpression {
         expression: literal,
         kind: ParsedLiteralKind::AcceptedInteger,
-        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(80), 0, 2).unwrap(),
+        span: compiler::source::ByteSpan::new(SourceFileId::from_raw(80), 0, 2).unwrap(),
     }];
     let grouped = [ParsedGroupedExpression {
         expression: group,
         inner: name,
-        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(80), 3, 9).unwrap(),
+        span: compiler::source::ByteSpan::new(SourceFileId::from_raw(80), 3, 9).unwrap(),
     }];
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(name, SymbolId::from_raw(40)));
@@ -3117,18 +3117,18 @@ fn accepted_expression_composition_types_nested_groups_when_inner_becomes_known(
     let literals = [ParsedLiteralExpression {
         expression: literal,
         kind: ParsedLiteralKind::AcceptedString,
-        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(81), 2, 8).unwrap(),
+        span: compiler::source::ByteSpan::new(SourceFileId::from_raw(81), 2, 8).unwrap(),
     }];
     let grouped = [
         ParsedGroupedExpression {
             expression: outer_group,
             inner: inner_group,
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(81), 0, 10).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(81), 0, 10).unwrap(),
         },
         ParsedGroupedExpression {
             expression: inner_group,
             inner: literal,
-            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(81), 1, 9).unwrap(),
+            span: compiler::source::ByteSpan::new(SourceFileId::from_raw(81), 1, 9).unwrap(),
         },
     ];
     let resolutions = ResolutionTable::new();
@@ -3153,7 +3153,7 @@ fn accepted_expression_composition_reports_unknown_resolved_name_types() {
     let grouped = [ParsedGroupedExpression {
         expression: unknown_group,
         inner: unknown_name,
-        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(82), 0, 8).unwrap(),
+        span: compiler::source::ByteSpan::new(SourceFileId::from_raw(82), 0, 8).unwrap(),
     }];
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(unknown_name, SymbolId::from_raw(41)));

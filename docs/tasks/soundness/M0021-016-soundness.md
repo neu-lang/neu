@@ -6,8 +6,8 @@
 
 Inputs read: `docs/tasks/M0021-016-exhaustive-match-coverage.md`,
 `docs/milestones/M0021-algebraic-data-and-exhaustiveness.md`, ADR-0033
-authority excerpt, `crates/newlang/src/name_resolution.rs`, and
-`crates/newlang/tests/name_resolution.rs`.
+authority excerpt, `crates/compiler/src/name_resolution.rs`, and
+`crates/compiler/tests/name_resolution.rs`.
 
 Attack checked: a `when` with duplicate arms could otherwise also report
 missing coverage and obscure the first actionable error. The coverage analyzer

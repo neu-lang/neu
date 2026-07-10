@@ -19,9 +19,9 @@ resolved for its `when` subject.
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Decision” and “Diagnostics And Recovery”.
-- `crates/newlang/src/name_resolution.rs`: match analysis and enum variant
+- `crates/compiler/src/name_resolution.rs`: match analysis and enum variant
   identity records.
-- `crates/newlang/src/parser.rs`: qualified case-pattern metadata.
+- `crates/compiler/src/parser.rs`: qualified case-pattern metadata.
 
 ## Scope
 

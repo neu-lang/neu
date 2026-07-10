@@ -95,11 +95,11 @@ require_text "$spec" 'Resolution diagnostics include `unresolved_name`, `duplica
 require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Resolution Source: `docs/adr/ADR-0026-name-resolution-policy.md`'
 require_text "$ambiguity" 'Resolved Date: `2026-07-10`'
-require_text "$ambiguity" '\[x\] Language Lawyer determines whether existing text resolves it'
-require_text "$ambiguity" '\[x\] Adversarial Engineer reviews soundness risk'
-require_text "$ambiguity" '\[x\] Diagnostics Engineer reviews unresolved-name and duplicate-name diagnostics'
-require_text "$ambiguity" '\[x\] Simplicity Guardian reviews the bootstrap subset for overreach'
-require_text "$ambiguity" '\[x\] Chief Architect approves final source-of-truth update'
+require_text "$ambiguity" '\[x\] main-task language review determines whether existing text resolves it'
+require_text "$ambiguity" '\[x\] main-task adversarial check reviews soundness risk'
+require_text "$ambiguity" '\[x\] main-task diagnostics check reviews unresolved-name and duplicate-name diagnostics'
+require_text "$ambiguity" '\[x\] main-task simplicity check reviews the bootstrap subset for overreach'
+require_text "$ambiguity" '\[x\] main task approves final source-of-truth update'
 require_text "$ambiguity" 'Implementation may define name resolution only as specified by accepted ADR-0026'
 
 require_text "$decision" '^Decision: approved$'
@@ -109,11 +109,11 @@ require_text "$decision" 'M0016 ambiguity is resolved'
 require_text "$milestone" '\[x\] Name resolution source of truth is accepted'
 require_text "$task" 'Status: `complete`'
 
-require_file crates/newlang/src/name_resolution.rs
-require_absent_path crates/newlang/src/resolution.rs
-require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
-require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
-require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
-require_absent_text crates/newlang/src/parser.rs 'NameResolution|ResolvedName|UnresolvedName|ImportResolver|LookupScope'
+require_file crates/compiler/src/name_resolution.rs
+require_absent_path crates/compiler/src/resolution.rs
+require_text crates/compiler/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/compiler/src/lib.rs 'pub mod resolution'
+require_absent_text crates/compiler/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
+require_absent_text crates/compiler/src/parser.rs 'NameResolution|ResolvedName|UnresolvedName|ImportResolver|LookupScope'
 
 echo "m0016-accepted: name resolution policy accepted ADR validation passed"

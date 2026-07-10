@@ -46,8 +46,8 @@ The M0018 implementation now has accepted expression typing, declaration signatu
 
 - `docs/milestones/M0018-type-checking-core.md`
 - `docs/adr/ADR-0027-type-checking-core.md`
-- `crates/newlang/src/type_check.rs`
-- `crates/newlang/tests/type_check.rs`
+- `crates/compiler/src/type_check.rs`
+- `crates/compiler/tests/type_check.rs`
 - Existing M0018 task reports.
 
 ## Required Tests

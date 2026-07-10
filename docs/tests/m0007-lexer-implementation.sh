@@ -21,22 +21,22 @@ require_text() {
 }
 
 require_file docs/adr/ADR-0021-lexical-grammar.md
-require_file crates/newlang/src/lexer.rs
-require_file crates/newlang/tests/lexer.rs
+require_file crates/compiler/src/lexer.rs
+require_file crates/compiler/tests/lexer.rs
 require_file docs/tasks/M0007-008-lexer-implementation.md
 
 require_text docs/adr/ADR-0021-lexical-grammar.md '^Status: Accepted$'
-require_text crates/newlang/src/lib.rs '^pub mod lexer;$'
-require_text crates/newlang/src/lexer.rs 'pub fn lex'
-require_text crates/newlang/src/lexer.rs 'enum TokenKind'
-require_text crates/newlang/src/lexer.rs 'enum DiagnosticKind'
-require_text crates/newlang/tests/lexer.rs 'integer_overflow'
-require_text crates/newlang/tests/lexer.rs 'UnsupportedIdentifierCharacter'
-require_text crates/newlang/tests/lexer.rs 'DotDotLess'
+require_text crates/compiler/src/lib.rs '^pub mod lexer;$'
+require_text crates/compiler/src/lexer.rs 'pub fn lex'
+require_text crates/compiler/src/lexer.rs 'enum TokenKind'
+require_text crates/compiler/src/lexer.rs 'enum DiagnosticKind'
+require_text crates/compiler/tests/lexer.rs 'integer_overflow'
+require_text crates/compiler/tests/lexer.rs 'UnsupportedIdentifierCharacter'
+require_text crates/compiler/tests/lexer.rs 'DotDotLess'
 
-require_absent_path crates/newlang/src/token.rs
-require_absent_path crates/newlang/src/hir.rs
-require_absent_path crates/newlang/src/mir.rs
-require_absent_path crates/newlang/src/backend
+require_absent_path crates/compiler/src/token.rs
+require_absent_path crates/compiler/src/hir.rs
+require_absent_path crates/compiler/src/mir.rs
+require_absent_path crates/compiler/src/backend
 
 echo "m0007-lexer-impl: lexer implementation validation passed"

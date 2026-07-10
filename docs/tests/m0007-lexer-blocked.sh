@@ -30,9 +30,9 @@ require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `resolved`'
 require_text docs/ambiguities/M0006-lexical-grammar.md 'Detailed lexical grammar is missing'
 require_text docs/ambiguities/M0006-lexical-grammar.md 'Accepted `docs/adr/ADR-0021-lexical-grammar.md`'
 require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Status: `blocked`'
-require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Language Designer'
-require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'Chief Architect'
+require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'main-task semantic design'
+require_text docs/tasks/M0007-001-lexical-grammar-blocker.md 'main task'
 
-require_absent_path crates/newlang/src/token.rs
+require_absent_path crates/compiler/src/token.rs
 
 echo "m0007: historical lexer blocker resolved by accepted lexical grammar ADR"

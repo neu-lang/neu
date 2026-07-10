@@ -77,7 +77,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Accepted local initializer checking entry point does not exist yet.
@@ -102,7 +102,7 @@ Add a helper that builds primitive annotation signatures, composes accepted expr
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/type_check.rs`
+- Generate tests: edit `crates/compiler/tests/type_check.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-019-accepted-local-initializer-checks.md`
@@ -112,9 +112,9 @@ Add a helper that builds primitive annotation signatures, composes accepted expr
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-019-accepted-local-initializer-checks.md`
   - `docs/tasks/reviews/M0018-019-review.md`
@@ -137,7 +137,7 @@ Add a helper that builds primitive annotation signatures, composes accepted expr
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 accepted local initializer checking task.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added accepted local initializer tests for literal, resolved name, grouped resolved-name, mismatch, unknown annotation, and untyped initializer behavior before implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `newlang::type_check::type_m0018_local_declaration_initializers`.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `compiler::type_check::type_m0018_local_declaration_initializers`.
 - 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added `type_m0018_local_declaration_initializers` to compose accepted expression types, record primitive declaration signatures, and check typed local initializers.
 - 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 163 tests.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-019-accepted-local-initializer-checks.md` passed after ordinary tests.

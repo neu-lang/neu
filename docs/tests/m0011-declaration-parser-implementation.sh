@@ -28,29 +28,29 @@ require_absent_text() {
   fi
 }
 
-require_file crates/newlang/src/parser.rs
-require_file crates/newlang/tests/parser.rs
+require_file crates/compiler/src/parser.rs
+require_file crates/compiler/tests/parser.rs
 require_file docs/tasks/M0011-008-declaration-parser-implementation.md
 require_file docs/adr/ADR-0022-declaration-syntax.md
 
-require_text crates/newlang/src/lib.rs '^pub mod parser;$'
-require_text crates/newlang/src/parser.rs 'pub fn parse_source'
-require_text crates/newlang/src/parser.rs 'MisplacedPackageDeclaration'
-require_text crates/newlang/src/parser.rs 'MisplacedImportDeclaration'
-require_text crates/newlang/src/parser.rs 'DuplicateVisibilityModifier'
-require_text crates/newlang/src/parser.rs 'UnsupportedDeclarationModifier'
-require_text crates/newlang/src/parser.rs 'MissingDeclarationName'
-require_text crates/newlang/src/parser.rs 'MalformedDeclarationHeader'
-require_text crates/newlang/src/parser.rs 'InvalidMemberDeclarationPosition'
-require_text crates/newlang/src/parser.rs 'UnexpectedTokenInDeclarationBody'
-require_text crates/newlang/tests/parser.rs 'parses_package_import_and_function_declaration'
-require_text crates/newlang/tests/parser.rs 'parses_nested_declaration_body_shells'
-require_text crates/newlang/tests/parser.rs 'reports_misplaced_package_and_import'
-require_text crates/newlang/tests/parser.rs 'rejects_deferred_expression_and_field_syntax'
+require_text crates/compiler/src/lib.rs '^pub mod parser;$'
+require_text crates/compiler/src/parser.rs 'pub fn parse_source'
+require_text crates/compiler/src/parser.rs 'MisplacedPackageDeclaration'
+require_text crates/compiler/src/parser.rs 'MisplacedImportDeclaration'
+require_text crates/compiler/src/parser.rs 'DuplicateVisibilityModifier'
+require_text crates/compiler/src/parser.rs 'UnsupportedDeclarationModifier'
+require_text crates/compiler/src/parser.rs 'MissingDeclarationName'
+require_text crates/compiler/src/parser.rs 'MalformedDeclarationHeader'
+require_text crates/compiler/src/parser.rs 'InvalidMemberDeclarationPosition'
+require_text crates/compiler/src/parser.rs 'UnexpectedTokenInDeclarationBody'
+require_text crates/compiler/tests/parser.rs 'parses_package_import_and_function_declaration'
+require_text crates/compiler/tests/parser.rs 'parses_nested_declaration_body_shells'
+require_text crates/compiler/tests/parser.rs 'reports_misplaced_package_and_import'
+require_text crates/compiler/tests/parser.rs 'rejects_deferred_expression_and_field_syntax'
 require_text docs/tasks/M0011-008-declaration-parser-implementation.md 'Status: `complete`'
 
-require_absent_text crates/newlang/src/parser.rs 'TypeRef|Symbol|NameResolution|Hir|Mir|Borrow|Ownership|FlowFact|OwnershipState|BorrowState'
-require_absent_path crates/newlang/src/hir.rs
-require_absent_path crates/newlang/src/mir.rs
+require_absent_text crates/compiler/src/parser.rs 'TypeRef|Symbol|NameResolution|Hir|Mir|Borrow|Ownership|FlowFact|OwnershipState|BorrowState'
+require_absent_path crates/compiler/src/hir.rs
+require_absent_path crates/compiler/src/mir.rs
 
 echo "m0011-parser-impl: declaration parser implementation validation passed"

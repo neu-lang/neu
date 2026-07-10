@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0026-name-resolution-policy.md`
 - Changed files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Ordinary test results:
   - Rust name-resolution tests, M0016 data-model validator, and M0016 accepted-state validator passed.
@@ -41,29 +41,29 @@
 Attack: Collapse declarations with the same text across modules or packages.
 Expected result: Module and package namespace participate in the declaration key.
 Actual result: Tests insert the same symbol across distinct modules and packages without collision.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Collapse function and type declarations into one key.
 Expected result: Declaration kind participates in the key.
 Actual result: Tests insert the same symbol as Function and Type under the same module/package without collision.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 
 Attack: Replace an earlier declaration silently on duplicate key insertion.
 Expected result: Duplicate insert preserves existing declaration and reports the attempted duplicate.
 Actual result: DeclarationIndex returns DeclarationInsert::Duplicate and leaves the original declaration in place.
-Source of truth: crates/newlang/tests/name_resolution.rs
+Source of truth: crates/compiler/tests/name_resolution.rs
 Outcome: pass
 ```
 
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
-  - `cargo test -p newlang --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+  - `cargo test -p compiler --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Result:
   - `pass`
 

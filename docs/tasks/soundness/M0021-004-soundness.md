@@ -21,7 +21,7 @@
 
 ## Evidence
 
-- `cargo test -p newlang --test name_resolution m0021_enum_variant_identity`
+- `cargo test -p compiler --test name_resolution m0021_enum_variant_identity`
 - `sh docs/tests/m0021-enum-variant-identity.sh`
 
 ## Findings

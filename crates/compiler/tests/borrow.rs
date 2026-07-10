@@ -1,4 +1,4 @@
-use newlang::{
+use compiler::{
     ast::AstNodeId,
     borrow::{
         BorrowDiagnostic, BorrowDiagnosticKind, BorrowKind, BorrowRecord, LifetimeEscapeRecord,

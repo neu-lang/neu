@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0012-type-generic-parser-implementation.sh`
   - validator updates for M0012 implementation state.
 - Ordinary test results:
@@ -66,7 +66,7 @@ Outcome: pass
 Attack: Hide malformed nullable, generic, capability-bound, or function type syntax without diagnostics.
 Expected result: parser exposes ADR-0023 diagnostic kinds and tests assert malformed cases.
 Actual result: parser tests assert malformed generic parameter list, malformed capability bound, malformed nullable type, malformed function type, and missing type name diagnostics.
-Source of truth: crates/newlang/tests/parser.rs
+Source of truth: crates/compiler/tests/parser.rs
 Outcome: pass
 ```
 

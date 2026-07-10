@@ -19,7 +19,7 @@ enum and report `duplicate_enum_variant` on the repeated variant.
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Diagnostics And Recovery”.
-- `crates/newlang/src/name_resolution.rs`: enum variant identity index.
+- `crates/compiler/src/name_resolution.rs`: enum variant identity index.
 
 ## Scope
 

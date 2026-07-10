@@ -20,10 +20,10 @@ parameter and each of its explicitly parsed capability bounds.
   “ADR-0023: Type And Generic Syntax”.
 - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`, “Recommended
   Choice”.
-- `crates/newlang/src/parser.rs`: `ParseOutput`, parsed metadata records,
+- `crates/compiler/src/parser.rs`: `ParseOutput`, parsed metadata records,
   `parse_generic_parameters`, and `parse_capability_bound`.
-- `crates/newlang/tests/parser.rs`: generic parser coverage.
-- Validation: `cargo test -p newlang --test parser m0020_generic_parameter_metadata`;
+- `crates/compiler/tests/parser.rs`: generic parser coverage.
+- Validation: `cargo test -p compiler --test parser m0020_generic_parameter_metadata`;
   `cargo fmt --all --check`; `git diff --check`.
 - Expand context only if accepted parser recovery or generic syntax is unclear;
   then consult ADR-0023 rather than inferring semantics.
@@ -73,7 +73,7 @@ parameter and each of its explicitly parsed capability bounds.
 ## Execution Log
 
 - 2026-07-10 main_task=Main phase=create-task result=pass evidence=bounded task created from ADR-0016 and ADR-0023. handoff=main-task test work
-- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p newlang --test parser m0020_generic_parameter_metadata` failed because `ParseOutput.generic_parameters` did not exist. handoff=main-task implementation
+- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p compiler --test parser m0020_generic_parameter_metadata` failed because `ParseOutput.generic_parameters` did not exist. handoff=main-task implementation
 - 2026-07-10 main_task=Main phase=implementation result=pass evidence=added syntax-only generic parameter and capability-bound metadata; focused parser tests passed. handoff=main-task review
 - 2026-07-10 main_task=Main phase=ordinary-tests result=pass evidence=focused metadata tests, validator, formatting, strict clippy, and 216 workspace tests passed. handoff=main-task review
 - 2026-07-10 main_task=Main phase=adversarial result=pass evidence=syntax-only metadata and malformed-input boundaries verified; `docs/tasks/soundness/M0020-001-soundness.md`. handoff=main-task review

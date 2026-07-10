@@ -1,9 +1,9 @@
-use newlang::ast::{AstNodeId, AstNodeKind};
-use newlang::module::{
+use compiler::ast::{AstNodeId, AstNodeKind};
+use compiler::module::{
     DeclarationVisibility, ModuleDiagnosticKind, ModuleMetadata, ModuleName, PackageNamespace,
     VisibilityCategory, VisibilityOrigin,
 };
-use newlang::source::{SourceDatabase, SourceFileId};
+use compiler::source::{SourceDatabase, SourceFileId};
 
 #[test]
 fn module_names_validate_adr0025_identifier_segments() {
@@ -58,8 +58,8 @@ fn module_metadata_preserves_explicit_name_and_ordered_source_files() {
 #[test]
 fn module_identity_does_not_depend_on_source_file_paths() {
     let mut sources = SourceDatabase::new();
-    let first = sources.add_file("one/path/app.nl", "package app");
-    let second = sources.add_file("different/path/app.nl", "package app");
+    let first = sources.add_file("one/path/app.neu", "package app");
+    let second = sources.add_file("different/path/app.neu", "package app");
 
     let first_metadata =
         ModuleMetadata::new(ModuleName::parse("app.core").unwrap(), [first]).unwrap();

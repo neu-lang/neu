@@ -127,19 +127,19 @@ mod tests {
     fn file_ids_are_stable_in_insertion_order() {
         let mut db = SourceDatabase::new();
 
-        let first = db.add_file("first.nl", "");
-        let second = db.add_file("second.nl", "value");
+        let first = db.add_file("first.neu", "");
+        let second = db.add_file("second.neu", "value");
 
         assert_eq!(first.index(), 0);
         assert_eq!(second.index(), 1);
-        assert_eq!(db.file(first).unwrap().path(), "first.nl");
+        assert_eq!(db.file(first).unwrap().path(), "first.neu");
         assert_eq!(db.file(second).unwrap().text(), "value");
     }
 
     #[test]
     fn empty_file_maps_offset_zero_to_first_line_first_column() {
         let mut db = SourceDatabase::new();
-        let file = db.add_file("empty.nl", "");
+        let file = db.add_file("empty.neu", "");
 
         assert_eq!(
             db.line_column(file, 0).unwrap(),
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn single_line_ascii_offsets_map_to_one_based_columns() {
         let mut db = SourceDatabase::new();
-        let file = db.add_file("single.nl", "abc");
+        let file = db.add_file("single.neu", "abc");
 
         assert_eq!(
             db.line_column(file, 0).unwrap(),
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn multi_line_ascii_offsets_map_to_lines_and_columns() {
         let mut db = SourceDatabase::new();
-        let file = db.add_file("multi.nl", "ab\ncd\n");
+        let file = db.add_file("multi.neu", "ab\ncd\n");
 
         assert_eq!(
             db.line_column(file, 0).unwrap(),
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn invalid_offsets_and_spans_are_rejected() {
         let mut db = SourceDatabase::new();
-        let file = db.add_file("bounds.nl", "abc");
+        let file = db.add_file("bounds.neu", "abc");
 
         assert!(db.line_column(file, 4).is_none());
         assert!(db.span(file, 0, 4).is_none());

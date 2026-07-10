@@ -17,9 +17,9 @@
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
 - Changed files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/symbol.rs`
-  - `crates/newlang/tests/symbol.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/symbol.rs`
+  - `crates/compiler/tests/symbol.rs`
   - `docs/tests/m0015-symbol-interner.sh`
   - `docs/milestones/M0015-symbol-interning-and-name-tables.md`
   - `docs/tasks/M0015-001-symbol-interner.md`
@@ -58,7 +58,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/symbol.rs`
+  - `crates/compiler/tests/symbol.rs`
   - `docs/tests/m0015-symbol-interner.sh`
 - Tests run:
   - `cargo test --workspace --all-targets symbol -- --nocapture && docs/tests/m0015-symbol-interner.sh`

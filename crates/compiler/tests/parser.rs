@@ -1,8 +1,8 @@
-use newlang::ast::AstNodeKind;
-use newlang::name_resolution::{DeclarationKind, LocalBindingKind};
-use newlang::parser::ParsedBinaryOperator;
-use newlang::parser::{DiagnosticKind, ParsedLiteralKind, parse_source};
-use newlang::source::{ByteSpan, SourceFileId};
+use compiler::ast::AstNodeKind;
+use compiler::name_resolution::{DeclarationKind, LocalBindingKind};
+use compiler::parser::ParsedBinaryOperator;
+use compiler::parser::{DiagnosticKind, ParsedLiteralKind, parse_source};
+use compiler::source::{ByteSpan, SourceFileId};
 
 #[test]
 fn parses_package_import_and_function_declaration() {

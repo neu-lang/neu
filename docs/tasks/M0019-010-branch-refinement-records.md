@@ -70,7 +70,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-branch-refinement-records.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -96,9 +96,9 @@ Implement a passive function that maps eligible null-test direction to the corre
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/type_check.rs and create docs/tests/m0019-branch-refinement-records.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_branch_refinement`
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_branch_refinement && sh docs/tests/m0019-branch-refinement-records.sh`
+- Generate tests: `edit crates/compiler/tests/type_check.rs and create docs/tests/m0019-branch-refinement-records.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_branch_refinement`
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_branch_refinement && sh docs/tests/m0019-branch-refinement-records.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-010-branch-refinement-records.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-010-branch-refinement-records.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-branch-refinement-records.sh && sh docs/tests/m0019-null-test-eligibility.sh && sh docs/tests/m0019-null-test-recognition.sh && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -106,10 +106,10 @@ Implement a passive function that maps eligible null-test direction to the corre
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-branch-refinement-records.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-010-branch-refinement-records.md`
   - `docs/tasks/reviews/M0019-010-review.md`
@@ -132,9 +132,9 @@ Implement a passive function that maps eligible null-test direction to the corre
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 branch refinement record task.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added focused branch refinement record tests and docs validator before implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check m0019_branch_refinement` failed before implementation due to unresolved branch refinement import.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test type_check m0019_branch_refinement` failed before implementation due to unresolved branch refinement import.
 - 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added passive branch refinement recorder from eligible null-test records and parser if-expression metadata.
-- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check m0019_branch_refinement`, `cargo test -p newlang --test type_check`, and `sh docs/tests/m0019-branch-refinement-records.sh` passed.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p compiler --test type_check m0019_branch_refinement`, `cargo test -p compiler --test type_check`, and `sh docs/tests/m0019-branch-refinement-records.sh` passed.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-010-branch-refinement-records.md` passed and concrete soundness report recorded.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared changes against `docs/SPEC.md`, ADR-0028, and M0019; approved pending final CI.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, and listed docs validators passed.
@@ -147,4 +147,4 @@ Implement a passive function that maps eligible null-test direction to the corre
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`

@@ -26,8 +26,8 @@ require_absent_text() {
 
 adr=docs/adr/ADR-0024-expression-statement-pattern-syntax.md
 task=docs/tasks/M0013-007-expression-statement-pattern-ast-shell.md
-ast=crates/newlang/src/ast.rs
-ast_tests=crates/newlang/tests/ast.rs
+ast=crates/compiler/src/ast.rs
+ast_tests=crates/compiler/tests/ast.rs
 
 require_file "$adr"
 require_file "$task"
@@ -87,7 +87,7 @@ require_text "$ast_tests" 'AstNodeKind::QualifiedCasePattern'
 
 require_text "$task" 'Status: `complete`'
 
-require_absent_text crates/newlang/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
+require_absent_text crates/compiler/src/parser.rs 'parse_when|parse_match|parse_coroutine|parse_unsafe'
 require_absent_text "$ast" 'TypeId|ResolvedType|SymbolId|Constraint|CapabilitySet|OwnershipState|BorrowState|FlowFact|Exhaustive|CoroutineFrame|UnsafeBoundary|Hir|Mir'
 
 echo "m0013-ast-shell: expression, statement, and pattern AST shell validation passed"

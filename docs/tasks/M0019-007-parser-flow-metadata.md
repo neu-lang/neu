@@ -69,7 +69,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0019-parser-flow-metadata.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -95,9 +95,9 @@ Follow existing parser side-table patterns. Record binary expression metadata du
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/parser.rs and create docs/tests/m0019-parser-flow-metadata.sh`
-- Verify tests fail: `cargo test -p newlang --test parser m0019`
-- Ordinary tests: `cargo test -p newlang --test parser && sh docs/tests/m0019-parser-flow-metadata.sh`
+- Generate tests: `edit crates/compiler/tests/parser.rs and create docs/tests/m0019-parser-flow-metadata.sh`
+- Verify tests fail: `cargo test -p compiler --test parser m0019`
+- Ordinary tests: `cargo test -p compiler --test parser && sh docs/tests/m0019-parser-flow-metadata.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-007-parser-flow-metadata.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-007-parser-flow-metadata.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -105,10 +105,10 @@ Follow existing parser side-table patterns. Record binary expression metadata du
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0019-parser-flow-metadata.sh`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-007-parser-flow-metadata.md`
   - `docs/tasks/reviews/M0019-007-review.md`
@@ -131,8 +131,8 @@ Follow existing parser side-table patterns. Record binary expression metadata du
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 parser flow metadata task.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added parser metadata tests and docs validator before implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test parser m0019` failed because ParsedBinaryOperator and parser flow metadata fields did not exist.
-- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=Added syntax-only parser metadata for binary expressions and if condition/branch nodes; `cargo test -p newlang --test parser`, `cargo test -p newlang --test parser m0019`, and `sh docs/tests/m0019-parser-flow-metadata.sh` passed.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test parser m0019` failed because ParsedBinaryOperator and parser flow metadata fields did not exist.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=Added syntax-only parser metadata for binary expressions and if condition/branch nodes; `cargo test -p compiler --test parser`, `cargo test -p compiler --test parser m0019`, and `sh docs/tests/m0019-parser-flow-metadata.sh` passed.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-007-parser-flow-metadata.md` created a passing soundness report.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0019-007-parser-flow-metadata.md` created review report; concrete review approved syntax-metadata-only scope.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0019-parser-flow-metadata.sh`, `sh docs/tests/m0019-flow-output-data-model.sh`, M0019 accepted validator chain, and `sh docs/tests/m0002-workspace-ci.sh` passed. Examples skipped because this task adds parser metadata only.
@@ -144,4 +144,4 @@ Follow existing parser side-table patterns. Record binary expression metadata du
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`

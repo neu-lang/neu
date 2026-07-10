@@ -26,9 +26,9 @@ require_absent_text() {
 
 adr=docs/adr/ADR-0025-module-package-visibility-model.md
 task=docs/tasks/M0014-006-module-identity-model.md
-module_src=crates/newlang/src/module.rs
-lib=crates/newlang/src/lib.rs
-module_tests=crates/newlang/tests/module.rs
+module_src=crates/compiler/src/module.rs
+lib=crates/compiler/src/lib.rs
+module_tests=crates/compiler/tests/module.rs
 milestone=docs/milestones/M0014-module-package-and-visibility-model.md
 
 require_file "$adr"
@@ -66,6 +66,6 @@ require_text "$milestone" '\[x\] Visibility metadata is represented'
 
 require_absent_text "$module_src" 'Manifest|TargetTriple|Dependency|PackageManager|NameResolution|SymbolTable|SourceRoot|OutputPath|CurrentDirectory'
 require_absent_text "$module_src" 'std::path|PathBuf|Path'
-require_absent_text crates/newlang/src/parser.rs 'ModuleName|ModuleMetadata|module::'
+require_absent_text crates/compiler/src/parser.rs 'ModuleName|ModuleMetadata|module::'
 
 echo "m0014-module-identity: module identity model validation passed"

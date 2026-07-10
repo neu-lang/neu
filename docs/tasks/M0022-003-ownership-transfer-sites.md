@@ -19,11 +19,11 @@ move-only type.
 - `docs/SPEC.md`, “ADR-0035: Bootstrap Ownership And Move Analysis”.
 - `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`, “Move Sites”
   and “Move-State Model”.
-- `crates/newlang/src/ownership.rs`: M0022 value-category classifier.
-- `crates/newlang/src/parser.rs`: `ParsedLocalDeclaration` and
+- `crates/compiler/src/ownership.rs`: M0022 value-category classifier.
+- `crates/compiler/src/parser.rs`: `ParsedLocalDeclaration` and
   `ParsedAssignmentStatement`.
-- `crates/newlang/src/name_resolution.rs`: `ResolvedLocalBinding`.
-- `crates/newlang/src/type_check.rs`: `DeclarationSignature`.
+- `crates/compiler/src/name_resolution.rs`: `ResolvedLocalBinding`.
+- `crates/compiler/src/type_check.rs`: `DeclarationSignature`.
 
 ## Scope
 
@@ -56,7 +56,7 @@ move-only type.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=ownership classifier from M0022-002 is available. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test ownership failed with unresolved transfer API imports. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test ownership failed with unresolved transfer API imports. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=collect_ownership_transfers records move-only initializer and assignment source uses. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0022-003-soundness.md. handoff=Reviewer

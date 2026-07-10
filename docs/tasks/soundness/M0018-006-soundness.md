@@ -18,10 +18,10 @@
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
   - `docs/adr/ADR-0026-name-resolution-policy.md`
 - Changed files:
-  - `crates/newlang/src/types.rs`
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/types.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/types.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/types.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tasks/M0018-006-type-check-output-and-primitives.md`
 - Ordinary test results:
   - `cargo fmt --all --check`: pass

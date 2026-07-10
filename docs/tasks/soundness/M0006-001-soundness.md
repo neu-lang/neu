@@ -40,7 +40,7 @@ Source of truth: docs/milestones/M0006-token-model-and-lexer-fixtures.md
 Outcome: pass
 
 Attack: Introduce lexer implementation files during a planning milestone.
-Expected result: crates/newlang/src/lexer.rs and crates/newlang/src/token.rs do not exist.
+Expected result: crates/compiler/src/lexer.rs and crates/compiler/src/token.rs do not exist.
 Actual result: docs/tests/m0006-token-model-fixtures.sh passed absence checks.
 Source of truth: docs/tasks/M0006-001-token-model-fixtures.md
 Outcome: pass

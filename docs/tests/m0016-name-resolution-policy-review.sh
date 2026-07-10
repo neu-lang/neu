@@ -76,9 +76,9 @@ require_text "$review_dir/ADR-0026-chief-architect-decision.md" 'M0016 ambiguity
 require_text "$task" 'Status: `complete`'
 
 require_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
-require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
-require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
-require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
-require_absent_text crates/newlang/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
+require_text crates/compiler/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/compiler/src/lib.rs 'pub mod resolution'
+require_absent_text crates/compiler/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
+require_absent_text crates/compiler/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
 
 echo "m0016-review: name resolution policy proposal review validation passed"

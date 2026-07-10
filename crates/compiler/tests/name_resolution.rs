@@ -1,6 +1,6 @@
-use newlang::ast::{AstArena, AstNodeId};
-use newlang::module::{ModuleMetadata, ModuleName, PackageNamespace};
-use newlang::name_resolution::{
+use compiler::ast::{AstArena, AstNodeId};
+use compiler::module::{ModuleMetadata, ModuleName, PackageNamespace};
+use compiler::name_resolution::{
     DeclarationIndex, DeclarationInsert, DeclarationKey, DeclarationKind, DeclaredName,
     LocalBinding, LocalBindingIndex, LocalBindingInsert, LocalBindingKey, LocalBindingKind,
     LocalNameLookup, LocalNameLookupResult, LocalScopeId, LocalScopeTree, ResolutionDiagnostic,
@@ -13,9 +13,9 @@ use newlang::name_resolution::{
     build_local_binding_index, build_local_scope_tree, build_scoped_binding_index,
     build_scoped_local_binding_index, resolve_enum_parameter_types, resolve_qualified_variant_arms,
 };
-use newlang::parser::parse_source;
-use newlang::source::{ByteSpan, SourceFileId};
-use newlang::symbol::{SymbolId, SymbolInterner};
+use compiler::parser::parse_source;
+use compiler::source::{ByteSpan, SourceFileId};
+use compiler::symbol::{SymbolId, SymbolInterner};
 
 #[test]
 fn m0021_duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
@@ -148,7 +148,7 @@ fn m0021_exhaustiveness_reports_only_otherwise_valid_missing_coverage() {
     assert_eq!(coverage.len(), 1);
     assert_eq!(
         coverage[0].kind(),
-        newlang::name_resolution::MatchDiagnosticKind::NonExhaustiveMatch
+        compiler::name_resolution::MatchDiagnosticKind::NonExhaustiveMatch
     );
     assert_eq!(coverage[0].node(), parsed.when_expressions[2].subject);
 }
@@ -358,7 +358,7 @@ fn m0021_qualified_variant_arm_resolves_subject_enum_variant() {
     assert_eq!(arms.diagnostics().len(), 1);
     assert_eq!(
         arms.diagnostics()[0].kind(),
-        newlang::name_resolution::MatchDiagnosticKind::UnknownMatchVariant
+        compiler::name_resolution::MatchDiagnosticKind::UnknownMatchVariant
     );
 }
 
@@ -733,7 +733,7 @@ fn builds_declaration_index_from_parser_metadata_and_module_package() {
     let file = SourceFileId::from_raw(21);
     let parsed = parse_source(file, "fun main(); struct Box {}");
     assert!(parsed.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::parse("demo.pkg").unwrap())],
     )
@@ -763,7 +763,7 @@ fn declaration_index_builder_preserves_duplicate_insert_results() {
     let second_file = SourceFileId::from_raw(23);
     let first = parse_source(first_file, "fun dup();");
     let second = parse_source(second_file, "fun dup();");
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (first_file, PackageNamespace::root()),
@@ -800,7 +800,7 @@ fn declaration_index_builder_keeps_same_name_in_distinct_packages() {
     let second_file = SourceFileId::from_raw(25);
     let first = parse_source(first_file, "fun shared();");
     let second = parse_source(second_file, "fun shared();");
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (first_file, PackageNamespace::parse("one").unwrap()),
@@ -830,7 +830,7 @@ fn duplicate_declaration_diagnostics_do_not_replace_existing_declaration() {
     let second_file = SourceFileId::from_raw(27);
     let first = parse_source(first_file, "struct Thing {}");
     let second = parse_source(second_file, "struct Thing {}");
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (first_file, PackageNamespace::root()),
@@ -1653,7 +1653,7 @@ fn unqualified_function_reference_binding_uses_same_package_top_level_fallback()
     let parsed = parse_source(file, "fun helper(); fun run() { helper; }");
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::parse("app").unwrap())],
     )
@@ -1692,7 +1692,7 @@ fn unqualified_function_reference_binding_keeps_local_lookup_before_top_level() 
     let parsed = parse_source(file, "fun value(); fun run() { const value = 1; value; }");
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )
@@ -1738,7 +1738,7 @@ fn unqualified_function_reference_binding_rejects_other_package_top_level() {
     assert!(helper.diagnostics.is_empty());
     assert!(run.diagnostics.is_empty());
     assert_eq!(run.name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (helper_file, PackageNamespace::parse("lib").unwrap()),
@@ -1786,7 +1786,7 @@ fn unqualified_function_reference_binding_does_not_treat_types_as_function_fallb
     let parsed = parse_source(file, "struct Box {} fun run() { Box; }");
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )
@@ -1825,7 +1825,7 @@ fn unqualified_type_reference_binding_uses_same_package_top_level_fallback() {
     let parsed = parse_source(file, "struct Box {} fun run(): Box;");
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.type_name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::parse("app").unwrap())],
     )
@@ -1870,7 +1870,7 @@ fn unqualified_type_reference_binding_keeps_local_lookup_before_top_level() {
     );
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.type_name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )
@@ -1916,7 +1916,7 @@ fn unqualified_type_reference_binding_rejects_other_package_top_level() {
     assert!(type_source.diagnostics.is_empty());
     assert!(run.diagnostics.is_empty());
     assert_eq!(run.type_name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (type_file, PackageNamespace::parse("lib").unwrap()),
@@ -1964,7 +1964,7 @@ fn unqualified_type_reference_binding_does_not_treat_functions_as_type_fallback(
     let parsed = parse_source(file, "fun Box(); fun run(): Box;");
     assert!(parsed.diagnostics.is_empty());
     assert_eq!(parsed.type_name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )
@@ -2006,7 +2006,7 @@ fn package_qualified_type_reference_binding_uses_explicit_package_namespace() {
     assert!(type_source.diagnostics.is_empty());
     assert!(run.diagnostics.is_empty());
     assert_eq!(run.type_name_references.len(), 1);
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (type_file, PackageNamespace::parse("lib").unwrap()),
@@ -2042,7 +2042,7 @@ fn package_qualified_type_reference_binding_splits_nested_package_at_final_dot()
     let run = parse_source(run_file, "fun run(): lib.core.Result;");
     assert!(type_source.diagnostics.is_empty());
     assert!(run.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (type_file, PackageNamespace::parse("lib.core").unwrap()),
@@ -2075,7 +2075,7 @@ fn package_qualified_type_reference_binding_ignores_unqualified_type_names() {
     let file = SourceFileId::from_raw(114);
     let parsed = parse_source(file, "struct Box {} fun run(): Box;");
     assert!(parsed.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )
@@ -2100,7 +2100,7 @@ fn package_qualified_type_reference_binding_rejects_missing_and_function_candida
     let file = SourceFileId::from_raw(115);
     let parsed = parse_source(file, "fun Box(); fun run(): lib.Box;");
     assert!(parsed.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::parse("lib").unwrap())],
     )
@@ -2138,7 +2138,7 @@ fn accepted_name_reference_binding_combines_expression_and_type_bindings() {
     );
     assert!(box_source.diagnostics.is_empty());
     assert!(run.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [
             (box_file, PackageNamespace::parse("lib").unwrap()),
@@ -2186,7 +2186,7 @@ fn accepted_name_reference_binding_does_not_duplicate_package_qualified_type_dia
     let file = SourceFileId::from_raw(122);
     let parsed = parse_source(file, "fun run(): missing.Box;");
     assert!(parsed.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )
@@ -2229,7 +2229,7 @@ fn accepted_name_reference_binding_collects_expression_and_type_unresolved_diagn
     let file = SourceFileId::from_raw(123);
     let parsed = parse_source(file, "fun run(): Missing { missing; }");
     assert!(parsed.diagnostics.is_empty());
-    let metadata = newlang::module::ModuleMetadata::with_packages(
+    let metadata = compiler::module::ModuleMetadata::with_packages(
         ModuleName::parse("demo").unwrap(),
         [(file, PackageNamespace::root())],
     )

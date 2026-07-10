@@ -6,7 +6,7 @@
 
 Inputs read: `docs/tasks/M0023-002-borrow-record-conflicts.md`,
 `docs/adr/ADR-0036-bootstrap-borrow-and-lifetime-analysis.md`,
-`crates/newlang/src/borrow.rs`, and `crates/newlang/tests/borrow.rs`.
+`crates/compiler/src/borrow.rs`, and `crates/compiler/tests/borrow.rs`.
 
 Attack checked: multiple shared borrows of one local in one region must remain
 valid. The test accepts shared/shared same-region records.

@@ -184,7 +184,7 @@ ordinary, non-migration-specific parser categories.
 
 Evidence:
 
-- The new assertion in `crates/newlang/tests/parser.rs` for
+- The new assertion in `crates/compiler/tests/parser.rs` for
   `val removed = 1;` receives span text `removed` instead of `val`.
 - The new assertion for `fun const();` receives an empty span instead of
   `const`.
@@ -253,7 +253,7 @@ strengthen the fixture validation enough to catch this contradiction.
 ## Negative Tests Added Or Proposed
 
 - Added narrowly scoped assertions to the existing parser migration tests in
-  `crates/newlang/tests/parser.rs`:
+  `crates/compiler/tests/parser.rs`:
   - removed-introducer recovery must span `val`
   - newly reserved identifier-position rejection must span `const`
 - Both assertions currently fail and are intentionally retained as regression
@@ -306,7 +306,7 @@ Handoff:
 
 Files changed by this execution:
 
-- `crates/newlang/tests/parser.rs`
+- `crates/compiler/tests/parser.rs`
 - `docs/tasks/soundness/M0019-014-soundness.md`
 
 ## Re-review Closure: 2026-07-10
@@ -328,7 +328,7 @@ found and how closure was tested.
    However, `docs/tests/m0016-name-resolution-data-model.sh:86` still requires
    the superseded text `Val`. Running the validator fails with:
    `m0016-data-model: missing expected pattern in
-   crates/newlang/src/name_resolution.rs: Val`. The validator was therefore not
+   crates/compiler/src/name_resolution.rs: Val`. The validator was therefore not
    fixed and the prior coherent-migration finding remains open.
 3. **Closed — positive statement fixture.** Every case again has one complete
    expectation set. Strict `tomllib` parsing succeeds for all four changed

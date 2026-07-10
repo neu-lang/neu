@@ -17,11 +17,11 @@
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
 - Changed files:
-  - `crates/newlang/src/types.rs`
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/src/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-unsupported-type-form-blocking.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test types`: pass
+  - `cargo test -p compiler --test types`: pass
   - `sh docs/tests/m0017-unsupported-type-form-blocking.sh`: pass
 
 ## Safety Invariants Checked

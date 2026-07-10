@@ -6,7 +6,7 @@
 
 Inputs read: `docs/tasks/M0023-004-borrow-analysis-report.md`,
 `docs/adr/ADR-0036-bootstrap-borrow-and-lifetime-analysis.md`,
-`crates/newlang/src/borrow.rs`, and `crates/newlang/tests/borrow.rs`.
+`crates/compiler/src/borrow.rs`, and `crates/compiler/tests/borrow.rs`.
 
 Attack checked: the report must not drop conflict diagnostics when lifetime
 escape diagnostics are also present. The test expects both diagnostic kinds.

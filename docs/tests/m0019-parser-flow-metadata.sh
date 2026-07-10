@@ -24,8 +24,8 @@ require_absent_text() {
   fi
 }
 
-parser=crates/newlang/src/parser.rs
-tests=crates/newlang/tests/parser.rs
+parser=crates/compiler/src/parser.rs
+tests=crates/compiler/tests/parser.rs
 task=docs/tasks/M0019-007-parser-flow-metadata.md
 
 require_file "$parser"
@@ -47,6 +47,6 @@ require_text "$tests" 'm0019_records_if_expression_condition_and_branch_metadata
 require_text "$tests" 'm0019_records_if_expression_without_else_as_none'
 
 require_absent_text "$parser" 'recognize_null_test|apply_smart_cast|check_nullable_use|FlowRefinement'
-require_absent_text crates/newlang/src/type_check.rs 'recognize_null_test|apply_smart_cast|check_nullable_use|walk_if_branch'
+require_absent_text crates/compiler/src/type_check.rs 'recognize_null_test|apply_smart_cast|check_nullable_use|walk_if_branch'
 
 echo "m0019-parser-flow-metadata: parser flow metadata validation passed"

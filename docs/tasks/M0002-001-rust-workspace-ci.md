@@ -116,8 +116,8 @@ Add the minimum workspace, placeholder crate, CI workflow, and build documentati
   - `Cargo.toml`
   - `Cargo.lock`
   - `rust-toolchain.toml`
-  - `crates/newlang/Cargo.toml`
-  - `crates/newlang/src/lib.rs`
+  - `crates/compiler/Cargo.toml`
+  - `crates/compiler/src/lib.rs`
   - `.github/workflows/ci.yml`
 - Documentation or checklist files:
   - `docs/build.md`

@@ -50,7 +50,7 @@ The implementation now includes accepted-subset name reference binding, unresolv
 
 - `docs/milestones/M0016-name-resolution-pass.md`
 - `docs/tests/m0016-name-resolution-data-model.sh`
-- `crates/newlang/tests/name_resolution.rs`
+- `crates/compiler/tests/name_resolution.rs`
 - `docs/adr/ADR-0026-name-resolution-policy.md`
 
 ## Required Tests
@@ -94,7 +94,7 @@ Add milestone checklist assertions to the M0016 validator, verify they fail, the
 
 - Generate tests: `update docs/tests/m0016-name-resolution-data-model.sh`
 - Verify tests fail: `docs/tests/m0016-name-resolution-data-model.sh`
-- Ordinary tests: `docs/tests/m0016-name-resolution-data-model.sh && cargo test -p newlang --test name_resolution && docs/tests/m0016-name-resolution-policy-accepted.sh`
+- Ordinary tests: `docs/tests/m0016-name-resolution-data-model.sh && cargo test -p compiler --test name_resolution && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0016-026-complete-name-resolution-milestone.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0016-026-complete-name-resolution-milestone.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh && docs/tests/m0016-name-resolution-blocked.sh && docs/tests/m0015-name-table-infrastructure.sh && docs/tests/m0002-workspace-ci.sh`
@@ -127,7 +127,7 @@ Add milestone checklist assertions to the M0016 validator, verify they fail, the
 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated M0016 data-model validator to require completed milestone checklist items.
 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0016-name-resolution-data-model.sh failed before milestone update because Approved names resolve remained unchecked.
 2026-07-10 main_task=main-task review phase=implementation result=pass notes=Marked M0016 approved-name and unresolved-name checklist items complete based on implemented accepted-subset binders and diagnostics.
-2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0016 data-model validator, cargo test -p newlang --test name_resolution, and M0016 accepted-state validator passed.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=M0016 data-model validator, cargo test -p compiler --test name_resolution, and M0016 accepted-state validator passed.
 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found milestone closure backed by validators and no unsupported semantic changes.
 2026-07-10 main_task=main-task review phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
 2026-07-10 main_task=Build-Engineer phase=ci-fix result=pass notes=Updated legacy M0016 authority validator to require completed checklist items after milestone closure.

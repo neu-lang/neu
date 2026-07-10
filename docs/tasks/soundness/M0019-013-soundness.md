@@ -17,12 +17,12 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-refinement-aware-assignment-checking.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test type_check m0019_refinement_aware_assignment`: pass
-  - `cargo test -p newlang --test type_check`: pass
+  - `cargo test -p compiler --test type_check m0019_refinement_aware_assignment`: pass
+  - `cargo test -p compiler --test type_check`: pass
   - `sh docs/tests/m0019-refinement-aware-assignment-checking.sh`: pass
 
 ## Safety Invariants Checked
@@ -93,10 +93,10 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Tests run:
-  - `cargo test -p newlang --test type_check m0019_refinement_aware_assignment`
-  - `cargo test -p newlang --test type_check`
+  - `cargo test -p compiler --test type_check m0019_refinement_aware_assignment`
+  - `cargo test -p compiler --test type_check`
   - `sh docs/tests/m0019-refinement-aware-assignment-checking.sh`
   - `docs/scripts/adversarial-check.sh docs/tasks/M0019-013-refinement-aware-assignment-checking.md`
 - Result:

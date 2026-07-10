@@ -18,8 +18,8 @@ bootstrap enum declaration identity.
 
 - `docs/SPEC.md`, “ADR-0034: Bootstrap Enum Subject Typing”.
 - `docs/adr/ADR-0034-bootstrap-enum-subject-typing.md`, “Decision”.
-- `crates/newlang/src/parser.rs`: typed parameter and named-type metadata.
-- `crates/newlang/src/name_resolution.rs`: module/package declaration identity.
+- `crates/compiler/src/parser.rs`: typed parameter and named-type metadata.
+- `crates/compiler/src/name_resolution.rs`: module/package declaration identity.
 
 ## Scope
 

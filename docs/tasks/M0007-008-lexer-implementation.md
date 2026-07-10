@@ -37,7 +37,7 @@ M0007 now has accepted lexical authority and concrete fixtures. The compiler nee
 - Return token and diagnostic source spans.
 - Support whitespace, comments, identifiers, keywords, integer literals, string literals, operators, delimiters, and lexical errors from ADR-0021.
 - Add executable tests based on M0007 fixtures.
-- Update docs validators that previously rejected `crates/newlang/src/lexer.rs`.
+- Update docs validators that previously rejected `crates/compiler/src/lexer.rs`.
 
 ## Out Of Scope
 
@@ -57,7 +57,7 @@ M0007 now has accepted lexical authority and concrete fixtures. The compiler nee
   - `docs/adr/ADR-0021-lexical-grammar.md`
 - Existing files:
   - `tests/fixtures/lexer/*.fixture.toml`
-  - `crates/newlang/src/source.rs`
+  - `crates/compiler/src/source.rs`
 
 ## Required Tests
 
@@ -77,15 +77,15 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/lexer.rs`
+  - `crates/compiler/tests/lexer.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `newlang::lexer` does not exist yet.
+  - `compiler::lexer` does not exist yet.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Add `crates/newlang/src/lexer.rs` and export it from `lib.rs`. Keep token and diagnostic data structures in the lexer module until later architecture requires a separate token module.
+Add `crates/compiler/src/lexer.rs` and export it from `lib.rs`. Keep token and diagnostic data structures in the lexer module until later architecture requires a separate token module.
 
 ## Acceptance Criteria
 
@@ -102,7 +102,7 @@ Add `crates/newlang/src/lexer.rs` and export it from `lib.rs`. Keep token and di
 
 ## Execution Commands
 
-- Generate tests: `create crates/newlang/tests/lexer.rs`
+- Generate tests: `create crates/compiler/tests/lexer.rs`
 - Verify tests fail: `cargo test --workspace --all-targets lexer`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/tests/m0007-lexer-implementation.sh`
@@ -112,13 +112,13 @@ Add `crates/newlang/src/lexer.rs` and export it from `lib.rs`. Keep token and di
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/lexer.rs`
+  - `crates/compiler/tests/lexer.rs`
   - `docs/tests/m0007-lexer-implementation.sh`
-  - existing docs validators that formerly rejected `crates/newlang/src/lexer.rs`
+  - existing docs validators that formerly rejected `crates/compiler/src/lexer.rs`
 - Implementation files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/source.rs`
-  - `crates/newlang/src/lexer.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/source.rs`
+  - `crates/compiler/src/lexer.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0007-008-lexer-implementation.md`
   - `docs/milestones/M0007-lexer-implementation.md`
@@ -143,8 +143,8 @@ Append entries as the task progresses.
 
 ```text
 2026-07-09 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0007 lexer implementation task.
-2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created crates/newlang/tests/lexer.rs before adding lexer implementation.
-2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Rust tests failed as expected because newlang::lexer did not exist.
+2026-07-09 main_task=main-task test work phase=generate-tests result=pass notes=Created crates/compiler/tests/lexer.rs before adding lexer implementation.
+2026-07-09 main_task=main-task test work phase=verify-tests-fail result=pass notes=Rust tests failed as expected because compiler::lexer did not exist.
 2026-07-09 main_task=main-task implementation phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets and M0007 lexer implementation validator passed after adding lexer module.
 2026-07-09 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=Adversarial report confirms no parser behavior, no unsafe code, no overflow lexer diagnostic, and Unicode identifiers remain rejected.
 2026-07-09 main_task=main-task review phase=review result=pass notes=Review approved lexer implementation against ADR-0021 and M0007 fixtures.

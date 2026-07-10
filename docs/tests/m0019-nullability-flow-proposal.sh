@@ -32,7 +32,7 @@ proposal=docs/adr/proposals/ADR-0028-nullability-and-flow-typing.md
 accepted=docs/adr/ADR-0028-nullability-and-flow-typing.md
 ambiguity=docs/ambiguities/M0019-nullability-and-flow-typing.md
 task=docs/tasks/M0019-002-nullability-flow-proposal.md
-source=crates/newlang/src/type_check.rs
+source=crates/compiler/src/type_check.rs
 
 require_file "$proposal"
 require_file "$accepted"

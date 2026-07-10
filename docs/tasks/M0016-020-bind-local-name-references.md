@@ -57,9 +57,9 @@ M0016 has parser metadata for simple identifier references and a local lookup AP
 ## Required Inputs
 
 - `docs/adr/ADR-0026-name-resolution-policy.md`
-- `crates/newlang/src/parser.rs`
-- `crates/newlang/src/name_resolution.rs`
-- `crates/newlang/tests/name_resolution.rs`
+- `crates/compiler/src/parser.rs`
+- `crates/compiler/src/name_resolution.rs`
+- `crates/compiler/tests/name_resolution.rs`
 
 ## Required Tests
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to update before implementation:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -103,9 +103,9 @@ Add a `LocalReferenceBind` result and `bind_local_name_references` function that
 
 ## Execution Commands
 
-- Generate tests: `update crates/newlang/tests/name_resolution.rs && update docs/tests/m0016-name-resolution-data-model.sh`
-- Verify tests fail: `cargo test -p newlang --test name_resolution`
-- Ordinary tests: `cargo test -p newlang --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
+- Generate tests: `update crates/compiler/tests/name_resolution.rs && update docs/tests/m0016-name-resolution-data-model.sh`
+- Verify tests fail: `cargo test -p compiler --test name_resolution`
+- Ordinary tests: `cargo test -p compiler --test name_resolution && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0016-020-bind-local-name-references.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0016-020-bind-local-name-references.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && docs/tests/m0016-name-resolution-data-model.sh && docs/tests/m0016-name-resolution-policy-accepted.sh && docs/tests/m0016-name-resolution-blocked.sh && docs/tests/m0015-name-table-infrastructure.sh && docs/tests/m0002-workspace-ci.sh`
@@ -113,10 +113,10 @@ Add a `LocalReferenceBind` result and `bind_local_name_references` function that
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Implementation files:
-  - `crates/newlang/src/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0016-020-bind-local-name-references.md`
 
@@ -140,9 +140,9 @@ Add a `LocalReferenceBind` result and `bind_local_name_references` function that
 ```text
 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0016 local reference binding task.
 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Updated name-resolution tests and M0016 data-model validator before adding local binder API.
-2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test -p newlang --test name_resolution failed before implementation because bind_local_name_references was missing.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=cargo test -p compiler --test name_resolution failed before implementation because bind_local_name_references was missing.
 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added LocalReferenceBind and bind_local_name_references using existing local lookup and ResolutionTable APIs.
-2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test -p newlang --test name_resolution, M0016 data-model validator, and M0016 accepted-state validator passed.
+2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test -p compiler --test name_resolution, M0016 data-model validator, and M0016 accepted-state validator passed.
 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created a soundness report after ordinary tests; concrete adversarial review found no broader resolver behavior.
 2026-07-10 main_task=main-task review phase=review result=pass notes=docs/scripts/review-task.sh created a review after adversarial checks; concrete review approved scope pending final CI.
 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=cargo fmt, cargo clippy, cargo test, M0016 data-model/accepted/authority validators, M0015 validator, and M0002 validator passed.
@@ -155,4 +155,4 @@ Add a `LocalReferenceBind` result and `bind_local_name_references` function that
 - Required Context:
   - This task file
   - `docs/adr/ADR-0026-name-resolution-policy.md`
-  - `crates/newlang/src/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`

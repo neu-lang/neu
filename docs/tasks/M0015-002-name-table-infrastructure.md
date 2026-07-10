@@ -56,9 +56,9 @@ M0015 requires name table representation and duplicate-name detection hooks befo
 ## Required Inputs
 
 - `docs/milestones/M0015-symbol-interning-and-name-tables.md`
-- `crates/newlang/src/module.rs`
-- `crates/newlang/src/symbol.rs`
-- `crates/newlang/tests/symbol.rs`
+- `crates/compiler/src/module.rs`
+- `crates/compiler/src/symbol.rs`
+- `crates/compiler/tests/symbol.rs`
 
 ## Required Tests
 
@@ -78,7 +78,7 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0015-name-table-infrastructure.sh`
-  - name table test additions in `crates/newlang/tests/symbol.rs`
+  - name table test additions in `crates/compiler/tests/symbol.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `NameTable`, `NameTableKey`, and `NameTableEntry` do not exist.
@@ -86,7 +86,7 @@ Tests must be created before implementation.
 
 ## Implementation Plan
 
-Extend `crates/newlang/src/symbol.rs` with a small insertion-ordered name table keyed by `ModuleName` and `SymbolId`. Use an enum result to distinguish inserted entries from duplicate insertion hooks without declaring whether duplicates are language errors.
+Extend `crates/compiler/src/symbol.rs` with a small insertion-ordered name table keyed by `ModuleName` and `SymbolId`. Use an enum result to distinguish inserted entries from duplicate insertion hooks without declaring whether duplicates are language errors.
 
 ## Acceptance Criteria
 
@@ -103,7 +103,7 @@ Extend `crates/newlang/src/symbol.rs` with a small insertion-ordered name table 
 
 ## Execution Commands
 
-- Generate tests: `create docs/tests/m0015-name-table-infrastructure.sh and update crates/newlang/tests/symbol.rs`
+- Generate tests: `create docs/tests/m0015-name-table-infrastructure.sh and update crates/compiler/tests/symbol.rs`
 - Verify tests fail: `docs/tests/m0015-name-table-infrastructure.sh`
 - Ordinary tests: `cargo test --workspace --all-targets symbol -- --nocapture && docs/tests/m0015-name-table-infrastructure.sh && docs/tests/m0015-symbol-interner.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0015-002-name-table-infrastructure.md`
@@ -114,9 +114,9 @@ Extend `crates/newlang/src/symbol.rs` with a small insertion-ordered name table 
 
 - Test files:
   - `docs/tests/m0015-name-table-infrastructure.sh`
-  - `crates/newlang/tests/symbol.rs`
+  - `crates/compiler/tests/symbol.rs`
 - Implementation files:
-  - `crates/newlang/src/symbol.rs`
+  - `crates/compiler/src/symbol.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0015-symbol-interning-and-name-tables.md`
   - `docs/tasks/M0015-002-name-table-infrastructure.md`

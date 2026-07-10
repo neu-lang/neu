@@ -66,14 +66,14 @@ require_text "$proposal" 'inaccessible_name'
 
 require_text "$accepted" '^Status: Accepted$'
 require_text "$ambiguity" 'Status: `resolved`'
-require_text "$ambiguity" '\[x\] Language Designer drafts a name-resolution policy ADR or `docs/SPEC.md` revision'
+require_text "$ambiguity" '\[x\] main-task semantic design drafts a name-resolution policy ADR or `docs/SPEC.md` revision'
 require_text "$task" 'Status: `complete`'
 
 require_text docs/SPEC.md '^## ADR-0026: Name Resolution Policy$'
-require_file crates/newlang/src/name_resolution.rs
-require_absent_path crates/newlang/src/resolution.rs
-require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
-require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
-require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
+require_file crates/compiler/src/name_resolution.rs
+require_absent_path crates/compiler/src/resolution.rs
+require_text crates/compiler/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/compiler/src/lib.rs 'pub mod resolution'
+require_absent_text crates/compiler/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
 
 echo "m0016-proposal: name resolution policy proposal validation passed"

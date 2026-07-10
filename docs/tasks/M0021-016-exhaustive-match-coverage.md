@@ -19,9 +19,9 @@ Report `non_exhaustive_match` on the subject of an otherwise valid bootstrap
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Decision” and “Diagnostics And Recovery”.
-- `crates/newlang/src/name_resolution.rs`: enum variant identities, resolved
+- `crates/compiler/src/name_resolution.rs`: enum variant identities, resolved
   subjects, resolved arms, and match diagnostics.
-- `crates/newlang/tests/name_resolution.rs`: M0021 parser-backed resolution
+- `crates/compiler/tests/name_resolution.rs`: M0021 parser-backed resolution
   tests.
 
 ## Scope

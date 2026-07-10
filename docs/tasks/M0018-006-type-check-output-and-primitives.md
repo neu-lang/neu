@@ -72,8 +72,8 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/types.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/types.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `PrimitiveType`, primitive `TypeRecord`s, expression type entries, declaration signature entries, and assignment check entries do not exist yet.
@@ -98,7 +98,7 @@ Extend the existing M0017 type model with primitive type-checking identities, th
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/types.rs` and `crates/newlang/tests/type_check.rs`
+- Generate tests: edit `crates/compiler/tests/types.rs` and `crates/compiler/tests/type_check.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-006-type-check-output-and-primitives.md`
@@ -108,11 +108,11 @@ Extend the existing M0017 type model with primitive type-checking identities, th
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/types.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/types.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Implementation files:
-  - `crates/newlang/src/types.rs`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/types.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-006-type-check-output-and-primitives.md`
   - `docs/tasks/reviews/M0018-006-review.md`

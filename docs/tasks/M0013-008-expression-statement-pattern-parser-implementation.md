@@ -63,9 +63,9 @@ M0013 has accepted syntax, fixtures, and AST shell nodes. The compiler now needs
 - ADRs:
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Existing files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/parser.rs`
   - `tests/fixtures/parser/expressions/*.fixture.toml`
   - `tests/fixtures/parser/statements/*.fixture.toml`
   - `tests/fixtures/parser/patterns/*.fixture.toml`
@@ -90,10 +90,10 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
-  - focused Rust parser test additions in `crates/newlang/tests/parser.rs`
+  - focused Rust parser test additions in `crates/compiler/tests/parser.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `crates/newlang/src/parser.rs` does not yet define ADR-0024 parser diagnostics or parse body syntax into AST nodes.
+  - `crates/compiler/src/parser.rs` does not yet define ADR-0024 parser diagnostics or parse body syntax into AST nodes.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -115,7 +115,7 @@ Extend the existing parser with syntax-only recursive descent routines for ADR-0
 
 ## Execution Commands
 
-- Generate tests: `create docs/tests/m0013-expression-statement-pattern-parser-implementation.sh and update crates/newlang/tests/parser.rs`
+- Generate tests: `create docs/tests/m0013-expression-statement-pattern-parser-implementation.sh and update crates/compiler/tests/parser.rs`
 - Verify tests fail: `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
 - Ordinary tests: `cargo test --workspace --all-targets parser -- --nocapture && docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
 - Adversarial tests: `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
@@ -126,9 +126,9 @@ Extend the existing parser with syntax-only recursive descent routines for ADR-0
 
 - Test files:
   - `docs/tests/m0013-expression-statement-pattern-parser-implementation.sh`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0013-008-expression-statement-pattern-parser-implementation.md`
   - `docs/milestones/M0013-expression-statement-and-pattern-parser.md`

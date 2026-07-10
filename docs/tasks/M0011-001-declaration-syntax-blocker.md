@@ -119,7 +119,7 @@ Add blocker validation only. Do not implement parser code.
 
 ## Forbidden Changes
 
-- Do not add `crates/newlang/src/parser.rs`.
+- Do not add `crates/compiler/src/parser.rs`.
 - Do not add concrete parser fixtures.
 - Do not add concrete declaration AST nodes.
 - Do not change declaration syntax authority.

@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
 - Changed files:
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/tests/m0012-type-ast-shell.sh`
   - M0012 validator updates.
 - Ordinary test results:
@@ -57,7 +57,7 @@ Outcome: pass
 ```text
 Attack: Encode capability, borrow, lifetime, coroutine, or unsafe semantics in AST names or fields.
 Expected result: AST shell names mirror syntax categories only.
-Actual result: validator rejects semantic markers in `crates/newlang/src/ast.rs`.
+Actual result: validator rejects semantic markers in `crates/compiler/src/ast.rs`.
 Source of truth: docs/tests/m0012-type-ast-shell.sh
 Outcome: pass
 ```

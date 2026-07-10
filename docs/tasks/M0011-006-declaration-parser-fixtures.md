@@ -127,7 +127,7 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 - Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
-- Do not add `crates/newlang/src/parser.rs`.
+- Do not add `crates/compiler/src/parser.rs`.
 - Do not add executable Rust parser tests.
 
 ## Ambiguities And Dependencies

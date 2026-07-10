@@ -16,8 +16,8 @@
 - ADRs:
   - `docs/adr/ADR-0022-declaration-syntax.md`
 - Changed files:
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/ast/data-model.md`
   - `docs/tests/m0011-declaration-ast-shell.sh`
 - Ordinary test results:
@@ -54,7 +54,7 @@ Outcome: pass
 
 Attack: Implement parser behavior inside AST task.
 Expected result: Parser source and executable parser tests remain absent.
-Actual result: crates/newlang/src/parser.rs and crates/newlang/tests/parser.rs remain absent.
+Actual result: crates/compiler/src/parser.rs and crates/compiler/tests/parser.rs remain absent.
 Source of truth: docs/tasks/M0011-007-declaration-ast-shell.md
 Outcome: pass
 ```

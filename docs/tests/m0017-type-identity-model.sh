@@ -29,9 +29,9 @@ milestone=docs/milestones/M0017-type-representation.md
 adr_type=docs/adr/ADR-0010-type-system-shape.md
 adr_null=docs/adr/ADR-0006-nullability-and-absence.md
 adr_generics=docs/adr/ADR-0016-generics-and-parametric-polymorphism.md
-source=crates/newlang/src/types.rs
-lib=crates/newlang/src/lib.rs
-test_file=crates/newlang/tests/types.rs
+source=crates/compiler/src/types.rs
+lib=crates/compiler/src/lib.rs
+test_file=crates/compiler/tests/types.rs
 
 require_file "$task"
 require_file "$milestone"
@@ -70,6 +70,6 @@ require_absent_text "$source" 'infer_type|solve_constraints|ConstraintSolver|Own
 require_absent_text "$source" 'PrimitiveScalar|Int32|Int64|Float32|Float64|Bool|StringType'
 require_absent_text "$source" 'OptionalType'
 
-cargo test -p newlang --test types
+cargo test -p compiler --test types
 
 echo "m0017-type-identity-model: type identity model validation passed"

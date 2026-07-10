@@ -19,12 +19,12 @@ to their enclosing enum declaration.
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Decision” and “Diagnostics And Recovery”.
-- `crates/newlang/src/ast.rs`: enum declaration AST conventions.
-- `crates/newlang/src/parser.rs`: named-body declaration parsing and parsed
+- `crates/compiler/src/ast.rs`: enum declaration AST conventions.
+- `crates/compiler/src/parser.rs`: named-body declaration parsing and parsed
   side-table records.
-- `crates/newlang/tests/parser.rs` and `crates/newlang/tests/ast.rs`.
-- Validation: `cargo test -p newlang --test parser m0021_enum_variant`;
-  `cargo test -p newlang --test ast`; `cargo fmt --all --check`.
+- `crates/compiler/tests/parser.rs` and `crates/compiler/tests/ast.rs`.
+- Validation: `cargo test -p compiler --test parser m0021_enum_variant`;
+  `cargo test -p compiler --test ast`; `cargo fmt --all --check`.
 
 ## Scope
 
@@ -60,7 +60,7 @@ to their enclosing enum declaration.
 ## Execution Log
 
 - 2026-07-10 agent=Main phase=create-task result=pass evidence=task bounded to ADR-0033 enum declaration syntax. handoff=Test-Engineer
-- 2026-07-10 agent=Main phase=test-first result=fail evidence=`cargo test -p newlang --test parser m0021_enum_variants` failed because enum variant AST and parser metadata were absent. handoff=Implementer
+- 2026-07-10 agent=Main phase=test-first result=fail evidence=`cargo test -p compiler --test parser m0021_enum_variants` failed because enum variant AST and parser metadata were absent. handoff=Implementer
 - 2026-07-10 agent=Main phase=implementation result=pass evidence=identifier-only enum-body parser and ordered metadata added; focused parser and AST tests passed. handoff=Reviewer
 - 2026-07-10 agent=Main phase=ordinary-tests result=pass evidence=focused enum tests, validator, formatting, strict clippy, and 220 workspace tests passed. handoff=Reviewer
 - 2026-07-10 agent=Main phase=adversarial result=pass evidence=payload-shaped and nested declaration entries produce no variant metadata; `docs/tasks/soundness/M0021-002-soundness.md`. handoff=Reviewer

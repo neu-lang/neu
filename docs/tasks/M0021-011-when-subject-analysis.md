@@ -21,7 +21,7 @@ against the ADR-0034 resolved enum parameter identity.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Diagnostics And Recovery”.
 - `docs/adr/ADR-0034-bootstrap-enum-subject-typing.md`, “Decision”.
-- `crates/newlang/src/name_resolution.rs`: local reference and enum-parameter
+- `crates/compiler/src/name_resolution.rs`: local reference and enum-parameter
   identity records.
 
 ## Scope

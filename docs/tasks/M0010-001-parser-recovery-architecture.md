@@ -127,7 +127,7 @@ Add documentation and synthetic fixture artifacts only. Use synthetic token name
 
 ## Forbidden Changes
 
-- Do not add `crates/newlang/src/parser.rs`.
+- Do not add `crates/compiler/src/parser.rs`.
 - Do not add concrete parser fixtures.
 - Do not add concrete syntax AST nodes.
 - Do not modify accepted ADRs or `docs/SPEC.md`.

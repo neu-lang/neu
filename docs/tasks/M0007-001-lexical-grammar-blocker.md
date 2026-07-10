@@ -120,8 +120,8 @@ Do not implement lexer code. Add only the validation script and blocker record, 
 - Do not modify `docs/SPEC.md`.
 - Do not modify `docs/adr/`.
 - Do not implement lexer code.
-- Do not add `crates/newlang/src/lexer.rs`.
-- Do not add `crates/newlang/src/token.rs`.
+- Do not add `crates/compiler/src/lexer.rs`.
+- Do not add `crates/compiler/src/token.rs`.
 - Do not add concrete lexer fixtures.
 
 ## Ambiguities And Dependencies

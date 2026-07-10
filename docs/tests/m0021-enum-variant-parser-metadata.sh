@@ -10,9 +10,9 @@ require_text() {
   grep -Eq -- "$2" "$1" || fail "missing expected pattern in $1: $2"
 }
 
-source=crates/newlang/src/parser.rs
-ast=crates/newlang/src/ast.rs
-tests=crates/newlang/tests/parser.rs
+source=crates/compiler/src/parser.rs
+ast=crates/compiler/src/ast.rs
+tests=crates/compiler/tests/parser.rs
 
 [ -f "$source" ] || fail "missing parser source"
 [ -f "$ast" ] || fail "missing AST source"

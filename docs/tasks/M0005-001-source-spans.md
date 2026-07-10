@@ -56,7 +56,7 @@ M0005 requires stable file identifiers and span mapping before lexing, parsing, 
 - ADRs:
   - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - Existing files:
-  - `crates/newlang/src/lib.rs`
+  - `crates/compiler/src/lib.rs`
   - `docs/diagnostics.md`
   - `docs/test-harness.md`
 
@@ -76,7 +76,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/src/source.rs` tests, before implementation body is added.
+  - `crates/compiler/src/source.rs` tests, before implementation body is added.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Source database and span types are not implemented yet.
@@ -111,11 +111,11 @@ Add the smallest source module that stores files in insertion order, returns sta
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/src/source.rs`
+  - `crates/compiler/src/source.rs`
   - `docs/tests/m0005-source-spans.sh`
 - Implementation files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/source.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/source.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0005-source-database-spans-and-file-identity.md`
   - `docs/tasks/M0005-001-source-spans.md`

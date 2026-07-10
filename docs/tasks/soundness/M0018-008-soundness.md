@@ -17,10 +17,10 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/parser.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/parser.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tasks/M0018-008-parser-literal-type-inputs.md`
 - Ordinary test results:
   - `cargo fmt --all --check`: pass

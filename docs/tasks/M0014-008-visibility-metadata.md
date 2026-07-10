@@ -54,9 +54,9 @@ M0014 requires visibility metadata for declarations with parsed visibility scope
 
 - `docs/adr/ADR-0022-declaration-syntax.md`
 - `docs/adr/ADR-0025-module-package-visibility-model.md`
-- `crates/newlang/src/ast.rs`
-- `crates/newlang/src/module.rs`
-- `crates/newlang/tests/module.rs`
+- `crates/compiler/src/ast.rs`
+- `crates/compiler/src/module.rs`
+- `crates/compiler/tests/module.rs`
 
 ## Required Tests
 
@@ -77,7 +77,7 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0014-visibility-metadata.sh`
-  - visibility metadata test additions in `crates/newlang/tests/module.rs`
+  - visibility metadata test additions in `crates/compiler/tests/module.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `VisibilityCategory`, `VisibilityOrigin`, and declaration visibility metadata do not exist.
@@ -85,7 +85,7 @@ Tests must be created before implementation.
 
 ## Implementation Plan
 
-Extend `crates/newlang/src/module.rs` with visibility metadata types and a constructor that accepts package and visibility metadata together. Keep metadata explicit and independent of parser extraction.
+Extend `crates/compiler/src/module.rs` with visibility metadata types and a constructor that accepts package and visibility metadata together. Keep metadata explicit and independent of parser extraction.
 
 ## Acceptance Criteria
 
@@ -102,7 +102,7 @@ Extend `crates/newlang/src/module.rs` with visibility metadata types and a const
 
 ## Execution Commands
 
-- Generate tests: `create docs/tests/m0014-visibility-metadata.sh and update crates/newlang/tests/module.rs`
+- Generate tests: `create docs/tests/m0014-visibility-metadata.sh and update crates/compiler/tests/module.rs`
 - Verify tests fail: `docs/tests/m0014-visibility-metadata.sh`
 - Ordinary tests: `cargo test --workspace --all-targets module -- --nocapture && docs/tests/m0014-visibility-metadata.sh && docs/tests/m0014-package-namespace-metadata.sh && docs/tests/m0014-module-identity-model.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0014-008-visibility-metadata.md`
@@ -113,9 +113,9 @@ Extend `crates/newlang/src/module.rs` with visibility metadata types and a const
 
 - Test files:
   - `docs/tests/m0014-visibility-metadata.sh`
-  - `crates/newlang/tests/module.rs`
+  - `crates/compiler/tests/module.rs`
 - Implementation files:
-  - `crates/newlang/src/module.rs`
+  - `crates/compiler/src/module.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0014-module-package-and-visibility-model.md`
   - `docs/tasks/M0014-008-visibility-metadata.md`

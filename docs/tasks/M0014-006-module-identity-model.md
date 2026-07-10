@@ -58,7 +58,7 @@ M0014 now has accepted authority for explicit module names and one-module source
 - `docs/adr/ADR-0021-lexical-grammar.md`
 - `docs/adr/ADR-0025-module-package-visibility-model.md`
 - `docs/SPEC.md`
-- `crates/newlang/src/source.rs`
+- `crates/compiler/src/source.rs`
 
 ## Required Tests
 
@@ -80,15 +80,15 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0014-module-identity-model.sh`
-  - `crates/newlang/tests/module.rs`
+  - `crates/compiler/tests/module.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `crates/newlang/src/module.rs` and `newlang::module` do not exist.
+  - `crates/compiler/src/module.rs` and `compiler::module` do not exist.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
 
-Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module metadata record, and module diagnostics. Export it from `crates/newlang/src/lib.rs`. Do not read source file paths or parse package declarations in this task.
+Add `crates/compiler/src/module.rs` with a small validated `ModuleName`, module metadata record, and module diagnostics. Export it from `crates/compiler/src/lib.rs`. Do not read source file paths or parse package declarations in this task.
 
 ## Acceptance Criteria
 
@@ -105,7 +105,7 @@ Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module m
 
 ## Execution Commands
 
-- Generate tests: `create docs/tests/m0014-module-identity-model.sh and crates/newlang/tests/module.rs`
+- Generate tests: `create docs/tests/m0014-module-identity-model.sh and crates/compiler/tests/module.rs`
 - Verify tests fail: `docs/tests/m0014-module-identity-model.sh`
 - Ordinary tests: `cargo test --workspace --all-targets module -- --nocapture && docs/tests/m0014-module-identity-model.sh && docs/tests/m0014-module-package-visibility-model-accepted.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0014-006-module-identity-model.md`
@@ -116,10 +116,10 @@ Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module m
 
 - Test files:
   - `docs/tests/m0014-module-identity-model.sh`
-  - `crates/newlang/tests/module.rs`
+  - `crates/compiler/tests/module.rs`
 - Implementation files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/module.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/module.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0014-module-package-and-visibility-model.md`
   - `docs/tasks/M0014-006-module-identity-model.md`
@@ -144,7 +144,7 @@ Add `crates/newlang/src/module.rs` with a small validated `ModuleName`, module m
 ```text
 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0014 module identity model task.
 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Created docs/tests/m0014-module-identity-model.sh and Rust module tests before implementation.
-2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-identity-model.sh failed before implementation because crates/newlang/src/module.rs was missing.
+2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=docs/tests/m0014-module-identity-model.sh failed before implementation because crates/compiler/src/module.rs was missing.
 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added explicit ModuleName validation and ModuleMetadata source-file assignment model without package, visibility, or name-resolution behavior.
 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=cargo test --workspace --all-targets module -- --nocapture plus M0014 module identity and accepted ADR validators passed.
 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=docs/scripts/adversarial-check.sh created docs/tasks/soundness/M0014-006-soundness.md after ordinary-test evidence.

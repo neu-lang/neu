@@ -24,8 +24,8 @@ require_absent_text() {
   fi
 }
 
-source=crates/newlang/src/type_check.rs
-tests=crates/newlang/tests/type_check.rs
+source=crates/compiler/src/type_check.rs
+tests=crates/compiler/tests/type_check.rs
 task=docs/tasks/M0019-009-null-test-eligibility.md
 
 require_file "$source"

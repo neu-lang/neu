@@ -29,7 +29,7 @@ spec=docs/SPEC.md
 ambiguity=docs/ambiguities/M0019-nullability-and-flow-typing.md
 decision=docs/adr/proposals/reviews/ADR-0028-chief-architect-decision.md
 task=docs/tasks/M0019-005-accept-nullability-flow-adr.md
-source=crates/newlang/src/type_check.rs
+source=crates/compiler/src/type_check.rs
 
 require_file "$adr"
 require_file "$spec"
@@ -110,6 +110,6 @@ require_text "$decision" 'M0019 ambiguity is resolved'
 require_text "$task" 'Status: `(in_progress|review|complete)`'
 
 require_absent_text "$source" 'recognize_null_test|apply_smart_cast|check_nullable_use|walk_if_branch'
-require_absent_text crates/newlang/src/lib.rs 'pub mod hir|pub mod mir|pub mod backend'
+require_absent_text crates/compiler/src/lib.rs 'pub mod hir|pub mod mir|pub mod backend'
 
 echo "m0019-accepted: nullability and flow typing accepted ADR validation passed"

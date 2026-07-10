@@ -6,7 +6,7 @@
 
 Inputs read: `docs/tasks/M0022-003-ownership-transfer-sites.md`,
 `docs/adr/ADR-0035-bootstrap-ownership-and-move-analysis.md`,
-`crates/newlang/src/ownership.rs`, and `crates/newlang/tests/ownership.rs`.
+`crates/compiler/src/ownership.rs`, and `crates/compiler/tests/ownership.rs`.
 
 Attack checked: copyable `Int` local sources must not create move origins. The
 transfer collector uses the M0022 value-category classifier and ignores

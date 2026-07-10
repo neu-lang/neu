@@ -52,8 +52,8 @@ if grep -Eq 'source_text|expected_output|expected_error|token|parse|lexer|parser
   fail "inert fixture must not encode compiler behavior, source syntax, or expected compiler output"
 fi
 
-require_absent_path crates/newlang/src/hir.rs
-require_absent_path crates/newlang/src/mir.rs
-require_absent_path crates/newlang/src/backend
+require_absent_path crates/compiler/src/hir.rs
+require_absent_path crates/compiler/src/mir.rs
+require_absent_path crates/compiler/src/backend
 
 echo "m0003: fixture layout validation passed"

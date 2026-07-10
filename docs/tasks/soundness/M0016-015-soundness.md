@@ -17,11 +17,11 @@
   - `docs/adr/ADR-0026-name-resolution-policy.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test name_resolution`: pass
+  - `cargo test -p compiler --test name_resolution`: pass
   - `docs/tests/m0016-name-resolution-data-model.sh`: pass
   - `docs/tests/m0016-name-resolution-policy-accepted.sh`: pass
 
@@ -63,7 +63,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/name_resolution.rs`
+  - `crates/compiler/tests/name_resolution.rs`
   - `docs/tests/m0016-name-resolution-data-model.sh`
 - Tests run:
   - `docs/scripts/adversarial-check.sh docs/tasks/M0016-015-local-scope-tree-model.md`

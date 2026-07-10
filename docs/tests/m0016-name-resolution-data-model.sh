@@ -27,11 +27,11 @@ require_absent_text() {
 task=docs/tasks/M0016-006-name-resolution-data-model.md
 milestone=docs/milestones/M0016-name-resolution-pass.md
 adr=docs/adr/ADR-0026-name-resolution-policy.md
-source=crates/newlang/src/name_resolution.rs
-lib=crates/newlang/src/lib.rs
-test_file=crates/newlang/tests/name_resolution.rs
-parser=crates/newlang/src/parser.rs
-parser_test=crates/newlang/tests/parser.rs
+source=crates/compiler/src/name_resolution.rs
+lib=crates/compiler/src/lib.rs
+test_file=crates/compiler/tests/name_resolution.rs
+parser=crates/compiler/src/parser.rs
+parser_test=crates/compiler/tests/parser.rs
 
 require_file "$task"
 require_file "$milestone"

@@ -46,7 +46,7 @@ require_text "$ambiguity" '^# Ambiguity Report: M0016 Name Resolution Policy$'
 require_text "$ambiguity" 'Report ID: `M0016-NAME-RESOLUTION-POLICY`'
 require_text "$ambiguity" 'Related Task: `M0016-001`'
 require_text "$ambiguity" 'Status: `resolved`'
-require_text "$ambiguity" 'Required Owner: `Language Designer`'
+require_text "$ambiguity" 'Required Owner: `main-task semantic design`'
 require_text "$ambiguity" 'Resolution Source: `docs/adr/ADR-0026-name-resolution-policy.md`'
 require_text "$ambiguity" 'lookup order'
 require_text "$ambiguity" 'import semantics'
@@ -65,13 +65,13 @@ require_text "$spec" '^## ADR-0025: Module Package And Visibility Model$'
 require_text "$spec" 'later dependency and name resolution rules'
 require_text "$spec" '^## ADR-0026: Name Resolution Policy$'
 
-require_file crates/newlang/src/name_resolution.rs
-require_absent_path crates/newlang/src/resolution.rs
-require_file crates/newlang/tests/name_resolution.rs
-require_text crates/newlang/src/lib.rs 'pub mod name_resolution;'
-require_absent_text crates/newlang/src/lib.rs 'pub mod resolution'
-require_absent_text crates/newlang/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
-require_absent_text crates/newlang/src/symbol.rs 'ImportResolver|VisibilityEnforcement|LookupDiagnostic|ScopeStack|ResolutionPolicy'
-require_absent_text crates/newlang/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
+require_file crates/compiler/src/name_resolution.rs
+require_absent_path crates/compiler/src/resolution.rs
+require_file crates/compiler/tests/name_resolution.rs
+require_text crates/compiler/src/lib.rs 'pub mod name_resolution;'
+require_absent_text crates/compiler/src/lib.rs 'pub mod resolution'
+require_absent_text crates/compiler/src/name_resolution.rs 'LookupScope|ScopeStack|ImportResolver|VisibilityEnforcement|resolve_names|resolve_module|resolve_file'
+require_absent_text crates/compiler/src/symbol.rs 'ImportResolver|VisibilityEnforcement|LookupDiagnostic|ScopeStack|ResolutionPolicy'
+require_absent_text crates/compiler/src/parser.rs 'NameResolution|UnresolvedName|ResolvedName|ImportResolver'
 
 echo "m0016-authority: name resolution policy authority validation passed"

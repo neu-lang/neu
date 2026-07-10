@@ -72,7 +72,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-null-test-eligibility.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -98,9 +98,9 @@ Implement a passive eligibility selector over existing side tables. Return eligi
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/type_check.rs and create docs/tests/m0019-null-test-eligibility.sh`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_null_test_eligibility`
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_null_test_eligibility && sh docs/tests/m0019-null-test-eligibility.sh`
+- Generate tests: `edit crates/compiler/tests/type_check.rs and create docs/tests/m0019-null-test-eligibility.sh`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_null_test_eligibility`
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_null_test_eligibility && sh docs/tests/m0019-null-test-eligibility.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-009-null-test-eligibility.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-009-null-test-eligibility.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-null-test-eligibility.sh && sh docs/tests/m0019-null-test-recognition.sh && sh docs/tests/m0019-parser-flow-metadata.sh && sh docs/tests/m0019-flow-output-data-model.sh && sh docs/tests/m0002-workspace-ci.sh`
@@ -108,10 +108,10 @@ Implement a passive eligibility selector over existing side tables. Return eligi
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tests/m0019-null-test-eligibility.sh`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0019-009-null-test-eligibility.md`
   - `docs/tasks/reviews/M0019-009-review.md`
@@ -134,9 +134,9 @@ Implement a passive eligibility selector over existing side tables. Return eligi
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0019 null-test eligibility task.
 - 2026-07-10 main_task=main-task test work phase=generate-tests result=pass notes=Added focused null-test eligibility tests and docs validator before implementation.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test type_check m0019_null_test_eligibility` failed before implementation due to unresolved eligibility imports.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test type_check m0019_null_test_eligibility` failed before implementation due to unresolved eligibility imports.
 - 2026-07-10 main_task=main-task implementation phase=implement result=pass notes=Added passive eligible null-test refinement records and selector over resolution, local binding, declaration signature, and type side tables.
-- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p newlang --test type_check m0019_null_test_eligibility`, `cargo test -p newlang --test type_check`, and `sh docs/tests/m0019-null-test-eligibility.sh` passed.
+- 2026-07-10 main_task=main-task test work phase=ordinary-tests result=pass notes=`cargo test -p compiler --test type_check m0019_null_test_eligibility`, `cargo test -p compiler --test type_check`, and `sh docs/tests/m0019-null-test-eligibility.sh` passed.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-check result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0019-009-null-test-eligibility.md` passed and concrete soundness report recorded.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=Compared changes against `docs/SPEC.md`, ADR-0028, and M0019; approved pending final CI.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, and listed docs validators passed.
@@ -149,4 +149,4 @@ Implement a passive eligibility selector over existing side tables. Return eligi
 - Required Context:
   - This task file
   - `docs/adr/ADR-0028-nullability-and-flow-typing.md`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`

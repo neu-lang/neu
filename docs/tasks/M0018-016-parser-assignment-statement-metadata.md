@@ -69,7 +69,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `ParseOutput` has no assignment statement metadata field yet.
@@ -94,7 +94,7 @@ Add a `ParsedAssignmentStatement` parser metadata record and populate it only wh
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/parser.rs`
+- Generate tests: edit `crates/compiler/tests/parser.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-016-parser-assignment-statement-metadata.md`
@@ -104,9 +104,9 @@ Add a `ParsedAssignmentStatement` parser metadata record and populate it only wh
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/tests/parser.rs`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
+  - `crates/compiler/src/parser.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-016-parser-assignment-statement-metadata.md`
   - `docs/tasks/reviews/M0018-016-review.md`

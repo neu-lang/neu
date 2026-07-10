@@ -17,9 +17,9 @@
   - `docs/adr/ADR-0010-type-system-shape.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
 - Changed files:
-  - `crates/newlang/src/module.rs`
-  - `crates/newlang/src/symbol.rs`
-  - `crates/newlang/tests/symbol.rs`
+  - `crates/compiler/src/module.rs`
+  - `crates/compiler/src/symbol.rs`
+  - `crates/compiler/tests/symbol.rs`
   - `docs/tests/m0015-name-table-infrastructure.sh`
   - `docs/tests/m0015-symbol-interner.sh`
   - `docs/milestones/M0015-symbol-interning-and-name-tables.md`
@@ -60,7 +60,7 @@ Outcome: pass
 
 - Tests added:
   - `docs/tests/m0015-name-table-infrastructure.sh`
-  - name table tests in `crates/newlang/tests/symbol.rs`
+  - name table tests in `crates/compiler/tests/symbol.rs`
 - Tests run:
   - `cargo test --workspace --all-targets symbol -- --nocapture && docs/tests/m0015-name-table-infrastructure.sh && docs/tests/m0015-symbol-interner.sh`
 - Result:

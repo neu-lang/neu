@@ -29,8 +29,8 @@ milestone=docs/milestones/M0017-type-representation.md
 adr_diag=docs/adr/ADR-0015-diagnostics-as-semantics.md
 adr_syntax=docs/adr/ADR-0023-type-and-generic-syntax.md
 spec=docs/SPEC.md
-source=crates/newlang/src/types.rs
-test_file=crates/newlang/tests/types.rs
+source=crates/compiler/src/types.rs
+test_file=crates/compiler/tests/types.rs
 
 require_file "$task"
 require_file "$milestone"
@@ -72,6 +72,6 @@ require_text "$test_file" 'unsupported_type_forms_do_not_become_type_records'
 require_absent_text "$source" 'TypeKind::Unsupported|Unsupported\(UnsupportedTypeForm\)'
 require_absent_text "$source" 'lower_type|type_lower|infer_type|solve_constraints|ConstraintSolver|PrimitiveScalar|OwnershipCapability|Cranelift|LLVM'
 
-cargo test -p newlang --test types
+cargo test -p compiler --test types
 
 echo "m0017-unsupported-type-form-blocking: unsupported type-form blocking validation passed"

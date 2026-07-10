@@ -73,8 +73,8 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/parser.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/parser.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Parser literal expression metadata and parser-metadata type-check entry point do not exist yet.
@@ -99,7 +99,7 @@ Extend parser output with a literal metadata vector and map accepted literal tok
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/parser.rs` and `crates/newlang/tests/type_check.rs`
+- Generate tests: edit `crates/compiler/tests/parser.rs` and `crates/compiler/tests/type_check.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-008-parser-literal-type-inputs.md`
@@ -109,11 +109,11 @@ Extend parser output with a literal metadata vector and map accepted literal tok
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/parser.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/parser.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Implementation files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-008-parser-literal-type-inputs.md`
   - `docs/tasks/reviews/M0018-008-review.md`

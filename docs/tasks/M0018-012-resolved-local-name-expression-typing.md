@@ -70,7 +70,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Resolved name expression typing entry point and known-symbol type input records do not exist yet.
@@ -95,7 +95,7 @@ Add a minimal `KnownSymbolType` input and a function that reads `ResolutionTable
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/type_check.rs`
+- Generate tests: edit `crates/compiler/tests/type_check.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-012-resolved-local-name-expression-typing.md`
@@ -105,10 +105,10 @@ Add a minimal `KnownSymbolType` input and a function that reads `ResolutionTable
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Implementation files:
-  - `crates/newlang/src/name_resolution.rs`
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/name_resolution.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-012-resolved-local-name-expression-typing.md`
   - `docs/tasks/reviews/M0018-012-review.md`

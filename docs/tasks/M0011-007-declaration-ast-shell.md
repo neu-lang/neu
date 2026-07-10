@@ -54,8 +54,8 @@ The declaration parser needs stable AST node kinds for package, import, function
 - ADRs:
   - `docs/adr/ADR-0022-declaration-syntax.md`
 - Existing files:
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/ast/data-model.md`
 
 ## Required Tests
@@ -75,7 +75,7 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0011-declaration-ast-shell.sh`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/tests/ast.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - `AstNodeKind` does not include ADR-0022 declaration node kinds and `AstArena` has no declaration constructors.
@@ -102,7 +102,7 @@ Extend the existing syntax-independent AST shell with declaration node kinds and
 
 Commands may be `blocked: <reason>` until the project has the relevant harness.
 
-- Generate tests: `create docs/tests/m0011-declaration-ast-shell.sh and update crates/newlang/tests/ast.rs`
+- Generate tests: `create docs/tests/m0011-declaration-ast-shell.sh and update crates/compiler/tests/ast.rs`
 - Verify tests fail: `cargo test --workspace --all-targets ast && docs/tests/m0011-declaration-ast-shell.sh`
 - Ordinary tests: `cargo test --workspace --all-targets ast && docs/tests/m0011-declaration-ast-shell.sh`
 - Adversarial tests: `docs/tests/m0011-declaration-ast-shell.sh`
@@ -113,9 +113,9 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 
 - Test files:
   - `docs/tests/m0011-declaration-ast-shell.sh`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/tests/ast.rs`
 - Implementation files:
-  - `crates/newlang/src/ast.rs`
+  - `crates/compiler/src/ast.rs`
 - Documentation or checklist files:
   - `docs/ast/data-model.md`
   - `docs/tasks/M0011-007-declaration-ast-shell.md`
@@ -127,7 +127,7 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 - Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
-- Do not add `crates/newlang/src/parser.rs`.
+- Do not add `crates/compiler/src/parser.rs`.
 - Do not add HIR, MIR, symbol, type, expression, statement, or pattern AST nodes.
 
 ## Ambiguities And Dependencies

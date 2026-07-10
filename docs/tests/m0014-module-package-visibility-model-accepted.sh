@@ -77,8 +77,8 @@ require_text "$spec" 'M0014 module metadata includes module name, ordered source
 require_text "$ambiguity" 'Status: `resolved`'
 require_text "$ambiguity" 'Resolution Source: `docs/adr/ADR-0025-module-package-visibility-model.md`'
 require_text "$ambiguity" 'Resolved Date: `2026-07-10`'
-require_text "$ambiguity" '\[x\] Language Designer drafts'
-require_text "$ambiguity" '\[x\] Chief Architect approves final source-of-truth update'
+require_text "$ambiguity" '\[x\] main-task semantic design drafts'
+require_text "$ambiguity" '\[x\] main task approves final source-of-truth update'
 require_text "$ambiguity" 'Implementation may define module identity, package-to-module mapping, default visibility, `internal` meaning, and visibility diagnostics only as specified by accepted ADR-0025'
 
 require_text "$decision" '^Decision: approved$'
@@ -88,9 +88,9 @@ require_text "$decision" 'M0014 ambiguity is resolved'
 require_text "$milestone" '\[x\] Module, package, and visibility source of truth is accepted'
 require_text "$task" 'Status: `complete`'
 
-require_absent_path crates/newlang/src/modules.rs
-require_absent_path crates/newlang/src/name_resolution.rs
-require_absent_text crates/newlang/src/lib.rs 'pub mod modules|pub mod name_resolution'
-require_absent_text crates/newlang/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
+require_absent_path crates/compiler/src/modules.rs
+require_absent_path crates/compiler/src/name_resolution.rs
+require_absent_text crates/compiler/src/lib.rs 'pub mod modules|pub mod name_resolution'
+require_absent_text crates/compiler/src/parser.rs 'ModuleId|PackageId|VisibilityModel|DefaultVisibility|InternalVisibility|ModuleDependency'
 
 echo "m0014-accepted: module package and visibility accepted ADR validation passed"

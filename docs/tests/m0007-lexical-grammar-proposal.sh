@@ -34,12 +34,12 @@ require_text docs/adr/proposals/ADR-0021-lexical-grammar.md '^## Downstream Cons
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md '^## Dependencies$'
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md '^## Non-Authority Notice$'
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'docs/ambiguities/M0006-lexical-grammar.md'
-require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'Chief Architect'
+require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'main task'
 require_text docs/adr/proposals/ADR-0021-lexical-grammar.md 'No lexer implementation may depend on this proposal until accepted'
 
 require_text docs/adr/ADR-0021-lexical-grammar.md '^Status: Accepted$'
 require_text docs/ambiguities/M0006-lexical-grammar.md 'Status: `resolved`'
 
-require_absent_path crates/newlang/src/token.rs
+require_absent_path crates/compiler/src/token.rs
 
 echo "m0007-proposal: lexical grammar ADR proposal and acceptance validation passed"

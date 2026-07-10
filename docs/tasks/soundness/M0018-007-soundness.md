@@ -17,8 +17,8 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/tasks/M0018-007-literal-expression-typing.md`
 - Ordinary test results:
   - `cargo fmt --all --check`: pass

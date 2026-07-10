@@ -73,7 +73,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Assignment statement type-checking entry point does not exist yet.
@@ -98,7 +98,7 @@ Add a pure helper that scans assignment metadata in order, finds target and valu
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/type_check.rs`
+- Generate tests: edit `crates/compiler/tests/type_check.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-017-assignment-statement-type-checking.md`
@@ -108,9 +108,9 @@ Add a pure helper that scans assignment metadata in order, finds target and valu
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-017-assignment-statement-type-checking.md`
   - `docs/tasks/reviews/M0018-017-review.md`
@@ -132,7 +132,7 @@ Add a pure helper that scans assignment metadata in order, finds target and valu
 ## Execution Log
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Created M0018 assignment statement type-checking task.
-- 2026-07-10 main_task=main-task test work phase=test-first result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `newlang::type_check::type_assignment_statements`.
+- 2026-07-10 main_task=main-task test work phase=test-first result=pass notes=`cargo test --workspace --all-targets` failed before implementation with unresolved import `compiler::type_check::type_assignment_statements`.
 - 2026-07-10 main_task=main-task implementation phase=implementation result=pass notes=Added assignment statement type checking for exact identity and ADR-0027 nullable exceptions.
 - 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test --workspace --all-targets` passed with 158 tests.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0018-017-assignment-statement-type-checking.md` created a passing soundness report after ordinary tests.

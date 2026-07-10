@@ -49,7 +49,7 @@ Outcome: pass
 
 Attack: Fixture task quietly introduces parser implementation.
 Expected result: Parser source and executable parser tests remain absent.
-Actual result: crates/newlang/src/parser.rs and crates/newlang/tests/parser.rs remain absent.
+Actual result: crates/compiler/src/parser.rs and crates/compiler/tests/parser.rs remain absent.
 Source of truth: docs/tasks/M0011-006-declaration-parser-fixtures.md
 Outcome: pass
 

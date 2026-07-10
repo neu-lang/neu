@@ -16,10 +16,10 @@
 - ADRs:
   - `docs/adr/ADR-0022-declaration-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tests/m0011-declaration-parser-implementation.sh`
 - Ordinary test results:
   - `cargo test --workspace --all-targets`

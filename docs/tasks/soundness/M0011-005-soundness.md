@@ -56,7 +56,7 @@ Outcome: pass
 
 Attack: Implement parser behavior during source-of-truth acceptance.
 Expected result: No parser implementation or parser fixtures exist.
-Actual result: crates/newlang/src/parser.rs and tests/fixtures/parser remain absent.
+Actual result: crates/compiler/src/parser.rs and tests/fixtures/parser remain absent.
 Source of truth: docs/tasks/M0011-005-accept-declaration-syntax-adr.md
 Outcome: pass
 

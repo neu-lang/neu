@@ -26,8 +26,8 @@ require_absent_text() {
 
 task=docs/tasks/M0015-002-name-table-infrastructure.md
 milestone=docs/milestones/M0015-symbol-interning-and-name-tables.md
-symbol_src=crates/newlang/src/symbol.rs
-symbol_tests=crates/newlang/tests/symbol.rs
+symbol_src=crates/compiler/src/symbol.rs
+symbol_tests=crates/compiler/tests/symbol.rs
 
 require_file "$task"
 require_file "$milestone"
@@ -55,6 +55,6 @@ require_text "$milestone" '\[x\] Name tables are tested'
 require_text "$milestone" '\[x\] Resolution policy is deferred'
 
 require_absent_text "$symbol_src" 'ImportResolver|VisibilityEnforcement|TypeCheck|Overload|AccessCheck|LookupDiagnostic|ScopeStack|ResolutionPolicy'
-require_absent_text crates/newlang/src/parser.rs 'NameTable|NameTableKey|NameTableEntry|symbol::'
+require_absent_text crates/compiler/src/parser.rs 'NameTable|NameTableKey|NameTableEntry|symbol::'
 
 echo "m0015-name-table: name table infrastructure validation passed"

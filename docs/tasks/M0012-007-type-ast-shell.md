@@ -56,8 +56,8 @@ The M0012 parser needs AST targets before it can consume the accepted type and g
 - ADRs:
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
 - Existing files:
-  - `crates/newlang/src/ast.rs`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/src/ast.rs`
+  - `crates/compiler/tests/ast.rs`
   - `docs/tests/m0012-type-generic-parser-fixtures.sh`
 
 ## Required Tests
@@ -77,10 +77,10 @@ Tests must be created before implementation.
 
 - Test files to create before implementation:
   - `docs/tests/m0012-type-ast-shell.sh`
-  - focused Rust AST test additions in `crates/newlang/tests/ast.rs`
+  - focused Rust AST test additions in `crates/compiler/tests/ast.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - `crates/newlang/src/ast.rs` does not yet define ADR-0023 type/generic AST node kinds or arena constructors.
+  - `crates/compiler/src/ast.rs` does not yet define ADR-0023 type/generic AST node kinds or arena constructors.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -102,7 +102,7 @@ Add syntax-only `AstNodeKind` variants and `AstArena` constructor methods for AD
 
 ## Execution Commands
 
-- Generate tests: `create docs/tests/m0012-type-ast-shell.sh and update crates/newlang/tests/ast.rs`
+- Generate tests: `create docs/tests/m0012-type-ast-shell.sh and update crates/compiler/tests/ast.rs`
 - Verify tests fail: `docs/tests/m0012-type-ast-shell.sh`
 - Ordinary tests: `cargo test --workspace --all-targets ast -- --nocapture && docs/tests/m0012-type-ast-shell.sh`
 - Adversarial tests: `docs/tests/m0012-type-ast-shell.sh`
@@ -113,9 +113,9 @@ Add syntax-only `AstNodeKind` variants and `AstArena` constructor methods for AD
 
 - Test files:
   - `docs/tests/m0012-type-ast-shell.sh`
-  - `crates/newlang/tests/ast.rs`
+  - `crates/compiler/tests/ast.rs`
 - Implementation files:
-  - `crates/newlang/src/ast.rs`
+  - `crates/compiler/src/ast.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0012-007-type-ast-shell.md`
   - `docs/milestones/M0012-type-and-generic-syntax-parser.md`
@@ -128,7 +128,7 @@ Add syntax-only `AstNodeKind` variants and `AstArena` constructor methods for AD
 - Do not weaken or delete failing tests without main-task review approval.
 - Do not implement work outside this task scope.
 - Do not introduce language semantics not present in `docs/SPEC.md` or `docs/adr/`.
-- Do not add type parser APIs to `crates/newlang/src/parser.rs`.
+- Do not add type parser APIs to `crates/compiler/src/parser.rs`.
 - Do not add executable parser tests for type syntax.
 - Do not add semantic type IDs, symbol resolution, constraint solving, or capability meanings.
 

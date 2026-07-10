@@ -22,9 +22,9 @@ outputs.
   “Move-State Model” and “Diagnostics And Recovery”.
 - `docs/milestones/M0022-ownership-and-move-analysis.md`, completion
   checklist.
-- `crates/newlang/src/ownership.rs`: value categories, transfer records, and
+- `crates/compiler/src/ownership.rs`: value categories, transfer records, and
   use-after-move diagnostics.
-- `crates/newlang/src/type_check.rs`: `DeclarationSignature` and `TypeArena`
+- `crates/compiler/src/type_check.rs`: `DeclarationSignature` and `TypeArena`
   as type-checking outputs.
 
 ## Scope
@@ -60,7 +60,7 @@ outputs.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=task-created result=pass evidence=M0022-002 through M0022-004 provide report inputs. handoff=Test-Engineer
-- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p newlang --test ownership failed with unresolved analyze_ownership import. handoff=Implementer
+- 2026-07-11 agent=Main phase=test-first result=fail evidence=cargo test -p compiler --test ownership failed with unresolved analyze_ownership import. handoff=Implementer
 - 2026-07-11 agent=Main phase=implementation result=pass evidence=OwnershipReport and analyze_ownership compose transfer and diagnostic passes after type-check inputs. handoff=Reviewer
 - 2026-07-11 agent=Main phase=ordinary-tests result=pass evidence=cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo test --workspace --all-targets. handoff=Adversarial-Engineer
 - 2026-07-11 agent=Main phase=adversarial-check result=pass evidence=docs/tasks/soundness/M0022-005-soundness.md. handoff=Reviewer

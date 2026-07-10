@@ -10,8 +10,8 @@ require_text() {
   grep -Eq -- "$2" "$1" || fail "missing expected pattern in $1: $2"
 }
 
-source=crates/newlang/src/type_check.rs
-tests=crates/newlang/tests/type_check.rs
+source=crates/compiler/src/type_check.rs
+tests=crates/compiler/tests/type_check.rs
 task=docs/tasks/M0019-015-refinement-aware-local-initializers.md
 
 [ -f "$source" ] || fail "missing required file: $source"

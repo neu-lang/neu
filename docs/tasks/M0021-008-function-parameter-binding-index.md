@@ -18,8 +18,8 @@ immutable local bindings.
 
 - `docs/SPEC.md`, “ADR-0034: Bootstrap Enum Subject Typing”.
 - `docs/adr/ADR-0034-bootstrap-enum-subject-typing.md`, “Decision”.
-- `crates/newlang/src/parser.rs`: `ParsedFunctionParameter`.
-- `crates/newlang/src/name_resolution.rs`: local scopes and binding indexes.
+- `crates/compiler/src/parser.rs`: `ParsedFunctionParameter`.
+- `crates/compiler/src/name_resolution.rs`: local scopes and binding indexes.
 
 ## Scope
 

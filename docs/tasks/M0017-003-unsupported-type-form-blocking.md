@@ -73,7 +73,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-unsupported-type-form-blocking.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
@@ -99,9 +99,9 @@ Add a small diagnostic-only model in `types.rs`. Do not create `TypeKind::Unsupp
 
 ## Execution Commands
 
-- Generate tests: `edit crates/newlang/tests/types.rs and create docs/tests/m0017-unsupported-type-form-blocking.sh`
-- Verify tests fail: `cargo test -p newlang --test types`
-- Ordinary tests: `cargo test -p newlang --test types && sh docs/tests/m0017-unsupported-type-form-blocking.sh`
+- Generate tests: `edit crates/compiler/tests/types.rs and create docs/tests/m0017-unsupported-type-form-blocking.sh`
+- Verify tests fail: `cargo test -p compiler --test types`
+- Ordinary tests: `cargo test -p compiler --test types && sh docs/tests/m0017-unsupported-type-form-blocking.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0017-unsupported-type-form-blocking.sh`
@@ -109,10 +109,10 @@ Add a small diagnostic-only model in `types.rs`. Do not create `TypeKind::Unsupp
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-unsupported-type-form-blocking.sh`
 - Implementation files:
-  - `crates/newlang/src/types.rs`
+  - `crates/compiler/src/types.rs`
 - Documentation or checklist files:
   - `docs/milestones/M0017-type-representation.md`
   - `docs/tasks/M0017-003-unsupported-type-form-blocking.md`
@@ -137,8 +137,8 @@ Add a small diagnostic-only model in `types.rs`. Do not create `TypeKind::Unsupp
 ## Execution Log
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and blocks deferred type forms as diagnostics.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `UnsupportedTypeForm`, `TypeDiagnostic`, and `TypeDiagnosticKind` did not exist.
-- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` passed after adding diagnostic-only unsupported type-form blocking; validator initially failed only because the milestone checklist had not yet been updated.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test types` failed because `UnsupportedTypeForm`, `TypeDiagnostic`, and `TypeDiagnosticKind` did not exist.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p compiler --test types` passed after adding diagnostic-only unsupported type-form blocking; validator initially failed only because the milestone checklist had not yet been updated.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md` created a passing soundness report.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-003-unsupported-type-form-blocking.md` created review and concrete review approved after source-of-truth comparison.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-unsupported-type-form-blocking.sh`, `sh docs/tests/m0017-nullable-type-representation.sh`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.

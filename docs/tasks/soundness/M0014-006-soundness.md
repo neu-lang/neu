@@ -17,9 +17,9 @@
   - `docs/adr/ADR-0021-lexical-grammar.md`
   - `docs/adr/ADR-0025-module-package-visibility-model.md`
 - Changed files:
-  - `crates/newlang/src/lib.rs`
-  - `crates/newlang/src/module.rs`
-  - `crates/newlang/tests/module.rs`
+  - `crates/compiler/src/lib.rs`
+  - `crates/compiler/src/module.rs`
+  - `crates/compiler/tests/module.rs`
   - `docs/tests/m0014-module-identity-model.sh`
   - `docs/milestones/M0014-module-package-and-visibility-model.md`
   - M0014 historical validators updated to allow in-scope `module.rs`.
@@ -56,7 +56,7 @@ Outcome: pass
 
 Attack: Use this task to introduce visibility metadata, module dependencies, name resolution, manifests, or target triples.
 Expected result: Those remain absent and deferred.
-Actual result: Documentation validator rejects those terms in `crates/newlang/src/module.rs`; parser and name-resolution files remain untouched.
+Actual result: Documentation validator rejects those terms in `crates/compiler/src/module.rs`; parser and name-resolution files remain untouched.
 Source of truth: docs/adr/ADR-0025-module-package-visibility-model.md
 Outcome: pass
 ```
@@ -64,7 +64,7 @@ Outcome: pass
 ## Adversarial Tests
 
 - Tests added:
-  - `crates/newlang/tests/module.rs`
+  - `crates/compiler/tests/module.rs`
   - `docs/tests/m0014-module-identity-model.sh`
 - Tests run:
   - `cargo test --workspace --all-targets module -- --nocapture && docs/tests/m0014-module-identity-model.sh && docs/tests/m0014-module-package-visibility-model-accepted.sh`

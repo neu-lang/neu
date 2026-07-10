@@ -28,8 +28,8 @@ require_absent_text() {
   fi
 }
 
-ast=crates/newlang/src/ast.rs
-tests=crates/newlang/tests/ast.rs
+ast=crates/compiler/src/ast.rs
+tests=crates/compiler/tests/ast.rs
 doc=docs/ast/data-model.md
 task=docs/tasks/M0011-007-declaration-ast-shell.md
 
@@ -61,7 +61,7 @@ require_text "$doc" 'ADR-0022 declaration node kinds'
 require_text "$task" 'Status: `complete`'
 
 require_absent_text "$ast" 'TypeRef|Resolved|Symbol|Borrow|Ownership|NameResolution|Hir|Mir|FlowFact|Exhaustive|CoroutineFrame|UnsafeBoundary'
-require_absent_path crates/newlang/src/hir.rs
-require_absent_path crates/newlang/src/mir.rs
+require_absent_path crates/compiler/src/hir.rs
+require_absent_path crates/compiler/src/mir.rs
 
 echo "m0011-ast-shell: declaration AST shell validation passed"

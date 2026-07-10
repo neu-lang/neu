@@ -24,8 +24,8 @@ require_absent_text() {
   fi
 }
 
-source=crates/newlang/src/type_check.rs
-tests=crates/newlang/tests/type_check.rs
+source=crates/compiler/src/type_check.rs
+tests=crates/compiler/tests/type_check.rs
 task=docs/tasks/M0019-006-flow-output-data-model.md
 adr=docs/adr/ADR-0028-nullability-and-flow-typing.md
 
@@ -60,6 +60,6 @@ require_text "$tests" 'm0019_flow_diagnostic_constructors_preserve_rule_node_and
 require_text "$tests" 'm0019_type_check_report_records_flow_refinements_in_insertion_order'
 
 require_absent_text "$source" 'recognize_null_test|apply_smart_cast|check_nullable_use|walk_if_branch'
-require_absent_text crates/newlang/src/lib.rs 'pub mod hir|pub mod mir|pub mod backend'
+require_absent_text crates/compiler/src/lib.rs 'pub mod hir|pub mod mir|pub mod backend'
 
 echo "m0019-flow-data-model: flow output data model validation passed"

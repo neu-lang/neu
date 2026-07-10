@@ -19,9 +19,9 @@ their name, exact named-type reference, parameter node, and owning function.
 - `docs/SPEC.md`, “ADR-0034: Bootstrap Enum Subject Typing”.
 - `docs/adr/ADR-0034-bootstrap-enum-subject-typing.md`, “Decision” and
   “Diagnostics And Recovery”.
-- `crates/newlang/src/parser.rs`: function and named-type parsing.
-- `crates/newlang/src/ast.rs`: declaration/type node conventions.
-- Validation: `cargo test -p newlang --test parser m0021_typed_function_parameter`;
+- `crates/compiler/src/parser.rs`: function and named-type parsing.
+- `crates/compiler/src/ast.rs`: declaration/type node conventions.
+- Validation: `cargo test -p compiler --test parser m0021_typed_function_parameter`;
   `cargo fmt --all --check`; `git diff --check`.
 
 ## Scope

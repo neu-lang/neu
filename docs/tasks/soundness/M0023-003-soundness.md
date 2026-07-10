@@ -6,7 +6,7 @@
 
 Inputs read: `docs/tasks/M0023-003-lifetime-escape-diagnostics.md`,
 `docs/adr/ADR-0036-bootstrap-borrow-and-lifetime-analysis.md`,
-`crates/newlang/src/borrow.rs`, and `crates/newlang/tests/borrow.rs`.
+`crates/compiler/src/borrow.rs`, and `crates/compiler/tests/borrow.rs`.
 
 Attack checked: same-region borrow use must not diagnose as an escape. The
 test includes a same-region record that produces no diagnostic.

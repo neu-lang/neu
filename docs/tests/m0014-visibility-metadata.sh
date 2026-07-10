@@ -26,8 +26,8 @@ require_absent_text() {
 
 adr=docs/adr/ADR-0025-module-package-visibility-model.md
 task=docs/tasks/M0014-008-visibility-metadata.md
-module_src=crates/newlang/src/module.rs
-module_tests=crates/newlang/tests/module.rs
+module_src=crates/compiler/src/module.rs
+module_tests=crates/compiler/tests/module.rs
 milestone=docs/milestones/M0014-module-package-and-visibility-model.md
 
 require_file "$adr"
@@ -66,6 +66,6 @@ require_text "$task" 'Status: `complete`'
 require_text "$milestone" '\[x\] Visibility metadata is represented'
 
 require_absent_text "$module_src" 'Protected|Friend|SealedScope|ExtensionScope|ProtocolConformance|AccessCheck|NameResolution|DependencyLookup'
-require_absent_text crates/newlang/src/parser.rs 'DeclarationVisibility|VisibilityCategory|VisibilityOrigin|module::'
+require_absent_text crates/compiler/src/parser.rs 'DeclarationVisibility|VisibilityCategory|VisibilityOrigin|module::'
 
 echo "m0014-visibility: visibility metadata validation passed"

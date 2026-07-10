@@ -73,7 +73,7 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to edit before implementation:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
   - Primitive local declaration signature entry point does not exist yet.
@@ -98,7 +98,7 @@ Add a small type-check entry point that consumes parser local declaration metada
 
 ## Execution Commands
 
-- Generate tests: edit `crates/newlang/tests/type_check.rs`
+- Generate tests: edit `crates/compiler/tests/type_check.rs`
 - Verify tests fail: `cargo test --workspace --all-targets`
 - Ordinary tests: `cargo test --workspace --all-targets`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0018-010-primitive-local-declaration-signatures.md`
@@ -108,9 +108,9 @@ Add a small type-check entry point that consumes parser local declaration metada
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
 - Implementation files:
-  - `crates/newlang/src/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0018-010-primitive-local-declaration-signatures.md`
   - `docs/tasks/reviews/M0018-010-review.md`

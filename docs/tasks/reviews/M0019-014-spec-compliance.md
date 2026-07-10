@@ -39,7 +39,7 @@ Target: Implementation and full current working-tree diff for
    eligibility check). Do not restore `Val` merely to satisfy this validator.
 
 4. **Revise — the diagnostics tests do not verify the required primary spans.**
-   `crates/newlang/tests/parser.rs:438-463` verifies diagnostic kinds, normal
+   `crates/compiler/tests/parser.rs:438-463` verifies diagnostic kinds, normal
    recovery, and no `val` binding, but not the primary span. ADR-0029 requires
    ordinary source-level diagnostics for the actual sequence: the removed
    introducer case must identify `val`, and the newly reserved identifier case
@@ -130,7 +130,7 @@ Date: `2026-07-10`
    that `unexpected_token_in_statement` spans `val`, as required by ADR-0024's
    unexpected-token primary-span rule. However, the test for `fun const();`
    now requires `missing_declaration_name` to span `const`, and
-   `crates/newlang/src/parser.rs:345-353` was broadened to produce that span for
+   `crates/compiler/src/parser.rs:345-353` was broadened to produce that span for
    every missing function name.
 
 ### New Blocking Finding

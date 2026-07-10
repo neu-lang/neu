@@ -19,12 +19,12 @@
   - `docs/adr/ADR-0023-type-and-generic-syntax.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/type_check.rs`
-  - `crates/newlang/tests/type_check.rs`
+  - `crates/compiler/src/type_check.rs`
+  - `crates/compiler/tests/type_check.rs`
   - `docs/ambiguities/M0018-type-checking-core.md`
   - `docs/tests/m0018-type-checking-ambiguity-blocker.sh`
 - Ordinary test results:
-  - `cargo test -p newlang --test type_check`: pass
+  - `cargo test -p compiler --test type_check`: pass
   - `sh docs/tests/m0018-type-checking-ambiguity-blocker.sh`: pass
 
 ## Safety Invariants Checked

@@ -19,7 +19,7 @@ second wildcard arm as `duplicate_match_wildcard`.
 - `docs/SPEC.md`, “ADR-0033: Bootstrap Sealed Sums And Exhaustive Match”.
 - `docs/adr/ADR-0033-bootstrap-sealed-sums-and-exhaustive-match.md`,
   “Diagnostics And Recovery”.
-- `crates/newlang/src/name_resolution.rs`: resolved arms and match report.
+- `crates/compiler/src/name_resolution.rs`: resolved arms and match report.
 
 ## Scope
 

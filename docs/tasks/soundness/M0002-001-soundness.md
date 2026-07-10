@@ -18,8 +18,8 @@
 - Changed files:
   - `Cargo.toml`
   - `rust-toolchain.toml`
-  - `crates/newlang/Cargo.toml`
-  - `crates/newlang/src/lib.rs`
+  - `crates/compiler/Cargo.toml`
+  - `crates/compiler/src/lib.rs`
   - `.github/workflows/ci.yml`
   - `docs/build.md`
   - `docs/tests/m0002-workspace-ci.sh`
@@ -50,7 +50,7 @@ Outcome: pass
 
 Attack: Check whether unsafe code is allowed in the placeholder crate.
 Expected result: Unsafe code is forbidden.
-Actual result: crates/newlang/src/lib.rs uses #![forbid(unsafe_code)].
+Actual result: crates/compiler/src/lib.rs uses #![forbid(unsafe_code)].
 Source of truth: M0002 no compiler behavior scope plus safe-code project constraints.
 Outcome: pass
 ```

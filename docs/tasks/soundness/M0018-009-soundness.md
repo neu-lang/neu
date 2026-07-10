@@ -17,8 +17,8 @@
   - `docs/adr/ADR-0027-type-checking-core.md`
   - `docs/adr/ADR-0024-expression-statement-pattern-syntax.md`
 - Changed files:
-  - `crates/newlang/src/parser.rs`
-  - `crates/newlang/tests/parser.rs`
+  - `crates/compiler/src/parser.rs`
+  - `crates/compiler/tests/parser.rs`
   - `docs/tasks/M0018-009-local-declaration-type-metadata.md`
 - Ordinary test results:
   - `cargo fmt --all --check`: pass

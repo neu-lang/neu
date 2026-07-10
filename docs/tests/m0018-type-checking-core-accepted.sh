@@ -29,7 +29,7 @@ spec=docs/SPEC.md
 ambiguity=docs/ambiguities/M0018-type-checking-core.md
 decision=docs/adr/proposals/reviews/ADR-0027-chief-architect-decision.md
 task=docs/tasks/M0018-005-accept-type-checking-core-adr.md
-source=crates/newlang/src/type_check.rs
+source=crates/compiler/src/type_check.rs
 
 require_file "$adr"
 require_file "$spec"
@@ -103,6 +103,6 @@ require_text "$decision" 'M0018 ambiguity is resolved'
 require_text "$task" 'Status: `(review|complete)`'
 
 require_absent_text "$source" 'check_expression|check_declaration|infer_type|literal_type|resolve_call|check_assignment|TypedExpression|TypedProgram|WellTyped'
-require_absent_text crates/newlang/src/lib.rs 'pub mod hir|pub mod mir|pub mod backend'
+require_absent_text crates/compiler/src/lib.rs 'pub mod hir|pub mod mir|pub mod backend'
 
 echo "m0018-accepted: type checking core accepted ADR validation passed"

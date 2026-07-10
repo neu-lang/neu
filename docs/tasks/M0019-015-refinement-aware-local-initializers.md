@@ -62,7 +62,7 @@ Tests must be created before implementation.
 
 ## Test-First Gate
 
-- Test files to create before implementation: `crates/newlang/tests/type_check.rs` and `docs/tests/m0019-refinement-aware-local-initializers.sh`.
+- Test files to create before implementation: `crates/compiler/tests/type_check.rs` and `docs/tests/m0019-refinement-aware-local-initializers.sh`.
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation: the local-initializer checker does not yet consume validated refined expression types.
 - main-task review approval required to modify/delete failing tests: `yes`
@@ -94,16 +94,16 @@ Reuse the validated exact-expression compatibility path established by M0019-013
 
 ## Execution Commands
 
-- Generate tests: `cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer`
-- Verify tests fail: `cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` (expected pre-implementation failure)
-- Ordinary tests: `cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer && sh docs/tests/m0019-refinement-aware-local-initializers.sh`
+- Generate tests: `cargo test -p compiler --test type_check m0019_refinement_aware_local_initializer`
+- Verify tests fail: `cargo test -p compiler --test type_check m0019_refinement_aware_local_initializer` (expected pre-implementation failure)
+- Ordinary tests: `cargo test -p compiler --test type_check m0019_refinement_aware_local_initializer && sh docs/tests/m0019-refinement-aware-local-initializers.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && sh docs/tests/m0019-refinement-aware-local-initializers.sh`
 
 ## Files Expected To Change
 
-- Test files: `crates/newlang/tests/type_check.rs`, `docs/tests/m0019-refinement-aware-local-initializers.sh`.
+- Test files: `crates/compiler/tests/type_check.rs`, `docs/tests/m0019-refinement-aware-local-initializers.sh`.
 - Implementation files: local-initializer/type-checking implementation only.
 - Documentation: this task’s execution/review artifacts only, if required by the workflow.
 
@@ -119,8 +119,8 @@ Reuse the validated exact-expression compatibility path established by M0019-013
 
 ## Execution Log
 
-- 2026-07-10 main_task=main-task test work phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` fails only because `type_m0019_local_declaration_initializers` is not implemented; `sh docs/tests/m0019-refinement-aware-local-initializers.sh` fails on the same missing API. next=main-task implementation
-- 2026-07-10 main_task=Task-Decomposer phase=ordinary-tests result=pass evidence=`cargo test -p newlang --test type_check m0019_refinement_aware_local_initializer` passed (7); `sh docs/tests/m0019-refinement-aware-local-initializers.sh` passed; `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check`, and `cargo test --workspace --all-targets` passed (214 tests). next=main-task review
+- 2026-07-10 main_task=main-task test work phase=test-first result=fail evidence=`cargo test -p compiler --test type_check m0019_refinement_aware_local_initializer` fails only because `type_m0019_local_declaration_initializers` is not implemented; `sh docs/tests/m0019-refinement-aware-local-initializers.sh` fails on the same missing API. next=main-task implementation
+- 2026-07-10 main_task=Task-Decomposer phase=ordinary-tests result=pass evidence=`cargo test -p compiler --test type_check m0019_refinement_aware_local_initializer` passed (7); `sh docs/tests/m0019-refinement-aware-local-initializers.sh` passed; `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check`, and `cargo test --workspace --all-targets` passed (214 tests). next=main-task review
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial result=pass evidence=`docs/scripts/adversarial-check.sh docs/tasks/M0019-015-refinement-aware-local-initializers.md` passed; cross-use and invalid-provenance checks hold. next=main-task review
 - 2026-07-10 main_task=main-task review phase=final-review result=approve evidence=Diagnostics, Test, Spec Compliance, and Adversarial reviews approved; no findings. next=Build-Engineer
 - 2026-07-10 main_task=Build-Engineer phase=final-ci result=pass evidence=CI passed 5/5: formatting, clippy, workspace tests (214), task validator, and diff check. next=Roadmap-Planner

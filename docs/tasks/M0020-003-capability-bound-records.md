@@ -21,11 +21,11 @@ linked to its generic parameter type.
   Generic Syntax”.
 - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`, “Recommended
   Choice”.
-- `crates/newlang/src/parser.rs`: `ParsedGenericParameter` and
+- `crates/compiler/src/parser.rs`: `ParsedGenericParameter` and
   `ParsedCapabilityBound`.
-- `crates/newlang/src/type_check.rs`: M0020 generic parameter type records.
-- `crates/newlang/src/symbol.rs`: `SymbolInterner`.
-- Validation: `cargo test -p newlang --test type_check m0020_capability_bound_records`;
+- `crates/compiler/src/type_check.rs`: M0020 generic parameter type records.
+- `crates/compiler/src/symbol.rs`: `SymbolInterner`.
+- Validation: `cargo test -p compiler --test type_check m0020_capability_bound_records`;
   `cargo fmt --all --check`; `git diff --check`.
 
 ## Scope
@@ -60,7 +60,7 @@ linked to its generic parameter type.
 ## Execution Log
 
 - 2026-07-10 main_task=Main phase=create-task result=pass evidence=opaque bound-record task created from accepted generic syntax and M0020-002 type records. handoff=main task
-- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p newlang --test type_check m0020_capability_bound_records` failed only because `build_m0020_capability_bound_records` was absent. handoff=main task
+- 2026-07-10 main_task=Main phase=test-first result=fail evidence=`cargo test -p compiler --test type_check m0020_capability_bound_records` failed only because `build_m0020_capability_bound_records` was absent. handoff=main task
 - 2026-07-10 main_task=Main phase=implementation result=pass evidence=opaque bound occurrence records preserve parameter/type/node identity and interned names; focused test passed. handoff=main task
 - 2026-07-10 main_task=Main phase=ordinary-tests result=pass evidence=focused bound-record test, validator, formatting, strict clippy, and 218 workspace tests passed. handoff=main task
 - 2026-07-10 main_task=Main phase=adversarial result=pass evidence=missing mappings and opaque capability-bound behavior verified; `docs/tasks/soundness/M0020-003-soundness.md`. handoff=main task

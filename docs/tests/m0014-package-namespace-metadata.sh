@@ -26,8 +26,8 @@ require_absent_text() {
 
 adr=docs/adr/ADR-0025-module-package-visibility-model.md
 task=docs/tasks/M0014-007-package-namespace-metadata.md
-module_src=crates/newlang/src/module.rs
-module_tests=crates/newlang/tests/module.rs
+module_src=crates/compiler/src/module.rs
+module_tests=crates/compiler/tests/module.rs
 milestone=docs/milestones/M0014-module-package-and-visibility-model.md
 
 require_file "$adr"
@@ -59,6 +59,6 @@ require_text "$milestone" '\[x\] Package namespace metadata is represented'
 require_text "$milestone" '\[x\] Visibility metadata is represented'
 
 require_absent_text "$module_src" 'PackageManager|Manifest|TargetTriple|Dependency|NameResolution|SymbolTable|ImportResolver'
-require_absent_text crates/newlang/src/parser.rs 'PackageNamespace|SourceFilePackage|module::'
+require_absent_text crates/compiler/src/parser.rs 'PackageNamespace|SourceFilePackage|module::'
 
 echo "m0014-package-namespace: package namespace metadata validation passed"

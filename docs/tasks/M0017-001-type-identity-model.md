@@ -66,7 +66,7 @@ Tests must be created before implementation.
   - Distinct packages produce distinct nominal identities.
   - Generic placeholder identity preserves declaration node and symbol.
 - Negative tests:
-  - The validator fails before implementation because `crates/newlang/src/types.rs` and `crates/newlang/tests/types.rs` are absent.
+  - The validator fails before implementation because `crates/compiler/src/types.rs` and `crates/compiler/tests/types.rs` are absent.
 - Diagnostic tests:
   - Not applicable; this slice adds representation only.
 - Adversarial tests:
@@ -75,11 +75,11 @@ Tests must be created before implementation.
 ## Test-First Gate
 
 - Test files to create before implementation:
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-type-identity-model.sh`
 - Expected pre-implementation result: `fail`
 - Failure reason expected before implementation:
-  - The public `newlang::types` module does not exist yet.
+  - The public `compiler::types` module does not exist yet.
 - main-task review approval required to modify/delete failing tests: `yes`
 
 ## Implementation Plan
@@ -101,9 +101,9 @@ Add the smallest type representation module that can store and retrieve type rec
 
 ## Execution Commands
 
-- Generate tests: `create crates/newlang/tests/types.rs docs/tests/m0017-type-identity-model.sh`
-- Verify tests fail: `cargo test -p newlang --test types`
-- Ordinary tests: `cargo test -p newlang --test types && docs/tests/m0017-type-identity-model.sh`
+- Generate tests: `create crates/compiler/tests/types.rs docs/tests/m0017-type-identity-model.sh`
+- Verify tests fail: `cargo test -p compiler --test types`
+- Ordinary tests: `cargo test -p compiler --test types && docs/tests/m0017-type-identity-model.sh`
 - Adversarial tests: `docs/scripts/adversarial-check.sh docs/tasks/M0017-001-type-identity-model.md`
 - Review: `docs/scripts/review-task.sh docs/tasks/M0017-001-type-identity-model.md`
 - CI: `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --all-targets && docs/tests/m0017-type-identity-model.sh`
@@ -111,11 +111,11 @@ Add the smallest type representation module that can store and retrieve type rec
 ## Files Expected To Change
 
 - Test files:
-  - `crates/newlang/tests/types.rs`
+  - `crates/compiler/tests/types.rs`
   - `docs/tests/m0017-type-identity-model.sh`
 - Implementation files:
-  - `crates/newlang/src/types.rs`
-  - `crates/newlang/src/lib.rs`
+  - `crates/compiler/src/types.rs`
+  - `crates/compiler/src/lib.rs`
 - Documentation or checklist files:
   - `docs/tasks/M0017-001-type-identity-model.md`
   - `docs/tasks/reviews/M0017-001-type-identity-model.md`
@@ -140,8 +140,8 @@ Add the smallest type representation module that can store and retrieve type rec
 ## Execution Log
 
 - 2026-07-10 main_task=Task-Decomposer phase=create-task result=pass notes=Task references only M0017 and avoids unresolved primitive semantics.
-- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p newlang --test types` failed because `newlang::types` did not exist.
-- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p newlang --test types` and `sh docs/tests/m0017-type-identity-model.sh` passed.
+- 2026-07-10 main_task=main-task test work phase=verify-tests-fail result=pass notes=`cargo test -p compiler --test types` failed because `compiler::types` did not exist.
+- 2026-07-10 main_task=main-task implementation phase=ordinary-tests result=pass notes=`cargo test -p compiler --test types` and `sh docs/tests/m0017-type-identity-model.sh` passed.
 - 2026-07-10 main_task=Adversarial-Engineer phase=adversarial-tests result=pass notes=`docs/scripts/adversarial-check.sh docs/tasks/M0017-001-type-identity-model.md` created a passing soundness report.
 - 2026-07-10 main_task=main-task review phase=review result=pass notes=`docs/scripts/review-task.sh docs/tasks/M0017-001-type-identity-model.md` created review and concrete review approved after source-of-truth comparison.
 - 2026-07-10 main_task=Build-Engineer phase=ci result=pass notes=`cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace --all-targets`, `sh docs/tests/m0017-type-identity-model.sh`, `sh docs/tests/m0016-name-resolution-data-model.sh`, and `sh docs/tests/m0002-workspace-ci.sh` passed.
