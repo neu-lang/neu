@@ -4,9 +4,9 @@ use crate::{
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
         ParseOutput, ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
-        ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral,
-        ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
-        ParsedTypeNameReference, ParsedUnaryExpression,
+        ParsedFunctionDeclaration, ParsedFunctionParameter, ParsedGenericParameter,
+        ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral, ParsedLiteralExpression,
+        ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference, ParsedUnaryExpression,
     },
     source::ByteSpan,
     symbol::{SymbolId, SymbolInterner},
@@ -322,6 +322,27 @@ impl ReturnPathDiagnostic {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ReturnPathReport {
     diagnostics: Vec<ReturnPathDiagnostic>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FunctionSignature {
+    declaration: AstNodeId,
+    parameter_types: Vec<TypeId>,
+    return_type: TypeId,
+}
+
+impl FunctionSignature {
+    pub fn declaration(&self) -> AstNodeId {
+        self.declaration
+    }
+
+    pub fn parameter_types(&self) -> &[TypeId] {
+        &self.parameter_types
+    }
+
+    pub fn return_type(&self) -> TypeId {
+        self.return_type
+    }
 }
 
 impl ReturnPathReport {
@@ -973,6 +994,47 @@ pub fn check_m0028_straight_line_returns(parsed: &ParseOutput) -> ReturnPathRepo
         }));
     }
     ReturnPathReport { diagnostics }
+}
+
+pub fn type_m0028_function_signatures(
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+) -> (TypeArena, Vec<FunctionSignature>) {
+    let mut arena = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut arena);
+    let is_int_annotation = |annotation| {
+        type_name_references
+            .iter()
+            .any(|reference| reference.reference == annotation && reference.name == "Int")
+    };
+    let mut signatures = Vec::new();
+
+    for function in functions {
+        let Some(return_annotation) = function.return_annotation else {
+            continue;
+        };
+        if !is_int_annotation(return_annotation) {
+            continue;
+        }
+        let function_parameters: Vec<_> = parameters
+            .iter()
+            .filter(|parameter| parameter.function == function.declaration)
+            .collect();
+        if function_parameters
+            .iter()
+            .any(|parameter| !is_int_annotation(parameter.annotation))
+        {
+            continue;
+        }
+        signatures.push(FunctionSignature {
+            declaration: function.declaration,
+            parameter_types: vec![primitives.int_id; function_parameters.len()],
+            return_type: primitives.int_id,
+        });
+    }
+
+    (arena, signatures)
 }
 
 pub fn recognize_m0019_null_tests(

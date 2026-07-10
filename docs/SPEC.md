@@ -552,6 +552,13 @@ participate in bootstrap straight-line analysis. No direct return reports
 reports `unreachable_return` at that return. Nested-block returns are deferred,
 neither satisfying nor producing these diagnostics.
 
+## ADR-0051: Bootstrap Direct Call Diagnostics
+
+`invalid_call_target` attaches to the callee, `argument_count_mismatch` to the
+call, `argument_type_mismatch` to the mismatching argument, and
+`recursive_call_unsupported` to the recursive call. Each recovery produces no
+successful call target or result type.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves

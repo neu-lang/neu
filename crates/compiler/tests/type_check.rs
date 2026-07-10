@@ -29,9 +29,10 @@ use compiler::{
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_m0028_executable_core, type_m0028_executable_int_operators,
-        type_m0028_static_integer_diagnostics, type_parser_literals,
-        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, type_unsupported_m0018_expressions,
+        type_m0028_function_signatures, type_m0028_static_integer_diagnostics,
+        type_parser_literals, type_primitive_local_declarations,
+        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
+        type_unsupported_m0018_expressions,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -3894,4 +3895,23 @@ fn m0028_straight_line_return_validation_reports_missing_and_unreachable_returns
             .node(),
         parsed.return_statements[2].statement
     );
+}
+
+#[test]
+fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(113),
+        "fun add(left: Int, right: Int): Int { return left + right; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let (types, signatures) = type_m0028_function_signatures(
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    assert_eq!(signatures.len(), 1);
+    assert_eq!(signatures[0].parameter_types().len(), 2);
+    assert_eq!(signatures[0].return_type(), TypeId::from_raw(1));
+    assert!(types.records().get(TypeId::from_raw(1).index()).is_some());
 }
