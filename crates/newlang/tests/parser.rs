@@ -212,6 +212,73 @@ fn name_reference_metadata_excludes_member_import_and_package_names() {
 }
 
 #[test]
+fn records_named_type_reference_metadata() {
+    let file = SourceFileId::from_raw(22);
+    let source = "fun run(): demo.Result<Box<Int?>> { val item: Box<Int> = make(); }";
+    let output = parse_source(file, source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let names: Vec<_> = output
+        .type_name_references
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect();
+    assert_eq!(names, ["demo.Result", "Box", "Int", "Box", "Int"]);
+
+    let first = &output.type_name_references[0];
+    assert_eq!(
+        &source[first.name_span.start()..first.name_span.end()],
+        "demo.Result"
+    );
+    assert_eq!(
+        output.arena.node(first.reference).unwrap().kind,
+        AstNodeKind::NamedType
+    );
+}
+
+#[test]
+fn type_name_reference_metadata_records_grouped_and_function_types_in_order() {
+    let file = SourceFileId::from_raw(23);
+    let output = parse_source(file, "fun run(): ((Input) -> Output)?;");
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+
+    let names: Vec<_> = output
+        .type_name_references
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect();
+    assert_eq!(names, ["Input", "Output"]);
+}
+
+#[test]
+fn type_name_reference_metadata_excludes_package_import_expression_and_missing_types() {
+    let output = parse_source(
+        SourceFileId::from_raw(24),
+        "package demo.core import demo.io fun run() { value; }",
+    );
+    let malformed = parse_source(SourceFileId::from_raw(25), "fun broken(): ;");
+
+    let type_names: Vec<_> = output
+        .type_name_references
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect();
+    let expression_names: Vec<_> = output
+        .name_references
+        .iter()
+        .map(|reference| reference.name.as_str())
+        .collect();
+
+    assert!(type_names.is_empty());
+    assert!(malformed.type_name_references.is_empty());
+    assert_eq!(expression_names, ["value"]);
+}
+
+#[test]
 fn records_local_val_and_var_binding_name_metadata() {
     let file = SourceFileId::from_raw(18);
     let source = "fun run() { val answer: Int = compute(); var next = answer; }";

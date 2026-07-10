@@ -57,6 +57,7 @@ pub struct ParseOutput {
     pub declaration_names: Vec<ParsedDeclarationName>,
     pub local_binding_names: Vec<ParsedLocalBindingName>,
     pub name_references: Vec<ParsedNameReference>,
+    pub type_name_references: Vec<ParsedTypeNameReference>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,6 +83,13 @@ pub struct ParsedNameReference {
     pub name_span: ByteSpan,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedTypeNameReference {
+    pub reference: crate::ast::AstNodeId,
+    pub name: String,
+    pub name_span: ByteSpan,
+}
+
 impl ParseOutput {
     pub fn node_kinds(&self) -> Vec<AstNodeKind> {
         self.arena.nodes().iter().map(|node| node.kind).collect()
@@ -100,6 +108,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         declaration_names: parser.declaration_names,
         local_binding_names: parser.local_binding_names,
         name_references: parser.name_references,
+        type_name_references: parser.type_name_references,
     }
 }
 
@@ -113,6 +122,7 @@ struct Parser<'source> {
     declaration_names: Vec<ParsedDeclarationName>,
     local_binding_names: Vec<ParsedLocalBindingName>,
     name_references: Vec<ParsedNameReference>,
+    type_name_references: Vec<ParsedTypeNameReference>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -129,6 +139,7 @@ impl<'source> Parser<'source> {
             declaration_names: Vec::new(),
             local_binding_names: Vec::new(),
             name_references: Vec::new(),
+            type_name_references: Vec::new(),
             saw_package_or_import: false,
             saw_top_level_declaration: false,
         }
@@ -1147,12 +1158,22 @@ impl<'source> Parser<'source> {
 
     fn parse_named_type(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
-        let mut end = self.parse_qualified_name_for_type()?;
+        let name_end = self.parse_qualified_name_for_type()?;
+        let mut end = name_end;
+        let reference_index = self.type_name_references.len();
         if self.current_kind() == Some(TokenKind::Less) {
             end = self.parse_generic_arguments().unwrap_or(end);
         }
         let span = self.span(start, end);
-        self.arena.add_named_type(span);
+        let reference = self.arena.add_named_type(span);
+        self.type_name_references.insert(
+            reference_index,
+            ParsedTypeNameReference {
+                reference,
+                name: self.text[start..name_end].to_owned(),
+                name_span: self.span(start, name_end),
+            },
+        );
         Some(span)
     }
 
