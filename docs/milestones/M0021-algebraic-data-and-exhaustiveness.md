@@ -20,7 +20,8 @@ Algebraic data and exhaustive matching are central to safe domain modeling and e
 ## Background
 
 ADR-0012 selects sealed sums; ADR-0033 defines the first parser-backed finite
-coverage subset without payloads or implicit smart casts.
+coverage subset without payloads or implicit smart casts. ADR-0034 supplies
+the narrow enum-typed parameter subject required by that subset.
 
 ## Prerequisites
 
@@ -32,6 +33,7 @@ coverage subset without payloads or implicit smart casts.
 - Type checker from M0018.
 - Flow typing from M0019.
 - `docs/adr/ADR-0012-pattern-matching-and-algebraic-data.md`
+- `docs/adr/ADR-0034-bootstrap-enum-subject-typing.md`
 
 ## Outputs
 

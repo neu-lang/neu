@@ -1,6 +1,11 @@
 # ADR-0034: Bootstrap Enum Subject Typing
 
-Status: Proposed
+Status: Accepted as `docs/adr/ADR-0034-bootstrap-enum-subject-typing.md`
+
+## Non-Authority Notice
+
+This proposal is retained as design history. The accepted ADR is the only
+implementation authority.
 
 ## Question
 
@@ -34,8 +39,7 @@ constructors, fields, member lookup, overloads, and non-enum nominal typing.
 
 ## Concrete Draft
 
-This section is proposed only and does not change `docs/SPEC.md` until
-accepted.
+This section was accepted as the decision above.
 
 ### Syntax
 

@@ -12,7 +12,7 @@ declaration syntax is separate, so `parsed_surface.nl` retains its member
 - `parsed_surface.nl` uses syntax currently accepted by the frontend parser, including forms whose full semantic checking is intentionally deferred.
 - `accepted_nullability_flow.nl` shows the M0019 nullability and flow-typing surface accepted by ADR-0028. The compiler records direct local null refinements and checks direct assignment-statement and annotated local-initializer values using valid per-use refinements. Grouped refinement propagation and end-to-end flow-pass orchestration remain pending.
 - `region_exit_refinement_error.nl` shows the accepted ADR-0031 diagnostic case: a later direct use of a nullable local after its guarded refinement branch reports `region_exit_invalidated_refinement` and is still treated as nullable for recovery.
-- `accepted_bootstrap_match.nl` is accepted by the current parser and shows the ADR-0033 no-payload enum and `when` surface. Variant resolution and exhaustiveness checking remain pending M0021 work; payloads, destructuring, and implicit smart casts remain deferred.
+- `accepted_bootstrap_match.nl` shows the accepted ADR-0033 enum and `when` surface with the ADR-0034 typed parameter subject. Parser metadata, variant resolution, and exhaustiveness checking remain pending M0021 work; payloads, destructuring, and implicit smart casts remain deferred.
 - `parsed_bootstrap_enum.nl` is accepted by the current parser and records ordered no-payload enum variants. `when` parsing, variant resolution, and exhaustiveness checking remain pending M0021 work.
 
 The implemented examples show current compiler support. The accepted semantics example also states the remaining integration limits above.

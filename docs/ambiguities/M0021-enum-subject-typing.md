@@ -34,3 +34,8 @@ gives that parameter its enum type.
 ## Recommended Owner
 
 Language Designer, with Chief Architect approval.
+
+## Resolution
+
+Resolved by accepted ADR-0034. The accepted source defines typed parameters
+for functions with bodies and the exact M0021 enum-subject resolution path.

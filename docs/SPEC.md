@@ -290,3 +290,15 @@ covers each declared variant once or has exactly one wildcard. Duplicate,
 unknown, and missing variants, duplicate wildcards, and non-enum subjects
 diagnose under ADR-0033; payloads, destructuring, generic enums, nullable
 coverage, implicit smart casts, and arm-result type unification remain deferred.
+
+## ADR-0034: Bootstrap Enum Subject Typing
+
+For functions with bodies, parameters use `identifier : named-type` entries in
+a comma-separated parameter list. M0021 accepts an ADR-0033 `when` subject
+only as a bare reference to one such parameter when its named annotation
+resolves in the declaring module/package to exactly one bootstrap enum. Other
+subject shapes, unresolved types, and non-enum types report
+`invalid_match_subject` on the subject. Parameters are immutable local bindings
+visible throughout their function body; general parameter typing, enum value
+expressions, constructors, member lookup, nullable/generic parameters, calls,
+and cross-module lookup remain deferred.

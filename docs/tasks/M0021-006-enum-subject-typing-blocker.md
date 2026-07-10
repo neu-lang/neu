@@ -6,7 +6,7 @@
 - Milestone: `M0021`
 - Milestone File: `docs/milestones/M0021-algebraic-data-and-exhaustiveness.md`
 - Specification: `docs/SPEC.md`
-- Status: `blocked`
+- Status: `complete`
 - Owner: `Language Designer`
 
 ## Objective
@@ -21,14 +21,12 @@ a bootstrap enum before implementing variant resolution or coverage checking.
 
 ## Blocker
 
-No accepted rule specifies an enum-typed source subject, nominal enum type
-resolution for an annotation or parameter, or qualified enum-variant value
-expressions. Implementing those rules would invent language semantics.
+This blocker was resolved by accepted ADR-0034.
 
 ## Required Resolution
 
-An accepted ADR must specify the smallest source and type-resolution subset
-that allows an M0021 `when` subject to resolve to a declared enum.
+Implement the accepted ADR-0034 source and type-resolution subset through
+separate parser, binding, and semantic tasks.
 
 ## Out Of Scope
 
@@ -39,3 +37,4 @@ that allows an M0021 `when` subject to resolve to a declared enum.
 ## Execution Log
 
 - 2026-07-11 agent=Main phase=blocker-recorded result=blocked evidence=ADR-0033 subject rule lacks an accepted source-to-enum typing path. handoff=Language-Designer
+- 2026-07-11 agent=Main phase=resolution-accepted result=pass evidence=user accepted ADR-0034; source of truth updated. handoff=Task-Decomposer
