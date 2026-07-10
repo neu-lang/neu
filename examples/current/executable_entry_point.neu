@@ -1,0 +1,5 @@
+package examples.current
+
+public fun main(): Int {
+    return 0;
+}

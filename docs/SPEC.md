@@ -534,6 +534,16 @@ Local bindings, names, assignments, calls, member access, `if`, `when`, and
 other forms are not bootstrap integer constant expressions. They must not
 receive a static arithmetic diagnostic solely from an inferred runtime value.
 
+## ADR-0049: Bootstrap Entry-Point Diagnostic Provenance
+
+`missing_entry_point` uses the explicit selected entry-package invocation input
+as its primary location. Every duplicate top-level selected-package `main`
+candidate receives `duplicate_entry_point` at its declaration. An invalid
+candidate receives `invalid_entry_point_signature` at its declaration. Entry
+diagnostics carry either a source-file-qualified span or the explicit external
+input location, never a host path or arena-local node identity alone; recovery
+selects no entry point.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves

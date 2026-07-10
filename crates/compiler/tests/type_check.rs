@@ -1,5 +1,6 @@
 use compiler::{
     ast::{AstArena, AstNodeId, AstNodeKind},
+    module::PackageNamespace,
     name_resolution::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
         ResolvedLocalBinding, ResolvedName, bind_local_name_references, build_local_scope_tree,
@@ -15,11 +16,12 @@ use compiler::{
     symbol::{SymbolId, SymbolInterner},
     type_check::{
         AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement,
-        ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind,
-        NullTestRefinedBranch, RecognizedNullTest, RefinedExpressionType, RefinementRecord,
-        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
-        build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
-        known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
+        EntryPointDiagnosticKind, EntryPointFile, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
+        RefinedExpressionType, RefinementRecord, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport, TypeRuleDiagnostic, build_m0020_capability_bound_records,
+        build_m0020_generic_parameter_types, check_m0028_entry_point, known_local_symbol_types,
+        recognize_m0019_null_tests, record_m0019_branch_refinements,
         record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
         type_m0018_accepted_expressions, type_m0018_core,
@@ -3748,4 +3750,108 @@ fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
         &parsed.binary_expressions,
     );
     assert_eq!(diagnostics, []);
+}
+
+#[test]
+fn m0028_entry_point_selects_one_valid_main_in_the_explicit_package() {
+    let entry_file = parse_source(SourceFileId::from_raw(102), "fun main(): Int { return 0; }");
+    let other_file = parse_source(SourceFileId::from_raw(103), "fun main(): Int { return 1; }");
+    let entry_package = PackageNamespace::parse("app").unwrap();
+    let other_package = PackageNamespace::parse("other").unwrap();
+    let files = [
+        EntryPointFile::new(&entry_package, &entry_file),
+        EntryPointFile::new(&other_package, &other_file),
+    ];
+
+    let report = check_m0028_entry_point(&entry_package, &files);
+
+    assert_eq!(report.diagnostics(), []);
+    assert_eq!(
+        report.entry_point().map(|entry| entry.declaration()),
+        Some(entry_file.function_declarations[0].declaration)
+    );
+}
+
+#[test]
+fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
+    let package = PackageNamespace::parse("app").unwrap();
+    let missing = parse_source(
+        SourceFileId::from_raw(104),
+        "fun helper(): Int { return 0; }",
+    );
+    let duplicate_first =
+        parse_source(SourceFileId::from_raw(105), "fun main(): Int { return 0; }");
+    let duplicate_second =
+        parse_source(SourceFileId::from_raw(106), "fun main(): Int { return 1; }");
+    let invalid = parse_source(
+        SourceFileId::from_raw(107),
+        "fun main(value: Int): String { return \"bad\"; }",
+    );
+
+    let missing_report =
+        check_m0028_entry_point(&package, &[EntryPointFile::new(&package, &missing)]);
+    assert!(
+        missing_report
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.kind() == EntryPointDiagnosticKind::MissingEntryPoint)
+    );
+    assert_eq!(missing_report.entry_point(), None);
+
+    let duplicate_report = check_m0028_entry_point(
+        &package,
+        &[
+            EntryPointFile::new(&package, &duplicate_first),
+            EntryPointFile::new(&package, &duplicate_second),
+        ],
+    );
+    assert_eq!(
+        duplicate_report
+            .diagnostics()
+            .iter()
+            .filter(|diagnostic| diagnostic.kind() == EntryPointDiagnosticKind::DuplicateEntryPoint)
+            .count(),
+        2
+    );
+    assert_eq!(duplicate_report.entry_point(), None);
+
+    let invalid_report =
+        check_m0028_entry_point(&package, &[EntryPointFile::new(&package, &invalid)]);
+    assert!(invalid_report.diagnostics().iter().any(|diagnostic| {
+        diagnostic.kind() == EntryPointDiagnosticKind::InvalidEntryPointSignature
+            && diagnostic.source_span()
+                == Some(
+                    invalid
+                        .arena
+                        .node(invalid.function_declarations[0].declaration)
+                        .unwrap()
+                        .span,
+                )
+    }));
+    assert_eq!(invalid_report.entry_point(), None);
+}
+
+#[test]
+fn m0028_entry_point_rejects_every_non_entry_main_shape() {
+    let package = PackageNamespace::parse("app").unwrap();
+    for (file, source) in [
+        (108, "fun main() { return 0; }"),
+        (109, "fun main(): Int;"),
+        (110, "struct Container { fun main(): Int { return 0; } }"),
+    ] {
+        let parsed = parse_source(SourceFileId::from_raw(file), source);
+        assert!(parsed.diagnostics.is_empty());
+        let report = check_m0028_entry_point(&package, &[EntryPointFile::new(&package, &parsed)]);
+
+        if file == 110 {
+            assert!(report.diagnostics().iter().any(|diagnostic| {
+                diagnostic.kind() == EntryPointDiagnosticKind::MissingEntryPoint
+            }));
+        } else {
+            assert!(report.diagnostics().iter().any(|diagnostic| {
+                diagnostic.kind() == EntryPointDiagnosticKind::InvalidEntryPointSignature
+            }));
+        }
+        assert_eq!(report.entry_point(), None);
+    }
 }

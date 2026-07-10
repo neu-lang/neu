@@ -1,12 +1,14 @@
 use crate::{
     ast::{AstArena, AstNodeId, AstNodeKind},
+    module::PackageNamespace,
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
-        ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
+        ParseOutput, ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
         ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral,
         ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
         ParsedTypeNameReference, ParsedUnaryExpression,
     },
+    source::ByteSpan,
     symbol::{SymbolId, SymbolInterner},
     types::{GenericParameterType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -195,6 +197,99 @@ impl TypeCheckDiagnostic {
 
     pub fn actual_type(&self) -> Option<TypeId> {
         self.actual_type
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EntryPointDiagnosticKind {
+    MissingEntryPoint,
+    DuplicateEntryPoint,
+    InvalidEntryPointSignature,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EntryPointDiagnosticLocation {
+    Source(ByteSpan),
+    EntryPackageInput(PackageNamespace),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EntryPointDiagnostic {
+    kind: EntryPointDiagnosticKind,
+    location: EntryPointDiagnosticLocation,
+}
+
+impl EntryPointDiagnostic {
+    fn source(kind: EntryPointDiagnosticKind, span: ByteSpan) -> Self {
+        Self {
+            kind,
+            location: EntryPointDiagnosticLocation::Source(span),
+        }
+    }
+
+    fn entry_package_input(package: &PackageNamespace) -> Self {
+        Self {
+            kind: EntryPointDiagnosticKind::MissingEntryPoint,
+            location: EntryPointDiagnosticLocation::EntryPackageInput(package.clone()),
+        }
+    }
+
+    pub fn kind(&self) -> EntryPointDiagnosticKind {
+        self.kind
+    }
+
+    pub fn source_span(&self) -> Option<ByteSpan> {
+        match &self.location {
+            EntryPointDiagnosticLocation::Source(span) => Some(*span),
+            EntryPointDiagnosticLocation::EntryPackageInput(_) => None,
+        }
+    }
+
+    pub fn location(&self) -> &EntryPointDiagnosticLocation {
+        &self.location
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EntryPoint {
+    declaration: AstNodeId,
+    source_span: ByteSpan,
+}
+
+impl EntryPoint {
+    pub fn declaration(self) -> AstNodeId {
+        self.declaration
+    }
+
+    pub fn source_span(self) -> ByteSpan {
+        self.source_span
+    }
+}
+
+pub struct EntryPointFile<'a> {
+    package: &'a PackageNamespace,
+    parsed: &'a ParseOutput,
+}
+
+impl<'a> EntryPointFile<'a> {
+    pub fn new(package: &'a PackageNamespace, parsed: &'a ParseOutput) -> Self {
+        Self { package, parsed }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct EntryPointReport {
+    entry_point: Option<EntryPoint>,
+    diagnostics: Vec<EntryPointDiagnostic>,
+}
+
+impl EntryPointReport {
+    pub fn entry_point(&self) -> Option<EntryPoint> {
+        self.entry_point
+    }
+
+    pub fn diagnostics(&self) -> &[EntryPointDiagnostic] {
+        &self.diagnostics
     }
 }
 
@@ -723,6 +818,84 @@ impl TypeCheckReport {
 impl Default for TypeCheckReport {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+pub fn check_m0028_entry_point(
+    entry_package: &PackageNamespace,
+    files: &[EntryPointFile<'_>],
+) -> EntryPointReport {
+    let candidates: Vec<_> = files
+        .iter()
+        .filter(|file| file.package == entry_package)
+        .flat_map(|file| {
+            file.parsed
+                .function_declarations
+                .iter()
+                .filter(move |function| {
+                    function.top_level
+                        && file.parsed.declaration_names.iter().any(|name| {
+                            name.declaration == function.declaration && name.name == "main"
+                        })
+                })
+                .map(move |function| (file.parsed, function))
+        })
+        .collect();
+
+    if candidates.is_empty() {
+        return EntryPointReport {
+            entry_point: None,
+            diagnostics: vec![EntryPointDiagnostic::entry_package_input(entry_package)],
+        };
+    }
+
+    if candidates.len() > 1 {
+        return EntryPointReport {
+            entry_point: None,
+            diagnostics: candidates
+                .iter()
+                .map(|(parsed, function)| {
+                    EntryPointDiagnostic::source(
+                        EntryPointDiagnosticKind::DuplicateEntryPoint,
+                        parsed
+                            .arena
+                            .node(function.declaration)
+                            .expect("parsed function declaration is in its arena")
+                            .span,
+                    )
+                })
+                .collect(),
+        };
+    }
+
+    let (parsed, candidate) = candidates[0];
+    let has_int_return = candidate.return_annotation.is_some_and(|annotation| {
+        parsed
+            .type_name_references
+            .iter()
+            .any(|reference| reference.reference == annotation && reference.name == "Int")
+    });
+    let span = parsed
+        .arena
+        .node(candidate.declaration)
+        .expect("parsed function declaration is in its arena")
+        .span;
+    if candidate.body.is_none() || !candidate.parameters.is_empty() || !has_int_return {
+        return EntryPointReport {
+            entry_point: None,
+            diagnostics: vec![EntryPointDiagnostic::source(
+                EntryPointDiagnosticKind::InvalidEntryPointSignature,
+                span,
+            )],
+        };
+    }
+
+    EntryPointReport {
+        entry_point: Some(EntryPoint {
+            declaration: candidate.declaration,
+            source_span: span,
+        }),
+        diagnostics: Vec::new(),
     }
 }
 
