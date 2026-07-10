@@ -81,6 +81,15 @@ impl GenericParameterType {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrimitiveType {
+    Bool,
+    Int,
+    String,
+    Unit,
+    Null,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NullableType {
     base: TypeId,
 }
@@ -99,6 +108,7 @@ impl NullableType {
 pub enum TypeKind {
     Nominal(NominalTypeIdentity),
     GenericParameter(GenericParameterType),
+    Primitive(PrimitiveType),
     Nullable(NullableType),
 }
 
@@ -173,6 +183,13 @@ impl TypeRecord {
         Self {
             id: TypeId::from_raw(usize::MAX),
             kind: TypeKind::GenericParameter(generic),
+        }
+    }
+
+    pub fn primitive(primitive: PrimitiveType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::Primitive(primitive),
         }
     }
 

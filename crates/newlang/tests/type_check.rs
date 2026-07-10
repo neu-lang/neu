@@ -1,8 +1,10 @@
 use newlang::{
     ast::AstNodeId,
     type_check::{
-        AmbiguousTypeRule, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
+        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType,
+        TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
     },
+    types::TypeId,
 };
 
 #[test]
@@ -43,4 +45,60 @@ fn type_check_report_records_blockers_without_successful_output() {
 
     assert!(report.is_blocked());
     assert_eq!(report.diagnostics(), &[diagnostic]);
+}
+
+#[test]
+fn type_check_report_records_expression_types_in_insertion_order() {
+    let mut report = TypeCheckReport::new();
+    let first = ExpressionType::new(AstNodeId::from_raw(10), TypeId::from_raw(1));
+    let second = ExpressionType::new(AstNodeId::from_raw(11), TypeId::from_raw(2));
+
+    report.record_expression_type(first);
+    report.record_expression_type(second);
+
+    assert!(!report.is_blocked());
+    assert_eq!(report.expression_types(), &[first, second]);
+    assert_eq!(
+        report.expression_type(AstNodeId::from_raw(10)),
+        Some(TypeId::from_raw(1))
+    );
+    assert_eq!(
+        report.expression_type(AstNodeId::from_raw(99)),
+        None,
+        "reports must not synthesize missing expression type entries"
+    );
+}
+
+#[test]
+fn type_check_report_records_declaration_signatures_by_node() {
+    let mut report = TypeCheckReport::new();
+    let signature = DeclarationSignature::new(AstNodeId::from_raw(20), TypeId::from_raw(3));
+
+    report.record_declaration_signature(signature);
+
+    assert_eq!(report.declaration_signatures(), &[signature]);
+    assert_eq!(
+        report.declaration_signature(AstNodeId::from_raw(20)),
+        Some(TypeId::from_raw(3))
+    );
+    assert_eq!(report.declaration_signature(AstNodeId::from_raw(21)), None);
+}
+
+#[test]
+fn type_check_report_records_assignment_checks_by_statement_node() {
+    let mut report = TypeCheckReport::new();
+    let accepted = AssignmentCheck::new(
+        AstNodeId::from_raw(30),
+        TypeId::from_raw(4),
+        TypeId::from_raw(4),
+    );
+
+    report.record_assignment_check(accepted);
+
+    assert_eq!(report.assignment_checks(), &[accepted]);
+    assert_eq!(
+        report.assignment_check(AstNodeId::from_raw(30)),
+        Some(accepted)
+    );
+    assert_eq!(report.assignment_check(AstNodeId::from_raw(31)), None);
 }

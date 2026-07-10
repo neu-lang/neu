@@ -3,8 +3,8 @@ use newlang::{
     module::{ModuleName, PackageNamespace},
     symbol::SymbolId,
     types::{
-        GenericParameterType, NominalTypeIdentity, NullableType, TypeArena, TypeDiagnostic,
-        TypeDiagnosticKind, TypeId, TypeKind, TypeRecord, UnsupportedTypeForm,
+        GenericParameterType, NominalTypeIdentity, NullableType, PrimitiveType, TypeArena,
+        TypeDiagnostic, TypeDiagnosticKind, TypeId, TypeKind, TypeRecord, UnsupportedTypeForm,
     },
 };
 
@@ -87,6 +87,32 @@ fn type_record_preserves_kind_and_id() {
 
     assert_eq!(record.id(), id);
     assert_eq!(record.kind(), &TypeKind::GenericParameter(generic));
+}
+
+#[test]
+fn primitive_type_records_cover_adr0027_bootstrap_identities() {
+    let primitives = [
+        PrimitiveType::Bool,
+        PrimitiveType::Int,
+        PrimitiveType::String,
+        PrimitiveType::Unit,
+        PrimitiveType::Null,
+    ];
+
+    assert_eq!(primitives.len(), 5);
+
+    let mut arena = TypeArena::new();
+    let ids: Vec<_> = primitives
+        .iter()
+        .copied()
+        .map(|primitive| arena.insert(TypeRecord::primitive(primitive)))
+        .collect();
+
+    for (index, primitive) in primitives.iter().copied().enumerate() {
+        let record = arena.get(ids[index]).unwrap();
+        assert_eq!(record.id(), ids[index]);
+        assert_eq!(record.kind(), &TypeKind::Primitive(primitive));
+    }
 }
 
 #[test]
