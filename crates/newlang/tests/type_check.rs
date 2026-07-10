@@ -4,16 +4,19 @@ use newlang::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
         ResolvedName,
     },
-    parser::{parse_source, ParsedAssignmentStatement, ParsedGroupedExpression},
+    parser::{
+        parse_source, ParsedAssignmentStatement, ParsedGroupedExpression, ParsedLiteralExpression,
+        ParsedLiteralKind,
+    },
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
         known_local_symbol_types, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport,
+        type_literal_expressions, type_m0018_accepted_expressions, type_parser_literals,
+        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
+        type_resolved_name_expressions, AmbiguousTypeRule, AssignmentCheck, DeclarationSignature,
+        ExpressionType, KnownSymbolType, LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
@@ -740,4 +743,96 @@ fn assignment_statement_type_checking_rejects_null_for_non_nullable_targets() {
     assert_eq!(report.diagnostics()[0].node(), AstNodeId::from_raw(182));
     assert_eq!(report.diagnostics()[0].expected_type(), Some(int_id));
     assert_eq!(report.diagnostics()[0].actual_type(), Some(null_id));
+}
+
+#[test]
+fn accepted_expression_composition_records_literals_names_and_groups() {
+    let literal = AstNodeId::from_raw(190);
+    let name = AstNodeId::from_raw(191);
+    let group = AstNodeId::from_raw(192);
+    let literals = [ParsedLiteralExpression {
+        expression: literal,
+        kind: ParsedLiteralKind::AcceptedInteger,
+        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(80), 0, 2).unwrap(),
+    }];
+    let grouped = [ParsedGroupedExpression {
+        expression: group,
+        inner: name,
+        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(80), 3, 9).unwrap(),
+    }];
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(name, SymbolId::from_raw(40)));
+    let known = [KnownSymbolType::new(
+        SymbolId::from_raw(40),
+        TypeId::from_raw(0),
+    )];
+
+    let (arena, report) =
+        type_m0018_accepted_expressions(&literals, &grouped, &resolutions, &known);
+
+    assert_eq!(arena.records().len(), 5);
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(report.expression_type(literal), Some(TypeId::from_raw(1)));
+    assert_eq!(report.expression_type(name), Some(TypeId::from_raw(0)));
+    assert_eq!(report.expression_type(group), Some(TypeId::from_raw(0)));
+}
+
+#[test]
+fn accepted_expression_composition_types_nested_groups_when_inner_becomes_known() {
+    let literal = AstNodeId::from_raw(200);
+    let inner_group = AstNodeId::from_raw(201);
+    let outer_group = AstNodeId::from_raw(202);
+    let literals = [ParsedLiteralExpression {
+        expression: literal,
+        kind: ParsedLiteralKind::AcceptedString,
+        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(81), 2, 8).unwrap(),
+    }];
+    let grouped = [
+        ParsedGroupedExpression {
+            expression: outer_group,
+            inner: inner_group,
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(81), 0, 10).unwrap(),
+        },
+        ParsedGroupedExpression {
+            expression: inner_group,
+            inner: literal,
+            span: newlang::source::ByteSpan::new(SourceFileId::from_raw(81), 1, 9).unwrap(),
+        },
+    ];
+    let resolutions = ResolutionTable::new();
+
+    let (_arena, report) = type_m0018_accepted_expressions(&literals, &grouped, &resolutions, &[]);
+
+    assert_eq!(report.expression_type(literal), Some(TypeId::from_raw(2)));
+    assert_eq!(
+        report.expression_type(inner_group),
+        Some(TypeId::from_raw(2))
+    );
+    assert_eq!(
+        report.expression_type(outer_group),
+        Some(TypeId::from_raw(2))
+    );
+}
+
+#[test]
+fn accepted_expression_composition_skips_unknown_names_and_groups() {
+    let unknown_name = AstNodeId::from_raw(210);
+    let unknown_group = AstNodeId::from_raw(211);
+    let grouped = [ParsedGroupedExpression {
+        expression: unknown_group,
+        inner: unknown_name,
+        span: newlang::source::ByteSpan::new(SourceFileId::from_raw(82), 0, 8).unwrap(),
+    }];
+    let mut resolutions = ResolutionTable::new();
+    resolutions.insert(ResolvedName::new(unknown_name, SymbolId::from_raw(41)));
+
+    let (_arena, report) = type_m0018_accepted_expressions(&[], &grouped, &resolutions, &[]);
+
+    assert_eq!(report.expression_type(unknown_name), None);
+    assert_eq!(report.expression_type(unknown_group), None);
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.assignment_checks(), &[]);
 }

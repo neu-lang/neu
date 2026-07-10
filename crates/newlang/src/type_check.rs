@@ -571,3 +571,50 @@ fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bo
         _ => false,
     }
 }
+
+pub fn type_m0018_accepted_expressions(
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    resolutions: &ResolutionTable,
+    known_symbols: &[KnownSymbolType],
+) -> (TypeArena, TypeCheckReport) {
+    let mut arena = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut arena);
+    let mut report = TypeCheckReport::new();
+
+    for literal in literals {
+        report.record_expression_type(ExpressionType::new(
+            literal.expression,
+            primitives.type_for_literal(literal_kind_from_parser(literal.kind)),
+        ));
+    }
+
+    for resolved in resolutions.resolved_names() {
+        let Some(known) = known_symbols
+            .iter()
+            .find(|known| known.symbol() == resolved.symbol())
+        else {
+            continue;
+        };
+        report.record_expression_type(ExpressionType::new(resolved.reference(), known.ty()));
+    }
+
+    loop {
+        let mut added_group = false;
+        for grouped in grouped_expressions {
+            if report.expression_type(grouped.expression).is_some() {
+                continue;
+            }
+            let Some(inner) = report.expression_type(grouped.inner) else {
+                continue;
+            };
+            report.record_expression_type(ExpressionType::new(grouped.expression, inner));
+            added_group = true;
+        }
+        if !added_group {
+            break;
+        }
+    }
+
+    (arena, report)
+}
