@@ -369,3 +369,41 @@ is primary and the boundary node is secondary. Because M0024 has no approved
 synchronization abstractions, shared mutable state is not accepted through a
 `Share` capture; mutable captures may only be modeled as `Send` transfers when
 the type satisfies `Send`.
+
+## ADR-0038: Bootstrap Coroutine Scope And Suspension Analysis
+
+M0025 uses a metadata-only bootstrap coroutine scope and suspension model. It
+adds no source-level coroutine, `async`, `await`, task-spawn, detached-task,
+cancellation, pinned-frame, closure, channel, synchronization, or scheduler
+syntax. Existing unsupported concurrency-like source forms remain rejected or
+unsupported.
+
+Structured scope input records contain a scope node and ordered child-task
+records. Child-task records contain a task node, the containing scope node, and
+the scope node in which the child is proven to complete or be cancelled. A child
+task is valid only when its completion-or-cancellation scope is the same scope
+as its containing structured scope. Other task escape rules are deferred.
+
+M0025 reports `task_scope_escape` when a child task is not proven to complete or
+be cancelled in its containing structured scope. The child task node is primary,
+the containing scope node is secondary, and the diagnostic identifies that the
+child task would outlive its structured scope.
+
+Suspension point records contain a suspension node and suspended-frame scope
+node. Suspended-borrow records contain a suspension node, borrowed local
+binding, borrow node, borrow kind, borrowed-value lifetime scope,
+suspended-frame scope, and whether the suspended frame may be concurrently
+accessed. A borrow crossing suspension is valid only when the frame is not
+concurrently accessible and the suspended-frame scope is the same scope as the
+borrowed value's lifetime scope.
+
+M0025 reports `borrow_across_suspension` when a suspended borrow may be
+concurrently accessed, may outlive the borrowed value, or both. The suspension
+node is primary, the borrow node is secondary, and the diagnostic identifies the
+borrowed local and rejection reason.
+
+Cancellation resource-safety in M0025 is limited to the structured-scope
+completion-or-cancellation check. Runtime cancellation propagation, destructor
+execution during cancellation, cancellation handlers, cancellation masking, and
+async drop are deferred. ADR-0037 remains the authority for any supplied
+thread-capability capture records.

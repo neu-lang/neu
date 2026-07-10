@@ -7,7 +7,7 @@
 - Related Milestone: `M0025`
 - Filed By: `main task`
 - Date: `2026-07-11`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
@@ -96,8 +96,8 @@ metadata-only bootstrap subset with diagnostics.
 ## Resolution
 
 - Decision:
-  - pending
+  - Accepted `docs/adr/ADR-0038-bootstrap-coroutine-scope-and-suspension-analysis.md`.
 - Source of truth updated:
-  - pending
+  - `docs/SPEC.md`, `ADR-0038: Bootstrap Coroutine Scope And Suspension Analysis`.
 - Date resolved:
-  - pending
+  - `2026-07-11`
