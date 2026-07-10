@@ -4,18 +4,18 @@ use newlang::{
         LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId, ResolutionTable,
         ResolvedName,
     },
-    parser::{parse_source, ParsedGroupedExpression},
+    parser::{parse_source, ParsedAssignmentStatement, ParsedGroupedExpression},
     source::SourceFileId,
     symbol::SymbolId,
     type_check::{
-        known_local_symbol_types, type_grouped_expressions, type_literal_expressions,
-        type_parser_literals, type_primitive_local_declarations,
+        known_local_symbol_types, type_assignment_statements, type_grouped_expressions,
+        type_literal_expressions, type_parser_literals, type_primitive_local_declarations,
         type_primitive_local_initializer_declarations, type_resolved_name_expressions,
         AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, ExpressionType, KnownSymbolType,
         LiteralExpressionInput, LiteralKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
         TypeCheckReport,
     },
-    types::{PrimitiveType, TypeId, TypeKind},
+    types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
 
 #[test]
@@ -588,4 +588,156 @@ fn grouped_expression_typing_supports_already_typed_nested_groups() {
             ExpressionType::new(outer_group, TypeId::from_raw(4)),
         ]
     );
+}
+
+#[test]
+fn assignment_statement_type_checking_records_exact_matches() {
+    let mut arena = TypeArena::new();
+    let bool_id = arena.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(140),
+            target: AstNodeId::from_raw(141),
+            value: AstNodeId::from_raw(142),
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(143),
+            target: AstNodeId::from_raw(144),
+            value: AstNodeId::from_raw(145),
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(141), bool_id),
+        ExpressionType::new(AstNodeId::from_raw(142), bool_id),
+        ExpressionType::new(AstNodeId::from_raw(144), int_id),
+        ExpressionType::new(AstNodeId::from_raw(145), int_id),
+    ];
+
+    let report = type_assignment_statements(&assignments, &expression_types, &arena);
+
+    assert_eq!(report.expression_types(), &[]);
+    assert_eq!(report.declaration_signatures(), &[]);
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(
+        report.assignment_checks(),
+        &[
+            AssignmentCheck::new(AstNodeId::from_raw(140), bool_id, bool_id),
+            AssignmentCheck::new(AstNodeId::from_raw(143), int_id, int_id),
+        ]
+    );
+}
+
+#[test]
+fn assignment_statement_type_checking_reports_mismatches_on_values() {
+    let mut arena = TypeArena::new();
+    let bool_id = arena.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let assignments = [ParsedAssignmentStatement {
+        statement: AstNodeId::from_raw(150),
+        target: AstNodeId::from_raw(151),
+        value: AstNodeId::from_raw(152),
+    }];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(151), bool_id),
+        ExpressionType::new(AstNodeId::from_raw(152), int_id),
+    ];
+
+    let report = type_assignment_statements(&assignments, &expression_types, &arena);
+
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(report.diagnostics().len(), 1);
+    let diagnostic = &report.diagnostics()[0];
+    assert_eq!(diagnostic.kind(), TypeCheckDiagnosticKind::TypeMismatch);
+    assert_eq!(diagnostic.node(), AstNodeId::from_raw(152));
+    assert_eq!(diagnostic.expected_type(), Some(bool_id));
+    assert_eq!(diagnostic.actual_type(), Some(int_id));
+}
+
+#[test]
+fn assignment_statement_type_checking_skips_unknown_sides() {
+    let mut arena = TypeArena::new();
+    let bool_id = arena.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(160),
+            target: AstNodeId::from_raw(161),
+            value: AstNodeId::from_raw(162),
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(163),
+            target: AstNodeId::from_raw(164),
+            value: AstNodeId::from_raw(165),
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(161), bool_id),
+        ExpressionType::new(AstNodeId::from_raw(165), bool_id),
+    ];
+
+    let report = type_assignment_statements(&assignments, &expression_types, &arena);
+
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(report.diagnostics(), &[]);
+}
+
+#[test]
+fn assignment_statement_type_checking_accepts_nullable_exceptions() {
+    let mut arena = TypeArena::new();
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let null_id = arena.insert(TypeRecord::primitive(PrimitiveType::Null));
+    let nullable_int_id = arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
+    let assignments = [
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(170),
+            target: AstNodeId::from_raw(171),
+            value: AstNodeId::from_raw(172),
+        },
+        ParsedAssignmentStatement {
+            statement: AstNodeId::from_raw(173),
+            target: AstNodeId::from_raw(174),
+            value: AstNodeId::from_raw(175),
+        },
+    ];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(171), nullable_int_id),
+        ExpressionType::new(AstNodeId::from_raw(172), null_id),
+        ExpressionType::new(AstNodeId::from_raw(174), nullable_int_id),
+        ExpressionType::new(AstNodeId::from_raw(175), int_id),
+    ];
+
+    let report = type_assignment_statements(&assignments, &expression_types, &arena);
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(
+        report.assignment_checks(),
+        &[
+            AssignmentCheck::new(AstNodeId::from_raw(170), nullable_int_id, null_id),
+            AssignmentCheck::new(AstNodeId::from_raw(173), nullable_int_id, int_id),
+        ]
+    );
+}
+
+#[test]
+fn assignment_statement_type_checking_rejects_null_for_non_nullable_targets() {
+    let mut arena = TypeArena::new();
+    let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let null_id = arena.insert(TypeRecord::primitive(PrimitiveType::Null));
+    let assignments = [ParsedAssignmentStatement {
+        statement: AstNodeId::from_raw(180),
+        target: AstNodeId::from_raw(181),
+        value: AstNodeId::from_raw(182),
+    }];
+    let expression_types = [
+        ExpressionType::new(AstNodeId::from_raw(181), int_id),
+        ExpressionType::new(AstNodeId::from_raw(182), null_id),
+    ];
+
+    let report = type_assignment_statements(&assignments, &expression_types, &arena);
+
+    assert_eq!(report.assignment_checks(), &[]);
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(report.diagnostics()[0].node(), AstNodeId::from_raw(182));
+    assert_eq!(report.diagnostics()[0].expected_type(), Some(int_id));
+    assert_eq!(report.diagnostics()[0].actual_type(), Some(null_id));
 }

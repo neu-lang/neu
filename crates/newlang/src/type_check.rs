@@ -2,11 +2,11 @@ use crate::{
     ast::AstNodeId,
     name_resolution::{LocalBinding, ResolutionTable},
     parser::{
-        ParsedGroupedExpression, ParsedLiteralExpression, ParsedLiteralKind,
-        ParsedLocalDeclaration, ParsedTypeNameReference,
+        ParsedAssignmentStatement, ParsedGroupedExpression, ParsedLiteralExpression,
+        ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference,
     },
     symbol::SymbolId,
-    types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
+    types::{PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -507,4 +507,67 @@ pub fn type_grouped_expressions(
     }
 
     report
+}
+
+pub fn type_assignment_statements(
+    assignments: &[ParsedAssignmentStatement],
+    known_expression_types: &[ExpressionType],
+    arena: &TypeArena,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+
+    for assignment in assignments {
+        let Some(target_type) = expression_type_in(known_expression_types, assignment.target)
+        else {
+            continue;
+        };
+        let Some(value_type) = expression_type_in(known_expression_types, assignment.value) else {
+            continue;
+        };
+
+        if assignment_compatible(target_type, value_type, arena) {
+            report.record_assignment_check(AssignmentCheck::new(
+                assignment.statement,
+                target_type,
+                value_type,
+            ));
+        } else {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                assignment.value,
+                target_type,
+                value_type,
+            ));
+        }
+    }
+
+    report
+}
+
+fn expression_type_in(
+    expression_types: &[ExpressionType],
+    expression: AstNodeId,
+) -> Option<TypeId> {
+    expression_types
+        .iter()
+        .find(|entry| entry.expression() == expression)
+        .map(|entry| entry.ty())
+}
+
+fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bool {
+    if target == value {
+        return true;
+    }
+
+    let Some(target_record) = arena.get(target) else {
+        return false;
+    };
+    let Some(value_record) = arena.get(value) else {
+        return false;
+    };
+
+    match (target_record.kind(), value_record.kind()) {
+        (TypeKind::Nullable(_), TypeKind::Primitive(PrimitiveType::Null)) => true,
+        (TypeKind::Nullable(nullable), _) => nullable.base() == value,
+        _ => false,
+    }
 }
