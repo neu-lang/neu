@@ -14,7 +14,7 @@ use newlang::{
     symbol::SymbolId,
     type_check::{
         known_local_symbol_types, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_m0018_accepted_expressions,
+        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions, AmbiguousTypeRule,
@@ -1132,4 +1132,164 @@ fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers()
     );
     assert_eq!(report.assignment_check(unknown_declaration), None);
     assert_eq!(report.assignment_check(skipped_declaration), None);
+}
+
+#[test]
+fn m0018_core_types_well_typed_accepted_fixture() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(88),
+        "fun run() { val source: Int = 1; val copy: Int = source; val grouped: Int = (copy); var next: Int = grouped; next = source; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let source_symbol = SymbolId::from_raw(60);
+    let copy_symbol = SymbolId::from_raw(61);
+    let grouped_symbol = SymbolId::from_raw(62);
+    let next_symbol = SymbolId::from_raw(63);
+    let mut resolutions = ResolutionTable::new();
+    for reference in &parsed.name_references {
+        let symbol = match reference.name.as_str() {
+            "source" => source_symbol,
+            "copy" => copy_symbol,
+            "grouped" => grouped_symbol,
+            "next" => next_symbol,
+            other => panic!("unexpected reference {other}"),
+        };
+        resolutions.insert(ResolvedName::new(reference.reference, symbol));
+    }
+    let bindings = [
+        LocalBinding::new(
+            LocalBindingKey::new(LocalScopeId::from_raw(0), source_symbol),
+            parsed.local_declarations[0].declaration,
+            LocalBindingKind::Val,
+        ),
+        LocalBinding::new(
+            LocalBindingKey::new(LocalScopeId::from_raw(0), copy_symbol),
+            parsed.local_declarations[1].declaration,
+            LocalBindingKind::Val,
+        ),
+        LocalBinding::new(
+            LocalBindingKey::new(LocalScopeId::from_raw(0), grouped_symbol),
+            parsed.local_declarations[2].declaration,
+            LocalBindingKind::Val,
+        ),
+        LocalBinding::new(
+            LocalBindingKey::new(LocalScopeId::from_raw(0), next_symbol),
+            parsed.local_declarations[3].declaration,
+            LocalBindingKind::Var,
+        ),
+    ];
+
+    let (_arena, report) = type_m0018_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &parsed.assignment_statements,
+        &resolutions,
+        &bindings,
+    );
+
+    assert_eq!(report.diagnostics(), &[]);
+    assert_eq!(report.declaration_signatures().len(), 4);
+    assert_eq!(report.assignment_checks().len(), 5);
+    for declaration in &parsed.local_declarations {
+        assert_eq!(
+            report.declaration_signature(declaration.declaration),
+            Some(TypeId::from_raw(1))
+        );
+        assert!(report.assignment_check(declaration.declaration).is_some());
+    }
+    assert!(report
+        .assignment_check(parsed.assignment_statements[0].statement)
+        .is_some());
+}
+
+#[test]
+fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(89),
+        "fun run() { val source: Int = 1; val bad: String = source; val unknown: UserId = source; val missingKnown: Int = external; logger.info(source); }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let source_symbol = SymbolId::from_raw(70);
+    let external_symbol = SymbolId::from_raw(71);
+    let mut resolutions = ResolutionTable::new();
+    for reference in &parsed.name_references {
+        let symbol = match reference.name.as_str() {
+            "source" => source_symbol,
+            "external" => external_symbol,
+            "logger" => external_symbol,
+            "info" => external_symbol,
+            other => panic!("unexpected reference {other}"),
+        };
+        resolutions.insert(ResolvedName::new(reference.reference, symbol));
+    }
+    let bindings = [LocalBinding::new(
+        LocalBindingKey::new(LocalScopeId::from_raw(0), source_symbol),
+        parsed.local_declarations[0].declaration,
+        LocalBindingKind::Val,
+    )];
+
+    let (_arena, report) = type_m0018_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.grouped_expressions,
+        &parsed.assignment_statements,
+        &resolutions,
+        &bindings,
+    );
+
+    assert!(report
+        .diagnostics()
+        .iter()
+        .any(
+            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch
+                && diagnostic.node() == parsed.local_declarations[1].initializer.unwrap()
+                && diagnostic.expected_type() == Some(TypeId::from_raw(2))
+                && diagnostic.actual_type() == Some(TypeId::from_raw(1))
+        ));
+    assert!(report
+        .diagnostics()
+        .iter()
+        .any(
+            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnresolvedTypeRule
+                && diagnostic.rule() == TypeRuleDiagnostic::MissingAnnotationType
+                && diagnostic.node() == parsed.local_declarations[2].declaration
+        ));
+    assert!(report
+        .diagnostics()
+        .iter()
+        .any(
+            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnresolvedTypeRule
+                && diagnostic.rule() == TypeRuleDiagnostic::MissingResolvedNameType
+        ));
+    assert!(report
+        .diagnostics()
+        .iter()
+        .any(
+            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
+                && diagnostic.rule() == TypeRuleDiagnostic::MemberExpressionDeferred
+        ));
+    assert!(report
+        .diagnostics()
+        .iter()
+        .any(
+            |diagnostic| diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
+                && diagnostic.rule() == TypeRuleDiagnostic::DirectCallDeferred
+        ));
+    assert_eq!(
+        report.assignment_check(parsed.local_declarations[2].declaration),
+        None
+    );
+    assert_eq!(
+        report.assignment_check(parsed.local_declarations[3].declaration),
+        None
+    );
 }

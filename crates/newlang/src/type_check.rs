@@ -643,6 +643,98 @@ fn unsupported_expression_rule(kind: AstNodeKind) -> Option<TypeRuleDiagnostic> 
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn type_m0018_core(
+    arena: &AstArena,
+    declarations: &[ParsedLocalDeclaration],
+    type_name_references: &[ParsedTypeNameReference],
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    assignments: &[ParsedAssignmentStatement],
+    resolutions: &ResolutionTable,
+    local_bindings: &[LocalBinding],
+) -> (TypeArena, TypeCheckReport) {
+    let mut type_arena = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut type_arena);
+    let mut report = TypeCheckReport::new();
+
+    for declaration in declarations {
+        let Some(annotation_type) =
+            primitive_annotation_type(declaration, type_name_references, primitives)
+        else {
+            report.record_diagnostic(TypeCheckDiagnostic::unresolved_type_rule(
+                TypeRuleDiagnostic::MissingAnnotationType,
+                declaration.declaration,
+            ));
+            continue;
+        };
+        report.record_declaration_signature(DeclarationSignature::new(
+            declaration.declaration,
+            annotation_type,
+        ));
+    }
+
+    let known_symbols = known_local_symbol_types(local_bindings, report.declaration_signatures());
+    record_m0018_accepted_expression_types(
+        literals,
+        grouped_expressions,
+        resolutions,
+        &known_symbols,
+        primitives,
+        &mut report,
+    );
+
+    for declaration in declarations {
+        let Some(annotation_type) = report.declaration_signature(declaration.declaration) else {
+            continue;
+        };
+        let Some(initializer) = declaration.initializer else {
+            continue;
+        };
+        let Some(initializer_type) = report.expression_type(initializer) else {
+            continue;
+        };
+
+        if assignment_compatible(annotation_type, initializer_type, &type_arena) {
+            report.record_assignment_check(AssignmentCheck::new(
+                declaration.declaration,
+                annotation_type,
+                initializer_type,
+            ));
+        } else {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                initializer,
+                annotation_type,
+                initializer_type,
+            ));
+        }
+    }
+
+    let assignment_report =
+        type_assignment_statements(assignments, report.expression_types(), &type_arena);
+    merge_type_check_report(&mut report, assignment_report);
+
+    let unsupported_report = type_unsupported_m0018_expressions(arena);
+    merge_type_check_report(&mut report, unsupported_report);
+
+    (type_arena, report)
+}
+
+fn merge_type_check_report(target: &mut TypeCheckReport, source: TypeCheckReport) {
+    for expression_type in source.expression_types() {
+        target.record_expression_type(*expression_type);
+    }
+    for signature in source.declaration_signatures() {
+        target.record_declaration_signature(*signature);
+    }
+    for assignment_check in source.assignment_checks() {
+        target.record_assignment_check(*assignment_check);
+    }
+    for diagnostic in source.diagnostics() {
+        target.record_diagnostic(diagnostic.clone());
+    }
+}
+
 pub fn type_m0018_accepted_expressions(
     literals: &[ParsedLiteralExpression],
     grouped_expressions: &[ParsedGroupedExpression],
@@ -668,6 +760,26 @@ fn type_m0018_accepted_expressions_with_primitives(
     let primitives = PrimitiveTypeIds::insert_into(&mut arena);
     let mut report = TypeCheckReport::new();
 
+    record_m0018_accepted_expression_types(
+        literals,
+        grouped_expressions,
+        resolutions,
+        known_symbols,
+        primitives,
+        &mut report,
+    );
+
+    (arena, primitives, report)
+}
+
+fn record_m0018_accepted_expression_types(
+    literals: &[ParsedLiteralExpression],
+    grouped_expressions: &[ParsedGroupedExpression],
+    resolutions: &ResolutionTable,
+    known_symbols: &[KnownSymbolType],
+    primitives: PrimitiveTypeIds,
+    report: &mut TypeCheckReport,
+) {
     for literal in literals {
         report.record_expression_type(ExpressionType::new(
             literal.expression,
@@ -705,8 +817,6 @@ fn type_m0018_accepted_expressions_with_primitives(
             break;
         }
     }
-
-    (arena, primitives, report)
 }
 
 pub fn type_m0018_local_declaration_initializers(
