@@ -2,7 +2,7 @@ use newlang::ast::AstNodeKind;
 use newlang::name_resolution::{DeclarationKind, LocalBindingKind};
 use newlang::parser::ParsedBinaryOperator;
 use newlang::parser::{parse_source, DiagnosticKind, ParsedLiteralKind};
-use newlang::source::SourceFileId;
+use newlang::source::{ByteSpan, SourceFileId};
 
 #[test]
 fn parses_package_import_and_function_declaration() {
@@ -124,6 +124,61 @@ fn parses_type_and_generic_syntax() {
     assert!(kinds.contains(&AstNodeKind::NullableType));
     assert!(kinds.contains(&AstNodeKind::FunctionType));
     assert!(kinds.contains(&AstNodeKind::GroupedType));
+}
+
+#[test]
+fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
+    let source = "struct Box<T: capability.Send & Share, U> {} fun wrap<V: Send>() {}";
+    let file = SourceFileId::from_raw(200);
+    let output = parse_source(file, source);
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.generic_parameters.len(), 3);
+
+    let box_parameter = &output.generic_parameters[0];
+    assert_eq!(box_parameter.name, "T");
+    assert_eq!(
+        box_parameter.name_span,
+        ByteSpan::new(file, 11, 12).unwrap()
+    );
+    assert_eq!(box_parameter.capability_bounds.len(), 2);
+    assert_eq!(box_parameter.capability_bounds[0].name, "capability.Send");
+    assert_eq!(
+        box_parameter.capability_bounds[0].name_span,
+        ByteSpan::new(file, 14, 29).unwrap()
+    );
+    assert_eq!(box_parameter.capability_bounds[1].name, "Share");
+    assert_eq!(
+        box_parameter.capability_bounds[1].name_span,
+        ByteSpan::new(file, 32, 37).unwrap()
+    );
+    assert_ne!(
+        box_parameter.parameter,
+        box_parameter.capability_bounds[0].bound
+    );
+
+    assert_eq!(output.generic_parameters[1].name, "U");
+    assert!(output.generic_parameters[1].capability_bounds.is_empty());
+    assert_eq!(output.generic_parameters[2].name, "V");
+    assert_eq!(
+        output.generic_parameters[2].capability_bounds[0].name,
+        "Send"
+    );
+}
+
+#[test]
+fn m0020_generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
+    let output = parse_source(
+        SourceFileId::from_raw(201),
+        "struct Bad<T: > {} fun use(): Box<Send> {};",
+    );
+
+    assert!(output
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::MissingGenericBound));
+    assert!(output.generic_parameters.is_empty());
 }
 
 #[test]

@@ -64,6 +64,22 @@ pub struct ParseOutput {
     pub if_expressions: Vec<ParsedIfExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
+    pub generic_parameters: Vec<ParsedGenericParameter>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedCapabilityBound {
+    pub bound: AstNodeId,
+    pub name: String,
+    pub name_span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedGenericParameter {
+    pub parameter: AstNodeId,
+    pub name: String,
+    pub name_span: ByteSpan,
+    pub capability_bounds: Vec<ParsedCapabilityBound>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -193,6 +209,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         if_expressions: parser.if_expressions,
         local_declarations: parser.local_declarations,
         assignment_statements: parser.assignment_statements,
+        generic_parameters: parser.generic_parameters,
     }
 }
 
@@ -213,6 +230,7 @@ struct Parser<'source> {
     if_expressions: Vec<ParsedIfExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
     assignment_statements: Vec<ParsedAssignmentStatement>,
+    generic_parameters: Vec<ParsedGenericParameter>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
 }
@@ -228,6 +246,7 @@ impl<'source> Parser<'source> {
             diagnostics: Vec::new(),
             declaration_names: Vec::new(),
             local_binding_names: Vec::new(),
+            generic_parameters: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
@@ -1271,9 +1290,13 @@ impl<'source> Parser<'source> {
                 self.skip_to_generic_parameter_boundary();
                 return;
             }
+            let name = self
+                .current()
+                .expect("generic parameter name exists")
+                .clone();
             self.advance();
 
-            let mut bound_count = 0usize;
+            let mut capability_bounds = Vec::new();
             if self.current_kind() == Some(TokenKind::Colon) {
                 self.advance();
                 if !self.can_start_capability_bound() {
@@ -1281,14 +1304,22 @@ impl<'source> Parser<'source> {
                     self.skip_to_generic_parameter_boundary();
                     return;
                 }
-                bound_count = self.parse_capability_bound_list();
+                capability_bounds = self.parse_capability_bound_list();
             }
 
             let parameter_end = self
                 .previous_span()
                 .map_or(parameter_start, |span| span.end());
-            self.arena
+            let parameter = self
+                .arena
                 .add_generic_parameter(self.span(parameter_start, parameter_end));
+            let bound_count = capability_bounds.len();
+            self.generic_parameters.push(ParsedGenericParameter {
+                parameter,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                name_span: name.span,
+                capability_bounds,
+            });
 
             match self.current_kind() {
                 Some(TokenKind::Comma) => {
@@ -1457,30 +1488,34 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn parse_capability_bound_list(&mut self) -> usize {
-        let mut count = 0usize;
+    fn parse_capability_bound_list(&mut self) -> Vec<ParsedCapabilityBound> {
+        let mut bounds = Vec::new();
         loop {
-            if self.parse_capability_bound().is_none() {
-                return count;
-            }
-            count += 1;
+            let Some(bound) = self.parse_capability_bound() else {
+                return bounds;
+            };
+            bounds.push(bound);
             if self.current_kind() != Some(TokenKind::Amp) {
-                return count;
+                return bounds;
             }
             self.advance();
             if !self.can_start_capability_bound() {
                 self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedCapabilityBound);
-                return count;
+                return bounds;
             }
         }
     }
 
-    fn parse_capability_bound(&mut self) -> Option<ByteSpan> {
+    fn parse_capability_bound(&mut self) -> Option<ParsedCapabilityBound> {
         let start = self.current()?.span.start();
         let end = self.parse_qualified_name_for_type()?;
         let span = self.span(start, end);
-        self.arena.add_capability_bound(span);
-        Some(span)
+        let bound = self.arena.add_capability_bound(span);
+        Some(ParsedCapabilityBound {
+            bound,
+            name: self.text[start..end].to_owned(),
+            name_span: span,
+        })
     }
 
     fn parse_function_type(&mut self) -> Option<ByteSpan> {
