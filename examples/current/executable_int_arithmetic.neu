@@ -1,0 +1,19 @@
+package examples.current
+
+public fun executableIntArithmetic() {
+    const plus: Int = 1 + 2;
+    const minus: Int = 3 - 2;
+    const product: Int = 2 * 3;
+    const quotient: Int = 8 / 2;
+    const remainder: Int = 7 % 3;
+    const power: Int = 2 ** 8;
+    const leftShift: Int = 1 << 4;
+    const rightShift: Int = -8 >> 2;
+    const bitAnd: Int = 6 & 3;
+    const bitOr: Int = 6 | 3;
+    const bitXor: Int = 6 ^ 3;
+    const unaryPlus: Int = +1;
+    const unaryMinus: Int = -1;
+    const bitNot: Int = ~1;
+    const minimum: Int = -(9223372036854775808);
+}

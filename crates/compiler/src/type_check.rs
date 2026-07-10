@@ -3,7 +3,7 @@ use crate::{
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
         ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
-        ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression,
+        ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral,
         ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
         ParsedTypeNameReference, ParsedUnaryExpression,
     },
@@ -30,6 +30,7 @@ pub enum TypeCheckDiagnosticKind {
     InvalidatedRefinement,
     UnsupportedFlowRule,
     AmbiguousFlowRule,
+    StaticIntegerDiagnostic,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -54,6 +55,11 @@ pub enum TypeRuleDiagnostic {
     ExclusiveBorrowRefinementDeferred,
     AmbiguousLocalBindingFlow,
     AmbiguousNullTestRegion,
+    IntegerLiteralOutOfRange,
+    IntegerOverflow,
+    DivisionByZero,
+    NegativeExponent,
+    InvalidShiftCount,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -72,6 +78,15 @@ pub struct TypeCheckDiagnostic {
 }
 
 impl TypeCheckDiagnostic {
+    pub fn static_integer(rule: TypeRuleDiagnostic, node: AstNodeId) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::StaticIntegerDiagnostic,
+            rule,
+            node,
+            expected_type: None,
+            actual_type: None,
+        }
+    }
     pub fn ambiguous_type_rule(rule: AmbiguousTypeRule, node: AstNodeId) -> Self {
         Self {
             kind: TypeCheckDiagnosticKind::AmbiguousTypeRule,
@@ -1280,6 +1295,232 @@ fn is_m0028_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
     )
 }
 
+pub fn type_m0028_static_integer_diagnostics(
+    literals: &[ParsedIntegerLiteral],
+    grouped: &[ParsedGroupedExpression],
+    unary: &[ParsedUnaryExpression],
+    binaries: &[ParsedBinaryExpression],
+) -> Vec<TypeCheckDiagnostic> {
+    fn is_constant_expression(
+        node: AstNodeId,
+        literals: &[ParsedIntegerLiteral],
+        grouped: &[ParsedGroupedExpression],
+        unary: &[ParsedUnaryExpression],
+        binaries: &[ParsedBinaryExpression],
+    ) -> bool {
+        if literals.iter().any(|literal| literal.expression == node) {
+            return true;
+        }
+        if let Some(group) = grouped.iter().find(|group| group.expression == node) {
+            return is_constant_expression(group.inner, literals, grouped, unary, binaries);
+        }
+        if let Some(expression) = unary
+            .iter()
+            .find(|expression| expression.expression == node)
+        {
+            return matches!(
+                expression.operator,
+                crate::parser::ParsedUnaryOperator::Plus
+                    | crate::parser::ParsedUnaryOperator::Minus
+                    | crate::parser::ParsedUnaryOperator::BitwiseNot
+            ) && is_constant_expression(
+                expression.operand,
+                literals,
+                grouped,
+                unary,
+                binaries,
+            );
+        }
+        let Some(expression) = binaries
+            .iter()
+            .find(|expression| expression.expression == node)
+        else {
+            return false;
+        };
+        is_m0028_executable_int_operator(expression.operator)
+            && is_constant_expression(expression.left, literals, grouped, unary, binaries)
+            && is_constant_expression(expression.right, literals, grouped, unary, binaries)
+    }
+
+    fn is_min_int_magnitude(
+        node: AstNodeId,
+        literals: &[ParsedIntegerLiteral],
+        grouped: &[ParsedGroupedExpression],
+    ) -> bool {
+        if let Some(literal) = literals.iter().find(|literal| literal.expression == node) {
+            return literal.value == Some((i64::MAX as u64) + 1);
+        }
+        grouped
+            .iter()
+            .find(|group| group.expression == node)
+            .is_some_and(|group| is_min_int_magnitude(group.inner, literals, grouped))
+    }
+
+    fn checked_power(base: i64, mut exponent: i64) -> Option<i64> {
+        let mut result = 1_i64;
+        let mut factor = base;
+        while exponent > 0 {
+            if exponent % 2 != 0 {
+                result = result.checked_mul(factor)?;
+            }
+            exponent /= 2;
+            if exponent > 0 {
+                factor = factor.checked_mul(factor)?;
+            }
+        }
+        Some(result)
+    }
+
+    fn evaluate(
+        node: AstNodeId,
+        literals: &[ParsedIntegerLiteral],
+        grouped: &[ParsedGroupedExpression],
+        unary: &[ParsedUnaryExpression],
+        binaries: &[ParsedBinaryExpression],
+    ) -> Result<Option<i64>, TypeRuleDiagnostic> {
+        if let Some(literal) = literals.iter().find(|literal| literal.expression == node) {
+            return literal
+                .value
+                .and_then(|value| i64::try_from(value).ok())
+                .map(Some)
+                .ok_or(TypeRuleDiagnostic::IntegerLiteralOutOfRange);
+        }
+        if let Some(group) = grouped.iter().find(|group| group.expression == node) {
+            return evaluate(group.inner, literals, grouped, unary, binaries);
+        }
+        if let Some(expression) = unary
+            .iter()
+            .find(|expression| expression.expression == node)
+        {
+            if expression.operator == crate::parser::ParsedUnaryOperator::Minus
+                && is_min_int_magnitude(expression.operand, literals, grouped)
+            {
+                return Ok(Some(i64::MIN));
+            }
+            let value = evaluate(expression.operand, literals, grouped, unary, binaries)?;
+            return match (expression.operator, value) {
+                (_, None) => Ok(None),
+                (crate::parser::ParsedUnaryOperator::Plus, Some(value)) => Ok(Some(value)),
+                (crate::parser::ParsedUnaryOperator::Minus, Some(value)) => value
+                    .checked_neg()
+                    .map(Some)
+                    .ok_or(TypeRuleDiagnostic::IntegerOverflow),
+                (crate::parser::ParsedUnaryOperator::BitwiseNot, Some(value)) => Ok(Some(!value)),
+            };
+        }
+        let Some(expression) = binaries
+            .iter()
+            .find(|expression| expression.expression == node)
+        else {
+            return Ok(None);
+        };
+        let (Some(left), Some(right)) = (
+            evaluate(expression.left, literals, grouped, unary, binaries)?,
+            evaluate(expression.right, literals, grouped, unary, binaries)?,
+        ) else {
+            return Ok(None);
+        };
+        let value = match expression.operator {
+            ParsedBinaryOperator::Plus => left.checked_add(right),
+            ParsedBinaryOperator::Minus => left.checked_sub(right),
+            ParsedBinaryOperator::Star => left.checked_mul(right),
+            ParsedBinaryOperator::Slash => {
+                return if right == 0 {
+                    Err(TypeRuleDiagnostic::DivisionByZero)
+                } else {
+                    left.checked_div(right)
+                        .map(Some)
+                        .ok_or(TypeRuleDiagnostic::IntegerOverflow)
+                };
+            }
+            ParsedBinaryOperator::Percent => {
+                return if right == 0 {
+                    Err(TypeRuleDiagnostic::DivisionByZero)
+                } else {
+                    left.checked_rem(right)
+                        .map(Some)
+                        .ok_or(TypeRuleDiagnostic::IntegerOverflow)
+                };
+            }
+            ParsedBinaryOperator::Exponent => {
+                if right < 0 {
+                    return Err(TypeRuleDiagnostic::NegativeExponent);
+                }
+                checked_power(left, right)
+            }
+            ParsedBinaryOperator::ShiftLeft | ParsedBinaryOperator::ShiftRight
+                if !(0..64).contains(&right) =>
+            {
+                return Err(TypeRuleDiagnostic::InvalidShiftCount);
+            }
+            ParsedBinaryOperator::ShiftLeft => left.checked_shl(right as u32),
+            ParsedBinaryOperator::ShiftRight => Some(left >> right),
+            ParsedBinaryOperator::BitwiseAnd => Some(left & right),
+            ParsedBinaryOperator::BitwiseOr => Some(left | right),
+            ParsedBinaryOperator::BitwiseXor => Some(left ^ right),
+            _ => return Ok(None),
+        };
+        value.map(Some).ok_or(TypeRuleDiagnostic::IntegerOverflow)
+    }
+
+    let expressions: Vec<_> = literals
+        .iter()
+        .map(|literal| literal.expression)
+        .chain(grouped.iter().map(|expression| expression.expression))
+        .chain(unary.iter().map(|expression| expression.expression))
+        .chain(binaries.iter().map(|expression| expression.expression))
+        .filter(|expression| {
+            is_constant_expression(*expression, literals, grouped, unary, binaries)
+        })
+        .collect();
+    let children: Vec<_> = grouped
+        .iter()
+        .filter(|expression| {
+            is_constant_expression(expression.expression, literals, grouped, unary, binaries)
+        })
+        .map(|expression| expression.inner)
+        .chain(
+            unary
+                .iter()
+                .filter(|expression| {
+                    is_constant_expression(
+                        expression.expression,
+                        literals,
+                        grouped,
+                        unary,
+                        binaries,
+                    )
+                })
+                .map(|expression| expression.operand),
+        )
+        .chain(
+            binaries
+                .iter()
+                .filter(|expression| {
+                    is_constant_expression(
+                        expression.expression,
+                        literals,
+                        grouped,
+                        unary,
+                        binaries,
+                    )
+                })
+                .flat_map(|expression| [expression.left, expression.right]),
+        )
+        .collect();
+
+    let mut diagnostics = Vec::new();
+    for expression in expressions
+        .into_iter()
+        .filter(|expression| !children.contains(expression))
+    {
+        if let Err(rule) = evaluate(expression, literals, grouped, unary, binaries) {
+            diagnostics.push(TypeCheckDiagnostic::static_integer(rule, expression));
+        }
+    }
+    diagnostics
+}
+
 pub fn type_assignment_statements(
     assignments: &[ParsedAssignmentStatement],
     known_expression_types: &[ExpressionType],
@@ -1759,6 +2000,7 @@ pub fn type_m0028_executable_core(
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
     literals: &[ParsedLiteralExpression],
+    integer_literals: &[ParsedIntegerLiteral],
     grouped_expressions: &[ParsedGroupedExpression],
     unary_expressions: &[ParsedUnaryExpression],
     binary_expressions: &[ParsedBinaryExpression],
@@ -1766,7 +2008,7 @@ pub fn type_m0028_executable_core(
     resolutions: &ResolutionTable,
     local_bindings: &[LocalBinding],
 ) -> (TypeArena, TypeCheckReport) {
-    type_core(
+    let (arena, mut report) = type_core(
         arena,
         declarations,
         type_name_references,
@@ -1776,7 +2018,16 @@ pub fn type_m0028_executable_core(
         resolutions,
         local_bindings,
         Some((unary_expressions, binary_expressions)),
-    )
+    );
+    for diagnostic in type_m0028_static_integer_diagnostics(
+        integer_literals,
+        grouped_expressions,
+        unary_expressions,
+        binary_expressions,
+    ) {
+        report.record_diagnostic(diagnostic);
+    }
+    (arena, report)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -525,6 +525,15 @@ arithmetic, numeric casts, unsigned integers, fixed-width aliases, floats,
 machine-word integers, rotates, population count, and bit-scan intrinsics are
 deferred.
 
+## ADR-0048: Bootstrap Integer Constant Expressions
+
+For ADR-0043 diagnostics, a bootstrap integer constant expression is an
+integer literal or a grouped, unary `+`/`-`/`~`, or ADR-0042 integer binary
+operator expression whose operands are bootstrap integer constant expressions.
+Local bindings, names, assignments, calls, member access, `if`, `when`, and
+other forms are not bootstrap integer constant expressions. They must not
+receive a static arithmetic diagnostic solely from an inferred runtime value.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves

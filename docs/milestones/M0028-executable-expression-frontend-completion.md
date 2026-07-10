@@ -111,5 +111,6 @@ runtime behavior for arithmetic, exponentiation, bitwise, and shift operators.
 
 - [x] Executable operators parse.
 - [x] Executable operators type-check.
+- [x] Bootstrap constant-tree integer diagnostics exist.
 - [ ] Entry, call, and return checks exist.
 - [ ] Unsupported executable forms are rejected before HIR.

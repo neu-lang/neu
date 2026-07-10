@@ -25,7 +25,8 @@ use compiler::{
         type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
-        type_m0028_executable_core, type_m0028_executable_int_operators, type_parser_literals,
+        type_m0028_executable_core, type_m0028_executable_int_operators,
+        type_m0028_static_integer_diagnostics, type_parser_literals,
         type_primitive_local_declarations, type_primitive_local_initializer_declarations,
         type_resolved_name_expressions, type_unsupported_m0018_expressions,
     },
@@ -3589,6 +3590,7 @@ fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
+        &parsed.integer_literals,
         &parsed.grouped_expressions,
         &parsed.unary_expressions,
         &parsed.binary_expressions,
@@ -3621,6 +3623,7 @@ fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
+        &parsed.integer_literals,
         &parsed.grouped_expressions,
         &parsed.unary_expressions,
         &parsed.binary_expressions,
@@ -3655,6 +3658,7 @@ fn m0028_core_keeps_non_executable_operators_deferred() {
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
+        &parsed.integer_literals,
         &parsed.grouped_expressions,
         &parsed.unary_expressions,
         &parsed.binary_expressions,
@@ -3670,4 +3674,78 @@ fn m0028_core_keeps_non_executable_operators_deferred() {
         .collect();
     assert!(rules.contains(&TypeRuleDiagnostic::UnaryExpressionDeferred));
     assert!(rules.contains(&TypeRuleDiagnostic::BinaryExpressionDeferred));
+}
+
+#[test]
+fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(97),
+        "fun run() { const range = 9223372036854775808; const overflow = 9223372036854775807 + 1; const zero = 1 / 0; const exponent = 2 ** -1; const shift = 1 << 64; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let diagnostics = type_m0028_static_integer_diagnostics(
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+    );
+    let rules: Vec<_> = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.rule())
+        .collect();
+    assert!(rules.contains(&TypeRuleDiagnostic::IntegerLiteralOutOfRange));
+    assert!(rules.contains(&TypeRuleDiagnostic::IntegerOverflow));
+    assert!(rules.contains(&TypeRuleDiagnostic::DivisionByZero));
+    assert!(rules.contains(&TypeRuleDiagnostic::NegativeExponent));
+    assert!(rules.contains(&TypeRuleDiagnostic::InvalidShiftCount));
+}
+
+#[test]
+fn m0028_static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(98),
+        "fun run() { const min = -9223372036854775808; const value: Int = 1; const deferred = value + 9223372036854775808; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let diagnostics = type_m0028_static_integer_diagnostics(
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+    );
+    assert_eq!(
+        diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.rule() == TypeRuleDiagnostic::IntegerLiteralOutOfRange)
+            .count(),
+        1
+    );
+    assert!(diagnostics.iter().all(|diagnostic| {
+        diagnostic.rule() != TypeRuleDiagnostic::IntegerOverflow
+            && diagnostic.rule() != TypeRuleDiagnostic::DivisionByZero
+            && diagnostic.rule() != TypeRuleDiagnostic::NegativeExponent
+            && diagnostic.rule() != TypeRuleDiagnostic::InvalidShiftCount
+    }));
+}
+
+#[test]
+fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(99),
+        "fun run() { const plus = 1 + 2; const minus = 3 - 2; const product = 2 * 3; const quotient = 8 / 2; const remainder = 7 % 3; const power = 2 ** 8; const left = 1 << 4; const right = -8 >> 2; const and = 6 & 3; const or = 6 | 3; const xor = 6 ^ 3; const unaryPlus = +1; const unaryMinus = -1; const inverted = ~1; const min = -(9223372036854775808); }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let diagnostics = type_m0028_static_integer_diagnostics(
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+    );
+    assert_eq!(diagnostics, []);
 }
