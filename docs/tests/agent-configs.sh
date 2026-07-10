@@ -10,6 +10,14 @@ fail() {
 [ ! -e docs/AGENTS.md ] || fail "docs/AGENTS.md must not exist"
 [ -f .codex/config.toml ] || fail "missing .codex/config.toml"
 grep -Eq '^max_threads = 6$' .codex/config.toml || fail "max_threads must be 6"
+grep -Fq '## Context, Parallelism, And Report Budget' AGENTS.md ||
+  fail "AGENTS.md must define the context and report budget"
+grep -Fq '## Review Routing' docs/TASK_TEMPLATE.md ||
+  fail "task template must define conditional review routing"
+grep -Fq '## Authority Extract' docs/TASK_TEMPLATE.md ||
+  fail "task template must define a bounded authority extract"
+grep -Fq 'Successful reviews should be no more than 150 words' docs/REVIEW_TEMPLATE.md ||
+  fail "review template must define concise successful reviews"
 
 set -- .codex/agents/*.toml
 [ "$#" -eq 13 ] || fail "expected 13 TOML agent definitions, found $#"
@@ -29,6 +37,8 @@ for file in "$@"; do
     fail "sandbox mode must be workspace-write in $file"
   grep -Eq '^developer_instructions = """$' "$file" ||
     fail "missing developer instructions in $file"
+  grep -Fq '## Efficiency Rules' "$file" ||
+    fail "missing efficiency rules in $file"
 done
 
 if grep -R -Eq 'model_reasoning_effort = "xhigh"|model = "gpt-5\.[0-5]' .codex/agents; then

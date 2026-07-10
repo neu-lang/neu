@@ -51,6 +51,21 @@
 - Existing files:
   - `<path>`
 
+## Authority Extract
+
+This is the bounded context for the next agent. List exact sections, ADR
+headings, paths, and commands. Do not require whole documents unless the task
+is a semantic or architectural decision.
+
+- Required source-of-truth excerpts:
+  - `<SPEC heading or ADR heading>`
+- Required implementation/test paths:
+  - `<path>`
+- Validation commands:
+  - `<command>`
+- Context expansion trigger:
+  - `<what missing fact requires escalation or broader reading>`
+
 ## Required Tests
 
 Tests must be created before implementation.
@@ -90,6 +105,16 @@ Tests must be created before implementation.
 - [ ] CI passes as final gate.
 - [ ] Milestone checklist is updated.
 
+## Review Routing
+
+- Base review: `Reviewer`
+- Test Engineer: `<required only when tests changed | not required>`
+- Spec Compliance Auditor: `<required only when semantic accept/reject behavior changes | not required>`
+- Diagnostics Engineer: `<required only when diagnostics change | not required>`
+- Build Engineer: `<required only when build/release files change | not required>`
+- Simplicity Guardian: `<required only when a new abstraction or boundary is introduced | not required>`
+- Adversarial Engineer: `<required only when a soundness boundary changes | not required>`
+
 ## Execution Commands
 
 Commands may be `blocked: <reason>` until the project has the relevant harness.
@@ -124,10 +149,11 @@ Commands may be `blocked: <reason>` until the project has the relevant harness.
 
 ## Execution Log
 
-Append entries as the task progresses.
+Append one concise entry per phase. Do not repeat the task, prior entries, or
+full command output.
 
 ```text
-YYYY-MM-DD agent=<agent> phase=<phase> result=<result> notes=<notes>
+YYYY-MM-DD agent=<agent> phase=<phase> result=<pass|fail|blocked> evidence=<command or finding> handoff=<next role|none>
 ```
 
 ## Handoff
@@ -135,7 +161,5 @@ YYYY-MM-DD agent=<agent> phase=<phase> result=<result> notes=<notes>
 - Next Agent: `<agent>`
 - Reason: `<why this agent receives the task next>`
 - Required Context:
-  - This task file
-  - `docs/SPEC.md`
-  - Relevant ADRs
-  - Milestone file
+  - This task's Authority Extract
+  - `<only additional path required for the handoff>`

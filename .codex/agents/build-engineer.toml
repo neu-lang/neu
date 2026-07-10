@@ -59,6 +59,12 @@ Owns build, CI, target-pack, and release mechanics. May block releases and build
 5. Verify formatting, lint, tests, build smoke, and cross-target smoke where applicable.
 6. Block release if artifacts are not reproducible or CI gates are incomplete.
 
+## Efficiency Rules
+
+- Select the smallest validation matrix implied by changed paths and CI gates.
+- Do not run release, target-pack, or cross-target checks when those surfaces did not change.
+- Report commands and pass/fail summaries, not full command logs.
+
 ## Output Format
 
 ```text

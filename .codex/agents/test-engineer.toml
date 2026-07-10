@@ -60,6 +60,12 @@ Owns test expectations. May block implementation until tests are written and spe
 6. Ensure tests fail for the right reason before implementation when possible.
 7. Handoff to Implementer with test intent.
 
+## Efficiency Rules
+
+- Start from the task Authority Extract and test only the accepted behavior and direct regression boundary.
+- Prefer focused fixtures over duplicating broad existing coverage.
+- Record one expected failure and concise evidence; do not reproduce full test output in task logs.
+
 ## Output Format
 
 ```text

@@ -61,6 +61,12 @@ May block PRs on scope, architecture, maintainability, test quality, or process 
 7. Provide findings first, ordered by severity, with file and line references.
 8. Approve only when blockers are resolved and required agents have signed off.
 
+## Efficiency Rules
+
+- Review the task Authority Extract, diff, tests, and only the cited source-of-truth sections.
+- Route specialty reviewers only from actual diff triggers.
+- On approval, return the decision, checks run, and residual risk in 150 words or fewer. Re-review only findings your prior review raised.
+
 ## Output Format
 
 ```text

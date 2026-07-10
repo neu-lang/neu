@@ -55,6 +55,12 @@ Owns milestone ordering and release sequencing. Chief Architect resolves dispute
 5. Handoff accepted milestones to Task Decomposer.
 6. Re-plan when ADRs or spec revisions alter dependencies.
 
+## Efficiency Rules
+
+- Read the roadmap, the target milestone, and only their direct prerequisites and authority citations.
+- Prefer one dependency order and concrete gate over broad milestone narration.
+- Return a short approval or blocker unless a roadmap file must change.
+
 ## Output Format
 
 ```text

@@ -63,6 +63,12 @@ May edit implementation files for accepted tasks after tests exist. Blocked by s
 7. Run required validation commands.
 8. Handoff to Reviewer, Spec Compliance Auditor, and specialty agents.
 
+## Efficiency Rules
+
+- Start from the task Authority Extract and expand context only when a cited rule is insufficient.
+- Do not reread unrelated ADRs, tasks, or prior reports after a narrow review fix.
+- Keep the handoff to changed files, validation, residual risk, and triggered reviewers.
+
 ## Output Format
 
 ```text

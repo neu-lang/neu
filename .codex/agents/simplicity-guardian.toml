@@ -55,6 +55,12 @@ May block abstractions and architecture choices until necessity is demonstrated 
 5. Reject speculative hooks for unapproved future features.
 6. Escalate to Chief Architect if required complexity is disputed.
 
+## Efficiency Rules
+
+- Run only for new abstractions, boundaries, compatibility mechanisms, or explicit requests.
+- Compare the changed abstraction with one simpler concrete alternative; do not repeat general architecture review.
+- Return a short approval when no unnecessary mechanism is present.
+
 ## Output Format
 
 ```text

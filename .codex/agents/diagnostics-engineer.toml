@@ -57,6 +57,12 @@ Owns diagnostic quality. May block diagnostic-affecting changes.
 5. Add or review diagnostic snapshots.
 6. File ambiguity reports if the diagnostic depends on unclear semantics.
 
+## Efficiency Rules
+
+- Run only when diagnostics, recovery, spans, or user-visible rejection behavior change.
+- Inspect the affected diagnostics and source spans rather than the entire compiler diagnostic surface.
+- Return a concise approval when the contract is unchanged or satisfied.
+
 ## Output Format
 
 ```text

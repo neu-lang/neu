@@ -143,10 +143,23 @@ No agent may:
 Every agent execution must start from:
 
 - The user request or assigned task.
-- `docs/SPEC.md`.
-- Relevant ADRs from `docs/adr/`.
 - This `AGENTS.md`.
 - The executing agent's file under `.codex/agents/`.
+
+Use a bounded authority set rather than loading the whole design corpus:
+
+- Read only the `docs/SPEC.md` sections cited by the task, milestone, review
+  request, or ambiguity report.
+- Read only accepted ADRs explicitly named there, plus a directly superseded
+  ADR when resolving a conflict.
+- Read the milestone only when its acceptance criteria or ordering affects the
+  assigned work.
+- Do not scan all ADRs, all task history, or unrelated implementation files for
+  routine work. Escalate if the bounded set cannot answer a required question.
+
+Semantic-change executions may expand this set to the directly affected source
+of truth, compatibility surfaces, and supersession targets. The expansion must
+be stated in the handoff or decision record.
 
 Implementation-related executions additionally require:
 
@@ -189,6 +202,29 @@ Review outputs must include:
 - Required fixes.
 - Non-blocking suggestions clearly separated.
 
+## Context, Parallelism, And Report Budget
+
+Agents must optimize for useful work per token.
+
+- Task Decomposer records an **Authority Extract** in each task: exact SPEC
+  headings, ADR sections, source paths, and validation commands needed for the
+  next role. Receiving agents start there and expand context only when blocked.
+- Default role output is at most 400 words. A blocking semantic, soundness, or
+  diagnostic finding may use up to 800 words when the extra detail is needed to
+  make the fix unambiguous.
+- A successful review returns `APPROVE` plus the checks run and any residual
+  risk in at most 150 words. It does not create a long report by default.
+- Persist a detailed report only for a blocker, ambiguity, soundness attack, or
+  explicit user request. Otherwise record the decision in the task execution
+  log.
+- Each execution-log entry is one line with agent, phase, result, command or
+  evidence, and next handoff. Do not repeat prior logs or restate the task.
+- Do not fork full conversation history into subagents. Prompts must identify
+  the task, bounded authority set, allowed write paths, and requested output.
+- Treat six agents as a ceiling, not a target. Use one primary agent and at
+  most two independent sidecars by default. Use more only for disjoint work
+  that materially shortens the critical path.
+
 Ambiguity outputs must include:
 
 - Exact ambiguous text or missing rule.
@@ -200,26 +236,29 @@ Ambiguity outputs must include:
 ## Handoff Protocol
 
 1. State the current role and task.
-2. List files read.
-3. List decisions made and cite `docs/SPEC.md` or ADRs.
-4. List files changed.
-5. List validation performed.
-6. List unresolved questions.
-7. Name the next agent and why handoff is required.
+2. Cite only the bounded authority actually used.
+3. State files changed and validation performed.
+4. State unresolved question or `none`.
+5. Name the next agent and the one reason for handoff.
 
 Handoffs must not contain hidden assumptions. If a receiving agent needs a semantic decision not present in `docs/SPEC.md` or `docs/adr/`, the handoff must route to Language Designer or Chief Architect before implementation continues.
 
 ## Review Protocol
 
-Every implementation PR requires review from:
+Every implementation PR requires a Reviewer. Add only the specialty review that
+the changed behavior triggers:
 
-- Reviewer.
-- Test Engineer, if tests were changed.
-- Spec Compliance Auditor, if semantic behavior changed.
-- Diagnostics Engineer, if diagnostics changed.
-- Build Engineer, if build, CI, target, packaging, or release files changed.
-- Simplicity Guardian, if new abstractions or subsystem boundaries were introduced.
-- Adversarial Engineer, if ownership, borrowing, lifetimes, async, thread safety, unsafe, FFI, or diagnostics were affected.
+| Change trigger | Required additional reviewer |
+| --- | --- |
+| Tests changed or test expectations repaired | Test Engineer |
+| Accepted semantic behavior or rejection changes | Spec Compliance Auditor |
+| User-visible diagnostic kind, span, recovery, wording, or snapshot changes | Diagnostics Engineer |
+| Build, CI, target-pack, packaging, or release files change | Build Engineer |
+| New abstraction, subsystem boundary, compatibility layer, or framework | Simplicity Guardian |
+| Ownership, borrowing, lifetime, async, thread-safety, unsafe, FFI, or soundness boundary changes | Adversarial Engineer |
+
+Routine fixture, terminology, or mechanical refactoring changes do not require
+specialty review unless they alter one of the triggers above.
 
 Reviewers must check:
 
@@ -230,6 +269,11 @@ Reviewers must check:
 - Diagnostics are actionable and source-level.
 - Complexity is necessary.
 - CI gates pass.
+
+When a reviewer raises a blocker, only that reviewer and any role directly
+affected by the fix re-review it. Do not repeat the full review fan-out after a
+narrow correction. A final Reviewer closure records that all triggered reviews
+are satisfied.
 
 ## Escalation Protocol
 
@@ -360,23 +404,26 @@ CI may not be bypassed because tests expose an implementation defect. A failing 
 
 1. Task Decomposer reads the accepted milestone and relevant spec material.
 2. Tasks are split into independently reviewable units.
-3. Each task includes scope, non-scope, required tests, implementation area, diagnostics impact, dependencies, and reviewers.
+3. Each task includes scope, non-scope, required tests, implementation area,
+   diagnostics impact, dependencies, review triggers, and an Authority Extract.
 4. Test Engineer confirms tasks are testable.
 5. Implementer receives only accepted tasks.
 
 ## Workflow: Implementing A Task
 
-1. Implementer reads the task, `docs/SPEC.md`, relevant ADRs, tests, and agent rules.
+1. Implementer reads the task Authority Extract, the cited source-of-truth
+   sections, tests, and agent rules.
 2. If tests do not exist, hand off to Test Engineer.
 3. If semantics are ambiguous, file an ambiguity report.
 4. Implement only the accepted task scope.
 5. Do not weaken or delete tests.
 6. Run required validation.
-7. Handoff to Reviewer, Spec Compliance Auditor, and any specialty reviewer required by the change.
+7. Handoff to Reviewer and only the specialty reviewers triggered by the diff.
 
 ## Workflow: Adding Tests
 
-1. Test Engineer reads the task, `docs/SPEC.md`, relevant ADRs, and expected diagnostics.
+1. Test Engineer reads the task Authority Extract, cited source-of-truth
+   sections, and expected diagnostics.
 2. Write positive tests for accepted behavior.
 3. Write negative tests for rejected behavior.
 4. Add diagnostic expectations when errors are involved.
@@ -385,17 +432,19 @@ CI may not be bypassed because tests expose an implementation defect. A failing 
 
 ## Workflow: Reviewing A PR
 
-1. Reviewer reads the task, diff, tests, `docs/SPEC.md`, relevant ADRs, and prior review comments.
+1. Reviewer reads the task Authority Extract, diff, tests, prior findings, and
+   cited source-of-truth sections.
 2. Check scope first.
 3. Check architecture and maintainability.
 4. Check test-first rule.
-5. Request specialty review where needed.
+5. Route only the review triggers present in the diff.
 6. Report blocking findings first with file and line references.
 7. Approve only after blockers are resolved and CI gates pass.
 
 ## Workflow: Adversarial Testing
 
-1. Adversarial Engineer reads the task, `docs/SPEC.md`, relevant ADRs, implementation diff, and existing tests.
+1. Adversarial Engineer reads the task Authority Extract, relevant soundness
+   sections, implementation diff, and existing tests.
 2. Identify ways to violate memory safety, thread safety, lifetime validity, ownership, borrowing, async cancellation, unsafe boundaries, FFI contracts, or diagnostics.
 3. Produce negative tests or a written attack report.
 4. If the attack exposes ambiguity, file an ambiguity report.

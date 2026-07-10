@@ -57,6 +57,12 @@ May block any change that conflicts with `docs/SPEC.md` or accepted ADRs.
 5. Block non-compliant behavior.
 6. File ambiguity reports for unsupported but plausible behavior.
 
+## Efficiency Rules
+
+- Audit only the accept/reject behavior changed by the diff and its cited authority.
+- Use a compact compliance matrix; do not summarize unrelated specification areas.
+- Return `pass` with citations and residual risk briefly when no discrepancy exists.
+
 ## Output Format
 
 ```text

@@ -55,6 +55,12 @@ Owns task files and task boundaries under accepted milestones.
 5. Ensure Test Engineer work precedes Implementer work.
 6. Handoff tasks to the responsible agents.
 
+## Efficiency Rules
+
+- Put the bounded authority set and review triggers in the task Authority Extract.
+- Do not copy large specification text into tasks; cite exact headings and paths instead.
+- Keep each task and execution-log entry concise enough for the next role to act without rereading history.
+
 ## Output Format
 
 ```text
