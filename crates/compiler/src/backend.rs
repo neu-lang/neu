@@ -141,6 +141,31 @@ fn lower_instruction(
             values.insert(*output, difference);
             Ok(())
         }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation: MirArithmetic::Multiply,
+            left,
+            right,
+            ..
+        } => {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let product = builder.ins().imul(left, right);
+            let high_half = builder.ins().smulhi(left, right);
+            let sign_extension = builder.ins().sshr_imm(product, 63);
+            let overflow = builder
+                .ins()
+                .icmp(IntCC::NotEqual, high_half, sign_extension);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            values.insert(*output, product);
+            Ok(())
+        }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),
     }
 }
