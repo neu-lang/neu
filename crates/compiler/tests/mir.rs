@@ -1,4 +1,5 @@
 use compiler::{
+    ast::AstNodeId,
     hir::{
         HirBinaryOperator, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirModule,
         HirReturn, HirSafetyFacts, HirUnaryOperator,
@@ -8,9 +9,54 @@ use compiler::{
         MirLocal, MirLocalId, MirModule, MirTerminator, MirValueId, lower_hir_to_mir,
     },
     module::ModuleName,
+    ownership_effects::{EffectKind, OwnershipEffectContract, infer_parameter_effects},
     source::{ByteSpan, SourceFileId},
     types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
+
+#[test]
+fn m0062_hir_to_mir_preserves_ownership_effect_contract() {
+    let file = SourceFileId::from_raw(1006);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let contract = OwnershipEffectContract::new(
+        AstNodeId::from_raw(1007),
+        infer_parameter_effects(1, &[(0, EffectKind::Read)]),
+        true,
+    );
+    let hir_function = compiler::hir::HirFunction::new(
+        compiler::hir::HirFunctionId::from_raw(0),
+        ModuleName::parse("app").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        vec![],
+        vec![],
+        vec![HirExpression::int_literal(
+            compiler::hir::HirExpressionId::from_raw(0),
+            span,
+            int,
+            1,
+        )],
+        vec![HirReturn::new(
+            span,
+            compiler::hir::HirExpressionId::from_raw(0),
+        )],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    )
+    .with_control_flow(vec![])
+    .with_effect_contract(contract.clone());
+    let mir = lower_hir_to_mir(
+        &HirModule::new(ModuleName::parse("app").unwrap(), vec![hir_function]),
+        &types,
+    )
+    .unwrap();
+
+    assert_eq!(mir.functions()[0].effect_contract(), Some(&contract));
+}
 
 #[test]
 fn m0032_hir_to_mir_preserves_function_symbol_identity() {

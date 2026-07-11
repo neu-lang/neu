@@ -14,6 +14,7 @@ pub mod mir;
 pub mod module;
 pub mod name_resolution;
 pub mod ownership;
+pub mod ownership_effects;
 pub mod parser;
 pub mod source;
 pub mod symbol;

@@ -717,3 +717,22 @@ innermost loop and `continue` advances it; neither carries a value or label.
 `while` remains unsupported. Branches and loop back-edges preserve ownership,
 borrowing, initialization, cleanup, and source-mapping obligations. No runtime,
 stdlib, printing, or scheduler behavior is added.
+
+## ADR-0062: Inferred Ownership Effects
+
+Neu infers read-only, exclusive-mutating, consuming, storing, and
+returned-ownership effects from function bodies and call sites. Read-only uses
+create temporary shared borrows and preserve the source binding. Mutating,
+consuming, and storing uses consume move-only values; copyable values remain
+available under existing copy rules. Both `val` and `var` may be consumed, but
+only `var` supports atomic consume-and-rebind when a consuming call returns a
+compatible owned value.
+
+Effect contracts preserve per-parameter projections, implicit borrow regions,
+conditional ownership states, consumption origins, and returned ownership.
+Bindings are usable after branches and loops only when every reachable path
+proves them available. Separate compilation requires exported effect metadata;
+missing or stale metadata is an error. No explicit reference, dereference,
+lifetime, or move syntax is introduced. Methods, fields, closures, coroutines,
+move-only nominal runtime values, arrays, slices, strings, allocation, and FFI
+remain deferred where their existing frontend or backend contracts are absent.

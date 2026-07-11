@@ -11,6 +11,7 @@ use crate::{
     linker::{LinkInvocation, LinkInvocationError},
     mir::{MirLoweringError, lower_hir_to_mir},
     module::{ModuleName, PackageNamespace},
+    ownership_effects::infer_source_parameter_effects,
     parser,
     source::SourceFileId,
     target_pack::{TargetPackRegistry, TargetPackRegistryError},
@@ -209,6 +210,11 @@ pub fn compile_source_to_executable(
         .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Byte))
         .map(|record| record.id())
         .expect("bootstrap type checker creates Byte");
+    let effect_contracts = parsed
+        .function_declarations
+        .iter()
+        .map(|function| infer_source_parameter_effects(&parsed, function.declaration))
+        .collect::<Vec<_>>();
     let hir = lower_checked_hir_source(
         CheckedHirSource::new(
             options.module().clone(),
@@ -218,7 +224,8 @@ pub fn compile_source_to_executable(
             report.expression_types(),
             true,
         )
-        .with_byte_type(byte_type),
+        .with_byte_type(byte_type)
+        .with_effect_contracts(&effect_contracts),
     )
     .map_err(DriverError::Hir)?;
     let mir = lower_hir_to_mir(&hir, &types).map_err(DriverError::Mir)?;

@@ -5,6 +5,7 @@ use crate::{
     },
     hir::{HirControlFlow, HirExpression},
     module::{FunctionSymbolIdentity, ModuleName},
+    ownership_effects::OwnershipEffectContract,
     source::ByteSpan,
     types::{PrimitiveType, TypeArena, TypeId, TypeKind},
 };
@@ -347,6 +348,7 @@ pub struct MirFunction {
     cleanup_boundary: MirCleanupBoundary,
     symbol_identity: Option<FunctionSymbolIdentity>,
     entry: bool,
+    effect_contract: Option<OwnershipEffectContract>,
 }
 impl MirFunction {
     pub fn new(
@@ -368,6 +370,7 @@ impl MirFunction {
             cleanup_boundary,
             symbol_identity: None,
             entry: false,
+            effect_contract: None,
         }
     }
     pub fn id(&self) -> MirFunctionId {
@@ -401,6 +404,13 @@ impl MirFunction {
     pub fn with_entry(mut self, entry: bool) -> Self {
         self.entry = entry;
         self
+    }
+    pub fn with_effect_contract(mut self, contract: OwnershipEffectContract) -> Self {
+        self.effect_contract = Some(contract);
+        self
+    }
+    pub fn effect_contract(&self) -> Option<&OwnershipEffectContract> {
+        self.effect_contract.as_ref()
     }
     pub fn is_entry(&self) -> bool {
         self.entry
@@ -574,7 +584,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 returned.span(),
             )
         };
-        let mir_function = MirFunction::new(
+        let mut mir_function = MirFunction::new(
             MirFunctionId::from_raw(function.id().index()),
             function.span(),
             function
@@ -602,6 +612,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             MirCleanupBoundary::empty(),
         )
         .with_entry(function.is_entry());
+        if let Some(contract) = function.effect_contract() {
+            mir_function = mir_function.with_effect_contract(contract.clone());
+        }
         functions.push(match function.symbol_identity() {
             Some(identity) => mir_function.with_symbol_identity(identity.clone()),
             None => mir_function,
@@ -951,7 +964,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                 ))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(MirFunction::new(
+        let mut mir = MirFunction::new(
             MirFunctionId::from_raw(self.function.id().index()),
             self.function.span(),
             self.function
@@ -964,7 +977,11 @@ impl<'a> ShortCircuitLowerer<'a> {
             blocks,
             MirCleanupBoundary::empty(),
         )
-        .with_entry(self.function.is_entry()))
+        .with_entry(self.function.is_entry());
+        if let Some(contract) = self.function.effect_contract() {
+            mir = mir.with_effect_contract(contract.clone());
+        }
+        Ok(mir)
     }
 }
 
@@ -1385,7 +1402,7 @@ fn lower_hir_function_with_control_flow(
             ))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mir = MirFunction::new(
+    let mut mir = MirFunction::new(
         MirFunctionId::from_raw(function.id().index()),
         function.span(),
         function
@@ -1399,6 +1416,9 @@ fn lower_hir_function_with_control_flow(
         MirCleanupBoundary::empty(),
     )
     .with_entry(function.is_entry());
+    if let Some(contract) = function.effect_contract() {
+        mir = mir.with_effect_contract(contract.clone());
+    }
     Ok(match function.symbol_identity() {
         Some(identity) => mir.with_symbol_identity(identity.clone()),
         None => mir,

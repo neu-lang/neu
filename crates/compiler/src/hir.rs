@@ -1,6 +1,7 @@
 use crate::{
     module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
     name_resolution::LocalBindingKind,
+    ownership_effects::OwnershipEffectContract,
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
     type_check::{ExpressionType, FunctionSignature},
@@ -36,6 +37,7 @@ pub struct CheckedHirSource<'a> {
     expression_types: &'a [ExpressionType],
     clean: bool,
     byte_type: Option<TypeId>,
+    effect_contracts: Option<&'a [OwnershipEffectContract]>,
 }
 impl<'a> CheckedHirSource<'a> {
     pub fn new(
@@ -54,11 +56,20 @@ impl<'a> CheckedHirSource<'a> {
             expression_types,
             clean,
             byte_type: None,
+            effect_contracts: None,
         }
     }
 
     pub fn with_byte_type(mut self, byte_type: TypeId) -> Self {
         self.byte_type = Some(byte_type);
+        self
+    }
+
+    pub fn with_effect_contracts(
+        mut self,
+        effect_contracts: &'a [OwnershipEffectContract],
+    ) -> Self {
+        self.effect_contracts = Some(effect_contracts);
         self
     }
 }
@@ -296,25 +307,33 @@ pub fn lower_checked_hir_source(
         } else {
             Vec::new()
         };
-        functions.push(
-            HirFunction::new(
-                id,
-                source.module.clone(),
-                source.package.clone(),
-                span,
-                declaration_is_main(source.parsed, function.declaration),
-                signature.return_type(),
-                parameters,
-                locals,
-                expressions,
-                returns,
-                HirSafetyFacts::executable_subset_checked(),
-                vec![],
-            )
-            .with_assignments(assignments)
-            .with_control_flow(control_flow)
-            .with_symbol_identity(symbol_identity),
-        );
+        let declaration = function.declaration;
+        let hir_function = HirFunction::new(
+            id,
+            source.module.clone(),
+            source.package.clone(),
+            span,
+            declaration_is_main(source.parsed, function.declaration),
+            signature.return_type(),
+            parameters,
+            locals,
+            expressions,
+            returns,
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )
+        .with_assignments(assignments)
+        .with_control_flow(control_flow)
+        .with_symbol_identity(symbol_identity);
+        let function = match source.effect_contracts.and_then(|contracts| {
+            contracts
+                .iter()
+                .find(|contract| contract.function() == declaration)
+        }) {
+            Some(contract) => hir_function.with_effect_contract(contract.clone()),
+            None => hir_function,
+        };
+        functions.push(function);
     }
     Ok(HirModule::new(source.module, functions))
 }
@@ -1271,6 +1290,7 @@ pub struct HirFunction {
     safety_facts: HirSafetyFacts,
     unsupported_forms: Vec<HirUnsupportedForm>,
     symbol_identity: Option<FunctionSymbolIdentity>,
+    effect_contract: Option<OwnershipEffectContract>,
 }
 impl HirFunction {
     #[allow(clippy::too_many_arguments)]
@@ -1304,6 +1324,7 @@ impl HirFunction {
             safety_facts,
             unsupported_forms,
             symbol_identity: None,
+            effect_contract: None,
         }
     }
     pub fn id(&self) -> HirFunctionId {
@@ -1359,6 +1380,13 @@ impl HirFunction {
     pub fn with_symbol_identity(mut self, identity: FunctionSymbolIdentity) -> Self {
         self.symbol_identity = Some(identity);
         self
+    }
+    pub fn with_effect_contract(mut self, contract: OwnershipEffectContract) -> Self {
+        self.effect_contract = Some(contract);
+        self
+    }
+    pub fn effect_contract(&self) -> Option<&OwnershipEffectContract> {
+        self.effect_contract.as_ref()
     }
     pub fn symbol_identity(&self) -> Option<&FunctionSymbolIdentity> {
         self.symbol_identity.as_ref()
