@@ -365,3 +365,90 @@ fn m0032_reports_unavailable_executable() {
     );
     let _ = fs::remove_dir_all(root);
 }
+
+#[cfg(unix)]
+#[test]
+fn m0032_verifies_valid_bootstrap_exit() {
+    let root = fixture_root("verify-valid");
+    executable_program(&root, 17);
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), root.join("program")).unwrap();
+
+    assert_eq!(plan.verify_main_result(17, pack.trap_exit_code()), Ok(()));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn m0032_verifies_unsupported_bootstrap_exit() {
+    let root = fixture_root("verify-unsupported");
+    executable_program(&root, 1);
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), root.join("program")).unwrap();
+
+    assert_eq!(plan.verify_main_result(300, pack.trap_exit_code()), Ok(()));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn m0032_rejects_unexpected_bootstrap_exit() {
+    let root = fixture_root("verify-mismatch");
+    executable_program(&root, 16);
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), root.join("program")).unwrap();
+
+    assert_eq!(
+        plan.verify_main_result(17, pack.trap_exit_code()),
+        Err(compiler::linker::ExecutableSmokeError::UnexpectedExit {
+            expected: 17,
+            actual: 16,
+        })
+    );
+    let _ = fs::remove_dir_all(root);
+}

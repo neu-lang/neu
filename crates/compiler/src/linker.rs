@@ -5,7 +5,10 @@ use std::{
     process::Command,
 };
 
-use crate::target_pack::TargetPack;
+use crate::{
+    bootstrap::{BootstrapOutcome, map_main_result},
+    target_pack::TargetPack,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LinkInvocationError {
@@ -24,6 +27,13 @@ pub enum ExecutableRunError {
 pub enum ExecutableRunOutcome {
     Exited(i32),
     Signaled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ExecutableSmokeError {
+    Unavailable,
+    Signaled,
+    UnexpectedExit { expected: u8, actual: i32 },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -96,5 +106,23 @@ impl LinkInvocation {
         Ok(status
             .code()
             .map_or(ExecutableRunOutcome::Signaled, ExecutableRunOutcome::Exited))
+    }
+
+    pub fn verify_main_result(
+        &self,
+        main_result: i64,
+        failure_status: u8,
+    ) -> Result<(), ExecutableSmokeError> {
+        let expected = match map_main_result(main_result, failure_status) {
+            BootstrapOutcome::Exit(status) | BootstrapOutcome::Failure { status, .. } => status,
+        };
+        match self.run() {
+            Err(ExecutableRunError::Unavailable) => Err(ExecutableSmokeError::Unavailable),
+            Ok(ExecutableRunOutcome::Signaled) => Err(ExecutableSmokeError::Signaled),
+            Ok(ExecutableRunOutcome::Exited(actual)) if actual == i32::from(expected) => Ok(()),
+            Ok(ExecutableRunOutcome::Exited(actual)) => {
+                Err(ExecutableSmokeError::UnexpectedExit { expected, actual })
+            }
+        }
     }
 }
