@@ -340,7 +340,7 @@ fn lower_mir_function_with_module(
     function_return_types: &HashMap<crate::mir::MirFunctionId, TypeId>,
     runtime: Option<&RuntimeFunctions>,
 ) -> Result<Function, CraneliftLoweringError> {
-    require_bootstrap_int(function.return_type(), type_arena)?;
+    require_bootstrap_runtime_type(function.return_type(), type_arena)?;
     if function.blocks().is_empty() {
         return Err(CraneliftLoweringError::UnsupportedFunctionShape);
     }
@@ -494,7 +494,7 @@ fn encode_symbol_component(value: &str) -> String {
     format!("{}_{}", value.len(), encoded)
 }
 
-fn require_bootstrap_int(
+fn require_bootstrap_runtime_type(
     ty: crate::types::TypeId,
     type_arena: &TypeArena,
 ) -> Result<(), CraneliftLoweringError> {
@@ -505,6 +505,7 @@ fn require_bootstrap_int(
                 | PrimitiveType::Int
                 | PrimitiveType::Float
                 | PrimitiveType::Byte
+                | PrimitiveType::String
                 | PrimitiveType::Unit
         ))
     )

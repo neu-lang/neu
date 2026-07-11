@@ -1,8 +1,8 @@
 use compiler::{
     ast::AstNodeId,
     hir::{
-        HirBinaryOperator, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirModule,
-        HirReturn, HirSafetyFacts, HirUnaryOperator,
+        HirBinaryOperator, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirLocal,
+        HirModule, HirParameter, HirReturn, HirSafetyFacts, HirUnaryOperator,
     },
     mir::{
         MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
@@ -13,6 +13,41 @@ use compiler::{
     source::{ByteSpan, SourceFileId},
     types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
+
+#[test]
+fn m0064_cleanup_boundary_tracks_owned_string_values() {
+    let file = SourceFileId::from_raw(1064);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let function = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("strings").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        string,
+        vec![HirParameter::new(
+            compiler::hir::HirParameterId::from_raw(0),
+            span,
+            string,
+        )],
+        vec![HirLocal::new(
+            compiler::hir::HirLocalId::from_raw(0),
+            span,
+            string,
+            false,
+        )],
+        vec![],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    );
+    let boundary = MirCleanupBoundary::for_function(&function, &types);
+    assert_eq!(boundary.owned_locals(), &[MirLocalId::from_raw(0)]);
+    assert_eq!(boundary.owned_parameters(), &[MirValueId::from_raw(0)]);
+    assert!(boundary.returns_owned());
+}
 
 #[test]
 fn m0062_hir_to_mir_preserves_ownership_effect_contract() {

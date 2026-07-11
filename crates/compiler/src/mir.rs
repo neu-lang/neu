@@ -385,16 +385,53 @@ impl MirBasicBlock {
         self.terminator
     }
 }
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MirCleanupBoundary {
-    reserved: bool,
+    owned_locals: Vec<MirLocalId>,
+    owned_parameters: Vec<MirValueId>,
+    returns_owned: bool,
 }
 impl MirCleanupBoundary {
     pub fn empty() -> Self {
-        Self { reserved: false }
+        Self {
+            owned_locals: Vec::new(),
+            owned_parameters: Vec::new(),
+            returns_owned: false,
+        }
+    }
+    pub fn for_function(function: &HirFunction, types: &TypeArena) -> Self {
+        let is_string = |ty| {
+            types
+                .get(ty)
+                .is_some_and(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::String))
+        };
+        Self {
+            owned_locals: function
+                .locals()
+                .iter()
+                .filter(|local| is_string(local.ty()))
+                .map(|local| MirLocalId::from_raw(local.id().index()))
+                .collect(),
+            owned_parameters: function
+                .parameters()
+                .iter()
+                .filter(|parameter| is_string(parameter.ty()))
+                .map(|parameter| MirValueId::from_raw(parameter.id().index()))
+                .collect(),
+            returns_owned: is_string(function.return_type()),
+        }
     }
     pub fn is_empty(&self) -> bool {
-        !self.reserved
+        self.owned_locals.is_empty() && self.owned_parameters.is_empty() && !self.returns_owned
+    }
+    pub fn owned_locals(&self) -> &[MirLocalId] {
+        &self.owned_locals
+    }
+    pub fn owned_parameters(&self) -> &[MirValueId] {
+        &self.owned_parameters
+    }
+    pub fn returns_owned(&self) -> bool {
+        self.returns_owned
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -451,8 +488,8 @@ impl MirFunction {
     pub fn blocks(&self) -> &[MirBasicBlock] {
         &self.blocks
     }
-    pub fn cleanup_boundary(&self) -> MirCleanupBoundary {
-        self.cleanup_boundary
+    pub fn cleanup_boundary(&self) -> &MirCleanupBoundary {
+        &self.cleanup_boundary
     }
     pub fn with_symbol_identity(mut self, identity: FunctionSymbolIdentity) -> Self {
         self.symbol_identity = Some(identity);
@@ -771,7 +808,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 instructions,
                 terminator,
             )],
-            MirCleanupBoundary::empty(),
+            MirCleanupBoundary::for_function(function, types),
         )
         .with_entry(function.is_entry());
         if let Some(contract) = function.effect_contract() {
@@ -1144,7 +1181,7 @@ impl<'a> ShortCircuitLowerer<'a> {
             self.function.return_type(),
             self.locals,
             blocks,
-            MirCleanupBoundary::empty(),
+            MirCleanupBoundary::for_function(self.function, self.types),
         )
         .with_entry(self.function.is_entry());
         if let Some(contract) = self.function.effect_contract() {
@@ -1589,7 +1626,7 @@ fn lower_hir_function_with_control_flow(
         function.return_type(),
         locals,
         blocks,
-        MirCleanupBoundary::empty(),
+        MirCleanupBoundary::for_function(function, types),
     )
     .with_entry(function.is_entry());
     if let Some(contract) = function.effect_contract() {

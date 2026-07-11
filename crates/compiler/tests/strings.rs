@@ -27,6 +27,14 @@ fn parses_valid_string_literal_and_rejects_invalid_escape() {
     );
     assert!(valid.lex_diagnostics.is_empty());
     assert!(valid.diagnostics.is_empty(), "{:?}", valid.diagnostics);
+    assert_eq!(valid.string_literals[0].bytes, b"hi\n");
+
+    let utf8 = parse_source(
+        SourceFileId::from_raw(6403),
+        r#"fun read(): String { return "café"; }"#,
+    );
+    assert!(utf8.lex_diagnostics.is_empty());
+    assert!(utf8.diagnostics.is_empty(), "{:?}", utf8.diagnostics);
 
     let invalid = compiler::lexer::lex(SourceFileId::from_raw(6402), r#""bad\q""#);
     assert!(
@@ -57,15 +65,99 @@ fn compiles_string_length_index_equality_concat_and_clone() {
 }
 
 #[test]
+fn compiles_string_byte_index_and_utf8_byte_length() {
+    let workspace = std::env::temp_dir().join(format!("neu-string-bytes-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun main(): Int {
+            val text: String = "é";
+            val first: Byte = text[0];
+            return text.length;
+        }
+    "#;
+    let output = compile_source_to_executable(source, options(&executable)).unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(2));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_string_equality_inequality_and_empty_concat() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-string-equality-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun main(): Int {
+            val equal: Bool = "a" == "a";
+            val unequal: Bool = "a" != "ab";
+            val empty: String = "" + "";
+            return empty.length + 7;
+        }
+    "#;
+    let output = compile_source_to_executable(source, options(&executable)).unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn string_parameter_return_and_clone_preserve_ownership() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-string-functions-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun identity(value: String): String {
+            return value;
+        }
+        public fun main(): Int {
+            val original: String = "ab";
+            val copied: String = clone(original);
+            val returned: String = identity(copied);
+            return original.length + returned.length + 3;
+        }
+    "#;
+    let output = compile_source_to_executable(source, options(&executable)).unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn dynamic_string_index_traps() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-string-dynamic-index-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun main(): Int {
+            val text: String = "a";
+            val index: Int = 1;
+            val byte: Byte = text[index];
+            return 7;
+        }
+    "#;
+    let output = compile_source_to_executable(source, options(&executable)).unwrap();
+    assert!(!Command::new(output).status().unwrap().success());
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn string_read_only_use_preserves_source_and_move_is_diagnosed() {
     let workspace = std::env::temp_dir().join(format!("neu-string-move-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
+        public fun consume(value: String): String {
+            return value;
+        }
         public fun main(): Int {
             var text: String = "value";
-            var other: String = text;
+            val consumed: String = consume(text);
             return text.length;
         }
     "#;

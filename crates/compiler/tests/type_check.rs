@@ -4826,7 +4826,7 @@ fn m0028_unsupported_executable_forms_report_outermost_source_spans() {
 
     let report = check_m0028_unsupported_executable_forms(&parsed);
 
-    assert_eq!(report.diagnostics().len(), 2);
+    assert_eq!(report.diagnostics().len(), 1);
     assert_eq!(
         report.diagnostics()[0].span(),
         parsed
@@ -4834,9 +4834,5 @@ fn m0028_unsupported_executable_forms_report_outermost_source_spans() {
             .node(parsed.declaration_names[0].declaration)
             .unwrap()
             .span
-    );
-    assert_eq!(
-        report.diagnostics()[1].span(),
-        parsed.literal_expressions[0].span
     );
 }

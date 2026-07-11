@@ -1,8 +1,8 @@
 use crate::{
     ast::AstNodeId,
     name_resolution::{LocalBinding, ResolvedLocalBinding},
-    parser::{ParsedAssignmentStatement, ParsedLocalDeclaration},
-    type_check::DeclarationSignature,
+    parser::{ParseOutput, ParsedAssignmentStatement, ParsedLocalDeclaration},
+    type_check::{DeclarationSignature, FunctionSignature},
     types::{PrimitiveType, TypeArena, TypeId, TypeKind},
 };
 
@@ -34,6 +34,7 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
 pub enum OwnershipTransferKind {
     LocalInitializer,
     Assignment,
+    ConsumingCallArgument,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -120,6 +121,58 @@ pub fn collect_ownership_transfers(
         }
     }
 
+    transfers
+}
+
+pub fn collect_ownership_call_transfers(
+    parsed: &ParseOutput,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    signatures: &[FunctionSignature],
+    types: &TypeArena,
+) -> Vec<OwnershipTransfer> {
+    let mut transfers = Vec::new();
+    for call in &parsed.call_expressions {
+        let Some(callee) = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == call.callee)
+        else {
+            continue;
+        };
+        let Some(declaration) = parsed
+            .declaration_names
+            .iter()
+            .find(|name| name.name == callee.name)
+            .map(|name| name.declaration)
+        else {
+            continue;
+        };
+        let Some(signature) = signatures
+            .iter()
+            .find(|signature| signature.declaration() == declaration)
+        else {
+            continue;
+        };
+        for (argument, parameter_type) in call.arguments.iter().zip(signature.parameter_types()) {
+            if classify_ownership_category(types, *parameter_type)
+                != Some(OwnershipCategory::MoveOnly)
+            {
+                continue;
+            }
+            let Some(resolved) = resolved_local_bindings
+                .iter()
+                .find(|resolved| resolved.reference() == *argument)
+            else {
+                continue;
+            };
+            transfers.push(OwnershipTransfer::new(
+                OwnershipTransferKind::ConsumingCallArgument,
+                call.expression,
+                *argument,
+                resolved.binding().clone(),
+            ));
+        }
+    }
     transfers
 }
 
@@ -238,5 +291,25 @@ pub fn analyze_ownership(
     );
     let diagnostics = analyze_use_after_move(resolved_local_bindings, &transfers);
 
+    OwnershipReport::new(transfers, diagnostics)
+}
+
+pub fn analyze_ownership_with_extra_transfers(
+    declarations: &[ParsedLocalDeclaration],
+    assignments: &[ParsedAssignmentStatement],
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    declaration_signatures: &[DeclarationSignature],
+    types: &TypeArena,
+    extra_transfers: &[OwnershipTransfer],
+) -> OwnershipReport {
+    let mut transfers = collect_ownership_transfers(
+        declarations,
+        assignments,
+        resolved_local_bindings,
+        declaration_signatures,
+        types,
+    );
+    transfers.extend_from_slice(extra_transfers);
+    let diagnostics = analyze_use_after_move(resolved_local_bindings, &transfers);
     OwnershipReport::new(transfers, diagnostics)
 }

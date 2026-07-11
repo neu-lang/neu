@@ -3,6 +3,8 @@ package examples.current
 public fun main(): Int {
     val prefix: String = "Neu";
     val text: String = clone(prefix) + "!";
+    val first: Byte = text[0];
+    val same: Bool = text == "Neu!";
     val length: Int = text.length;
     return length + 3;
 }

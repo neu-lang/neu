@@ -475,6 +475,7 @@ fn lower_expression(
             local_bindings,
             output,
         )?;
+        let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::binary(
             id,
             span,
@@ -501,6 +502,7 @@ fn lower_expression(
             local_bindings,
             output,
         )?;
+        let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::string_length(id, span, ty, receiver));
         return Ok(id);
     }
@@ -523,6 +525,7 @@ fn lower_expression(
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::array_literal(id, span, ty, elements));
         return Ok(id);
     }
@@ -546,6 +549,7 @@ fn lower_expression(
             local_bindings,
             output,
         )?;
+        let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::index(id, span, ty, array, index_value));
         return Ok(id);
     }
@@ -562,6 +566,7 @@ fn lower_expression(
             local_bindings,
             output,
         )?;
+        let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::unary(
             id,
             span,
@@ -620,6 +625,7 @@ fn lower_expression(
                 local_bindings,
                 output,
             )?;
+            let id = HirExpressionId::from_raw(output.len());
             output.push(HirExpression::string_clone(id, span, ty, argument));
             return Ok(id);
         }
@@ -648,6 +654,7 @@ fn lower_expression(
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::direct_call(
             id,
             span,

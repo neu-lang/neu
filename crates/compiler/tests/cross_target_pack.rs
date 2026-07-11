@@ -2,6 +2,7 @@ use std::{fs, path::PathBuf};
 
 use compiler::{
     backend::emit_mir_function_to_object_for_target,
+    driver::{SourceDriverOptions, compile_source_to_executable},
     linker::LinkInvocation,
     mir::{
         MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
@@ -84,5 +85,36 @@ fn links_the_explicit_x86_64_target_pack_without_foreign_execution() {
             .symbols()
             .any(|symbol| { symbol.name().is_ok_and(|name| name == pack.entry_symbol()) })
     );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn links_string_object_through_the_x86_target_pack_without_execution() {
+    let target = "x86_64-unknown-linux-gnu".parse::<Triple>().unwrap();
+    let root = std::env::temp_dir().join(format!("neu-cross-string-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let output = root.join("program");
+    let source = r#"
+        public fun main(): Int {
+            val text: String = "é" + "";
+            return text.length;
+        }
+    "#;
+    let executable = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(801),
+            ModuleName::parse("strings").unwrap(),
+            PackageNamespace::root(),
+            target,
+            target_pack_root(),
+            &output,
+        ),
+    )
+    .unwrap();
+    let executable_bytes = fs::read(executable).unwrap();
+    let executable = object::File::parse(executable_bytes.as_slice()).unwrap();
+    assert_eq!(executable.format(), object::BinaryFormat::Elf);
     let _ = fs::remove_dir_all(root);
 }

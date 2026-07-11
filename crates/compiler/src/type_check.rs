@@ -1913,6 +1913,17 @@ pub fn type_m0064_string_operations(
         (record.kind() == &TypeKind::Primitive(PrimitiveType::Bool)).then_some(record.id())
     });
 
+    for literal in &parsed.string_literals {
+        report.replace_expression_type(ExpressionType::new(literal.expression, string_type));
+    }
+    report.retain_diagnostics(|diagnostic| {
+        diagnostic.kind() != TypeCheckDiagnosticKind::TypeMismatch
+            || !parsed
+                .string_literals
+                .iter()
+                .any(|literal| literal.expression == diagnostic.node())
+    });
+
     for name in &parsed.name_references {
         let Some(binding) = parsed
             .local_binding_names
@@ -2057,9 +2068,29 @@ pub fn type_m0064_string_operations(
                     report
                         .replace_expression_type(ExpressionType::new(binary.expression, bool_type));
                 }
+                report.retain_diagnostics(|diagnostic| {
+                    let declaration = parsed
+                        .local_declarations
+                        .iter()
+                        .find(|declaration| declaration.initializer == Some(binary.expression))
+                        .map(|declaration| declaration.declaration);
+                    diagnostic.kind() != TypeCheckDiagnosticKind::TypeMismatch
+                        || (diagnostic.node() != binary.expression
+                            && Some(diagnostic.node()) != declaration)
+                });
             }
             ParsedBinaryOperator::Plus => {
                 report.replace_expression_type(ExpressionType::new(binary.expression, string_type));
+                report.retain_diagnostics(|diagnostic| {
+                    let declaration = parsed
+                        .local_declarations
+                        .iter()
+                        .find(|declaration| declaration.initializer == Some(binary.expression))
+                        .map(|declaration| declaration.declaration);
+                    diagnostic.kind() != TypeCheckDiagnosticKind::TypeMismatch
+                        || (diagnostic.node() != binary.expression
+                            && Some(diagnostic.node()) != declaration)
+                });
             }
             _ => report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                 TypeRuleDiagnostic::StringOperationUnsupported,
