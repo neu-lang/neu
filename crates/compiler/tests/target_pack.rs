@@ -128,3 +128,34 @@ fn m0032_rejects_invalid_manifest() {
         Err(TargetPackError::InvalidManifest)
     );
 }
+
+#[test]
+fn m0032_loads_target_pack_manifest_from_toml() {
+    let root = fixture_root("toml");
+    fs::write(root.join("bin/linker"), b"linker").unwrap();
+    fs::write(root.join("runtime/startup.o"), b"shim").unwrap();
+    let manifest = format!(
+        "[target]\ntriple = \"{}\"\nobject_format = \"macho\"\nexecutable_format = \"macho\"\n[linker]\npath = \"bin/linker\"\n[startup_shim]\npath = \"runtime/startup.o\"\n[entry]\nplatform_symbol = \"_start\"\nlanguage_symbol = \"neu_lang_main\"\ntrap_exit_code = 1\n",
+        Triple::host()
+    );
+
+    let pack = TargetPack::resolve_toml(&root, &manifest, Triple::host()).unwrap();
+
+    assert_eq!(pack.entry_symbol(), "_start");
+    assert_eq!(pack.language_entry_symbol(), "neu_lang_main");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn m0032_rejects_malformed_target_pack_toml() {
+    assert_eq!(
+        TargetPackManifest::from_toml("[target]\ntriple = \"not a triple\"\n"),
+        Err(TargetPackError::InvalidManifest)
+    );
+    assert_eq!(
+        TargetPackManifest::from_toml(
+            "[target]\ntriple = \"aarch64-apple-darwin\"\nobject_format = \"macho\"\n"
+        ),
+        Err(TargetPackError::InvalidManifest)
+    );
+}

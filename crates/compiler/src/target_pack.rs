@@ -3,7 +3,39 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+use serde::Deserialize;
 use target_lexicon::Triple;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SerializedTargetPackManifest {
+    target: SerializedTarget,
+    linker: SerializedArtifact,
+    startup_shim: SerializedArtifact,
+    entry: SerializedEntry,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SerializedTarget {
+    triple: String,
+    object_format: String,
+    executable_format: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SerializedArtifact {
+    path: PathBuf,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SerializedEntry {
+    platform_symbol: String,
+    language_symbol: String,
+    trap_exit_code: u8,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ArtifactKind {
@@ -35,6 +67,26 @@ pub struct TargetPackManifest {
 }
 
 impl TargetPackManifest {
+    pub fn from_toml(input: &str) -> Result<Self, TargetPackError> {
+        let serialized = toml::from_str::<SerializedTargetPackManifest>(input)
+            .map_err(|_| TargetPackError::InvalidManifest)?;
+        let target = serialized
+            .target
+            .triple
+            .parse::<Triple>()
+            .map_err(|_| TargetPackError::InvalidManifest)?;
+        Self::new(
+            target,
+            serialized.target.object_format,
+            serialized.target.executable_format,
+            serialized.linker.path,
+            serialized.startup_shim.path,
+            serialized.entry.platform_symbol,
+            serialized.entry.language_symbol,
+            serialized.entry.trap_exit_code,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         target: Triple,
@@ -86,6 +138,18 @@ pub struct TargetPack {
 }
 
 impl TargetPack {
+    pub fn resolve_toml(
+        root: impl AsRef<Path>,
+        input: &str,
+        requested_target: Triple,
+    ) -> Result<Self, TargetPackError> {
+        Self::resolve(
+            root,
+            TargetPackManifest::from_toml(input)?,
+            requested_target,
+        )
+    }
+
     pub fn resolve(
         root: impl AsRef<Path>,
         manifest: TargetPackManifest,
