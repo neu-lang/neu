@@ -21,6 +21,7 @@ fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
         MirFunctionId::from_raw(0),
         span,
         vec![(MirValueId::from_raw(0), int)],
+        int,
         vec![MirLocal::new(MirLocalId::from_raw(0), int, span)],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
@@ -40,6 +41,7 @@ fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
     let module = MirModule::new(ModuleName::parse("app").unwrap(), vec![function]);
 
     assert_eq!(module.functions()[0].blocks()[0].instructions().len(), 2);
+    assert_eq!(module.functions()[0].return_type(), int);
     assert_eq!(module.functions()[0].blocks()[0].terminator().span(), span);
     assert!(module.functions()[0].cleanup_boundary().is_empty());
 }
@@ -79,5 +81,32 @@ fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
     );
     let mir = lower_hir_to_mir(&hir).unwrap();
     assert_eq!(mir.functions()[0].blocks()[0].instructions().len(), 3);
+    assert_eq!(mir.functions()[0].return_type(), int);
     assert_eq!(mir.functions()[0].blocks()[0].terminator().span(), span);
+}
+
+#[test]
+fn m0030_mir_function_preserves_declared_return_type() {
+    let file = SourceFileId::from_raw(302);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let int = TypeId::from_raw(1);
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::int_constant(
+                MirValueId::from_raw(0),
+                1,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+
+    assert_eq!(function.return_type(), int);
 }

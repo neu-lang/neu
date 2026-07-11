@@ -211,6 +211,7 @@ pub struct MirFunction {
     id: MirFunctionId,
     span: ByteSpan,
     parameters: Vec<(MirValueId, TypeId)>,
+    return_type: TypeId,
     locals: Vec<MirLocal>,
     blocks: Vec<MirBasicBlock>,
     cleanup_boundary: MirCleanupBoundary,
@@ -220,6 +221,7 @@ impl MirFunction {
         id: MirFunctionId,
         span: ByteSpan,
         parameters: Vec<(MirValueId, TypeId)>,
+        return_type: TypeId,
         locals: Vec<MirLocal>,
         blocks: Vec<MirBasicBlock>,
         cleanup_boundary: MirCleanupBoundary,
@@ -228,6 +230,7 @@ impl MirFunction {
             id,
             span,
             parameters,
+            return_type,
             locals,
             blocks,
             cleanup_boundary,
@@ -241,6 +244,9 @@ impl MirFunction {
     }
     pub fn parameters(&self) -> &[(MirValueId, TypeId)] {
         &self.parameters
+    }
+    pub fn return_type(&self) -> TypeId {
+        self.return_type
     }
     pub fn locals(&self) -> &[MirLocal] {
         &self.locals
@@ -300,6 +306,7 @@ pub fn lower_hir_to_mir(hir: &HirModule) -> Result<MirModule, MirLoweringError> 
             MirFunctionId::from_raw(function.id().index()),
             function.span(),
             vec![],
+            function.return_type(),
             vec![],
             vec![MirBasicBlock::new(
                 MirBlockId::from_raw(0),
