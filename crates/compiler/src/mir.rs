@@ -173,6 +173,16 @@ pub enum MirInstruction {
         elements: Vec<MirValueId>,
         span: ByteSpan,
     },
+    ArrayValue {
+        output: MirValueId,
+        local: MirLocalId,
+        span: ByteSpan,
+    },
+    ArrayAssign {
+        local: MirLocalId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
     ArrayLoad {
         output: MirValueId,
         local: MirLocalId,
@@ -282,6 +292,8 @@ impl MirInstruction {
             | Self::StoreLocal { span, .. }
             | Self::DirectCall { span, .. }
             | Self::ArrayInit { span, .. }
+            | Self::ArrayValue { span, .. }
+            | Self::ArrayAssign { span, .. }
             | Self::ArrayLoad { span, .. }
             | Self::ArrayStore { span, .. } => *span,
             Self::StringConstant { span, .. }
@@ -569,7 +581,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     });
                 }
                 HirExpressionKind::LocalRead(local) => {
-                    if !matches!(
+                    if matches!(
+                        types.get(expression.ty()).map(|record| record.kind()),
+                        Some(TypeKind::Array(_))
+                    ) {
+                        instructions.push(MirInstruction::ArrayValue {
+                            output,
+                            local: MirLocalId::from_raw(local.index()),
+                            span: expression.span(),
+                        });
+                    } else if !matches!(
                         types.get(expression.ty()).map(|record| record.kind()),
                         Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
                     ) {
@@ -673,6 +694,11 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             .collect(),
                         span: expression.span(),
                     });
+                    instructions.push(MirInstruction::ArrayValue {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        span: expression.span(),
+                    });
                 }
                 HirExpressionKind::StringLiteral(bytes) => {
                     instructions.push(MirInstruction::StringConstant {
@@ -725,17 +751,26 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
             }
             for local in function.locals() {
-                if local.initializer() == Some(expression.id())
-                    && !matches!(
+                if local.initializer() == Some(expression.id()) {
+                    if matches!(
                         types.get(local.ty()).map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
-                    )
-                {
-                    instructions.push(MirInstruction::StoreLocal {
-                        local: MirLocalId::from_raw(local.id().index()),
-                        value: output,
-                        span: expression.span(),
-                    });
+                        Some(TypeKind::Array(_))
+                    ) {
+                        instructions.push(MirInstruction::ArrayAssign {
+                            local: MirLocalId::from_raw(local.id().index()),
+                            value: output,
+                            span: expression.span(),
+                        });
+                    } else if !matches!(
+                        types.get(local.ty()).map(|record| record.kind()),
+                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    ) {
+                        instructions.push(MirInstruction::StoreLocal {
+                            local: MirLocalId::from_raw(local.id().index()),
+                            value: output,
+                            span: expression.span(),
+                        });
+                    }
                 }
             }
             for assignment in function.assignments() {

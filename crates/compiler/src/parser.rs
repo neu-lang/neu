@@ -855,12 +855,16 @@ impl<'source> Parser<'source> {
             }
             index += 1;
         }
+        let mut bracket_depth = 0usize;
         while let Some(token) = self.tokens.get(index) {
             match token.kind {
+                TokenKind::LeftBracket => bracket_depth += 1,
+                TokenKind::RightBracket => bracket_depth = bracket_depth.saturating_sub(1),
                 TokenKind::LeftBrace => return true,
-                TokenKind::Semicolon => return false,
-                _ => index += 1,
+                TokenKind::Semicolon if bracket_depth == 0 => return false,
+                _ => {}
             }
+            index += 1;
         }
         false
     }

@@ -100,3 +100,36 @@ fn dynamic_out_of_bounds_index_traps() {
     assert!(!Command::new(output).status().unwrap().success());
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn compiles_fixed_array_parameters_and_returns() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-array-abi-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun identity(values: [Int; 2]): [Int; 2] {
+            return values;
+        }
+        public fun main(): Int {
+            val values: [Int; 2] = [3, 4];
+            val returned: [Int; 2] = identity(values);
+            return returned[0] + returned[1];
+        }
+    "#;
+    let output = compiler::driver::compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6305),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}

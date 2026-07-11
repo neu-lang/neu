@@ -352,6 +352,7 @@ fn lower_mir_function_with_module(
         Function::with_name_signature(UserFuncName::user(0, function_index), signature);
     let mut builder_context = FunctionBuilderContext::new();
     let mut values = HashMap::new();
+    let mut aggregate_values = HashMap::new();
 
     {
         let mut builder = FunctionBuilder::new(&mut clif_function, &mut builder_context);
@@ -392,12 +393,22 @@ fn lower_mir_function_with_module(
             .get(&function.blocks()[0].id())
             .ok_or(CraneliftLoweringError::UnsupportedFunctionShape)?;
         builder.append_block_params_for_function_params(entry_block);
-        for ((value_id, _), value) in function
-            .parameters()
-            .iter()
-            .zip(builder.block_params(entry_block).iter().copied())
-        {
-            values.insert(*value_id, value);
+        let block_params = builder.block_params(entry_block).to_vec();
+        let mut parameter_cursor = 0usize;
+        for (value_id, parameter_type) in function.parameters() {
+            let mut flattened = Vec::new();
+            flattened_cranelift_types(*parameter_type, type_arena, &mut flattened)?;
+            let end = parameter_cursor + flattened.len();
+            let parameter_values = block_params
+                .get(parameter_cursor..end)
+                .ok_or(CraneliftLoweringError::MissingValue)?
+                .to_vec();
+            parameter_cursor = end;
+            if array_shape(*parameter_type, type_arena).is_some() {
+                aggregate_values.insert(*value_id, parameter_values);
+            } else if let Some(value) = parameter_values.first().copied() {
+                values.insert(*value_id, value);
+            }
         }
 
         for mir_block in function.blocks() {
@@ -410,6 +421,7 @@ fn lower_mir_function_with_module(
                     instruction,
                     &mut builder,
                     &mut values,
+                    &mut aggregate_values,
                     &locals,
                     &array_locals,
                     &mut module,
@@ -417,7 +429,13 @@ fn lower_mir_function_with_module(
                     &lowering_context,
                 )?;
             }
-            lower_terminator(mir_block.terminator(), &clif_blocks, &mut builder, &values)?;
+            lower_terminator(
+                mir_block.terminator(),
+                &clif_blocks,
+                &mut builder,
+                &values,
+                &aggregate_values,
+            )?;
         }
         for clif_block in clif_blocks.values().copied() {
             builder.seal_block(clif_block);
@@ -438,13 +456,17 @@ fn mir_signature(
 ) -> Result<Signature, CraneliftLoweringError> {
     let mut signature = Signature::new(CallConv::triple_default(target));
     for (_, parameter_type) in function.parameters() {
-        let parameter_type = cranelift_type(*parameter_type, type_arena)
-            .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
-        signature.params.push(AbiParam::new(parameter_type));
+        let mut flattened = Vec::new();
+        flattened_cranelift_types(*parameter_type, type_arena, &mut flattened)?;
+        signature
+            .params
+            .extend(flattened.into_iter().map(AbiParam::new));
     }
-    if let Some(return_type) = cranelift_type(function.return_type(), type_arena) {
-        signature.returns.push(AbiParam::new(return_type));
-    }
+    let mut flattened = Vec::new();
+    flattened_cranelift_types(function.return_type(), type_arena, &mut flattened)?;
+    signature
+        .returns
+        .extend(flattened.into_iter().map(AbiParam::new));
     Ok(signature)
 }
 
@@ -507,7 +529,7 @@ fn require_bootstrap_runtime_type(
                 | PrimitiveType::Byte
                 | PrimitiveType::String
                 | PrimitiveType::Unit
-        ))
+        )) | Some(TypeKind::Array(_))
     )
     .then_some(())
     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)
@@ -521,6 +543,30 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
         Some(TypeKind::Primitive(PrimitiveType::String)) => Some(types::I64),
         _ => None,
+    }
+}
+
+fn flattened_cranelift_types(
+    ty: TypeId,
+    type_arena: &TypeArena,
+    output: &mut Vec<types::Type>,
+) -> Result<(), CraneliftLoweringError> {
+    match type_arena.get(ty).map(|record| record.kind()) {
+        Some(TypeKind::Array(array)) => {
+            for _ in 0..array.length() {
+                flattened_cranelift_types(array.element(), type_arena, output)?;
+            }
+            Ok(())
+        }
+        Some(TypeKind::Primitive(PrimitiveType::Unit)) => Ok(()),
+        Some(_) => {
+            output.push(
+                cranelift_type(ty, type_arena)
+                    .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?,
+            );
+            Ok(())
+        }
+        None => Err(CraneliftLoweringError::UnsupportedRuntimeType),
     }
 }
 
@@ -687,6 +733,7 @@ fn lower_instruction(
     instruction: &MirInstruction,
     builder: &mut FunctionBuilder<'_>,
     values: &mut HashMap<MirValueId, Value>,
+    aggregate_values: &mut HashMap<MirValueId, Vec<Value>>,
     locals: &HashMap<crate::mir::MirLocalId, Variable>,
     array_locals: &HashMap<(crate::mir::MirLocalId, u64), Variable>,
     module: &mut Option<&mut ObjectModule>,
@@ -714,8 +761,13 @@ fn lower_instruction(
         MirInstruction::ParameterRead {
             output, parameter, ..
         } => {
+            let parameter_id = MirValueId::from_raw(parameter.index());
+            if let Some(aggregate) = aggregate_values.get(&parameter_id).cloned() {
+                aggregate_values.insert(*output, aggregate);
+                return Ok(());
+            }
             let value = values
-                .get(&MirValueId::from_raw(parameter.index()))
+                .get(&parameter_id)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             let ty = context
@@ -744,26 +796,76 @@ fn lower_instruction(
                 .as_deref_mut()
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
             let function_ref = module.declare_func_in_func(function_id, builder.func);
-            let arguments = arguments
-                .iter()
-                .map(|argument| {
-                    values
-                        .get(argument)
-                        .copied()
-                        .ok_or(CraneliftLoweringError::MissingValue)
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let call = builder.ins().call(function_ref, &arguments);
-            if let Some(value) = builder.inst_results(call).first().copied() {
-                let ty = context
-                    .function_return_types
-                    .get(callee)
-                    .copied()
-                    .ok_or(CraneliftLoweringError::MissingValue)?;
+            let mut call_arguments = Vec::new();
+            for argument in arguments {
+                if let Some(aggregate) = aggregate_values.get(argument) {
+                    call_arguments.extend(aggregate.iter().copied());
+                } else {
+                    call_arguments.push(
+                        values
+                            .get(argument)
+                            .copied()
+                            .ok_or(CraneliftLoweringError::MissingValue)?,
+                    );
+                }
+            }
+            let call = builder.ins().call(function_ref, &call_arguments);
+            let results = builder.inst_results(call).to_vec();
+            let ty = context
+                .function_return_types
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            if array_shape(ty, context.type_arena).is_some() {
+                aggregate_values.insert(*output, results);
+            } else if let Some(value) = results.first().copied() {
                 values.insert(
                     *output,
                     normalize_bool_value(value, ty, context.type_arena, builder),
                 );
+            }
+            Ok(())
+        }
+        MirInstruction::ArrayValue { output, local, .. } => {
+            let (_, length) = context
+                .function
+                .locals()
+                .iter()
+                .find(|candidate| candidate.id() == *local)
+                .and_then(|candidate| array_shape(candidate.ty(), context.type_arena))
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            let mut result = Vec::new();
+            for position in 0..length {
+                let variable = array_locals
+                    .get(&(*local, position))
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                result.push(builder.use_var(variable));
+            }
+            aggregate_values.insert(*output, result);
+            Ok(())
+        }
+        MirInstruction::ArrayAssign { local, value, .. } => {
+            let source = aggregate_values
+                .get(value)
+                .cloned()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let (_, length) = context
+                .function
+                .locals()
+                .iter()
+                .find(|candidate| candidate.id() == *local)
+                .and_then(|candidate| array_shape(candidate.ty(), context.type_arena))
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            if source.len() != usize::try_from(length).unwrap_or(usize::MAX) {
+                return Err(CraneliftLoweringError::MissingValue);
+            }
+            for (position, value) in source.into_iter().enumerate() {
+                let variable = array_locals
+                    .get(&(*local, position as u64))
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                builder.def_var(variable, value);
             }
             Ok(())
         }
@@ -1371,14 +1473,19 @@ fn lower_terminator(
     blocks: &HashMap<crate::mir::MirBlockId, cranelift_codegen::ir::Block>,
     builder: &mut FunctionBuilder<'_>,
     values: &HashMap<MirValueId, Value>,
+    aggregate_values: &HashMap<MirValueId, Vec<Value>>,
 ) -> Result<(), CraneliftLoweringError> {
     match terminator {
         MirTerminator::Return { value, .. } => {
-            let value = values
-                .get(&value)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            builder.ins().return_(&[value]);
+            if let Some(aggregate) = aggregate_values.get(&value) {
+                builder.ins().return_(aggregate);
+            } else {
+                let value = values
+                    .get(&value)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                builder.ins().return_(&[value]);
+            }
             Ok(())
         }
         MirTerminator::ReturnUnit { .. } => {

@@ -1672,41 +1672,19 @@ pub fn type_m0063_function_signatures_in(
     array_types: &[ParsedArrayType],
 ) -> Vec<FunctionSignature> {
     let primitives = PrimitiveTypeIds::module_owned(arena);
-    let primitive_annotation = |annotation| {
-        let name = type_name_references
-            .iter()
-            .find(|reference| reference.reference == annotation)?
-            .name
-            .as_str();
-        Some(match name {
-            "Bool" => primitives.bool_id,
-            "Int" => primitives.int_id,
-            "String" => primitives.string_id,
-            "Unit" => primitives.unit_id,
-            "Float" => primitives.float_id,
-            "Byte" => primitives.byte_id,
-            _ => return None,
-        })
-    };
-    let annotation_type = |annotation, arena: &mut TypeArena| {
-        if let Some(primitive) = primitive_annotation(annotation) {
-            return Some(primitive);
-        }
-        array_types
-            .iter()
-            .find(|array| array.array == annotation)
-            .and_then(|array| {
-                let element = primitive_annotation(array.element_type)?;
-                Some(arena.array(element, array.length?))
-            })
-    };
     let mut signatures = Vec::new();
 
     for function in functions {
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        let Some(return_type) = annotation_type(return_annotation, arena) else {
+        let Some(return_type) = resolve_m0063_annotation_type(
+            return_annotation,
+            type_name_references,
+            array_types,
+            &primitives,
+            arena,
+        ) else {
             continue;
         };
         let function_parameters: Vec<_> = parameters
@@ -1715,7 +1693,15 @@ pub fn type_m0063_function_signatures_in(
             .collect();
         let Some(parameter_types) = function_parameters
             .iter()
-            .map(|parameter| annotation_type(parameter.annotation, arena))
+            .map(|parameter| {
+                resolve_m0063_annotation_type(
+                    parameter.annotation,
+                    type_name_references,
+                    array_types,
+                    &primitives,
+                    arena,
+                )
+            })
             .collect::<Option<Vec<_>>>()
         else {
             continue;
@@ -1728,6 +1714,30 @@ pub fn type_m0063_function_signatures_in(
     }
 
     signatures
+}
+
+fn resolve_m0063_annotation_type(
+    annotation: AstNodeId,
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    primitives: &PrimitiveTypeIds,
+    arena: &mut TypeArena,
+) -> Option<TypeId> {
+    if let Some(reference) = type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)
+    {
+        return primitives.type_for_primitive_name(&reference.name);
+    }
+    let array = array_types.iter().find(|array| array.array == annotation)?;
+    let element = resolve_m0063_annotation_type(
+        array.element_type,
+        type_name_references,
+        array_types,
+        primitives,
+        arena,
+    )?;
+    Some(arena.array(element, array.length?))
 }
 
 pub fn type_m0063_array_expressions(
@@ -1896,7 +1906,8 @@ pub fn type_m0063_array_expressions(
 pub fn type_m0064_string_operations(
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
-    types: &TypeArena,
+    types: &mut TypeArena,
+    array_types: &[ParsedArrayType],
 ) {
     let Some(string_type) = types.records().iter().find_map(|record| {
         (record.kind() == &TypeKind::Primitive(PrimitiveType::String)).then_some(record.id())
@@ -1938,25 +1949,14 @@ pub fn type_m0064_string_operations(
     }
 
     for parameter in &parsed.function_parameters {
-        let Some(type_reference) = parsed
-            .type_name_references
-            .iter()
-            .find(|reference| reference.reference == parameter.annotation)
-        else {
-            continue;
-        };
-        let Some(parameter_type) = types.records().iter().find_map(|record| {
-            let matches = match type_reference.name.as_str() {
-                "Bool" => record.kind() == &TypeKind::Primitive(PrimitiveType::Bool),
-                "Int" => record.kind() == &TypeKind::Primitive(PrimitiveType::Int),
-                "String" => record.kind() == &TypeKind::Primitive(PrimitiveType::String),
-                "Unit" => record.kind() == &TypeKind::Primitive(PrimitiveType::Unit),
-                "Float" => record.kind() == &TypeKind::Primitive(PrimitiveType::Float),
-                "Byte" => record.kind() == &TypeKind::Primitive(PrimitiveType::Byte),
-                _ => false,
-            };
-            matches.then_some(record.id())
-        }) else {
+        let primitives = PrimitiveTypeIds::module_owned(types);
+        let Some(parameter_type) = resolve_m0063_annotation_type(
+            parameter.annotation,
+            &parsed.type_name_references,
+            array_types,
+            &primitives,
+            types,
+        ) else {
             continue;
         };
         for reference in parsed.name_references.iter().filter(|reference| {

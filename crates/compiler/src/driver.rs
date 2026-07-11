@@ -158,7 +158,8 @@ pub fn compile_source_to_executable(
         &crate::name_resolution::ResolutionTable::new(),
         &[],
     );
-    type_m0064_string_operations(&parsed, &mut report, &types);
+    type_m0063_array_expressions(&mut types, &parsed, &mut report);
+    type_m0064_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
     let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
         options.package(),
         &parsed,
@@ -173,7 +174,6 @@ pub fn compile_source_to_executable(
     apply_m0028_direct_call_results(&mut report, &parsed, &calls);
     let expression_types = report.expression_types().to_vec();
     validate_m0061_compile_time_constants(&parsed, &expression_types, &types, &mut report);
-    type_m0063_array_expressions(&mut types, &parsed, &mut report);
     report.retain_diagnostics(|diagnostic| {
         !matches!(
             diagnostic.kind(),
