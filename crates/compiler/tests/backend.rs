@@ -829,6 +829,67 @@ fn m0035_lowers_primitive_direct_call_through_module_context() {
 }
 
 #[test]
+fn m0035_lowers_unit_direct_call_without_abi_result() {
+    let file = SourceFileId::from_raw(928);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let unit_type = types.insert(TypeRecord::primitive(PrimitiveType::Unit));
+    let module_name = compiler::module::ModuleName::parse("app").unwrap();
+    let package = compiler::module::PackageNamespace::parse("demo").unwrap();
+    let helper = MirFunction::new(
+        MirFunctionId::from_raw(1),
+        span,
+        vec![],
+        unit_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::unit_constant(span)],
+            MirTerminator::return_unit(span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(compiler::module::FunctionSymbolIdentity::new(
+        module_name.clone(),
+        package.clone(),
+        "unit_helper",
+    ));
+    let caller = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        vec![],
+        unit_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::DirectCall {
+                output: MirValueId::from_raw(0),
+                callee: MirFunctionId::from_raw(1),
+                arguments: vec![],
+                span,
+            }],
+            MirTerminator::return_unit(span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(compiler::module::FunctionSymbolIdentity::new(
+        module_name.clone(),
+        package.clone(),
+        "unit_caller",
+    ));
+    let module = compiler::mir::MirModule::new(module_name, vec![caller, helper]);
+
+    let ir = lower_mir_module_to_cranelift(&module, &types).unwrap();
+    assert!(ir[0].contains("call"), "{}", ir[0]);
+    assert!(!ir[0].contains("->"), "{}", ir[0]);
+    assert!(
+        !emit_mir_module_to_object(&module, &types, "neu_main")
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn m0031_lowers_checked_exponentiation() {
     let file = SourceFileId::from_raw(410);
     let span = ByteSpan::new(file, 0, 10).unwrap();
