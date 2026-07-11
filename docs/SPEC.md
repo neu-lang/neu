@@ -574,6 +574,14 @@ descendants in that form are suppressed. Recovery emits no executable type,
 control-flow, ownership, or lowering fact for the rejected region, and HIR
 must not receive it. Unrelated sibling forms continue checking.
 
+## ADR-0054: Bootstrap Return-Type Mismatch Diagnostics
+
+`return_type_mismatch` attaches to the explicit return expression and emits
+only when that expression and the enclosing function's declared return type
+are known and incompatible. Recovery records no typed executable return fact;
+an unresolved or deferred expression retains its original diagnostic without a
+second mismatch error.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves
