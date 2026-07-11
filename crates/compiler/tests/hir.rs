@@ -9,7 +9,7 @@ use compiler::{
     parser::parse_source,
     source::{ByteSpan, SourceFileId},
     type_check::{
-        ExecutableSourceTypes, FunctionSignature, apply_m0028_direct_call_results,
+        ExecutableSourceTypes, ExpressionType, FunctionSignature, apply_m0028_direct_call_results,
         check_m0028_direct_calls, type_m0028_executable_core_in, type_m0028_function_signatures_in,
         type_parser_literals,
     },
@@ -197,6 +197,60 @@ fn m0035_hir_preserves_primitive_operator_kinds_and_operand_order() {
             && binary.right() == right));
     assert!(matches!(not.kind(), HirExpressionKind::Unary(unary)
         if unary.operator() == HirUnaryOperator::Not && unary.operand() == left));
+}
+
+#[test]
+fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(918),
+        "fun main(): Byte { return 255; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = compiler::types::TypeArena::new();
+    let mut report = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &[],
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &compiler::name_resolution::ResolutionTable::new(),
+        &[],
+    );
+    assert!(
+        report.diagnostics().is_empty(),
+        "{:?}",
+        report.diagnostics()
+    );
+    let return_expression = parsed.return_statements[0].value.unwrap();
+    report.replace_expression_type(ExpressionType::new(return_expression, TypeId::from_raw(6)));
+    let signatures = vec![FunctionSignature::new(
+        parsed.function_declarations[0].declaration,
+        vec![],
+        TypeId::from_raw(6),
+    )];
+    let module = lower_checked_hir_source(
+        CheckedHirSource::new(
+            ModuleName::parse("app").unwrap(),
+            PackageNamespace::parse("app").unwrap(),
+            &parsed,
+            &signatures,
+            report.expression_types(),
+            true,
+        )
+        .with_byte_type(TypeId::from_raw(6)),
+    )
+    .unwrap();
+
+    assert!(matches!(
+        module.functions()[0].expressions()[0].kind(),
+        HirExpressionKind::ByteLiteral(255)
+    ));
 }
 
 #[test]

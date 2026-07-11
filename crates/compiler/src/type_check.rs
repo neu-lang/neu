@@ -1197,6 +1197,12 @@ impl TypeCheckReport {
         self.expression_types.push(expression_type);
     }
 
+    pub fn replace_expression_type(&mut self, expression_type: ExpressionType) {
+        self.expression_types
+            .retain(|entry| entry.expression() != expression_type.expression());
+        self.expression_types.push(expression_type);
+    }
+
     pub fn expression_types(&self) -> &[ExpressionType] {
         &self.expression_types
     }
@@ -2027,6 +2033,8 @@ pub fn type_primitive_local_initializer_declarations(
         {
             match integer.value {
                 Some(value) if value <= u64::from(u8::MAX) => {
+                    report
+                        .replace_expression_type(ExpressionType::new(initializer, annotation_type));
                     report.record_assignment_check(AssignmentCheck::new(
                         declaration.declaration,
                         annotation_type,

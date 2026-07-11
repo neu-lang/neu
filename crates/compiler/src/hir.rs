@@ -34,6 +34,7 @@ pub struct CheckedHirSource<'a> {
     signatures: &'a [FunctionSignature],
     expression_types: &'a [ExpressionType],
     clean: bool,
+    byte_type: Option<TypeId>,
 }
 impl<'a> CheckedHirSource<'a> {
     pub fn new(
@@ -51,7 +52,13 @@ impl<'a> CheckedHirSource<'a> {
             signatures,
             expression_types,
             clean,
+            byte_type: None,
         }
+    }
+
+    pub fn with_byte_type(mut self, byte_type: TypeId) -> Self {
+        self.byte_type = Some(byte_type);
+        self
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -195,7 +202,13 @@ fn lower_expression(
                     .and_then(|integer| integer.value)
                     .and_then(|value| i64::try_from(value).ok())
                     .ok_or(HirLoweringError::UnsupportedExpression)?;
-                output.push(HirExpression::int_literal(id, span, ty, value));
+                if source.byte_type == Some(ty) {
+                    let value =
+                        u8::try_from(value).map_err(|_| HirLoweringError::UnsupportedExpression)?;
+                    output.push(HirExpression::byte_literal(id, span, ty, value));
+                } else {
+                    output.push(HirExpression::int_literal(id, span, ty, value));
+                }
             }
             ParsedLiteralKind::AcceptedString | ParsedLiteralKind::Null => {
                 return Err(HirLoweringError::UnsupportedExpression);
