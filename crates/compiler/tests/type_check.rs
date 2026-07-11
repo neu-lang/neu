@@ -1664,6 +1664,7 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
     let byte_right = AstNodeId::from_raw(707);
     let byte_result = AstNodeId::from_raw(708);
     let unary_result = AstNodeId::from_raw(709);
+    let float_unary_result = AstNodeId::from_raw(710);
 
     let known = vec![
         ExpressionType::new(bool_left, bool_type),
@@ -1673,12 +1674,20 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
         ExpressionType::new(byte_left, byte_type),
         ExpressionType::new(byte_right, byte_type),
     ];
-    let unary = vec![ParsedUnaryExpression {
-        expression: unary_result,
-        operator: ParsedUnaryOperator::Not,
-        operand: bool_left,
-        span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
-    }];
+    let unary = vec![
+        ParsedUnaryExpression {
+            expression: unary_result,
+            operator: ParsedUnaryOperator::Not,
+            operand: bool_left,
+            span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
+        },
+        ParsedUnaryExpression {
+            expression: float_unary_result,
+            operator: ParsedUnaryOperator::Minus,
+            operand: float_left,
+            span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
+        },
+    ];
     let binary = vec![
         ParsedBinaryExpression {
             expression: bool_result,
@@ -1709,6 +1718,7 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
 
     assert!(report.diagnostics().is_empty());
     assert_eq!(report.expression_type(unary_result), Some(bool_type));
+    assert_eq!(report.expression_type(float_unary_result), Some(float_type));
     assert_eq!(report.expression_type(bool_result), Some(bool_type));
     assert_eq!(report.expression_type(float_result), Some(bool_type));
     assert_eq!(report.expression_type(byte_result), Some(byte_type));
@@ -1753,6 +1763,43 @@ fn m0035_executable_core_types_primitive_operator_source() {
     assert_eq!(
         report.expression_type(parsed.binary_expressions[1].expression),
         Some(TypeId::from_raw(0))
+    );
+}
+
+#[test]
+fn m0035_executable_core_contextualizes_byte_literal_initializers() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(915),
+        "fun run(): Int { const value: Byte = 255; return 0; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let mut types = TypeArena::new();
+    let report = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    let initializer = parsed.local_declarations[0].initializer.unwrap();
+    assert_eq!(
+        report.expression_type(initializer),
+        Some(TypeId::from_raw(6))
+    );
+    assert!(
+        report.diagnostics().is_empty(),
+        "{:?}",
+        report.diagnostics()
     );
 }
 

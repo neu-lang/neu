@@ -2300,6 +2300,12 @@ pub fn type_m0035_primitive_operators(
                     operand_type,
                 ));
             }
+        } else if matches!(
+            unary.operator,
+            crate::parser::ParsedUnaryOperator::Plus | crate::parser::ParsedUnaryOperator::Minus
+        ) && operand_type == float_type
+        {
+            report.record_expression_type(ExpressionType::new(unary.expression, float_type));
         }
     }
 
@@ -3279,6 +3285,30 @@ fn type_core_with_arena(
         primitives,
         &mut report,
     );
+
+    // A Byte annotation gives a directly written integer literal its exact
+    // contextual type before operator propagation and assignment checking.
+    for declaration in declarations {
+        if report.declaration_signature(declaration.declaration) != Some(primitives.byte_id) {
+            continue;
+        }
+        let Some(initializer) = declaration.initializer else {
+            continue;
+        };
+        let Some(integer) = integer_literals.and_then(|literals| {
+            literals
+                .iter()
+                .find(|literal| literal.expression == initializer)
+        }) else {
+            continue;
+        };
+        if integer
+            .value
+            .is_some_and(|value| value <= u64::from(u8::MAX))
+        {
+            report.replace_expression_type(ExpressionType::new(initializer, primitives.byte_id));
+        }
+    }
 
     if let Some((unary_expressions, binary_expressions)) = executable_operators {
         let int_unary_expressions: Vec<_> = unary_expressions
