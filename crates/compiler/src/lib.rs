@@ -2,6 +2,7 @@
 #![doc = "Core compiler crate for the new language."]
 
 pub mod ast;
+pub mod backend;
 pub mod borrow;
 pub mod coroutine;
 pub mod hir;
