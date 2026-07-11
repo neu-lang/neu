@@ -132,13 +132,18 @@ fn lower_mir_function(
     target: &Triple,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
-    if !function.parameters().is_empty() || function.blocks().is_empty() {
+    if function.blocks().is_empty() {
         return Err(CraneliftLoweringError::UnsupportedFunctionShape);
     }
 
     let function_index = u32::try_from(function.id().index())
         .map_err(|_| CraneliftLoweringError::FunctionIdOutOfRange)?;
     let mut signature = Signature::new(CallConv::triple_default(target));
+    for (_, parameter_type) in function.parameters() {
+        let parameter_type = cranelift_type(*parameter_type, type_arena)
+            .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+        signature.params.push(AbiParam::new(parameter_type));
+    }
     if let Some(return_type) = cranelift_type(function.return_type(), type_arena) {
         signature.returns.push(AbiParam::new(return_type));
     }
@@ -158,6 +163,18 @@ fn lower_mir_function(
         }
         for mir_block in function.blocks() {
             clif_blocks.insert(mir_block.id(), builder.create_block());
+        }
+
+        let entry_block = *clif_blocks
+            .get(&function.blocks()[0].id())
+            .ok_or(CraneliftLoweringError::UnsupportedFunctionShape)?;
+        builder.append_block_params_for_function_params(entry_block);
+        for ((value_id, _), value) in function
+            .parameters()
+            .iter()
+            .zip(builder.block_params(entry_block).iter().copied())
+        {
+            values.insert(*value_id, value);
         }
 
         for mir_block in function.blocks() {

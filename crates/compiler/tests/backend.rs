@@ -698,6 +698,65 @@ fn m0035_lowers_short_circuit_result_local_through_cfg() {
 }
 
 #[test]
+fn m0035_lowers_typed_primitive_parameters() {
+    let file = SourceFileId::from_raw(923);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
+    let byte_type = types.insert(TypeRecord::primitive(PrimitiveType::Byte));
+
+    let bool_function = MirFunction::new(
+        MirFunctionId::from_raw(72),
+        span,
+        vec![(MirValueId::from_raw(0), bool_type)],
+        bool_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let bool_ir = lower_mir_function_to_cranelift(&bool_function, &types).unwrap();
+    assert!(bool_ir.contains("i8"), "{bool_ir}");
+    assert!(bool_ir.contains("return"), "{bool_ir}");
+
+    let float_function = MirFunction::new(
+        MirFunctionId::from_raw(73),
+        span,
+        vec![(MirValueId::from_raw(1), float_type)],
+        float_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![],
+            MirTerminator::return_value(MirValueId::from_raw(1), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let float_ir = lower_mir_function_to_cranelift(&float_function, &types).unwrap();
+    assert!(float_ir.contains("f64"), "{float_ir}");
+
+    let byte_function = MirFunction::new(
+        MirFunctionId::from_raw(74),
+        span,
+        vec![(MirValueId::from_raw(2), byte_type)],
+        byte_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![],
+            MirTerminator::return_value(MirValueId::from_raw(2), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let byte_ir = lower_mir_function_to_cranelift(&byte_function, &types).unwrap();
+    assert!(byte_ir.contains("i8"), "{byte_ir}");
+}
+
+#[test]
 fn m0031_lowers_checked_exponentiation() {
     let file = SourceFileId::from_raw(410);
     let span = ByteSpan::new(file, 0, 10).unwrap();
