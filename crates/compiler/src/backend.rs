@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use cranelift_codegen::{
-    ir::{AbiParam, Function, InstBuilder, Signature, UserFuncName, Value, types},
+    ir::{
+        AbiParam, Function, InstBuilder, Signature, TrapCode, UserFuncName, Value,
+        condcodes::IntCC, types,
+    },
     isa::CallConv,
     settings, verify_function,
 };
@@ -9,7 +12,7 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use target_lexicon::Triple;
 
 use crate::{
-    mir::{MirFunction, MirInstruction, MirTerminator, MirValueId},
+    mir::{MirArithmetic, MirFunction, MirInstruction, MirTerminator, MirValueId},
     types::{PrimitiveType, TypeArena, TypeKind},
 };
 
@@ -82,6 +85,32 @@ fn lower_instruction(
     match instruction {
         MirInstruction::IntConstant { output, value, .. } => {
             values.insert(*output, builder.ins().iconst(types::I64, *value));
+            Ok(())
+        }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation: MirArithmetic::Add,
+            left,
+            right,
+            ..
+        } => {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let sum = builder.ins().iadd(left, right);
+            let left_sign_change = builder.ins().bxor(left, sum);
+            let right_sign_change = builder.ins().bxor(right, sum);
+            let signed_change = builder.ins().band(left_sign_change, right_sign_change);
+            let overflow = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, signed_change, 0);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            values.insert(*output, sum);
             Ok(())
         }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),
