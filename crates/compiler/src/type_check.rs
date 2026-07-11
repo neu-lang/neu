@@ -331,6 +331,276 @@ pub struct FunctionSignature {
     return_type: TypeId,
 }
 
+pub struct ExecutableSourceTypes<'a> {
+    package: &'a PackageNamespace,
+    parsed: &'a ParseOutput,
+    signatures: &'a [FunctionSignature],
+    expression_types: &'a [ExpressionType],
+}
+
+impl<'a> ExecutableSourceTypes<'a> {
+    pub fn new(
+        package: &'a PackageNamespace,
+        parsed: &'a ParseOutput,
+        signatures: &'a [FunctionSignature],
+        expression_types: &'a [ExpressionType],
+    ) -> Self {
+        Self {
+            package,
+            parsed,
+            signatures,
+            expression_types,
+        }
+    }
+
+    pub fn package(&self) -> &PackageNamespace {
+        self.package
+    }
+
+    pub fn parsed(&self) -> &ParseOutput {
+        self.parsed
+    }
+
+    pub fn signatures(&self) -> &[FunctionSignature] {
+        self.signatures
+    }
+
+    pub fn expression_types(&self) -> &[ExpressionType] {
+        self.expression_types
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DirectCallDiagnosticKind {
+    InvalidCallTarget,
+    ArgumentCountMismatch,
+    ArgumentTypeMismatch,
+    RecursiveCallUnsupported,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DirectCallDiagnostic {
+    kind: DirectCallDiagnosticKind,
+    span: ByteSpan,
+}
+
+impl DirectCallDiagnostic {
+    pub fn new(kind: DirectCallDiagnosticKind, span: ByteSpan) -> Self {
+        Self { kind, span }
+    }
+
+    pub fn kind(self) -> DirectCallDiagnosticKind {
+        self.kind
+    }
+
+    pub fn span(self) -> ByteSpan {
+        self.span
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DirectCallReport {
+    expression_types: Vec<ExpressionType>,
+    diagnostics: Vec<DirectCallDiagnostic>,
+}
+
+impl DirectCallReport {
+    pub fn expression_types(&self) -> &[ExpressionType] {
+        &self.expression_types
+    }
+
+    pub fn diagnostics(&self) -> &[DirectCallDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallReport {
+    let mut report = DirectCallReport::default();
+    let mut resolved_calls = Vec::new();
+    let mut call_edges: Vec<(ByteSpan, ByteSpan)> = Vec::new();
+
+    for (source_index, source) in sources.iter().enumerate() {
+        for (call_index, call) in source.parsed.call_expressions.iter().enumerate() {
+            let Some(callee_name) = source
+                .parsed
+                .name_references
+                .iter()
+                .find(|reference| reference.reference == call.callee)
+            else {
+                let span = source
+                    .parsed
+                    .arena
+                    .node(call.callee)
+                    .expect("parsed call callee")
+                    .span;
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::InvalidCallTarget,
+                    span,
+                ));
+                continue;
+            };
+            let targets: Vec<_> = sources
+                .iter()
+                .enumerate()
+                .filter(|(_, candidate)| candidate.package == source.package)
+                .flat_map(|(candidate_index, candidate)| {
+                    candidate
+                        .parsed
+                        .declaration_names
+                        .iter()
+                        .filter(move |name| name.name == callee_name.name)
+                        .filter_map(move |name| {
+                            candidate
+                                .signatures
+                                .iter()
+                                .position(|signature| signature.declaration == name.declaration)
+                                .map(|signature_index| (candidate_index, signature_index))
+                        })
+                })
+                .collect();
+            if targets.len() != 1 {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::InvalidCallTarget,
+                    callee_name.name_span,
+                ));
+                continue;
+            }
+            let (target_source_index, target_signature_index) = targets[0];
+            let target_source = &sources[target_source_index];
+            let target = &target_source.signatures[target_signature_index];
+            let has_body = target_source
+                .parsed
+                .function_declarations
+                .iter()
+                .any(|function| {
+                    function.declaration == target.declaration && function.body.is_some()
+                });
+            if !has_body {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::InvalidCallTarget,
+                    callee_name.name_span,
+                ));
+                continue;
+            }
+            let source_function_span = source
+                .parsed
+                .arena
+                .node(call.function)
+                .expect("parsed call owner function")
+                .span;
+            let target_span = target_source
+                .parsed
+                .arena
+                .node(target.declaration)
+                .expect("parsed call target function")
+                .span;
+            call_edges.push((source_function_span, target_span));
+            resolved_calls.push((
+                source_index,
+                call_index,
+                source_function_span,
+                target_span,
+                target_source_index,
+                target_signature_index,
+            ));
+        }
+    }
+
+    for (
+        source_index,
+        call_index,
+        source_function_span,
+        target_span,
+        target_source_index,
+        target_signature_index,
+    ) in resolved_calls
+    {
+        let source = &sources[source_index];
+        let call = &source.parsed.call_expressions[call_index];
+        let target = &sources[target_source_index].signatures[target_signature_index];
+        if m0028_call_path_exists(&call_edges, target_span, source_function_span) {
+            let span = source
+                .parsed
+                .arena
+                .node(call.expression)
+                .expect("parsed call expression")
+                .span;
+            report.diagnostics.push(DirectCallDiagnostic::new(
+                DirectCallDiagnosticKind::RecursiveCallUnsupported,
+                span,
+            ));
+            continue;
+        }
+        if call.arguments.len() != target.parameter_types.len() {
+            let span = source
+                .parsed
+                .arena
+                .node(call.expression)
+                .expect("parsed call expression")
+                .span;
+            report.diagnostics.push(DirectCallDiagnostic::new(
+                DirectCallDiagnosticKind::ArgumentCountMismatch,
+                span,
+            ));
+            continue;
+        }
+        let mut argument_error = false;
+        for (argument, parameter) in call.arguments.iter().zip(&target.parameter_types) {
+            if source
+                .expression_types
+                .iter()
+                .find(|typed| typed.expression == *argument)
+                .map(|typed| typed.ty)
+                != Some(*parameter)
+            {
+                let span = source
+                    .parsed
+                    .arena
+                    .node(*argument)
+                    .expect("parsed argument")
+                    .span;
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::ArgumentTypeMismatch,
+                    span,
+                ));
+                argument_error = true;
+            }
+        }
+        if !argument_error {
+            report
+                .expression_types
+                .push(ExpressionType::new(call.expression, target.return_type));
+        }
+    }
+    report
+}
+
+fn m0028_call_path_exists(
+    call_edges: &[(ByteSpan, ByteSpan)],
+    start: ByteSpan,
+    goal: ByteSpan,
+) -> bool {
+    let mut pending = vec![start];
+    let mut visited = Vec::new();
+
+    while let Some(current) = pending.pop() {
+        if current == goal {
+            return true;
+        }
+        if visited.contains(&current) {
+            continue;
+        }
+        visited.push(current);
+        pending.extend(
+            call_edges
+                .iter()
+                .filter_map(|(owner, target)| (*owner == current).then_some(*target)),
+        );
+    }
+
+    false
+}
+
 impl FunctionSignature {
     pub fn declaration(&self) -> AstNodeId {
         self.declaration

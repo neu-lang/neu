@@ -1,5 +1,9 @@
 package examples.current
 
+public fun increment(value: Int): Int {
+    return value + 1;
+}
+
 public fun main(): Int {
-    return 0;
+    return increment(41);
 }

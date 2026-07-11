@@ -15,17 +15,17 @@ use compiler::{
     source::SourceFileId,
     symbol::{SymbolId, SymbolInterner},
     type_check::{
-        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, EligibleNullTestRefinement,
-        EntryPointDiagnosticKind, EntryPointFile, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
-        RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
-        build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
-        check_m0028_entry_point, check_m0028_straight_line_returns, known_local_symbol_types,
-        recognize_m0019_null_tests, record_m0019_branch_refinements,
-        record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
-        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
-        type_m0018_accepted_expressions, type_m0018_core,
+        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, DirectCallDiagnosticKind,
+        EligibleNullTestRefinement, EntryPointDiagnosticKind, EntryPointFile,
+        ExecutableSourceTypes, ExpressionType, KnownSymbolType, LiteralExpressionInput,
+        LiteralKind, NullTestRefinedBranch, RecognizedNullTest, RefinedExpressionType,
+        RefinementRecord, ReturnPathDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport, TypeRuleDiagnostic, build_m0020_capability_bound_records,
+        build_m0020_generic_parameter_types, check_m0028_direct_calls, check_m0028_entry_point,
+        check_m0028_straight_line_returns, known_local_symbol_types, recognize_m0019_null_tests,
+        record_m0019_branch_refinements, record_m0019_refined_expression_types,
+        select_m0019_eligible_null_tests, type_assignment_statements, type_grouped_expressions,
+        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_m0028_executable_core, type_m0028_executable_core_in,
@@ -3993,5 +3993,282 @@ fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
     assert_eq!(
         first_report.expression_types()[0].ty(),
         second_report.expression_types()[0].ty()
+    );
+}
+
+#[test]
+fn m0028_direct_calls_type_same_package_helper_arguments() {
+    let helper = parse_source(
+        SourceFileId::from_raw(118),
+        "fun helper(value: Int): Int { return value; }",
+    );
+    let caller = parse_source(
+        SourceFileId::from_raw(119),
+        "fun main(): Int { return helper(1); }",
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let mut types = TypeArena::new();
+    let helper_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &helper.function_declarations,
+        &helper.function_parameters,
+        &helper.type_name_references,
+    );
+    let caller_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &caller.function_declarations,
+        &caller.function_parameters,
+        &caller.type_name_references,
+    );
+    let helper_types = type_m0028_executable_core_in(
+        &mut types,
+        &helper.arena,
+        &helper.local_declarations,
+        &helper.type_name_references,
+        &helper.literal_expressions,
+        &helper.integer_literals,
+        &helper.grouped_expressions,
+        &helper.unary_expressions,
+        &helper.binary_expressions,
+        &helper.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let caller_types = type_m0028_executable_core_in(
+        &mut types,
+        &caller.arena,
+        &caller.local_declarations,
+        &caller.type_name_references,
+        &caller.literal_expressions,
+        &caller.integer_literals,
+        &caller.grouped_expressions,
+        &caller.unary_expressions,
+        &caller.binary_expressions,
+        &caller.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let report = check_m0028_direct_calls(&[
+        ExecutableSourceTypes::new(
+            &package,
+            &helper,
+            &helper_signatures,
+            helper_types.expression_types(),
+        ),
+        ExecutableSourceTypes::new(
+            &package,
+            &caller,
+            &caller_signatures,
+            caller_types.expression_types(),
+        ),
+    ]);
+
+    assert_eq!(report.diagnostics(), []);
+    assert_eq!(report.expression_types().len(), 1);
+}
+
+#[test]
+fn m0028_direct_calls_report_invalid_target_and_arity() {
+    let target = parse_source(
+        SourceFileId::from_raw(120),
+        "fun helper(value: Int): Int { return value; }",
+    );
+    let caller = parse_source(
+        SourceFileId::from_raw(121),
+        "fun main(): Int { return missing(); } fun other(): Int { return helper(); }",
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let mut types = TypeArena::new();
+    let target_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &target.function_declarations,
+        &target.function_parameters,
+        &target.type_name_references,
+    );
+    let caller_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &caller.function_declarations,
+        &caller.function_parameters,
+        &caller.type_name_references,
+    );
+    let target_types = type_m0028_executable_core_in(
+        &mut types,
+        &target.arena,
+        &target.local_declarations,
+        &target.type_name_references,
+        &target.literal_expressions,
+        &target.integer_literals,
+        &target.grouped_expressions,
+        &target.unary_expressions,
+        &target.binary_expressions,
+        &target.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let caller_types = type_m0028_executable_core_in(
+        &mut types,
+        &caller.arena,
+        &caller.local_declarations,
+        &caller.type_name_references,
+        &caller.literal_expressions,
+        &caller.integer_literals,
+        &caller.grouped_expressions,
+        &caller.unary_expressions,
+        &caller.binary_expressions,
+        &caller.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let report = check_m0028_direct_calls(&[
+        ExecutableSourceTypes::new(
+            &package,
+            &target,
+            &target_signatures,
+            target_types.expression_types(),
+        ),
+        ExecutableSourceTypes::new(
+            &package,
+            &caller,
+            &caller_signatures,
+            caller_types.expression_types(),
+        ),
+    ]);
+    let kinds: Vec<_> = report
+        .diagnostics()
+        .iter()
+        .map(|diagnostic| diagnostic.kind())
+        .collect();
+    assert!(kinds.contains(&DirectCallDiagnosticKind::InvalidCallTarget));
+    assert!(kinds.contains(&DirectCallDiagnosticKind::ArgumentCountMismatch));
+}
+
+#[test]
+fn m0028_direct_calls_reject_every_edge_in_a_recursive_cycle() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(122),
+        "fun first(): Int { return second(); } fun second(): Int { return third(); } fun third(): Int { return first(); }",
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let mut types = TypeArena::new();
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    let executable_types = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    let report = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+        &package,
+        &parsed,
+        &signatures,
+        executable_types.expression_types(),
+    )]);
+
+    assert_eq!(report.expression_types(), []);
+    assert_eq!(report.diagnostics().len(), 3);
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .all(|diagnostic| diagnostic.kind()
+                == DirectCallDiagnosticKind::RecursiveCallUnsupported)
+    );
+}
+
+#[test]
+fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodies() {
+    let target = parse_source(
+        SourceFileId::from_raw(123),
+        "fun helper(value: Int): Int { return value; } fun declared(): Int;",
+    );
+    let caller = parse_source(
+        SourceFileId::from_raw(124),
+        "fun main(): Int { return helper(true); } fun other(): Int { return declared(); }",
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let mut types = TypeArena::new();
+    let target_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &target.function_declarations,
+        &target.function_parameters,
+        &target.type_name_references,
+    );
+    let caller_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &caller.function_declarations,
+        &caller.function_parameters,
+        &caller.type_name_references,
+    );
+    let target_types = type_m0028_executable_core_in(
+        &mut types,
+        &target.arena,
+        &target.local_declarations,
+        &target.type_name_references,
+        &target.literal_expressions,
+        &target.integer_literals,
+        &target.grouped_expressions,
+        &target.unary_expressions,
+        &target.binary_expressions,
+        &target.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let caller_types = type_m0028_executable_core_in(
+        &mut types,
+        &caller.arena,
+        &caller.local_declarations,
+        &caller.type_name_references,
+        &caller.literal_expressions,
+        &caller.integer_literals,
+        &caller.grouped_expressions,
+        &caller.unary_expressions,
+        &caller.binary_expressions,
+        &caller.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    let report = check_m0028_direct_calls(&[
+        ExecutableSourceTypes::new(
+            &package,
+            &target,
+            &target_signatures,
+            target_types.expression_types(),
+        ),
+        ExecutableSourceTypes::new(
+            &package,
+            &caller,
+            &caller_signatures,
+            caller_types.expression_types(),
+        ),
+    ]);
+
+    assert_eq!(report.expression_types(), []);
+    assert_eq!(report.diagnostics().len(), 2);
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.kind() == DirectCallDiagnosticKind::ArgumentTypeMismatch)
+    );
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.kind() == DirectCallDiagnosticKind::InvalidCallTarget)
     );
 }
