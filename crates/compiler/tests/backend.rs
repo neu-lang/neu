@@ -1,6 +1,7 @@
 use compiler::{
     backend::{
-        CraneliftLoweringError, lower_mir_function_to_cranelift, lower_mir_module_to_cranelift,
+        CraneliftLoweringError, emit_mir_module_to_object, lower_mir_function_to_cranelift,
+        lower_mir_module_to_cranelift,
     },
     mir::{
         MirArithmetic, MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId,
@@ -823,6 +824,8 @@ fn m0035_lowers_primitive_direct_call_through_module_context() {
     let ir = lower_mir_module_to_cranelift(&module, &types).unwrap();
     assert_eq!(ir.len(), 2);
     assert!(ir[0].contains("call"), "{}", ir[0]);
+    let object = emit_mir_module_to_object(&module, &types, "neu_main").unwrap();
+    assert!(!object.is_empty());
 }
 
 #[test]

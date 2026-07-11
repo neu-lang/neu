@@ -92,6 +92,69 @@ pub fn lower_mir_module_to_cranelift(
     Ok(output)
 }
 
+pub fn emit_mir_module_to_object(
+    module: &MirModule,
+    type_arena: &TypeArena,
+    language_entry_symbol: &str,
+) -> Result<Vec<u8>, CraneliftLoweringError> {
+    let target = Triple::host();
+    let isa_builder = cranelift_codegen::isa::lookup(target.clone())
+        .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
+    let isa = isa_builder
+        .finish(settings::Flags::new(settings::builder()))
+        .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
+    let mut object_module = ObjectModule::new(
+        ObjectBuilder::new(isa, "neu", default_libcall_names())
+            .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
+    );
+    let mut function_ids = HashMap::new();
+    for function in module.functions() {
+        let identity = function
+            .symbol_identity()
+            .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
+        let signature = mir_signature(function, type_arena, &target)?;
+        let symbol = if function.is_entry() {
+            if language_entry_symbol.is_empty() {
+                return Err(CraneliftLoweringError::MissingLanguageEntrySymbol);
+            }
+            language_entry_symbol.to_owned()
+        } else {
+            bootstrap_symbol(identity)
+        };
+        let linkage = if function.is_entry() {
+            Linkage::Export
+        } else {
+            Linkage::Local
+        };
+        let function_id = object_module
+            .declare_function(&symbol, linkage, &signature)
+            .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+        function_ids.insert(function.id(), function_id);
+    }
+
+    for function in module.functions() {
+        let clif_function = lower_mir_function_with_module(
+            function,
+            type_arena,
+            &target,
+            Some(&mut object_module),
+            &function_ids,
+        )?;
+        let function_id = function_ids
+            .get(&function.id())
+            .copied()
+            .ok_or(CraneliftLoweringError::ObjectDefinitionFailed)?;
+        let mut context = cranelift_codegen::Context::for_function(clif_function);
+        object_module
+            .define_function(function_id, &mut context)
+            .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    }
+    object_module
+        .finish()
+        .emit()
+        .map_err(|_| CraneliftLoweringError::ObjectEmissionFailed)
+}
+
 pub fn emit_mir_function_to_object(
     function: &MirFunction,
     type_arena: &TypeArena,
