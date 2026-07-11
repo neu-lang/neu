@@ -1,7 +1,0 @@
-package examples.current
-
-struct DeferredRuntimeType<T> {}
-
-public fun main(): Int {
-    return "not executable";
-}

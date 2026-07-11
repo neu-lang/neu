@@ -86,6 +86,6 @@ ADR-0020 requires no hidden host dependency for ordinary builds.
 
 ## Completion Checklist
 
-- [ ] Object emission works.
+- [x] Object emission works.
 - [ ] Bundled linker path works for host smoke.
 - [ ] Hidden host dependencies are documented or eliminated.

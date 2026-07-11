@@ -1,9 +1,0 @@
-package examples.current
-
-public fun staticIntegerDiagnostics() {
-    const overflow: Int = 9223372036854775807 + 1;
-    const zeroDivisor: Int = 1 / 0;
-    const zeroRemainder: Int = 1 % 0;
-    const negativeExponent: Int = 2 ** -1;
-    const invalidShift: Int = 1 << 64;
-}

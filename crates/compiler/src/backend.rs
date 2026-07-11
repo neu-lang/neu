@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write as _};
 
 use cranelift_codegen::{
     ir::{
@@ -9,6 +9,8 @@ use cranelift_codegen::{
     settings, verify_function,
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
 
 use crate::{
@@ -27,6 +29,11 @@ pub enum CraneliftLoweringError {
     UnsupportedTerminator,
     MissingValue,
     FunctionIdOutOfRange,
+    MissingFunctionIdentity,
+    TargetIsaUnavailable,
+    ObjectBuilderFailed,
+    ObjectDefinitionFailed,
+    ObjectEmissionFailed,
     VerificationFailed,
 }
 
@@ -34,6 +41,47 @@ pub fn lower_mir_function_to_cranelift(
     function: &MirFunction,
     type_arena: &TypeArena,
 ) -> Result<String, CraneliftLoweringError> {
+    Ok(lower_mir_function(function, type_arena)?
+        .display()
+        .to_string())
+}
+
+pub fn emit_mir_function_to_object(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+) -> Result<Vec<u8>, CraneliftLoweringError> {
+    let identity = function
+        .symbol_identity()
+        .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
+    let clif_function = lower_mir_function(function, type_arena)?;
+    let triple = Triple::host();
+    let isa_builder = cranelift_codegen::isa::lookup_by_name(&triple.to_string())
+        .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
+    let isa = isa_builder
+        .finish(settings::Flags::new(settings::builder()))
+        .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
+    let mut module = ObjectModule::new(
+        ObjectBuilder::new(isa, "neu", default_libcall_names())
+            .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
+    );
+    let symbol = bootstrap_symbol(identity);
+    let function_id = module
+        .declare_function(&symbol, Linkage::Local, &clif_function.signature)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let mut context = cranelift_codegen::Context::for_function(clif_function);
+    module
+        .define_function(function_id, &mut context)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    module
+        .finish()
+        .emit()
+        .map_err(|_| CraneliftLoweringError::ObjectEmissionFailed)
+}
+
+fn lower_mir_function(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
     if !function.parameters().is_empty() || function.blocks().len() != 1 {
         return Err(CraneliftLoweringError::UnsupportedFunctionShape);
@@ -65,7 +113,24 @@ pub fn lower_mir_function_to_cranelift(
     let flags = settings::Flags::new(settings::builder());
     verify_function(&clif_function, &flags)
         .map_err(|_| CraneliftLoweringError::VerificationFailed)?;
-    Ok(clif_function.display().to_string())
+    Ok(clif_function)
+}
+
+fn bootstrap_symbol(identity: &crate::module::FunctionSymbolIdentity) -> String {
+    format!(
+        "neu_fn_{}_{}_{}",
+        encode_symbol_component(identity.module().as_str()),
+        encode_symbol_component(identity.package().as_str()),
+        encode_symbol_component(identity.name()),
+    )
+}
+
+fn encode_symbol_component(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.as_bytes() {
+        let _ = write!(encoded, "{byte:02x}");
+    }
+    format!("{}_{}", value.len(), encoded)
 }
 
 fn require_bootstrap_int(
