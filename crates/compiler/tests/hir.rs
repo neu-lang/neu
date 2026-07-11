@@ -1,11 +1,17 @@
 use compiler::{
     hir::{
-        HirAssignment, HirBinaryOperator, HirDirectCall, HirExpression, HirExpressionId,
-        HirFunction, HirFunctionId, HirLocal, HirLocalId, HirModule, HirParameter, HirParameterId,
-        HirReturn, HirSafetyFacts, HirUnaryOperator, HirUnsupportedForm,
+        CheckedHirSource, HirAssignment, HirBinaryOperator, HirDirectCall, HirExpression,
+        HirExpressionId, HirFunction, HirFunctionId, HirLocal, HirLocalId, HirModule, HirParameter,
+        HirParameterId, HirReturn, HirSafetyFacts, HirUnaryOperator, HirUnsupportedForm,
+        lower_checked_hir_source,
     },
     module::{ModuleName, PackageNamespace},
+    parser::parse_source,
     source::{ByteSpan, SourceFileId},
+    type_check::{
+        ExecutableSourceTypes, apply_m0028_direct_call_results, check_m0028_direct_calls,
+        type_m0028_executable_core_in, type_m0028_function_signatures_in,
+    },
     types::TypeId,
 };
 
@@ -145,5 +151,59 @@ fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() 
     assert_eq!(
         function.assignments()[0].value(),
         HirExpressionId::from_raw(2)
+    );
+}
+
+#[test]
+fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(203),
+        "fun helper(): Int { return 1 + 2; } fun main(): Int { return helper(); }",
+    );
+    let mut types = compiler::types::TypeArena::new();
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    let mut expressions = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &compiler::name_resolution::ResolutionTable::new(),
+        &[],
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+        &package,
+        &parsed,
+        &signatures,
+        expressions.expression_types(),
+    )]);
+    apply_m0028_direct_call_results(&mut expressions, &parsed, &calls);
+    let module = lower_checked_hir_source(CheckedHirSource::new(
+        ModuleName::parse("app").unwrap(),
+        package,
+        &parsed,
+        &signatures,
+        expressions.expression_types(),
+        true,
+    ))
+    .unwrap();
+
+    assert_eq!(module.functions().len(), 2);
+    assert_eq!(module.functions()[0].expressions().len(), 3);
+    assert!(
+        module.functions()[1]
+            .direct_call(HirExpressionId::from_raw(0))
+            .is_some()
     );
 }

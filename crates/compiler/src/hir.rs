@@ -1,6 +1,8 @@
 use crate::{
     module::{ModuleName, PackageNamespace},
+    parser::{ParseOutput, ParsedBinaryOperator},
     source::ByteSpan,
+    type_check::{ExpressionType, FunctionSignature},
     types::TypeId,
 };
 
@@ -24,6 +26,208 @@ hir_id!(HirFunctionId);
 hir_id!(HirParameterId);
 hir_id!(HirLocalId);
 hir_id!(HirExpressionId);
+
+pub struct CheckedHirSource<'a> {
+    module: ModuleName,
+    package: PackageNamespace,
+    parsed: &'a ParseOutput,
+    signatures: &'a [FunctionSignature],
+    expression_types: &'a [ExpressionType],
+    clean: bool,
+}
+impl<'a> CheckedHirSource<'a> {
+    pub fn new(
+        module: ModuleName,
+        package: PackageNamespace,
+        parsed: &'a ParseOutput,
+        signatures: &'a [FunctionSignature],
+        expression_types: &'a [ExpressionType],
+        clean: bool,
+    ) -> Self {
+        Self {
+            module,
+            package,
+            parsed,
+            signatures,
+            expression_types,
+            clean,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HirLoweringError {
+    FrontendNotClean,
+    MissingType,
+    UnsupportedExpression,
+}
+
+pub fn lower_checked_hir_source(
+    source: CheckedHirSource<'_>,
+) -> Result<HirModule, HirLoweringError> {
+    if !source.clean {
+        return Err(HirLoweringError::FrontendNotClean);
+    }
+    let mut functions = Vec::new();
+    for function in &source.parsed.function_declarations {
+        let Some(signature) = source
+            .signatures
+            .iter()
+            .find(|signature| signature.declaration() == function.declaration)
+        else {
+            continue;
+        };
+        let span = source
+            .parsed
+            .arena
+            .node(function.declaration)
+            .ok_or(HirLoweringError::UnsupportedExpression)?
+            .span;
+        let id = HirFunctionId::from_raw(functions.len());
+        let mut expressions = Vec::new();
+        let mut returns = Vec::new();
+        for returned in source
+            .parsed
+            .return_statements
+            .iter()
+            .filter(|returned| returned.function == function.declaration)
+        {
+            let value = returned
+                .value
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let expression = lower_expression(&source, value, &mut expressions)?;
+            let return_span = source
+                .parsed
+                .arena
+                .node(returned.statement)
+                .ok_or(HirLoweringError::UnsupportedExpression)?
+                .span;
+            returns.push(HirReturn::new(return_span, expression));
+        }
+        functions.push(HirFunction::new(
+            id,
+            source.module.clone(),
+            source.package.clone(),
+            span,
+            declaration_is_main(source.parsed, function.declaration),
+            signature.return_type(),
+            vec![],
+            vec![],
+            expressions,
+            returns,
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        ));
+    }
+    Ok(HirModule::new(source.module, functions))
+}
+
+fn lower_expression(
+    source: &CheckedHirSource<'_>,
+    expression: crate::ast::AstNodeId,
+    output: &mut Vec<HirExpression>,
+) -> Result<HirExpressionId, HirLoweringError> {
+    let ty = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression() == expression)
+        .map(|typed| typed.ty())
+        .ok_or(HirLoweringError::MissingType)?;
+    let span = source
+        .parsed
+        .arena
+        .node(expression)
+        .ok_or(HirLoweringError::UnsupportedExpression)?
+        .span;
+    let id = HirExpressionId::from_raw(output.len());
+    if let Some(literal) = source
+        .parsed
+        .integer_literals
+        .iter()
+        .find(|literal| literal.expression == expression)
+    {
+        let value = literal
+            .value
+            .and_then(|value| i64::try_from(value).ok())
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
+        output.push(HirExpression::int_literal(id, span, ty, value));
+        return Ok(id);
+    }
+    if let Some(binary) = source
+        .parsed
+        .binary_expressions
+        .iter()
+        .find(|binary| binary.expression == expression)
+    {
+        let left = lower_expression(source, binary.left, output)?;
+        let right = lower_expression(source, binary.right, output)?;
+        output.push(HirExpression::binary(
+            id,
+            span,
+            ty,
+            lower_binary_operator(binary.operator)?,
+            left,
+            right,
+        ));
+        return Ok(id);
+    }
+    if let Some(call) = source
+        .parsed
+        .call_expressions
+        .iter()
+        .find(|call| call.expression == expression)
+    {
+        let name = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == call.callee)
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
+        let declaration = source
+            .parsed
+            .declaration_names
+            .iter()
+            .position(|declaration| declaration.name == name.name)
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
+        let arguments = call
+            .arguments
+            .iter()
+            .map(|argument| lower_expression(source, *argument, output))
+            .collect::<Result<Vec<_>, _>>()?;
+        output.push(HirExpression::direct_call(
+            id,
+            span,
+            ty,
+            HirDirectCall::new(HirFunctionId::from_raw(declaration), arguments),
+        ));
+        return Ok(id);
+    }
+    Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn declaration_is_main(parsed: &ParseOutput, declaration: crate::ast::AstNodeId) -> bool {
+    parsed
+        .declaration_names
+        .iter()
+        .any(|name| name.declaration == declaration && name.name == "main")
+}
+fn lower_binary_operator(
+    operator: ParsedBinaryOperator,
+) -> Result<HirBinaryOperator, HirLoweringError> {
+    Ok(match operator {
+        ParsedBinaryOperator::Plus => HirBinaryOperator::Plus,
+        ParsedBinaryOperator::Minus => HirBinaryOperator::Minus,
+        ParsedBinaryOperator::Star => HirBinaryOperator::Multiply,
+        ParsedBinaryOperator::Slash => HirBinaryOperator::Divide,
+        ParsedBinaryOperator::Percent => HirBinaryOperator::Remainder,
+        ParsedBinaryOperator::Exponent => HirBinaryOperator::Exponent,
+        ParsedBinaryOperator::BitwiseAnd => HirBinaryOperator::BitwiseAnd,
+        ParsedBinaryOperator::BitwiseOr => HirBinaryOperator::BitwiseOr,
+        ParsedBinaryOperator::BitwiseXor => HirBinaryOperator::BitwiseXor,
+        ParsedBinaryOperator::ShiftLeft => HirBinaryOperator::ShiftLeft,
+        ParsedBinaryOperator::ShiftRight => HirBinaryOperator::ShiftRight,
+        _ => return Err(HirLoweringError::UnsupportedExpression),
+    })
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HirModule {
