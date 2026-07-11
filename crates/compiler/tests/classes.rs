@@ -4,8 +4,8 @@ use compiler::{
     parser::parse_source,
     source::SourceFileId,
     type_check::{
-        ConstructorDiagnosticKind, check_m0069_constructor_calls, class_lifecycle_facts,
-        type_m0068_class_types,
+        ConstructorDiagnosticKind, DispatchDiagnosticKind, check_m0069_constructor_calls,
+        check_m0070_dispatch, class_lifecycle_facts, type_m0068_class_types,
     },
 };
 
@@ -93,5 +93,37 @@ fn associates_method_declarations_with_their_class() {
     assert_eq!(
         parsed.function_declarations[0].owner,
         Some(parsed.class_declarations[0].declaration)
+    );
+}
+
+#[test]
+fn preserves_method_dispatch_modifiers_and_visibility() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6805),
+        "class Base { open fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } }",
+    );
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert_eq!(parsed.function_declarations.len(), 2);
+    assert!(parsed.function_declarations[0].is_open);
+    assert!(parsed.function_declarations[1].is_override);
+    assert!(check_m0070_dispatch(&parsed).is_empty());
+
+    let invalid = parse_source(
+        SourceFileId::from_raw(6806),
+        "class Base { fun value(): Int { return 1; } } class Child: Base() { fun value(): Int { return 2; } }",
+    );
+    assert_eq!(
+        check_m0070_dispatch(&invalid)[0].kind(),
+        DispatchDiagnosticKind::MissingOverrideMarker
+    );
+
+    let incomplete = parse_source(
+        SourceFileId::from_raw(6807),
+        "interface Readable { fun read(): Int; } class Item: Readable {}",
+    );
+    assert!(
+        check_m0070_dispatch(&incomplete)
+            .iter()
+            .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::MissingInterfaceMethod)
     );
 }

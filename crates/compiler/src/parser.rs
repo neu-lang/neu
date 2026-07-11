@@ -153,6 +153,11 @@ pub struct ParsedFunctionParameter {
 pub struct ParsedFunctionDeclaration {
     pub declaration: AstNodeId,
     pub owner: Option<AstNodeId>,
+    pub name: String,
+    pub visibility: String,
+    pub is_override: bool,
+    pub is_open: bool,
+    pub is_final: bool,
     pub body: Option<AstNodeId>,
     pub return_annotation: Option<AstNodeId>,
     pub parameters: Vec<AstNodeId>,
@@ -547,6 +552,10 @@ struct Parser<'source> {
     saw_top_level_declaration: bool,
     current_function: Option<AstNodeId>,
     current_class: Option<AstNodeId>,
+    pending_method_visibility: String,
+    pending_method_override: bool,
+    pending_method_open: bool,
+    pending_method_final: bool,
 }
 
 impl<'source> Parser<'source> {
@@ -598,6 +607,10 @@ impl<'source> Parser<'source> {
             saw_top_level_declaration: false,
             current_function: None,
             current_class: None,
+            pending_method_visibility: "internal".to_owned(),
+            pending_method_override: false,
+            pending_method_open: false,
+            pending_method_final: false,
         }
     }
 
@@ -715,6 +728,7 @@ impl<'source> Parser<'source> {
             return;
         }
         let name = self.current().expect("function name exists").clone();
+        let method_name = self.text[name.span.start()..name.span.end()].to_owned();
         self.advance();
 
         self.parse_generic_parameters();
@@ -765,6 +779,11 @@ impl<'source> Parser<'source> {
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
+                    name: method_name.clone(),
+                    visibility: self.pending_method_visibility.clone(),
+                    is_override: self.pending_method_override,
+                    is_open: self.pending_method_open,
+                    is_final: self.pending_method_final,
                     body: None,
                     return_annotation,
                     parameters: parameters
@@ -800,6 +819,11 @@ impl<'source> Parser<'source> {
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
+                    name: method_name,
+                    visibility: self.pending_method_visibility.clone(),
+                    is_override: self.pending_method_override,
+                    is_open: self.pending_method_open,
+                    is_final: self.pending_method_final,
                     body,
                     return_annotation,
                     parameters: parameter_nodes,
@@ -1091,7 +1115,50 @@ impl<'source> Parser<'source> {
         let mut fields = Vec::new();
         self.advance();
         while !self.is_eof() && self.current_kind() != Some(TokenKind::RightBrace) {
-            if self.current_kind() == Some(TokenKind::KwFun) {
+            let method_with_visibility = self.is_visibility()
+                && matches!(
+                    self.peek_kind(),
+                    Some(
+                        TokenKind::KwFun
+                            | TokenKind::KwOverride
+                            | TokenKind::KwOpen
+                            | TokenKind::KwFinal
+                    )
+                );
+            if self.current_kind() == Some(TokenKind::KwFun)
+                || self.current_kind() == Some(TokenKind::KwOverride)
+                || self.current_kind() == Some(TokenKind::KwOpen)
+                || self.current_kind() == Some(TokenKind::KwFinal)
+                || method_with_visibility
+            {
+                self.pending_method_visibility = "internal".to_owned();
+                self.pending_method_override = false;
+                self.pending_method_open = false;
+                self.pending_method_final = false;
+                while self.is_visibility()
+                    || matches!(
+                        self.current_kind(),
+                        Some(TokenKind::KwOverride | TokenKind::KwOpen | TokenKind::KwFinal)
+                    )
+                {
+                    if self.is_visibility() {
+                        self.pending_method_visibility =
+                            self.current_text().unwrap_or("internal").to_owned();
+                    } else {
+                        match self.current_kind() {
+                            Some(TokenKind::KwOverride) => self.pending_method_override = true,
+                            Some(TokenKind::KwOpen) => self.pending_method_open = true,
+                            Some(TokenKind::KwFinal) => self.pending_method_final = true,
+                            _ => {}
+                        }
+                    }
+                    self.advance();
+                }
+                if self.current_kind() != Some(TokenKind::KwFun) {
+                    self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+                    self.skip_to_declaration_boundary(true);
+                    continue;
+                }
                 self.parse_function(true);
                 continue;
             }

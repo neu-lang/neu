@@ -601,6 +601,124 @@ pub fn class_lifecycle_facts(parsed: &ParseOutput) -> Vec<ClassLifecycleFacts> {
         .collect()
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DispatchDiagnosticKind {
+    OverrideWithoutSuperclass,
+    MissingOverrideMarker,
+    OpenAndFinalMethod,
+    MissingInterfaceMethod,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DispatchDiagnostic {
+    kind: DispatchDiagnosticKind,
+    span: ByteSpan,
+}
+
+impl DispatchDiagnostic {
+    pub fn kind(self) -> DispatchDiagnosticKind {
+        self.kind
+    }
+    pub fn span(self) -> ByteSpan {
+        self.span
+    }
+}
+
+pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for function in &parsed.function_declarations {
+        if function.is_open
+            && function.is_final
+            && let Some(node) = parsed.arena.node(function.declaration)
+        {
+            diagnostics.push(DispatchDiagnostic {
+                kind: DispatchDiagnosticKind::OpenAndFinalMethod,
+                span: node.span,
+            });
+        }
+        if !function.is_override {
+            continue;
+        }
+        let Some(owner) = function.owner.and_then(|owner| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|class| class.declaration == owner)
+        }) else {
+            continue;
+        };
+        if owner.superclass.is_none()
+            && let Some(node) = parsed.arena.node(function.declaration)
+        {
+            diagnostics.push(DispatchDiagnostic {
+                kind: DispatchDiagnosticKind::OverrideWithoutSuperclass,
+                span: node.span,
+            });
+        }
+    }
+    for child in &parsed.class_declarations {
+        let Some(super_name) = child.superclass.as_deref() else {
+            continue;
+        };
+        let Some(parent) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == super_name)
+        else {
+            continue;
+        };
+        for method in parsed
+            .function_declarations
+            .iter()
+            .filter(|method| method.owner == Some(child.declaration))
+        {
+            let inherited = parsed.function_declarations.iter().any(|candidate| {
+                candidate.owner == Some(parent.declaration) && candidate.name == method.name
+            });
+            if inherited
+                && !method.is_override
+                && let Some(node) = parsed.arena.node(method.declaration)
+            {
+                diagnostics.push(DispatchDiagnostic {
+                    kind: DispatchDiagnosticKind::MissingOverrideMarker,
+                    span: node.span,
+                });
+            }
+        }
+    }
+    for class in parsed
+        .class_declarations
+        .iter()
+        .filter(|class| !class.interface)
+    {
+        for interface_name in &class.interfaces {
+            let Some(interface) = parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.interface && candidate.name == *interface_name)
+            else {
+                continue;
+            };
+            for required in parsed
+                .function_declarations
+                .iter()
+                .filter(|method| method.owner == Some(interface.declaration))
+            {
+                let implemented = parsed.function_declarations.iter().any(|method| {
+                    method.owner == Some(class.declaration) && method.name == required.name
+                });
+                if !implemented && let Some(node) = parsed.arena.node(class.declaration) {
+                    diagnostics.push(DispatchDiagnostic {
+                        kind: DispatchDiagnosticKind::MissingInterfaceMethod,
+                        span: node.span,
+                    });
+                }
+            }
+        }
+    }
+    diagnostics
+}
+
 impl ClassTypeReport {
     pub fn classes(&self) -> &[ClassTypeRecord] {
         &self.classes
