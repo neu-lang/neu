@@ -1,0 +1,224 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+use target_lexicon::Triple;
+
+use crate::{
+    backend::{CraneliftLoweringError, emit_mir_module_to_object_for_target},
+    hir::{CheckedHirSource, HirLoweringError, lower_checked_hir_source},
+    linker::{LinkInvocation, LinkInvocationError},
+    mir::{MirLoweringError, lower_hir_to_mir},
+    module::{ModuleName, PackageNamespace},
+    parser,
+    source::SourceFileId,
+    target_pack::{TargetPackRegistry, TargetPackRegistryError},
+    type_check::{
+        DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes, ReturnPathDiagnostic,
+        ReturnTypeDiagnostic, TypeCheckDiagnostic, UnsupportedExecutableFormDiagnostic,
+        apply_m0028_direct_call_results, check_m0028_direct_calls, check_m0028_entry_point,
+        check_m0028_return_expression_types, check_m0028_straight_line_returns,
+        check_m0028_unsupported_executable_forms, type_m0028_executable_core_in,
+        type_m0028_function_signatures_in,
+    },
+    types::{PrimitiveType, TypeArena, TypeKind},
+};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceDriverOptions {
+    source_file: SourceFileId,
+    module: ModuleName,
+    package: PackageNamespace,
+    target: Triple,
+    target_packs: PathBuf,
+    output: PathBuf,
+}
+
+impl SourceDriverOptions {
+    pub fn new(
+        source_file: SourceFileId,
+        module: ModuleName,
+        package: PackageNamespace,
+        target: Triple,
+        target_packs: impl Into<PathBuf>,
+        output: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            source_file,
+            module,
+            package,
+            target,
+            target_packs: target_packs.into(),
+            output: output.into(),
+        }
+    }
+
+    pub fn source_file(&self) -> SourceFileId {
+        self.source_file
+    }
+
+    pub fn module(&self) -> &ModuleName {
+        &self.module
+    }
+
+    pub fn package(&self) -> &PackageNamespace {
+        &self.package
+    }
+
+    pub fn target(&self) -> Triple {
+        self.target.clone()
+    }
+
+    pub fn target_packs(&self) -> &Path {
+        &self.target_packs
+    }
+
+    pub fn output(&self) -> &Path {
+        &self.output
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DriverError {
+    Io {
+        operation: &'static str,
+        path: PathBuf,
+    },
+    LexDiagnostics(Vec<crate::lexer::Diagnostic>),
+    ParseDiagnostics(Vec<parser::Diagnostic>),
+    EntryPointDiagnostics(Vec<EntryPointDiagnostic>),
+    ReturnPathDiagnostics(Vec<ReturnPathDiagnostic>),
+    ReturnTypeDiagnostics(Vec<ReturnTypeDiagnostic>),
+    UnsupportedExecutableForms(Vec<UnsupportedExecutableFormDiagnostic>),
+    TypeDiagnostics(Vec<TypeCheckDiagnostic>),
+    DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
+    Hir(HirLoweringError),
+    Mir(MirLoweringError),
+    Backend(CraneliftLoweringError),
+    TargetPack(TargetPackRegistryError),
+    Link(LinkInvocationError),
+}
+
+pub fn compile_source_to_executable(
+    source: &str,
+    options: SourceDriverOptions,
+) -> Result<PathBuf, DriverError> {
+    let parsed = parser::parse_source(options.source_file(), source);
+    if !parsed.lex_diagnostics.is_empty() {
+        return Err(DriverError::LexDiagnostics(parsed.lex_diagnostics.clone()));
+    }
+    if !parsed.diagnostics.is_empty() {
+        return Err(DriverError::ParseDiagnostics(parsed.diagnostics.clone()));
+    }
+
+    let entry = check_m0028_entry_point(
+        options.package(),
+        &[crate::type_check::EntryPointFile::new(
+            options.package(),
+            &parsed,
+        )],
+    );
+    if !entry.diagnostics().is_empty() {
+        return Err(DriverError::EntryPointDiagnostics(
+            entry.diagnostics().to_vec(),
+        ));
+    }
+
+    let pack = TargetPackRegistry::new(options.target_packs())
+        .resolve(options.target())
+        .map_err(DriverError::TargetPack)?;
+    let mut types = TypeArena::new();
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    let mut report = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &crate::name_resolution::ResolutionTable::new(),
+        &[],
+    );
+    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+        options.package(),
+        &parsed,
+        &signatures,
+        report.expression_types(),
+    )]);
+    if !calls.diagnostics().is_empty() {
+        return Err(DriverError::DirectCallDiagnostics(
+            calls.diagnostics().to_vec(),
+        ));
+    }
+    apply_m0028_direct_call_results(&mut report, &parsed, &calls);
+
+    let return_paths = check_m0028_straight_line_returns(&parsed);
+    if !return_paths.diagnostics().is_empty() {
+        return Err(DriverError::ReturnPathDiagnostics(
+            return_paths.diagnostics().to_vec(),
+        ));
+    }
+    let return_types =
+        check_m0028_return_expression_types(&parsed, &signatures, report.expression_types());
+    if !return_types.diagnostics().is_empty() {
+        return Err(DriverError::ReturnTypeDiagnostics(
+            return_types.diagnostics().to_vec(),
+        ));
+    }
+    let unsupported = check_m0028_unsupported_executable_forms(&parsed);
+    if !unsupported.diagnostics().is_empty() {
+        return Err(DriverError::UnsupportedExecutableForms(
+            unsupported.diagnostics().to_vec(),
+        ));
+    }
+    if !report.diagnostics().is_empty() {
+        return Err(DriverError::TypeDiagnostics(report.diagnostics().to_vec()));
+    }
+
+    let byte_type = types
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Byte))
+        .map(|record| record.id())
+        .expect("bootstrap type checker creates Byte");
+    let hir = lower_checked_hir_source(
+        CheckedHirSource::new(
+            options.module().clone(),
+            options.package().clone(),
+            &parsed,
+            &signatures,
+            report.expression_types(),
+            true,
+        )
+        .with_byte_type(byte_type),
+    )
+    .map_err(DriverError::Hir)?;
+    let mir = lower_hir_to_mir(&hir, &types).map_err(DriverError::Mir)?;
+    let object = emit_mir_module_to_object_for_target(
+        &mir,
+        &types,
+        pack.language_entry_symbol(),
+        options.target(),
+    )
+    .map_err(DriverError::Backend)?;
+
+    let object_path = PathBuf::from(format!("{}.o", options.output().display()));
+    fs::write(&object_path, object).map_err(|_| DriverError::Io {
+        operation: "write object",
+        path: object_path.clone(),
+    })?;
+    let invocation =
+        LinkInvocation::new(&pack, &object_path, options.output()).map_err(DriverError::Link)?;
+    invocation.execute().map_err(DriverError::Link)?;
+    Ok(options.output().to_owned())
+}

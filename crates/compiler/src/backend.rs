@@ -109,7 +109,15 @@ pub fn emit_mir_module_to_object(
     type_arena: &TypeArena,
     language_entry_symbol: &str,
 ) -> Result<Vec<u8>, CraneliftLoweringError> {
-    let target = Triple::host();
+    emit_mir_module_to_object_for_target(module, type_arena, language_entry_symbol, Triple::host())
+}
+
+pub fn emit_mir_module_to_object_for_target(
+    module: &MirModule,
+    type_arena: &TypeArena,
+    language_entry_symbol: &str,
+    target: Triple,
+) -> Result<Vec<u8>, CraneliftLoweringError> {
     let isa_builder = cranelift_codegen::isa::lookup(target.clone())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let isa = isa_builder
