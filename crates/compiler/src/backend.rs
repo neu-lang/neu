@@ -17,6 +17,7 @@ use crate::{
 };
 
 const INVALID_SHIFT_COUNT_TRAP: TrapCode = TrapCode::unwrap_user(1);
+const NEGATIVE_EXPONENT_TRAP: TrapCode = TrapCode::unwrap_user(2);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CraneliftLoweringError {
@@ -304,6 +305,82 @@ fn lower_instruction(
                 _ => unreachable!("guard accepts only shift operations"),
             };
             values.insert(*output, value);
+            Ok(())
+        }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation: MirArithmetic::Exponent,
+            left,
+            right,
+            ..
+        } => {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+
+            let result = builder.declare_var(types::I64);
+            let base = builder.declare_var(types::I64);
+            let exponent = builder.declare_var(types::I64);
+            let one = builder.ins().iconst(types::I64, 1);
+            builder.def_var(result, one);
+            builder.def_var(base, left);
+            builder.def_var(exponent, right);
+
+            let loop_block = builder.create_block();
+            let negative_block = builder.create_block();
+            let check_zero_block = builder.create_block();
+            let multiply_block = builder.create_block();
+            let done_block = builder.create_block();
+
+            builder.ins().jump(loop_block, &[]);
+
+            builder.switch_to_block(loop_block);
+            let exponent_value = builder.use_var(exponent);
+            let is_negative = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, exponent_value, 0);
+            builder
+                .ins()
+                .brif(is_negative, negative_block, &[], check_zero_block, &[]);
+
+            builder.seal_block(negative_block);
+            builder.switch_to_block(negative_block);
+            builder.ins().trap(NEGATIVE_EXPONENT_TRAP);
+
+            builder.seal_block(check_zero_block);
+            builder.switch_to_block(check_zero_block);
+            let exponent_value = builder.use_var(exponent);
+            let is_zero = builder.ins().icmp_imm(IntCC::Equal, exponent_value, 0);
+            builder
+                .ins()
+                .brif(is_zero, done_block, &[], multiply_block, &[]);
+
+            builder.seal_block(multiply_block);
+            builder.switch_to_block(multiply_block);
+            let result_value = builder.use_var(result);
+            let base_value = builder.use_var(base);
+            let product = builder.ins().imul(result_value, base_value);
+            let high_half = builder.ins().smulhi(result_value, base_value);
+            let sign_extension = builder.ins().sshr_imm(product, 63);
+            let overflow = builder
+                .ins()
+                .icmp(IntCC::NotEqual, high_half, sign_extension);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            builder.def_var(result, product);
+            let exponent_value = builder.use_var(exponent);
+            let decremented = builder.ins().isub(exponent_value, one);
+            builder.def_var(exponent, decremented);
+            builder.ins().jump(loop_block, &[]);
+            builder.seal_block(loop_block);
+
+            builder.seal_block(done_block);
+            builder.switch_to_block(done_block);
+            values.insert(*output, builder.use_var(result));
             Ok(())
         }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),

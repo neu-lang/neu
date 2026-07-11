@@ -2,7 +2,7 @@ use compiler::{
     backend::{CraneliftLoweringError, lower_mir_function_to_cranelift},
     mir::{
         MirArithmetic, MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId,
-        MirInstruction, MirTerminator, MirUnary, MirValueId,
+        MirInstruction, MirLocalId, MirTerminator, MirUnary, MirValueId,
     },
     source::{ByteSpan, SourceFileId},
     types::{PrimitiveType, TypeArena, TypeRecord},
@@ -53,11 +53,9 @@ fn m0031_rejects_unsupported_mir_instruction() {
         vec![],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
-            vec![MirInstruction::CheckedArithmetic {
+            vec![MirInstruction::LoadLocal {
                 output: MirValueId::from_raw(2),
-                operation: MirArithmetic::Exponent,
-                left: MirValueId::from_raw(0),
-                right: MirValueId::from_raw(1),
+                local: MirLocalId::from_raw(0),
                 span,
             }],
             MirTerminator::return_value(MirValueId::from_raw(2), span),
@@ -379,4 +377,39 @@ fn m0031_lowers_unary_int_operations() {
     assert!(ir.contains("ineg"), "{ir}");
     assert!(ir.contains("bnot"), "{ir}");
     assert!(ir.contains("int_ovf"), "{ir}");
+}
+
+#[test]
+fn m0031_lowers_checked_exponentiation() {
+    let file = SourceFileId::from_raw(410);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(10),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![
+                MirInstruction::int_constant(MirValueId::from_raw(0), 2, span),
+                MirInstruction::int_constant(MirValueId::from_raw(1), 3, span),
+                MirInstruction::CheckedArithmetic {
+                    output: MirValueId::from_raw(2),
+                    operation: MirArithmetic::Exponent,
+                    left: MirValueId::from_raw(0),
+                    right: MirValueId::from_raw(1),
+                    span,
+                },
+            ],
+            MirTerminator::return_value(MirValueId::from_raw(2), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let ir = lower_mir_function_to_cranelift(&function, &types).unwrap();
+    assert!(ir.contains("imul"), "{ir}");
+    assert!(ir.contains("trapnz"), "{ir}");
+    assert!(ir.contains("trap user2"), "{ir}");
 }
