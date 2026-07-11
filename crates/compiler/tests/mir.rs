@@ -295,6 +295,102 @@ fn m0035_mir_preserves_non_integer_constants_and_unit_return() {
 }
 
 #[test]
+fn m0035_hir_to_mir_preserves_boolean_not_and_comparison_operations() {
+    let file = SourceFileId::from_raw(911);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            bool_type,
+            vec![],
+            vec![],
+            vec![
+                HirExpression::bool_literal(HirExpressionId::from_raw(0), span, bool_type, true),
+                HirExpression::unary(
+                    HirExpressionId::from_raw(1),
+                    span,
+                    bool_type,
+                    HirUnaryOperator::Not,
+                    HirExpressionId::from_raw(0),
+                ),
+                HirExpression::binary(
+                    HirExpressionId::from_raw(2),
+                    span,
+                    bool_type,
+                    HirBinaryOperator::Equal,
+                    HirExpressionId::from_raw(0),
+                    HirExpressionId::from_raw(1),
+                ),
+            ],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(2))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].instructions()[1],
+        MirInstruction::LogicalNot { .. }
+    ));
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].instructions()[2],
+        MirInstruction::Compare {
+            operation: compiler::mir::MirComparison::Equal,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn m0035_hir_to_mir_rejects_short_circuit_without_cfg_lowering() {
+    let file = SourceFileId::from_raw(912);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            bool_type,
+            vec![],
+            vec![],
+            vec![
+                HirExpression::bool_literal(HirExpressionId::from_raw(0), span, bool_type, true),
+                HirExpression::bool_literal(HirExpressionId::from_raw(1), span, bool_type, false),
+                HirExpression::binary(
+                    HirExpressionId::from_raw(2),
+                    span,
+                    bool_type,
+                    HirBinaryOperator::LogicalAnd,
+                    HirExpressionId::from_raw(0),
+                    HirExpressionId::from_raw(1),
+                ),
+            ],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(2))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+
+    assert_eq!(
+        lower_hir_to_mir(&hir, &types),
+        Err(compiler::mir::MirLoweringError::UnsupportedExpression)
+    );
+}
+
+#[test]
 fn m0035_hir_to_mir_lowers_primitive_literals_and_unit_return() {
     let file = SourceFileId::from_raw(908);
     let span = ByteSpan::new(file, 0, 4).unwrap();

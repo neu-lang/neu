@@ -58,7 +58,8 @@ contracts remain unchanged.
 
 ## Deliverables
 
-- Ordered implementation tasks M0035-001 through M0035-006.
+- Ordered implementation tasks M0035-001 through M0035-011, with subsequent
+  backend and end-to-end tasks added as their contracts become accepted.
 - Tests and negative diagnostics for each layer.
 - Primitive backend and cross-target smoke evidence.
 

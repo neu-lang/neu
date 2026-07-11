@@ -83,6 +83,15 @@ pub enum MirUnary {
     Negate,
     BitwiseNot,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MirComparison {
+    Equal,
+    NotEqual,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
+}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MirInstruction {
     IntConstant {
@@ -119,6 +128,18 @@ pub enum MirInstruction {
         output: MirValueId,
         operation: MirUnary,
         operand: MirValueId,
+        span: ByteSpan,
+    },
+    LogicalNot {
+        output: MirValueId,
+        operand: MirValueId,
+        span: ByteSpan,
+    },
+    Compare {
+        output: MirValueId,
+        operation: MirComparison,
+        left: MirValueId,
+        right: MirValueId,
         span: ByteSpan,
     },
     LoadLocal {
@@ -193,6 +214,8 @@ impl MirInstruction {
             | Self::UnitConstant { span }
             | Self::CheckedArithmetic { span, .. }
             | Self::Unary { span, .. }
+            | Self::LogicalNot { span, .. }
+            | Self::Compare { span, .. }
             | Self::LoadLocal { span, .. }
             | Self::StoreLocal { span, .. }
             | Self::DirectCall { span, .. } => *span,
@@ -374,20 +397,43 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     instructions.push(MirInstruction::unit_constant(expression.span()))
                 }
                 HirExpressionKind::Binary(binary) => {
-                    instructions.push(MirInstruction::CheckedArithmetic {
-                        output,
-                        operation: lower_binary(binary.operator())?,
-                        left: MirValueId::from_raw(binary.left().index()),
-                        right: MirValueId::from_raw(binary.right().index()),
-                        span: expression.span(),
-                    })
+                    let left = MirValueId::from_raw(binary.left().index());
+                    let right = MirValueId::from_raw(binary.right().index());
+                    if let Some(operation) = lower_comparison(binary.operator()) {
+                        instructions.push(MirInstruction::Compare {
+                            output,
+                            operation,
+                            left,
+                            right,
+                            span: expression.span(),
+                        });
+                    } else {
+                        instructions.push(MirInstruction::CheckedArithmetic {
+                            output,
+                            operation: lower_binary(binary.operator())?,
+                            left,
+                            right,
+                            span: expression.span(),
+                        });
+                    }
                 }
-                HirExpressionKind::Unary(unary) => instructions.push(MirInstruction::Unary {
-                    output,
-                    operation: lower_unary(unary.operator())?,
-                    operand: MirValueId::from_raw(unary.operand().index()),
-                    span: expression.span(),
-                }),
+                HirExpressionKind::Unary(unary) => {
+                    let operand = MirValueId::from_raw(unary.operand().index());
+                    if matches!(unary.operator(), HirUnaryOperator::Not) {
+                        instructions.push(MirInstruction::LogicalNot {
+                            output,
+                            operand,
+                            span: expression.span(),
+                        });
+                    } else {
+                        instructions.push(MirInstruction::Unary {
+                            output,
+                            operation: lower_unary(unary.operator())?,
+                            operand,
+                            span: expression.span(),
+                        });
+                    }
+                }
                 HirExpressionKind::DirectCall(call) => {
                     instructions.push(MirInstruction::DirectCall {
                         output,
@@ -498,6 +544,18 @@ fn lower_binary(operator: HirBinaryOperator) -> Result<MirArithmetic, MirLowerin
         HirBinaryOperator::BitwiseXor => MirArithmetic::BitwiseXor,
         HirBinaryOperator::ShiftLeft => MirArithmetic::ShiftLeft,
         HirBinaryOperator::ShiftRight => MirArithmetic::ShiftRight,
+    })
+}
+
+fn lower_comparison(operator: HirBinaryOperator) -> Option<MirComparison> {
+    Some(match operator {
+        HirBinaryOperator::Equal => MirComparison::Equal,
+        HirBinaryOperator::NotEqual => MirComparison::NotEqual,
+        HirBinaryOperator::Less => MirComparison::Less,
+        HirBinaryOperator::Greater => MirComparison::Greater,
+        HirBinaryOperator::LessEqual => MirComparison::LessEqual,
+        HirBinaryOperator::GreaterEqual => MirComparison::GreaterEqual,
+        _ => return None,
     })
 }
 fn lower_unary(operator: HirUnaryOperator) -> Result<MirUnary, MirLoweringError> {
