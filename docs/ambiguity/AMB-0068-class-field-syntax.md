@@ -1,6 +1,6 @@
 # Ambiguity: Class And Field Surface Syntax
 
-Status: Open
+Status: Resolved by ADR-0068
 
 ## Affected Work
 
@@ -40,10 +40,9 @@ ABI contracts. Task-008 cannot satisfy its acceptance criteria without also
 inventing object creation and field-initialization behavior that ADR-0067
 explicitly assigns to the constructor task.
 
-## Required Resolution
+## Resolution
 
-Superseding or revising authority must specify the class and field grammar,
-inheritance/interface header syntax, field initialization placement, and the
-minimum object-creation form permitted before task-009. Until then, class and
-field implementation remains stopped; existing primitive, array, and String
-work is unaffected.
+ADR-0068 specifies the class and field grammar, inheritance/interface header
+syntax, field initialization placement, member access forms, and the explicit
+deferral of object construction until task-009. Existing primitive, array, and
+String work is unaffected.
