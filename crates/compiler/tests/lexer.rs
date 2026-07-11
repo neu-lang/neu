@@ -83,6 +83,37 @@ fn lexes_literals_without_treating_integer_overflow_as_lexical() {
 }
 
 #[test]
+fn lexes_decimal_and_exponent_float_literals() {
+    let output = lex(SourceFileId::from_raw(91), "1.5 2e3 4.0E-2");
+
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(
+        output
+            .tokens
+            .iter()
+            .map(|token| token.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            TokenKind::FloatDecimal,
+            TokenKind::FloatDecimal,
+            TokenKind::FloatDecimal
+        ]
+    );
+}
+
+#[test]
+fn rejects_malformed_float_exponents() {
+    let output = lex(SourceFileId::from_raw(92), "1e+");
+
+    assert_eq!(output.tokens, vec![]);
+    assert_eq!(output.diagnostics.len(), 1);
+    assert_eq!(
+        output.diagnostics[0].kind,
+        DiagnosticKind::MalformedFloatLiteral
+    );
+}
+
+#[test]
 fn skips_comments_and_reports_unterminated_block_comment() {
     assert_eq!(
         kinds("const // comment\nvar"),

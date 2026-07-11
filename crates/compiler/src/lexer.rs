@@ -6,6 +6,7 @@ pub enum TokenKind {
     IntDecimal,
     IntBinary,
     IntHex,
+    FloatDecimal,
     String,
     KwAs,
     KwBreak,
@@ -86,6 +87,7 @@ pub enum DiagnosticKind {
     UnknownCharacter,
     UnterminatedBlockComment,
     MalformedIntegerLiteral,
+    MalformedFloatLiteral,
     UnsupportedIntegerLiteralSuffix,
     UnterminatedStringLiteral,
     InvalidStringEscape,
@@ -141,7 +143,7 @@ impl<'source> Lexer<'source> {
             if is_identifier_start(ch) {
                 self.lex_identifier_or_keyword(start);
             } else if ch.is_ascii_digit() {
-                self.lex_integer(start);
+                self.lex_number(start);
             } else if ch == '"' {
                 self.lex_string(start);
             } else if ch.is_ascii() {
@@ -230,15 +232,85 @@ impl<'source> Lexer<'source> {
         );
     }
 
-    fn lex_integer(&mut self, start: usize) {
+    fn lex_number(&mut self, start: usize) {
+        let prefixed = self.remaining().starts_with("0b")
+            || self.remaining().starts_with("0B")
+            || self.remaining().starts_with("0x")
+            || self.remaining().starts_with("0X");
+        if prefixed {
+            while let Some(ch) = self.current_char() {
+                if ch.is_ascii_alphanumeric() || ch == '_' {
+                    self.bump_char();
+                } else {
+                    break;
+                }
+            }
+            self.lex_integer_text(start);
+            return;
+        }
+
+        self.consume_decimal_digits();
+        let mut is_float = false;
+        let mut malformed = false;
+        if self.current_char() == Some('.') {
+            is_float = true;
+            self.bump_char();
+            if !self.consume_decimal_digits() {
+                malformed = true;
+            }
+        }
+        if matches!(self.current_char(), Some('e' | 'E')) {
+            is_float = true;
+            self.bump_char();
+            if matches!(self.current_char(), Some('+' | '-')) {
+                self.bump_char();
+            }
+            if !self.consume_decimal_digits() {
+                malformed = true;
+            }
+        }
+        if !is_float {
+            while self
+                .current_char()
+                .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+            {
+                self.bump_char();
+            }
+        }
+        if is_float {
+            while self
+                .current_char()
+                .is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_')
+            {
+                self.bump_char();
+                malformed = true;
+            }
+            if malformed || !valid_decimal_float(&self.text[start..self.offset]) {
+                self.diagnostic(DiagnosticKind::MalformedFloatLiteral, start, self.offset);
+            } else {
+                self.token(TokenKind::FloatDecimal, start, self.offset);
+            }
+        } else {
+            self.lex_integer_text(start);
+        }
+    }
+
+    fn consume_decimal_digits(&mut self) -> bool {
+        let mut saw_digit = false;
         while let Some(ch) = self.current_char() {
-            if ch.is_ascii_alphanumeric() || ch == '_' {
+            if ch.is_ascii_digit() {
+                saw_digit = true;
+                self.bump_char();
+            } else if ch == '_' {
                 self.bump_char();
             } else {
                 break;
             }
         }
+        saw_digit
+    }
 
+    fn lex_integer_text(&mut self, start: usize) {
         let text = &self.text[start..self.offset];
         match classify_integer(text) {
             IntegerClass::Token(kind) => self.token(kind, start, self.offset),
@@ -397,6 +469,35 @@ fn classify_digits(text: &str, is_digit: impl Fn(char) -> bool, kind: TokenKind)
     } else {
         IntegerClass::Malformed
     }
+}
+
+fn valid_decimal_float(text: &str) -> bool {
+    let (mantissa, exponent) = text
+        .split_once(['e', 'E'])
+        .map_or((text, None), |(mantissa, exponent)| {
+            (mantissa, Some(exponent))
+        });
+    let mantissa_valid = mantissa.split_once('.').map_or_else(
+        || valid_decimal_digits(mantissa),
+        |(whole, fraction)| valid_decimal_digits(whole) && valid_decimal_digits(fraction),
+    );
+    let exponent_valid = exponent.is_none_or(|value| {
+        let digits = value
+            .strip_prefix('+')
+            .or_else(|| value.strip_prefix('-'))
+            .unwrap_or(value);
+        valid_decimal_digits(digits)
+    });
+    mantissa_valid && exponent_valid
+}
+
+fn valid_decimal_digits(text: &str) -> bool {
+    !text.is_empty()
+        && !text.starts_with('_')
+        && !text.ends_with('_')
+        && !text.contains("__")
+        && text.chars().any(|ch| ch.is_ascii_digit())
+        && text.chars().all(|ch| ch.is_ascii_digit() || ch == '_')
 }
 
 fn is_identifier_start(ch: char) -> bool {

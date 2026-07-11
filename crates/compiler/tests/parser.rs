@@ -534,6 +534,17 @@ fn records_literal_expression_metadata_for_type_checking() {
 }
 
 #[test]
+fn records_float_and_unit_literal_metadata() {
+    let parsed = parse_source(SourceFileId::from_raw(93), "fun run() { 1.5; (); }");
+
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    assert_eq!(parsed.literal_expressions.len(), 2);
+    assert_eq!(parsed.literal_expressions[0].kind, ParsedLiteralKind::Float);
+    assert_eq!(parsed.literal_expressions[1].kind, ParsedLiteralKind::Unit);
+}
+
+#[test]
 fn m0028_records_integer_literal_values_without_truncation() {
     let output = parse_source(
         SourceFileId::from_raw(96),

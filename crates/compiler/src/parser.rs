@@ -204,6 +204,8 @@ pub enum ParsedLiteralKind {
     BoolFalse,
     AcceptedInteger,
     AcceptedString,
+    Float,
+    Unit,
     Null,
 }
 
@@ -1378,6 +1380,7 @@ impl<'source> Parser<'source> {
                 TokenKind::IntDecimal
                 | TokenKind::IntBinary
                 | TokenKind::IntHex
+                | TokenKind::FloatDecimal
                 | TokenKind::String
                 | TokenKind::KwTrue
                 | TokenKind::KwFalse
@@ -1408,6 +1411,20 @@ impl<'source> Parser<'source> {
                 Some(span)
             }
             Some(TokenKind::Identifier) => self.parse_name_expression(),
+            Some(TokenKind::LeftParen) if self.peek_kind() == Some(TokenKind::RightParen) => {
+                let start = self.current().expect("left paren exists").span.start();
+                self.advance();
+                let end = self.current().expect("right paren exists").span.end();
+                self.advance();
+                let span = self.span(start, end);
+                let expression = self.arena.add_literal_expression(span);
+                self.literal_expressions.push(ParsedLiteralExpression {
+                    expression,
+                    kind: ParsedLiteralKind::Unit,
+                    span,
+                });
+                Some(span)
+            }
             Some(TokenKind::LeftParen) => self.parse_grouped_expression(),
             Some(TokenKind::KwIf) => self.parse_if_expression(),
             Some(TokenKind::KwWhen) => self.parse_when_expression(),
@@ -2240,6 +2257,7 @@ impl<'source> Parser<'source> {
                 | TokenKind::IntDecimal
                 | TokenKind::IntBinary
                 | TokenKind::IntHex
+                | TokenKind::FloatDecimal
                 | TokenKind::String
                 | TokenKind::KwTrue
                 | TokenKind::KwFalse
@@ -2489,6 +2507,10 @@ impl<'source> Parser<'source> {
         self.current().map(|token| token.kind)
     }
 
+    fn peek_kind(&self) -> Option<TokenKind> {
+        self.tokens.get(self.index + 1).map(|token| token.kind)
+    }
+
     fn lookahead_kind(&self, distance: usize) -> Option<TokenKind> {
         self.tokens
             .get(self.index + distance)
@@ -2576,6 +2598,7 @@ fn parsed_literal_kind(kind: TokenKind) -> ParsedLiteralKind {
             ParsedLiteralKind::AcceptedInteger
         }
         TokenKind::String => ParsedLiteralKind::AcceptedString,
+        TokenKind::FloatDecimal => ParsedLiteralKind::Float,
         TokenKind::KwNull => ParsedLiteralKind::Null,
         _ => unreachable!("parser literal metadata is only built for literal tokens"),
     }

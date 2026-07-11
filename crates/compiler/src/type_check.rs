@@ -1005,6 +1005,8 @@ pub enum LiteralKind {
     BoolFalse,
     AcceptedInteger,
     AcceptedString,
+    Float,
+    Unit,
     Null,
 }
 
@@ -1885,6 +1887,8 @@ impl PrimitiveTypeIds {
             LiteralKind::BoolTrue | LiteralKind::BoolFalse => self.bool_id,
             LiteralKind::AcceptedInteger => self.int_id,
             LiteralKind::AcceptedString => self.string_id,
+            LiteralKind::Float => self.float_id,
+            LiteralKind::Unit => self.unit_id,
             LiteralKind::Null => self.null_id,
         }
     }
@@ -1934,6 +1938,8 @@ fn literal_kind_from_parser(kind: ParsedLiteralKind) -> LiteralKind {
         ParsedLiteralKind::BoolFalse => LiteralKind::BoolFalse,
         ParsedLiteralKind::AcceptedInteger => LiteralKind::AcceptedInteger,
         ParsedLiteralKind::AcceptedString => LiteralKind::AcceptedString,
+        ParsedLiteralKind::Float => LiteralKind::Float,
+        ParsedLiteralKind::Unit => LiteralKind::Unit,
         ParsedLiteralKind::Null => LiteralKind::Null,
     }
 }
