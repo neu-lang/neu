@@ -350,9 +350,52 @@ fn m0035_hir_to_mir_preserves_boolean_not_and_comparison_operations() {
 }
 
 #[test]
-fn m0035_hir_to_mir_rejects_short_circuit_without_cfg_lowering() {
+fn m0035_hir_to_mir_lowers_logical_or_with_short_circuit_cfg() {
     let file = SourceFileId::from_raw(912);
     let span = ByteSpan::new(file, 0, 4).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            bool_type,
+            vec![],
+            vec![],
+            vec![
+                HirExpression::bool_literal(HirExpressionId::from_raw(0), span, bool_type, true),
+                HirExpression::bool_literal(HirExpressionId::from_raw(1), span, bool_type, false),
+                HirExpression::binary(
+                    HirExpressionId::from_raw(2),
+                    span,
+                    bool_type,
+                    HirBinaryOperator::LogicalOr,
+                    HirExpressionId::from_raw(0),
+                    HirExpressionId::from_raw(1),
+                ),
+            ],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(2))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    assert_eq!(mir.functions()[0].blocks().len(), 4);
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].terminator(),
+        MirTerminator::BranchIf { .. }
+    ));
+}
+
+#[test]
+fn m0035_hir_to_mir_lowers_logical_and_with_short_circuit_cfg() {
+    let file = SourceFileId::from_raw(921);
+    let span = ByteSpan::new(file, 0, 6).unwrap();
     let mut types = TypeArena::new();
     let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
     let hir = HirModule::new(
@@ -384,10 +427,18 @@ fn m0035_hir_to_mir_rejects_short_circuit_without_cfg_lowering() {
         )],
     );
 
-    assert_eq!(
-        lower_hir_to_mir(&hir, &types),
-        Err(compiler::mir::MirLoweringError::UnsupportedExpression)
-    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    assert_eq!(mir.functions()[0].blocks().len(), 4);
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].terminator(),
+        MirTerminator::BranchIf { .. }
+    ));
+    assert!(mir.functions()[0].blocks().iter().any(|block| {
+        block
+            .instructions()
+            .iter()
+            .any(|instruction| matches!(instruction, MirInstruction::StoreLocal { .. }))
+    }));
 }
 
 #[test]

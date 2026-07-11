@@ -21,7 +21,7 @@ file an ambiguity report and stop the affected implementation.
 For ordinary implementation work:
 
 1. Write one concise task note in the main task, referencing exactly one
-   milestone. Do not create a persistent `docs/tasks/` record.
+   milestone.
 2. Read only the note's cited specification, ADRs, source paths, and tests.
 3. Write focused tests first and verify the expected failure.
 4. Implement the smallest complete change justified by accepted authority.

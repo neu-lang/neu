@@ -143,9 +143,10 @@ fn m0031_rejects_unsupported_mir_instruction() {
         vec![],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
-            vec![MirInstruction::LoadLocal {
+            vec![MirInstruction::DirectCall {
                 output: MirValueId::from_raw(2),
-                local: MirLocalId::from_raw(0),
+                callee: MirFunctionId::from_raw(0),
+                arguments: vec![],
                 span,
             }],
             MirTerminator::return_value(MirValueId::from_raw(2), span),
@@ -618,6 +619,82 @@ fn m0035_lowers_conditional_mir_cfg_to_cranelift() {
     assert!(ir.contains("block1"), "{ir}");
     assert!(ir.contains("block2"), "{ir}");
     let _ = bool_type;
+}
+
+#[test]
+fn m0035_lowers_short_circuit_result_local_through_cfg() {
+    let file = SourceFileId::from_raw(922);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let local = MirLocalId::from_raw(0);
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(71),
+        span,
+        vec![],
+        bool_type,
+        vec![compiler::mir::MirLocal::new(local, bool_type, span)],
+        vec![
+            MirBasicBlock::new(
+                MirBlockId::from_raw(0),
+                vec![MirInstruction::bool_constant(
+                    MirValueId::from_raw(0),
+                    true,
+                    span,
+                )],
+                MirTerminator::branch_if(
+                    MirValueId::from_raw(0),
+                    MirBlockId::from_raw(1),
+                    MirBlockId::from_raw(2),
+                    span,
+                ),
+            ),
+            MirBasicBlock::new(
+                MirBlockId::from_raw(1),
+                vec![
+                    MirInstruction::bool_constant(MirValueId::from_raw(1), false, span),
+                    MirInstruction::StoreLocal {
+                        local,
+                        value: MirValueId::from_raw(1),
+                        span,
+                    },
+                ],
+                MirTerminator::Branch {
+                    target: MirBlockId::from_raw(3),
+                    span,
+                },
+            ),
+            MirBasicBlock::new(
+                MirBlockId::from_raw(2),
+                vec![
+                    MirInstruction::bool_constant(MirValueId::from_raw(2), true, span),
+                    MirInstruction::StoreLocal {
+                        local,
+                        value: MirValueId::from_raw(2),
+                        span,
+                    },
+                ],
+                MirTerminator::Branch {
+                    target: MirBlockId::from_raw(3),
+                    span,
+                },
+            ),
+            MirBasicBlock::new(
+                MirBlockId::from_raw(3),
+                vec![MirInstruction::LoadLocal {
+                    output: MirValueId::from_raw(3),
+                    local,
+                    span,
+                }],
+                MirTerminator::return_value(MirValueId::from_raw(3), span),
+            ),
+        ],
+        MirCleanupBoundary::empty(),
+    );
+
+    let ir = lower_mir_function_to_cranelift(&function, &types).unwrap();
+    assert!(ir.contains("brif"), "{ir}");
+    assert!(ir.contains("return"), "{ir}");
 }
 
 #[test]

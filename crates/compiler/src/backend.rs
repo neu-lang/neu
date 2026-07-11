@@ -10,7 +10,7 @@ use cranelift_codegen::{
     isa::CallConv,
     settings, verify_function,
 };
-use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
@@ -150,6 +150,12 @@ fn lower_mir_function(
     {
         let mut builder = FunctionBuilder::new(&mut clif_function, &mut builder_context);
         let mut clif_blocks = HashMap::new();
+        let mut locals = HashMap::new();
+        for local in function.locals() {
+            let local_type = cranelift_type(local.ty(), type_arena)
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            locals.insert(local.id(), builder.declare_var(local_type));
+        }
         for mir_block in function.blocks() {
             clif_blocks.insert(mir_block.id(), builder.create_block());
         }
@@ -160,7 +166,7 @@ fn lower_mir_function(
                 .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
             builder.switch_to_block(clif_block);
             for instruction in mir_block.instructions() {
-                lower_instruction(instruction, &mut builder, &mut values)?;
+                lower_instruction(instruction, &mut builder, &mut values, &locals)?;
             }
             lower_terminator(mir_block.terminator(), &clif_blocks, &mut builder, &values)?;
         }
@@ -358,6 +364,7 @@ fn lower_instruction(
     instruction: &MirInstruction,
     builder: &mut FunctionBuilder<'_>,
     values: &mut HashMap<MirValueId, Value>,
+    locals: &HashMap<crate::mir::MirLocalId, Variable>,
 ) -> Result<(), CraneliftLoweringError> {
     match instruction {
         MirInstruction::IntConstant { output, value, .. } => {
@@ -462,6 +469,26 @@ fn lower_instruction(
             let one = builder.ins().iconst(types::I8, 1);
             let zero = builder.ins().iconst(types::I8, 0);
             values.insert(*output, builder.ins().select(condition, one, zero));
+            Ok(())
+        }
+        MirInstruction::LoadLocal { output, local, .. } => {
+            let local = locals
+                .get(local)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, builder.use_var(local));
+            Ok(())
+        }
+        MirInstruction::StoreLocal { local, value, .. } => {
+            let local = locals
+                .get(local)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let value = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.def_var(local, value);
             Ok(())
         }
         MirInstruction::CheckedArithmetic {

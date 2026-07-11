@@ -1,6 +1,9 @@
 use crate::{
     hir::HirExpression,
-    hir::{HirBinaryOperator, HirExpressionKind, HirModule, HirUnaryOperator},
+    hir::{
+        HirBinaryOperator, HirExpressionId, HirExpressionKind, HirFunction, HirModule,
+        HirUnaryOperator,
+    },
     module::{FunctionSymbolIdentity, ModuleName},
     source::ByteSpan,
     types::{PrimitiveType, TypeArena, TypeId, TypeKind},
@@ -407,6 +410,19 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
     let mut functions = Vec::new();
     for function in hir.functions() {
         require_bootstrap_runtime_type(function.return_type(), types)?;
+        if function.expressions().iter().any(|expression| {
+            matches!(
+                expression.kind(),
+                HirExpressionKind::Binary(binary)
+                    if matches!(
+                        binary.operator(),
+                        HirBinaryOperator::LogicalAnd | HirBinaryOperator::LogicalOr
+                    )
+            )
+        }) {
+            functions.push(lower_hir_function_with_short_circuit(function, types)?);
+            continue;
+        }
         let mut instructions = Vec::new();
         for expression in function.expressions() {
             require_hir_expression_type(expression, types)?;
@@ -517,6 +533,294 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
         });
     }
     Ok(MirModule::new(hir.name().clone(), functions))
+}
+
+struct LowerBlock {
+    id: MirBlockId,
+    instructions: Vec<MirInstruction>,
+    terminator: Option<MirTerminator>,
+}
+
+struct ShortCircuitLowerer<'a> {
+    function: &'a HirFunction,
+    types: &'a TypeArena,
+    blocks: Vec<LowerBlock>,
+    current: usize,
+    locals: Vec<MirLocal>,
+    next_block: usize,
+    next_value: usize,
+    lowered: Vec<HirExpressionId>,
+}
+
+impl<'a> ShortCircuitLowerer<'a> {
+    fn new(function: &'a HirFunction, types: &'a TypeArena) -> Self {
+        let next_value = function
+            .expressions()
+            .iter()
+            .map(|expression| expression.id().index())
+            .max()
+            .map_or(0, |value| value + 1);
+        let bool_type = function
+            .expressions()
+            .iter()
+            .find_map(|expression| {
+                matches!(
+                    expression.kind(),
+                    HirExpressionKind::Binary(binary)
+                        if matches!(
+                            binary.operator(),
+                            HirBinaryOperator::LogicalAnd | HirBinaryOperator::LogicalOr
+                        )
+                )
+                .then_some(expression.ty())
+            })
+            .unwrap_or(TypeId::from_raw(0));
+        Self {
+            function,
+            types,
+            blocks: vec![LowerBlock {
+                id: MirBlockId::from_raw(0),
+                instructions: Vec::new(),
+                terminator: None,
+            }],
+            current: 0,
+            locals: vec![MirLocal::new(
+                MirLocalId::from_raw(0),
+                bool_type,
+                function.span(),
+            )],
+            next_block: 1,
+            next_value,
+            lowered: Vec::new(),
+        }
+    }
+
+    fn new_block(&mut self) -> usize {
+        let index = self.blocks.len();
+        self.blocks.push(LowerBlock {
+            id: MirBlockId::from_raw(self.next_block),
+            instructions: Vec::new(),
+            terminator: None,
+        });
+        self.next_block += 1;
+        index
+    }
+
+    fn fresh_value(&mut self) -> MirValueId {
+        let value = MirValueId::from_raw(self.next_value);
+        self.next_value += 1;
+        value
+    }
+
+    fn set_terminator(&mut self, terminator: MirTerminator) {
+        self.blocks[self.current].terminator = Some(terminator);
+    }
+
+    fn push(&mut self, instruction: MirInstruction) {
+        self.blocks[self.current].instructions.push(instruction);
+    }
+
+    fn lower_expression(&mut self, id: HirExpressionId) -> Result<MirValueId, MirLoweringError> {
+        let expression = self
+            .function
+            .expressions()
+            .iter()
+            .find(|expression| expression.id() == id)
+            .cloned()
+            .ok_or(MirLoweringError::UnsupportedExpression)?;
+        require_hir_expression_type(&expression, self.types)?;
+        let output = MirValueId::from_raw(id.index());
+        if self.lowered.contains(&id) {
+            return Ok(output);
+        }
+
+        match expression.kind() {
+            HirExpressionKind::IntLiteral(value) => {
+                self.push(MirInstruction::int_constant(
+                    output,
+                    *value,
+                    expression.span(),
+                ));
+            }
+            HirExpressionKind::BoolLiteral(value) => {
+                self.push(MirInstruction::bool_constant(
+                    output,
+                    *value,
+                    expression.span(),
+                ));
+            }
+            HirExpressionKind::FloatLiteral(bits) => {
+                self.push(MirInstruction::float_constant(
+                    output,
+                    *bits,
+                    expression.span(),
+                ));
+            }
+            HirExpressionKind::ByteLiteral(value) => {
+                self.push(MirInstruction::byte_constant(
+                    output,
+                    *value,
+                    expression.span(),
+                ));
+            }
+            HirExpressionKind::UnitLiteral => {
+                self.push(MirInstruction::unit_constant(expression.span()));
+            }
+            HirExpressionKind::Binary(binary)
+                if matches!(
+                    binary.operator(),
+                    HirBinaryOperator::LogicalAnd | HirBinaryOperator::LogicalOr
+                ) =>
+            {
+                let left = self.lower_expression(binary.left())?;
+                let left_block = self.current;
+                let rhs_block = self.new_block();
+                let short_block = self.new_block();
+                let merge_block = self.new_block();
+                let rhs_target = self.blocks[rhs_block].id;
+                let short_target = self.blocks[short_block].id;
+                let merge_target = self.blocks[merge_block].id;
+                let (then_target, else_target) = match binary.operator() {
+                    HirBinaryOperator::LogicalAnd => (rhs_target, short_target),
+                    HirBinaryOperator::LogicalOr => (short_target, rhs_target),
+                    _ => unreachable!(),
+                };
+                self.blocks[left_block].terminator = Some(MirTerminator::branch_if(
+                    left,
+                    then_target,
+                    else_target,
+                    expression.span(),
+                ));
+
+                self.current = rhs_block;
+                let right = self.lower_expression(binary.right())?;
+                self.push(MirInstruction::StoreLocal {
+                    local: MirLocalId::from_raw(0),
+                    value: right,
+                    span: expression.span(),
+                });
+                self.set_terminator(MirTerminator::Branch {
+                    target: merge_target,
+                    span: expression.span(),
+                });
+
+                self.current = short_block;
+                let short_value = self.fresh_value();
+                self.push(MirInstruction::bool_constant(
+                    short_value,
+                    matches!(binary.operator(), HirBinaryOperator::LogicalOr),
+                    expression.span(),
+                ));
+                self.push(MirInstruction::StoreLocal {
+                    local: MirLocalId::from_raw(0),
+                    value: short_value,
+                    span: expression.span(),
+                });
+                self.set_terminator(MirTerminator::Branch {
+                    target: merge_target,
+                    span: expression.span(),
+                });
+
+                self.current = merge_block;
+                self.push(MirInstruction::LoadLocal {
+                    output,
+                    local: MirLocalId::from_raw(0),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::Binary(binary) => {
+                let left = self.lower_expression(binary.left())?;
+                let right = self.lower_expression(binary.right())?;
+                if let Some(operation) = lower_comparison(binary.operator()) {
+                    self.push(MirInstruction::Compare {
+                        output,
+                        operation,
+                        left,
+                        right,
+                        span: expression.span(),
+                    });
+                } else {
+                    self.push(MirInstruction::CheckedArithmetic {
+                        output,
+                        operation: lower_binary(binary.operator())?,
+                        left,
+                        right,
+                        span: expression.span(),
+                    });
+                }
+            }
+            HirExpressionKind::Unary(unary) => {
+                let operand = self.lower_expression(unary.operand())?;
+                if matches!(unary.operator(), HirUnaryOperator::Not) {
+                    self.push(MirInstruction::LogicalNot {
+                        output,
+                        operand,
+                        span: expression.span(),
+                    });
+                } else {
+                    self.push(MirInstruction::Unary {
+                        output,
+                        operation: lower_unary(unary.operator())?,
+                        operand,
+                        span: expression.span(),
+                    });
+                }
+            }
+            _ => return Err(MirLoweringError::UnsupportedExpression),
+        }
+        self.lowered.push(id);
+        Ok(output)
+    }
+
+    fn finish(mut self) -> Result<MirFunction, MirLoweringError> {
+        let returned = self
+            .function
+            .returns()
+            .first()
+            .ok_or(MirLoweringError::MissingReturn)?;
+        let value = self.lower_expression(returned.expression())?;
+        let return_is_unit = matches!(
+            self.types
+                .get(self.function.return_type())
+                .map(|record| record.kind()),
+            Some(TypeKind::Primitive(PrimitiveType::Unit))
+        );
+        if self.blocks[self.current].terminator.is_none() {
+            self.blocks[self.current].terminator = Some(if return_is_unit {
+                MirTerminator::return_unit(returned.span())
+            } else {
+                MirTerminator::return_value(value, returned.span())
+            });
+        }
+        let blocks = self
+            .blocks
+            .into_iter()
+            .map(|block| {
+                Ok(MirBasicBlock::new(
+                    block.id,
+                    block.instructions,
+                    block.terminator.ok_or(MirLoweringError::MissingReturn)?,
+                ))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(MirFunction::new(
+            MirFunctionId::from_raw(self.function.id().index()),
+            self.function.span(),
+            vec![],
+            self.function.return_type(),
+            self.locals,
+            blocks,
+            MirCleanupBoundary::empty(),
+        )
+        .with_entry(self.function.is_entry()))
+    }
+}
+
+fn lower_hir_function_with_short_circuit(
+    function: &HirFunction,
+    types: &TypeArena,
+) -> Result<MirFunction, MirLoweringError> {
+    ShortCircuitLowerer::new(function, types).finish()
 }
 
 fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), MirLoweringError> {
