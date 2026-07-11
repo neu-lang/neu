@@ -30,6 +30,7 @@ pub enum CraneliftLoweringError {
     MissingValue,
     FunctionIdOutOfRange,
     MissingFunctionIdentity,
+    MissingLanguageEntrySymbol,
     TargetIsaUnavailable,
     ObjectBuilderFailed,
     ObjectDefinitionFailed,
@@ -50,6 +51,22 @@ pub fn emit_mir_function_to_object(
     function: &MirFunction,
     type_arena: &TypeArena,
 ) -> Result<Vec<u8>, CraneliftLoweringError> {
+    emit_mir_function_to_object_impl(function, type_arena, None)
+}
+
+pub fn emit_mir_function_to_object_with_entry_symbol(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+    language_entry_symbol: &str,
+) -> Result<Vec<u8>, CraneliftLoweringError> {
+    emit_mir_function_to_object_impl(function, type_arena, Some(language_entry_symbol))
+}
+
+fn emit_mir_function_to_object_impl(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+    language_entry_symbol: Option<&str>,
+) -> Result<Vec<u8>, CraneliftLoweringError> {
     let identity = function
         .symbol_identity()
         .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
@@ -64,7 +81,14 @@ pub fn emit_mir_function_to_object(
         ObjectBuilder::new(isa, "neu", default_libcall_names())
             .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
     );
-    let symbol = bootstrap_symbol(identity);
+    let symbol = if function.is_entry() {
+        let symbol = language_entry_symbol
+            .filter(|symbol| !symbol.is_empty())
+            .ok_or(CraneliftLoweringError::MissingLanguageEntrySymbol)?;
+        symbol.to_owned()
+    } else {
+        bootstrap_symbol(identity)
+    };
     let function_id = module
         .declare_function(&symbol, Linkage::Local, &clif_function.signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
