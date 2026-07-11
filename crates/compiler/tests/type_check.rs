@@ -4180,6 +4180,33 @@ fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
 }
 
 #[test]
+fn m0035_function_signatures_type_all_bootstrap_primitives() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(919),
+        "fun bool_value(value: Bool): Bool { return value; } fun unit_value(): Unit { return (); } fun float_value(value: Float): Float { return value; } fun byte_value(value: Byte): Byte { return value; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (types, signatures) = type_m0028_function_signatures(
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+
+    assert_eq!(signatures.len(), 4);
+    assert_eq!(signatures[0].parameter_types(), &[TypeId::from_raw(0)]);
+    assert_eq!(signatures[0].return_type(), TypeId::from_raw(0));
+    assert_eq!(signatures[1].parameter_types(), &[]);
+    assert_eq!(signatures[1].return_type(), TypeId::from_raw(3));
+    assert_eq!(signatures[2].parameter_types(), &[TypeId::from_raw(5)]);
+    assert_eq!(signatures[2].return_type(), TypeId::from_raw(5));
+    assert_eq!(signatures[3].parameter_types(), &[TypeId::from_raw(6)]);
+    assert_eq!(signatures[3].return_type(), TypeId::from_raw(6));
+    assert_eq!(types.records().len(), 7);
+}
+
+#[test]
 fn m0028_function_signatures_share_the_caller_owned_module_arena() {
     let first = parse_source(
         SourceFileId::from_raw(114),

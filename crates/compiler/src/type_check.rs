@@ -1586,10 +1586,20 @@ pub fn type_m0028_function_signatures_in(
     type_name_references: &[ParsedTypeNameReference],
 ) -> Vec<FunctionSignature> {
     let primitives = PrimitiveTypeIds::module_owned(arena);
-    let is_int_annotation = |annotation| {
-        type_name_references
+    let primitive_annotation = |annotation| {
+        let name = type_name_references
             .iter()
-            .any(|reference| reference.reference == annotation && reference.name == "Int")
+            .find(|reference| reference.reference == annotation)?
+            .name
+            .as_str();
+        Some(match name {
+            "Bool" => primitives.bool_id,
+            "Int" => primitives.int_id,
+            "Unit" => primitives.unit_id,
+            "Float" => primitives.float_id,
+            "Byte" => primitives.byte_id,
+            _ => return None,
+        })
     };
     let mut signatures = Vec::new();
 
@@ -1597,23 +1607,24 @@ pub fn type_m0028_function_signatures_in(
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        if !is_int_annotation(return_annotation) {
+        let Some(return_type) = primitive_annotation(return_annotation) else {
             continue;
-        }
+        };
         let function_parameters: Vec<_> = parameters
             .iter()
             .filter(|parameter| parameter.function == function.declaration)
             .collect();
-        if function_parameters
+        let Some(parameter_types) = function_parameters
             .iter()
-            .any(|parameter| !is_int_annotation(parameter.annotation))
-        {
+            .map(|parameter| primitive_annotation(parameter.annotation))
+            .collect::<Option<Vec<_>>>()
+        else {
             continue;
-        }
+        };
         signatures.push(FunctionSignature {
             declaration: function.declaration,
-            parameter_types: vec![primitives.int_id; function_parameters.len()],
-            return_type: primitives.int_id,
+            parameter_types,
+            return_type,
         });
     }
 
