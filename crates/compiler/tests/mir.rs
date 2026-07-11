@@ -251,3 +251,45 @@ fn m0030_mir_function_preserves_declared_return_type() {
 
     assert_eq!(function.return_type(), int);
 }
+
+#[test]
+fn m0035_mir_preserves_non_integer_constants_and_unit_return() {
+    let file = SourceFileId::from_raw(905);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let bool_output = MirValueId::from_raw(0);
+    let float_output = MirValueId::from_raw(1);
+    let byte_output = MirValueId::from_raw(2);
+
+    let bool_constant = MirInstruction::bool_constant(bool_output, true, span);
+    let float_constant = MirInstruction::float_constant(float_output, (-0.0f64).to_bits(), span);
+    let byte_constant = MirInstruction::byte_constant(byte_output, 255, span);
+
+    assert_eq!(
+        bool_constant,
+        MirInstruction::BoolConstant {
+            output: bool_output,
+            value: true,
+            span
+        }
+    );
+    assert_eq!(
+        float_constant,
+        MirInstruction::FloatConstant {
+            output: float_output,
+            bits: (-0.0f64).to_bits(),
+            span,
+        }
+    );
+    assert_eq!(
+        byte_constant,
+        MirInstruction::ByteConstant {
+            output: byte_output,
+            value: 255,
+            span
+        }
+    );
+    assert_eq!(
+        MirTerminator::return_unit(span),
+        MirTerminator::ReturnUnit { span }
+    );
+}

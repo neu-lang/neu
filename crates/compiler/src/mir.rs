@@ -89,6 +89,24 @@ pub enum MirInstruction {
         value: i64,
         span: ByteSpan,
     },
+    BoolConstant {
+        output: MirValueId,
+        value: bool,
+        span: ByteSpan,
+    },
+    FloatConstant {
+        output: MirValueId,
+        bits: u64,
+        span: ByteSpan,
+    },
+    ByteConstant {
+        output: MirValueId,
+        value: u8,
+        span: ByteSpan,
+    },
+    UnitConstant {
+        span: ByteSpan,
+    },
     CheckedArithmetic {
         output: MirValueId,
         operation: MirArithmetic,
@@ -127,6 +145,30 @@ impl MirInstruction {
             span,
         }
     }
+
+    pub fn bool_constant(output: MirValueId, value: bool, span: ByteSpan) -> Self {
+        Self::BoolConstant {
+            output,
+            value,
+            span,
+        }
+    }
+
+    pub fn float_constant(output: MirValueId, bits: u64, span: ByteSpan) -> Self {
+        Self::FloatConstant { output, bits, span }
+    }
+
+    pub fn byte_constant(output: MirValueId, value: u8, span: ByteSpan) -> Self {
+        Self::ByteConstant {
+            output,
+            value,
+            span,
+        }
+    }
+
+    pub fn unit_constant(span: ByteSpan) -> Self {
+        Self::UnitConstant { span }
+    }
     pub fn checked_add(
         output: MirValueId,
         left: MirValueId,
@@ -144,6 +186,10 @@ impl MirInstruction {
     pub fn span(&self) -> ByteSpan {
         match self {
             Self::IntConstant { span, .. }
+            | Self::BoolConstant { span, .. }
+            | Self::FloatConstant { span, .. }
+            | Self::ByteConstant { span, .. }
+            | Self::UnitConstant { span }
             | Self::CheckedArithmetic { span, .. }
             | Self::Unary { span, .. }
             | Self::LoadLocal { span, .. }
@@ -164,6 +210,7 @@ pub enum MirTrap {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MirTerminator {
     Return { value: MirValueId, span: ByteSpan },
+    ReturnUnit { span: ByteSpan },
     Branch { target: MirBlockId, span: ByteSpan },
     Trap { reason: MirTrap, span: ByteSpan },
 }
@@ -171,11 +218,16 @@ impl MirTerminator {
     pub fn return_value(value: MirValueId, span: ByteSpan) -> Self {
         Self::Return { value, span }
     }
+
+    pub fn return_unit(span: ByteSpan) -> Self {
+        Self::ReturnUnit { span }
+    }
     pub fn span(&self) -> ByteSpan {
         match self {
-            Self::Return { span, .. } | Self::Branch { span, .. } | Self::Trap { span, .. } => {
-                *span
-            }
+            Self::Return { span, .. }
+            | Self::ReturnUnit { span }
+            | Self::Branch { span, .. }
+            | Self::Trap { span, .. } => *span,
         }
     }
 }
