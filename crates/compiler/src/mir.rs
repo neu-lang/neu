@@ -599,6 +599,7 @@ struct ShortCircuitLowerer<'a> {
     blocks: Vec<LowerBlock>,
     current: usize,
     locals: Vec<MirLocal>,
+    scratch_local: MirLocalId,
     next_block: usize,
     next_value: usize,
     lowered: Vec<HirExpressionId>,
@@ -627,6 +628,19 @@ impl<'a> ShortCircuitLowerer<'a> {
                 .then_some(expression.ty())
             })
             .unwrap_or(TypeId::from_raw(0));
+        let mut locals = function
+            .locals()
+            .iter()
+            .map(|local| {
+                MirLocal::new(
+                    MirLocalId::from_raw(local.id().index()),
+                    local.ty(),
+                    local.span(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let scratch_local = MirLocalId::from_raw(locals.len());
+        locals.push(MirLocal::new(scratch_local, bool_type, function.span()));
         Self {
             function,
             types,
@@ -636,11 +650,8 @@ impl<'a> ShortCircuitLowerer<'a> {
                 terminator: None,
             }],
             current: 0,
-            locals: vec![MirLocal::new(
-                MirLocalId::from_raw(0),
-                bool_type,
-                function.span(),
-            )],
+            locals,
+            scratch_local,
             next_block: 1,
             next_value,
             lowered: Vec::new(),
@@ -725,6 +736,13 @@ impl<'a> ShortCircuitLowerer<'a> {
             HirExpressionKind::UnitLiteral => {
                 self.push(MirInstruction::unit_constant(expression.span()));
             }
+            HirExpressionKind::LocalRead(local) => {
+                self.push(MirInstruction::LoadLocal {
+                    output,
+                    local: MirLocalId::from_raw(local.index()),
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::Binary(binary)
                 if matches!(
                     binary.operator(),
@@ -754,7 +772,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                 self.current = rhs_block;
                 let right = self.lower_expression(binary.right())?;
                 self.push(MirInstruction::StoreLocal {
-                    local: MirLocalId::from_raw(0),
+                    local: self.scratch_local,
                     value: right,
                     span: expression.span(),
                 });
@@ -771,7 +789,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
                 self.push(MirInstruction::StoreLocal {
-                    local: MirLocalId::from_raw(0),
+                    local: self.scratch_local,
                     value: short_value,
                     span: expression.span(),
                 });
@@ -783,7 +801,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                 self.current = merge_block;
                 self.push(MirInstruction::LoadLocal {
                     output,
-                    local: MirLocalId::from_raw(0),
+                    local: self.scratch_local,
                     span: expression.span(),
                 });
             }
@@ -826,6 +844,24 @@ impl<'a> ShortCircuitLowerer<'a> {
                 }
             }
             _ => return Err(MirLoweringError::UnsupportedExpression),
+        }
+        for local in self.function.locals() {
+            if local.initializer() == Some(expression.id()) {
+                self.push(MirInstruction::StoreLocal {
+                    local: MirLocalId::from_raw(local.id().index()),
+                    value: output,
+                    span: expression.span(),
+                });
+            }
+        }
+        for assignment in self.function.assignments() {
+            if assignment.value().index() == expression.id().index() {
+                self.push(MirInstruction::StoreLocal {
+                    local: MirLocalId::from_raw(assignment.target().index()),
+                    value: output,
+                    span: assignment.span(),
+                });
+            }
         }
         self.lowered.push(id);
         Ok(output)
