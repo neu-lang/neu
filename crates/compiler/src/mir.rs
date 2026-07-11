@@ -1,4 +1,9 @@
-use crate::{module::ModuleName, source::ByteSpan, types::TypeId};
+use crate::{
+    hir::{HirBinaryOperator, HirExpressionKind, HirModule},
+    module::ModuleName,
+    source::ByteSpan,
+    types::TypeId,
+};
 
 macro_rules! mir_id {
     ($name:ident) => {
@@ -246,4 +251,81 @@ impl MirFunction {
     pub fn cleanup_boundary(&self) -> MirCleanupBoundary {
         self.cleanup_boundary
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MirLoweringError {
+    UnsupportedExpression,
+    MissingReturn,
+}
+pub fn lower_hir_to_mir(hir: &HirModule) -> Result<MirModule, MirLoweringError> {
+    let mut functions = Vec::new();
+    for function in hir.functions() {
+        let mut instructions = Vec::new();
+        for expression in function.expressions() {
+            let output = MirValueId::from_raw(expression.id().index());
+            match expression.kind() {
+                HirExpressionKind::IntLiteral(value) => instructions.push(
+                    MirInstruction::int_constant(output, *value, expression.span()),
+                ),
+                HirExpressionKind::Binary(binary) => {
+                    instructions.push(MirInstruction::CheckedArithmetic {
+                        output,
+                        operation: lower_binary(binary.operator())?,
+                        left: MirValueId::from_raw(binary.left().index()),
+                        right: MirValueId::from_raw(binary.right().index()),
+                        span: expression.span(),
+                    })
+                }
+                HirExpressionKind::DirectCall(call) => {
+                    instructions.push(MirInstruction::DirectCall {
+                        output,
+                        callee: MirFunctionId::from_raw(call.callee().index()),
+                        arguments: call
+                            .arguments()
+                            .iter()
+                            .map(|argument| MirValueId::from_raw(argument.index()))
+                            .collect(),
+                        span: expression.span(),
+                    })
+                }
+                _ => return Err(MirLoweringError::UnsupportedExpression),
+            }
+        }
+        let returned = function
+            .returns()
+            .first()
+            .ok_or(MirLoweringError::MissingReturn)?;
+        functions.push(MirFunction::new(
+            MirFunctionId::from_raw(function.id().index()),
+            function.span(),
+            vec![],
+            vec![],
+            vec![MirBasicBlock::new(
+                MirBlockId::from_raw(0),
+                instructions,
+                MirTerminator::return_value(
+                    MirValueId::from_raw(returned.expression().index()),
+                    returned.span(),
+                ),
+            )],
+            MirCleanupBoundary::empty(),
+        ));
+    }
+    Ok(MirModule::new(hir.name().clone(), functions))
+}
+fn lower_binary(operator: HirBinaryOperator) -> Result<MirArithmetic, MirLoweringError> {
+    Ok(match operator {
+        HirBinaryOperator::Plus => MirArithmetic::Add,
+        HirBinaryOperator::Minus => MirArithmetic::Subtract,
+        HirBinaryOperator::Multiply => MirArithmetic::Multiply,
+        HirBinaryOperator::Divide => MirArithmetic::Divide,
+        HirBinaryOperator::Remainder => MirArithmetic::Remainder,
+        HirBinaryOperator::Exponent => MirArithmetic::Exponent,
+        HirBinaryOperator::BitwiseAnd => MirArithmetic::BitwiseAnd,
+        HirBinaryOperator::BitwiseOr => MirArithmetic::BitwiseOr,
+        HirBinaryOperator::BitwiseXor => MirArithmetic::BitwiseXor,
+        HirBinaryOperator::ShiftLeft => MirArithmetic::ShiftLeft,
+        HirBinaryOperator::ShiftRight => MirArithmetic::ShiftRight,
+    })
 }

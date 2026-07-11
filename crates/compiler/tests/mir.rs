@@ -1,7 +1,11 @@
 use compiler::{
+    hir::{
+        HirBinaryOperator, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirModule,
+        HirReturn, HirSafetyFacts,
+    },
     mir::{
         MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
-        MirLocal, MirLocalId, MirModule, MirTerminator, MirValueId,
+        MirLocal, MirLocalId, MirModule, MirTerminator, MirValueId, lower_hir_to_mir,
     },
     module::ModuleName,
     source::{ByteSpan, SourceFileId},
@@ -38,4 +42,42 @@ fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
     assert_eq!(module.functions()[0].blocks()[0].instructions().len(), 2);
     assert_eq!(module.functions()[0].blocks()[0].terminator().span(), span);
     assert!(module.functions()[0].cleanup_boundary().is_empty());
+}
+
+#[test]
+fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
+    let file = SourceFileId::from_raw(301);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let int = TypeId::from_raw(1);
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            int,
+            vec![],
+            vec![],
+            vec![
+                HirExpression::int_literal(HirExpressionId::from_raw(0), span, int, 1),
+                HirExpression::int_literal(HirExpressionId::from_raw(1), span, int, 2),
+                HirExpression::binary(
+                    HirExpressionId::from_raw(2),
+                    span,
+                    int,
+                    HirBinaryOperator::Plus,
+                    HirExpressionId::from_raw(0),
+                    HirExpressionId::from_raw(1),
+                ),
+            ],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(2))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+    let mir = lower_hir_to_mir(&hir).unwrap();
+    assert_eq!(mir.functions()[0].blocks()[0].instructions().len(), 3);
+    assert_eq!(mir.functions()[0].blocks()[0].terminator().span(), span);
 }
