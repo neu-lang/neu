@@ -714,8 +714,12 @@ fn m0035_lowers_typed_primitive_parameters() {
         vec![],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
-            vec![],
-            MirTerminator::return_value(MirValueId::from_raw(0), span),
+            vec![MirInstruction::ParameterRead {
+                output: MirValueId::from_raw(3),
+                parameter: compiler::mir::MirParameterId::from_raw(0),
+                span,
+            }],
+            MirTerminator::return_value(MirValueId::from_raw(3), span),
         )],
         MirCleanupBoundary::empty(),
     );

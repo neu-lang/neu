@@ -442,6 +442,48 @@ fn m0035_hir_to_mir_lowers_logical_and_with_short_circuit_cfg() {
 }
 
 #[test]
+fn m0035_hir_to_mir_lowers_primitive_parameter_reads() {
+    let file = SourceFileId::from_raw(925);
+    let span = ByteSpan::new(file, 0, 6).unwrap();
+    let mut types = TypeArena::new();
+    let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
+    let parameter = compiler::hir::HirParameter::new(
+        compiler::hir::HirParameterId::from_raw(0),
+        span,
+        float_type,
+    );
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            float_type,
+            vec![parameter],
+            vec![],
+            vec![HirExpression::parameter_read(
+                HirExpressionId::from_raw(0),
+                span,
+                float_type,
+                compiler::hir::HirParameterId::from_raw(0),
+            )],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(0))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    assert_eq!(mir.functions()[0].parameters().len(), 1);
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].instructions()[0],
+        MirInstruction::ParameterRead { .. }
+    ));
+}
+
+#[test]
 fn m0035_hir_to_mir_lowers_primitive_literals_and_unit_return() {
     let file = SourceFileId::from_raw(908);
     let span = ByteSpan::new(file, 0, 4).unwrap();

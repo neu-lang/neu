@@ -25,6 +25,7 @@ macro_rules! mir_id {
 }
 mir_id!(MirFunctionId);
 mir_id!(MirValueId);
+mir_id!(MirParameterId);
 mir_id!(MirLocalId);
 mir_id!(MirBlockId);
 
@@ -118,6 +119,11 @@ pub enum MirInstruction {
         span: ByteSpan,
     },
     UnitConstant {
+        span: ByteSpan,
+    },
+    ParameterRead {
+        output: MirValueId,
+        parameter: MirParameterId,
         span: ByteSpan,
     },
     CheckedArithmetic {
@@ -215,6 +221,7 @@ impl MirInstruction {
             | Self::FloatConstant { span, .. }
             | Self::ByteConstant { span, .. }
             | Self::UnitConstant { span }
+            | Self::ParameterRead { span, .. }
             | Self::CheckedArithmetic { span, .. }
             | Self::Unary { span, .. }
             | Self::LogicalNot { span, .. }
@@ -443,6 +450,13 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::UnitLiteral => {
                     instructions.push(MirInstruction::unit_constant(expression.span()))
                 }
+                HirExpressionKind::ParameterRead(parameter) => {
+                    instructions.push(MirInstruction::ParameterRead {
+                        output,
+                        parameter: MirParameterId::from_raw(parameter.index()),
+                        span: expression.span(),
+                    });
+                }
                 HirExpressionKind::Binary(binary) => {
                     let left = MirValueId::from_raw(binary.left().index());
                     let right = MirValueId::from_raw(binary.right().index());
@@ -516,7 +530,11 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
         let mir_function = MirFunction::new(
             MirFunctionId::from_raw(function.id().index()),
             function.span(),
-            vec![],
+            function
+                .parameters()
+                .iter()
+                .map(|parameter| (MirValueId::from_raw(parameter.id().index()), parameter.ty()))
+                .collect(),
             function.return_type(),
             vec![],
             vec![MirBasicBlock::new(
@@ -663,6 +681,13 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::ParameterRead(parameter) => {
+                self.push(MirInstruction::ParameterRead {
+                    output,
+                    parameter: MirParameterId::from_raw(parameter.index()),
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::UnitLiteral => {
                 self.push(MirInstruction::unit_constant(expression.span()));
             }
@@ -806,7 +831,11 @@ impl<'a> ShortCircuitLowerer<'a> {
         Ok(MirFunction::new(
             MirFunctionId::from_raw(self.function.id().index()),
             self.function.span(),
-            vec![],
+            self.function
+                .parameters()
+                .iter()
+                .map(|parameter| (MirValueId::from_raw(parameter.id().index()), parameter.ty()))
+                .collect(),
             self.function.return_type(),
             self.locals,
             blocks,

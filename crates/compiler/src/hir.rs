@@ -105,6 +105,30 @@ pub fn lower_checked_hir_source(
         let id = HirFunctionId::from_raw(functions.len());
         let mut expressions = Vec::new();
         let mut returns = Vec::new();
+        let parameters = source
+            .parsed
+            .function_parameters
+            .iter()
+            .filter(|parameter| parameter.function == function.declaration)
+            .enumerate()
+            .map(|(index, parameter)| {
+                let parameter_span = source
+                    .parsed
+                    .arena
+                    .node(parameter.parameter)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?
+                    .span;
+                let ty = *signature
+                    .parameter_types()
+                    .get(index)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                Ok(HirParameter::new(
+                    HirParameterId::from_raw(index),
+                    parameter_span,
+                    ty,
+                ))
+            })
+            .collect::<Result<Vec<_>, HirLoweringError>>()?;
         for returned in source
             .parsed
             .return_statements
@@ -114,7 +138,8 @@ pub fn lower_checked_hir_source(
             let value = returned
                 .value
                 .ok_or(HirLoweringError::UnsupportedExpression)?;
-            let expression = lower_expression(&source, value, &mut expressions)?;
+            let expression =
+                lower_expression(&source, function.declaration, value, &mut expressions)?;
             let return_span = source
                 .parsed
                 .arena
@@ -131,7 +156,7 @@ pub fn lower_checked_hir_source(
                 span,
                 declaration_is_main(source.parsed, function.declaration),
                 signature.return_type(),
-                vec![],
+                parameters,
                 vec![],
                 expressions,
                 returns,
@@ -146,6 +171,7 @@ pub fn lower_checked_hir_source(
 
 fn lower_expression(
     source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
     expression: crate::ast::AstNodeId,
     output: &mut Vec<HirExpression>,
 ) -> Result<HirExpressionId, HirLoweringError> {
@@ -222,8 +248,8 @@ fn lower_expression(
         .iter()
         .find(|binary| binary.expression == expression)
     {
-        let left = lower_expression(source, binary.left, output)?;
-        let right = lower_expression(source, binary.right, output)?;
+        let left = lower_expression(source, function_declaration, binary.left, output)?;
+        let right = lower_expression(source, function_declaration, binary.right, output)?;
         output.push(HirExpression::binary(
             id,
             span,
@@ -240,13 +266,33 @@ fn lower_expression(
         .iter()
         .find(|unary| unary.expression == expression)
     {
-        let operand = lower_expression(source, unary.operand, output)?;
+        let operand = lower_expression(source, function_declaration, unary.operand, output)?;
         output.push(HirExpression::unary(
             id,
             span,
             ty,
             lower_unary_operator(unary.operator)?,
             operand,
+        ));
+        return Ok(id);
+    }
+    if let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == expression)
+        && let Some(parameter_index) = source
+            .parsed
+            .function_parameters
+            .iter()
+            .filter(|parameter| parameter.function == function_declaration)
+            .position(|parameter| parameter.name == name.name)
+    {
+        output.push(HirExpression::parameter_read(
+            id,
+            span,
+            ty,
+            HirParameterId::from_raw(parameter_index),
         ));
         return Ok(id);
     }
@@ -271,7 +317,7 @@ fn lower_expression(
         let arguments = call
             .arguments
             .iter()
-            .map(|argument| lower_expression(source, *argument, output))
+            .map(|argument| lower_expression(source, function_declaration, *argument, output))
             .collect::<Result<Vec<_>, _>>()?;
         output.push(HirExpression::direct_call(
             id,
@@ -493,6 +539,7 @@ pub enum HirExpressionKind {
     UnitLiteral,
     FloatLiteral(u64),
     ByteLiteral(u8),
+    ParameterRead(HirParameterId),
     LocalRead(HirLocalId),
     Unary(HirUnary),
     Binary(HirBinary),
@@ -557,6 +604,19 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::LocalRead(local),
+        }
+    }
+    pub fn parameter_read(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        parameter: HirParameterId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ParameterRead(parameter),
         }
     }
     pub fn unary(
@@ -800,6 +860,15 @@ impl HirFunction {
             .find(|expression| expression.id == id)
             .and_then(|expression| match expression.kind {
                 HirExpressionKind::LocalRead(local) => Some(local),
+                _ => None,
+            })
+    }
+    pub fn parameter_read(&self, id: HirExpressionId) -> Option<HirParameterId> {
+        self.expressions
+            .iter()
+            .find(|expression| expression.id == id)
+            .and_then(|expression| match expression.kind {
+                HirExpressionKind::ParameterRead(parameter) => Some(parameter),
                 _ => None,
             })
     }

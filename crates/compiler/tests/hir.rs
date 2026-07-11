@@ -322,6 +322,56 @@ fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() 
 }
 
 #[test]
+fn m0035_hir_models_primitive_parameter_reads() {
+    let file = SourceFileId::from_raw(924);
+    let span = ByteSpan::new(file, 0, 3).unwrap();
+    let float_type = TypeId::from_raw(5);
+    let expression = HirExpression::parameter_read(
+        HirExpressionId::from_raw(0),
+        span,
+        float_type,
+        HirParameterId::from_raw(0),
+    );
+
+    assert!(matches!(
+        expression.kind(),
+        HirExpressionKind::ParameterRead(_)
+    ));
+}
+
+#[test]
+fn m0035_checked_source_lowers_primitive_parameter_reads() {
+    let file = SourceFileId::from_raw(926);
+    let parsed = parse_source(file, "fun echo(value: Float): Float { return value; }");
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    let return_expression = parsed.return_statements[0].value.unwrap();
+    let float_type = TypeId::from_raw(5);
+    let expression_types = vec![ExpressionType::new(return_expression, float_type)];
+    let signatures = vec![FunctionSignature::new(
+        parsed.function_declarations[0].declaration,
+        vec![float_type],
+        float_type,
+    )];
+
+    let module = lower_checked_hir_source(CheckedHirSource::new(
+        ModuleName::parse("app").unwrap(),
+        PackageNamespace::parse("app").unwrap(),
+        &parsed,
+        &signatures,
+        &expression_types,
+        true,
+    ))
+    .unwrap();
+
+    assert_eq!(module.functions()[0].parameters().len(), 1);
+    assert!(matches!(
+        module.functions()[0].expressions()[0].kind(),
+        HirExpressionKind::ParameterRead(_)
+    ));
+}
+
+#[test]
 fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
     let parsed = parse_source(
         SourceFileId::from_raw(203),

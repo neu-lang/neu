@@ -401,6 +401,16 @@ fn lower_instruction(
             Ok(())
         }
         MirInstruction::UnitConstant { .. } => Ok(()),
+        MirInstruction::ParameterRead {
+            output, parameter, ..
+        } => {
+            let value = values
+                .get(&MirValueId::from_raw(parameter.index()))
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, value);
+            Ok(())
+        }
         MirInstruction::Unary {
             output,
             operation: MirUnary::Plus,
