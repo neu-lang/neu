@@ -1942,6 +1942,7 @@ pub fn check_m0028_unsupported_executable_forms(
                 node.kind,
                 AstNodeKind::ImportDeclaration
                     | AstNodeKind::ClassDeclaration
+                    | AstNodeKind::NewExpression
                     | AstNodeKind::StructDeclaration
                     | AstNodeKind::EnumDeclaration
                     | AstNodeKind::InterfaceDeclaration

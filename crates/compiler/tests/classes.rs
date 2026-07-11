@@ -8,6 +8,8 @@ use compiler::{
         check_m0070_dispatch, class_lifecycle_facts, type_m0068_class_types,
     },
 };
+use std::{fs, path::PathBuf};
+use target_lexicon::Triple;
 
 #[test]
 fn parses_class_interface_and_field_surface() {
@@ -127,4 +129,26 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
             .iter()
             .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::MissingInterfaceMethod)
     );
+}
+
+#[test]
+fn class_source_stops_before_backend_until_object_lowering_exists() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-class-boundary-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compiler::driver::compile_source_to_executable(
+        "class Point(val x: Int) {} public fun main(): Int { val point: Point = new Point(7); return 0; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6808),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("UnsupportedExecutableForms"));
+    let _ = fs::remove_dir_all(workspace);
 }
