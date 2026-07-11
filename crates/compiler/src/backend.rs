@@ -202,6 +202,34 @@ fn lower_instruction(
             values.insert(*output, builder.ins().srem(left, right));
             Ok(())
         }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation,
+            left,
+            right,
+            ..
+        } if matches!(
+            operation,
+            MirArithmetic::BitwiseAnd | MirArithmetic::BitwiseOr | MirArithmetic::BitwiseXor
+        ) =>
+        {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let value = match operation {
+                MirArithmetic::BitwiseAnd => builder.ins().band(left, right),
+                MirArithmetic::BitwiseOr => builder.ins().bor(left, right),
+                MirArithmetic::BitwiseXor => builder.ins().bxor(left, right),
+                _ => unreachable!("guard accepts only bitwise operations"),
+            };
+            values.insert(*output, value);
+            Ok(())
+        }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),
     }
 }

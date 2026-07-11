@@ -55,7 +55,7 @@ fn m0031_rejects_unsupported_mir_instruction() {
             MirBlockId::from_raw(0),
             vec![MirInstruction::CheckedArithmetic {
                 output: MirValueId::from_raw(2),
-                operation: MirArithmetic::Exponent,
+                operation: MirArithmetic::ShiftLeft,
                 left: MirValueId::from_raw(0),
                 right: MirValueId::from_raw(1),
                 span,
@@ -243,4 +243,53 @@ fn m0031_lowers_checked_remainder() {
     );
     let ir = lower_mir_function_to_cranelift(&function, &types).unwrap();
     assert!(ir.contains("srem"), "{ir}");
+}
+
+#[test]
+fn m0031_lowers_bitwise_operations() {
+    let file = SourceFileId::from_raw(407);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(7),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![
+                MirInstruction::int_constant(MirValueId::from_raw(0), 6, span),
+                MirInstruction::int_constant(MirValueId::from_raw(1), 3, span),
+                MirInstruction::CheckedArithmetic {
+                    output: MirValueId::from_raw(2),
+                    operation: MirArithmetic::BitwiseAnd,
+                    left: MirValueId::from_raw(0),
+                    right: MirValueId::from_raw(1),
+                    span,
+                },
+                MirInstruction::CheckedArithmetic {
+                    output: MirValueId::from_raw(3),
+                    operation: MirArithmetic::BitwiseOr,
+                    left: MirValueId::from_raw(2),
+                    right: MirValueId::from_raw(1),
+                    span,
+                },
+                MirInstruction::CheckedArithmetic {
+                    output: MirValueId::from_raw(4),
+                    operation: MirArithmetic::BitwiseXor,
+                    left: MirValueId::from_raw(3),
+                    right: MirValueId::from_raw(0),
+                    span,
+                },
+            ],
+            MirTerminator::return_value(MirValueId::from_raw(4), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let ir = lower_mir_function_to_cranelift(&function, &types).unwrap();
+    assert!(ir.contains("band"), "{ir}");
+    assert!(ir.contains("bor"), "{ir}");
+    assert!(ir.contains("bxor"), "{ir}");
 }
