@@ -746,3 +746,88 @@ move-only nominal runtime values, slices, allocation outside ADR-0064, and FFI
 remain deferred where their existing frontend or backend contracts are absent;
 fixed-size inline arrays follow ADR-0063 and owned UTF-8 strings follow
 ADR-0064.
+
+## ADR-0065: Class And Interface Foundation
+
+Classes and interfaces are nominal identities consisting of their declaring
+module, package, declaration, and later generic arguments. A class has at most
+one direct superclass and may implement multiple interfaces. Interfaces may
+extend interfaces. Structural conformance, multiple class inheritance, traits,
+mixins, nested classes, companion objects, and generic classes/interfaces are
+deferred.
+
+Classes may declare typed `val` or `var` fields and `fun` methods. Visibility is
+`public`, `internal`, or `private` under ADR-0025; `protected` is deferred.
+Interfaces declare required methods. Default methods, interface state,
+extension methods, and operator overloading are deferred. Implementations must
+provide exactly one compatible method and use explicit `override` when
+replacing an inherited method. Field hiding and ambiguous interface methods are
+diagnostics.
+
+Instance methods have an implicit non-null `this`; `this.` is available for
+shadowing. Local names shadow members. `this` cannot be rebound or escape before
+construction completes. Class/interface values are nullable only with the
+accepted postfix nullable type form; safe access, casts, type tests, and
+downcasts are deferred. Null checks use existing flow typing before dispatch.
+
+Instances and fields are move-only by default. Fields own their values. Read
+receiver use borrows implicitly, mutation requires an exclusive inferred
+effect, and methods do not implicitly consume `this`. `Send` and `Share` are
+derived from owned fields and immutable state under ADR-0037. Cyclic owning
+graphs, tracing collection, reflection, serialization, and FFI remain
+deferred.
+
+## ADR-0066: Inheritance And Dispatch
+
+Neu uses one direct superclass and multiple interfaces. Only explicitly `open`
+methods may be overridden; `final` is the default. Overrides require explicit
+`override` and compatible parameter types, return type, visibility, receiver
+effects, and capabilities. Private methods are not virtual. Field hiding is
+rejected, and there is no `protected` visibility.
+
+`super.method(...)` is valid only in a derived instance method or constructor,
+selects the immediate superclass implementation, and cannot be stored,
+returned, or used to bypass visibility. Unqualified lookup uses the current
+receiver and local bindings shadow members; `this.member` qualifies receiver
+lookup. A class must satisfy every required interface method exactly once.
+Default-method conflict rules are deferred because default methods are
+deferred.
+
+Non-overridden or final methods use compiler-private direct dispatch. Open class
+methods use compiler-private virtual metadata and interface calls use
+compiler-private interface tables. No object, vtable, interface-table, method,
+or symbol layout is a stable public ABI or FFI contract. Separate compilation
+exports nominal method identity, visibility, signatures, override relationships,
+capabilities, and ownership-effect metadata, not target-specific table
+layouts. Downcasts, runtime type tests, nullable dispatch, reflection,
+multiple dispatch, dynamic loading, and FFI vtables are deferred.
+
+## ADR-0067: Object Lifecycle And ABI
+
+Classes use one primary constructor form and have no implicit default
+constructor. Secondary constructors and overload resolution are deferred.
+Fields require declared types and exactly-once initialization before the object
+is observable. Initialization follows declaration order and explicit
+superclass construction order. `this` cannot escape or be used as a fully
+initialized receiver before construction completes.
+
+Instances are compiler-managed owned values. The compiler may use local or
+target-pack-managed heap storage, but source code cannot request or observe
+placement. There is no `free`, allocator primitive, stable pointer, tracing
+collector, or user-visible deallocation API. Objects move by default and are
+not copied unless a later accepted copyability decision proves all owned state
+copyable. Receiver and field effects follow ADR-0062.
+
+Fields are destroyed recursively in reverse declaration order, with derived
+fields before inherited superclass fields. Partially initialized objects are
+never observable; initialized fields are cleaned in reverse order on rejected
+construction or runtime allocation failure, and allocation failure traps
+non-successfully. Exceptions, `Result` construction APIs, and catch behavior
+are deferred. Fields have no implicit null or zero state, and reads before
+initialization are diagnostics. Cyclic owning graphs are rejected or deferred.
+
+Object fields, offsets, alignment, padding, allocation headers, vtables, and
+interface tables are compiler-private target-pack contracts. Separate
+compilation carries nominal identity, field types, visibility, lifecycle,
+capability, and ownership metadata, never raw offsets. Public object layout,
+stable object ABI, FFI, and standard-library allocation remain deferred.
