@@ -221,6 +221,22 @@ fn lower_expression(
         ));
         return Ok(id);
     }
+    if let Some(unary) = source
+        .parsed
+        .unary_expressions
+        .iter()
+        .find(|unary| unary.expression == expression)
+    {
+        let operand = lower_expression(source, unary.operand, output)?;
+        output.push(HirExpression::unary(
+            id,
+            span,
+            ty,
+            lower_unary_operator(unary.operator)?,
+            operand,
+        ));
+        return Ok(id);
+    }
     if let Some(call) = source
         .parsed
         .call_expressions
@@ -265,6 +281,14 @@ fn lower_binary_operator(
     operator: ParsedBinaryOperator,
 ) -> Result<HirBinaryOperator, HirLoweringError> {
     Ok(match operator {
+        ParsedBinaryOperator::LogicalOr => HirBinaryOperator::LogicalOr,
+        ParsedBinaryOperator::LogicalAnd => HirBinaryOperator::LogicalAnd,
+        ParsedBinaryOperator::Equal => HirBinaryOperator::Equal,
+        ParsedBinaryOperator::NotEqual => HirBinaryOperator::NotEqual,
+        ParsedBinaryOperator::Less => HirBinaryOperator::Less,
+        ParsedBinaryOperator::Greater => HirBinaryOperator::Greater,
+        ParsedBinaryOperator::LessEqual => HirBinaryOperator::LessEqual,
+        ParsedBinaryOperator::GreaterEqual => HirBinaryOperator::GreaterEqual,
         ParsedBinaryOperator::Plus => HirBinaryOperator::Plus,
         ParsedBinaryOperator::Minus => HirBinaryOperator::Minus,
         ParsedBinaryOperator::Star => HirBinaryOperator::Multiply,
@@ -276,7 +300,17 @@ fn lower_binary_operator(
         ParsedBinaryOperator::BitwiseXor => HirBinaryOperator::BitwiseXor,
         ParsedBinaryOperator::ShiftLeft => HirBinaryOperator::ShiftLeft,
         ParsedBinaryOperator::ShiftRight => HirBinaryOperator::ShiftRight,
-        _ => return Err(HirLoweringError::UnsupportedExpression),
+    })
+}
+
+fn lower_unary_operator(
+    operator: crate::parser::ParsedUnaryOperator,
+) -> Result<HirUnaryOperator, HirLoweringError> {
+    Ok(match operator {
+        crate::parser::ParsedUnaryOperator::Not => HirUnaryOperator::Not,
+        crate::parser::ParsedUnaryOperator::Plus => HirUnaryOperator::Plus,
+        crate::parser::ParsedUnaryOperator::Minus => HirUnaryOperator::Minus,
+        crate::parser::ParsedUnaryOperator::BitwiseNot => HirUnaryOperator::BitwiseNot,
     })
 }
 
@@ -357,6 +391,7 @@ pub struct HirDirectCall {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirUnaryOperator {
+    Not,
     Plus,
     Minus,
     BitwiseNot,
@@ -364,6 +399,14 @@ pub enum HirUnaryOperator {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirBinaryOperator {
+    LogicalOr,
+    LogicalAnd,
+    Equal,
+    NotEqual,
+    Less,
+    Greater,
+    LessEqual,
+    GreaterEqual,
     Plus,
     Minus,
     Multiply,

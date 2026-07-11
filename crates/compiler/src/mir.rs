@@ -384,7 +384,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
                 HirExpressionKind::Unary(unary) => instructions.push(MirInstruction::Unary {
                     output,
-                    operation: lower_unary(unary.operator()),
+                    operation: lower_unary(unary.operator())?,
                     operand: MirValueId::from_raw(unary.operand().index()),
                     span: expression.span(),
                 }),
@@ -479,6 +479,14 @@ fn require_hir_expression_type(
 
 fn lower_binary(operator: HirBinaryOperator) -> Result<MirArithmetic, MirLoweringError> {
     Ok(match operator {
+        HirBinaryOperator::LogicalOr
+        | HirBinaryOperator::LogicalAnd
+        | HirBinaryOperator::Equal
+        | HirBinaryOperator::NotEqual
+        | HirBinaryOperator::Less
+        | HirBinaryOperator::Greater
+        | HirBinaryOperator::LessEqual
+        | HirBinaryOperator::GreaterEqual => return Err(MirLoweringError::UnsupportedExpression),
         HirBinaryOperator::Plus => MirArithmetic::Add,
         HirBinaryOperator::Minus => MirArithmetic::Subtract,
         HirBinaryOperator::Multiply => MirArithmetic::Multiply,
@@ -492,10 +500,11 @@ fn lower_binary(operator: HirBinaryOperator) -> Result<MirArithmetic, MirLowerin
         HirBinaryOperator::ShiftRight => MirArithmetic::ShiftRight,
     })
 }
-fn lower_unary(operator: HirUnaryOperator) -> MirUnary {
-    match operator {
+fn lower_unary(operator: HirUnaryOperator) -> Result<MirUnary, MirLoweringError> {
+    Ok(match operator {
+        HirUnaryOperator::Not => return Err(MirLoweringError::UnsupportedExpression),
         HirUnaryOperator::Plus => MirUnary::Plus,
         HirUnaryOperator::Minus => MirUnary::Negate,
         HirUnaryOperator::BitwiseNot => MirUnary::BitwiseNot,
-    }
+    })
 }

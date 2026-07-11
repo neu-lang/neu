@@ -2152,7 +2152,9 @@ pub fn type_m0028_executable_int_operators(
         let mut changed = false;
 
         for unary in unary_expressions {
-            if completed.contains(&unary.expression) {
+            if completed.contains(&unary.expression)
+                || !is_m0028_executable_int_unary_operator(unary.operator)
+            {
                 continue;
             }
             let Some(operand_type) = report.expression_type(unary.operand) else {
@@ -2239,6 +2241,15 @@ fn is_m0028_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
             | ParsedBinaryOperator::BitwiseXor
             | ParsedBinaryOperator::ShiftLeft
             | ParsedBinaryOperator::ShiftRight
+    )
+}
+
+fn is_m0028_executable_int_unary_operator(operator: crate::parser::ParsedUnaryOperator) -> bool {
+    matches!(
+        operator,
+        crate::parser::ParsedUnaryOperator::Plus
+            | crate::parser::ParsedUnaryOperator::Minus
+            | crate::parser::ParsedUnaryOperator::BitwiseNot
     )
 }
 
@@ -3025,13 +3036,13 @@ fn type_unsupported_expressions(
 
     for node in arena.nodes() {
         if executable_operators.is_some_and(|(unary, binary)| {
-            unary
-                .iter()
-                .any(|expression| expression.expression == node.id)
-                || binary.iter().any(|expression| {
-                    expression.expression == node.id
-                        && is_m0028_executable_int_operator(expression.operator)
-                })
+            unary.iter().any(|expression| {
+                expression.expression == node.id
+                    && is_m0028_executable_int_unary_operator(expression.operator)
+            }) || binary.iter().any(|expression| {
+                expression.expression == node.id
+                    && is_m0028_executable_int_operator(expression.operator)
+            })
         }) {
             continue;
         }

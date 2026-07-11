@@ -169,6 +169,37 @@ fn m0035_checked_source_lowers_bool_unit_and_float_literals_to_hir() {
 }
 
 #[test]
+fn m0035_hir_preserves_primitive_operator_kinds_and_operand_order() {
+    let file = SourceFileId::from_raw(909);
+    let span = ByteSpan::new(file, 0, 5).unwrap();
+    let bool_type = TypeId::from_raw(0);
+    let left = HirExpressionId::from_raw(0);
+    let right = HirExpressionId::from_raw(1);
+    let logical = HirExpression::binary(
+        HirExpressionId::from_raw(2),
+        span,
+        bool_type,
+        HirBinaryOperator::LogicalAnd,
+        left,
+        right,
+    );
+    let not = HirExpression::unary(
+        HirExpressionId::from_raw(3),
+        span,
+        bool_type,
+        HirUnaryOperator::Not,
+        left,
+    );
+
+    assert!(matches!(logical.kind(), HirExpressionKind::Binary(binary)
+        if binary.operator() == HirBinaryOperator::LogicalAnd
+            && binary.left() == left
+            && binary.right() == right));
+    assert!(matches!(not.kind(), HirExpressionKind::Unary(unary)
+        if unary.operator() == HirUnaryOperator::Not && unary.operand() == left));
+}
+
+#[test]
 fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() {
     let file = SourceFileId::from_raw(201);
     let span = ByteSpan::new(file, 0, 1).unwrap();
