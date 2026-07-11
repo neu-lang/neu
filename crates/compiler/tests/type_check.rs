@@ -1715,6 +1715,48 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
 }
 
 #[test]
+fn m0035_executable_core_types_primitive_operator_source() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(914),
+        "fun run() { const ready: Bool = !true; const ratio: Float = 1.5 + 2.0; const ordered: Bool = 1.5 < 2.0; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    assert!(
+        report.diagnostics().is_empty(),
+        "{:?}",
+        report.diagnostics()
+    );
+    assert_eq!(
+        report.expression_type(parsed.unary_expressions[0].expression),
+        Some(TypeId::from_raw(0))
+    );
+    assert_eq!(
+        report.expression_type(parsed.binary_expressions[0].expression),
+        Some(TypeId::from_raw(5))
+    );
+    assert_eq!(
+        report.expression_type(parsed.binary_expressions[1].expression),
+        Some(TypeId::from_raw(0))
+    );
+}
+
+#[test]
 fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
     let parsed = parse_source(
         SourceFileId::from_raw(64),
@@ -3770,7 +3812,7 @@ fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
 }
 
 #[test]
-fn m0028_core_keeps_non_executable_operators_deferred() {
+fn m0035_core_accepts_boolean_and_equality_operators() {
     let parsed = parse_source(
         SourceFileId::from_raw(95),
         "fun run() { const logical = !true; const comparison = 1 == 2; }",
@@ -3797,8 +3839,46 @@ fn m0028_core_keeps_non_executable_operators_deferred() {
         .iter()
         .map(|diagnostic| diagnostic.rule())
         .collect();
-    assert!(rules.contains(&TypeRuleDiagnostic::UnaryExpressionDeferred));
-    assert!(rules.contains(&TypeRuleDiagnostic::BinaryExpressionDeferred));
+    assert!(!rules.contains(&TypeRuleDiagnostic::UnaryExpressionDeferred));
+    assert!(!rules.contains(&TypeRuleDiagnostic::BinaryExpressionDeferred));
+}
+
+#[test]
+fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(915),
+        "fun run() { const bad_bool: Bool = !1; const bad_float: Float = 1.5 + 1; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| { diagnostic.kind() == TypeCheckDiagnosticKind::TypeMismatch })
+    );
+    assert!(report.diagnostics().iter().all(|diagnostic| {
+        !matches!(
+            diagnostic.rule(),
+            TypeRuleDiagnostic::UnaryExpressionDeferred
+                | TypeRuleDiagnostic::BinaryExpressionDeferred
+        )
+    }));
 }
 
 #[test]

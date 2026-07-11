@@ -1268,7 +1268,7 @@ impl TypeCheckReport {
         self.assignment_checks
             .iter()
             .find(|entry| entry.statement() == statement)
-            .copied()
+            .cloned()
     }
 
     pub fn diagnostics(&self) -> &[TypeCheckDiagnostic] {
@@ -3038,10 +3038,12 @@ fn type_unsupported_expressions(
         if executable_operators.is_some_and(|(unary, binary)| {
             unary.iter().any(|expression| {
                 expression.expression == node.id
-                    && is_m0028_executable_int_unary_operator(expression.operator)
+                    && (is_m0028_executable_int_unary_operator(expression.operator)
+                        || expression.operator == crate::parser::ParsedUnaryOperator::Not)
             }) || binary.iter().any(|expression| {
                 expression.expression == node.id
-                    && is_m0028_executable_int_operator(expression.operator)
+                    && (is_m0028_executable_int_operator(expression.operator)
+                        || is_m0035_primitive_binary_operator(expression.operator))
             })
         }) {
             continue;
@@ -3053,6 +3055,30 @@ fn type_unsupported_expressions(
     }
 
     report
+}
+
+fn is_m0035_primitive_binary_operator(operator: ParsedBinaryOperator) -> bool {
+    matches!(
+        operator,
+        ParsedBinaryOperator::LogicalOr
+            | ParsedBinaryOperator::LogicalAnd
+            | ParsedBinaryOperator::Equal
+            | ParsedBinaryOperator::NotEqual
+            | ParsedBinaryOperator::Less
+            | ParsedBinaryOperator::Greater
+            | ParsedBinaryOperator::LessEqual
+            | ParsedBinaryOperator::GreaterEqual
+            | ParsedBinaryOperator::Plus
+            | ParsedBinaryOperator::Minus
+            | ParsedBinaryOperator::Star
+            | ParsedBinaryOperator::Slash
+            | ParsedBinaryOperator::Percent
+            | ParsedBinaryOperator::BitwiseAnd
+            | ParsedBinaryOperator::BitwiseOr
+            | ParsedBinaryOperator::BitwiseXor
+            | ParsedBinaryOperator::ShiftLeft
+            | ParsedBinaryOperator::ShiftRight
+    )
 }
 
 fn unsupported_expression_rule(kind: AstNodeKind) -> Option<TypeRuleDiagnostic> {
@@ -3231,14 +3257,51 @@ fn type_core_with_arena(
     );
 
     if let Some((unary_expressions, binary_expressions)) = executable_operators {
+        let int_unary_expressions: Vec<_> = unary_expressions
+            .iter()
+            .filter(|expression| {
+                !matches!(
+                    report.expression_type(expression.operand),
+                    Some(ty) if ty == primitives.float_id || ty == primitives.byte_id
+                )
+            })
+            .cloned()
+            .collect();
+        let int_binary_expressions: Vec<_> = binary_expressions
+            .iter()
+            .filter(|expression| {
+                !matches!(
+                    (
+                        report.expression_type(expression.left),
+                        report.expression_type(expression.right),
+                    ),
+                    (Some(left), Some(right))
+                        if left == primitives.float_id
+                            || left == primitives.byte_id
+                            || right == primitives.float_id
+                            || right == primitives.byte_id
+                )
+            })
+            .cloned()
+            .collect();
         let operator_report = type_m0028_executable_int_operators(
-            unary_expressions,
-            binary_expressions,
+            &int_unary_expressions,
+            &int_binary_expressions,
             grouped_expressions,
             report.expression_types(),
             primitives.int_id,
         );
         merge_type_check_report(&mut report, operator_report);
+        let primitive_report = type_m0035_primitive_operators(
+            unary_expressions,
+            binary_expressions,
+            report.expression_types(),
+            primitives.bool_id,
+            primitives.float_id,
+            primitives.byte_id,
+            primitives.unit_id,
+        );
+        merge_type_check_report(&mut report, primitive_report);
     }
 
     for declaration in declarations {
