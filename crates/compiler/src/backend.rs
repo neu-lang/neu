@@ -530,6 +530,7 @@ fn require_bootstrap_runtime_type(
                 | PrimitiveType::String
                 | PrimitiveType::Unit
         )) | Some(TypeKind::Array(_))
+            | Some(TypeKind::Nominal(_))
     )
     .then_some(())
     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)
@@ -542,6 +543,7 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Float)) => Some(types::F64),
         Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
         Some(TypeKind::Primitive(PrimitiveType::String)) => Some(types::I64),
+        Some(TypeKind::Nominal(_)) => Some(types::I64),
         _ => None,
     }
 }
@@ -838,6 +840,54 @@ fn lower_instruction(
                 result.push(builder.use_var(variable));
             }
             aggregate_values.insert(*output, result);
+            Ok(())
+        }
+        MirInstruction::NewObject {
+            output, arguments, ..
+        } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let word_count = i64::try_from(arguments.len().max(1))
+                .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?;
+            let size = builder.ins().iconst(types::I64, word_count * 8);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let allocation = builder.ins().call(malloc_ref, &[size]);
+            let pointer = *builder
+                .inst_results(allocation)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(pointer, TrapCode::unwrap_user(4));
+            for (index, argument) in arguments.iter().enumerate() {
+                let value = values
+                    .get(argument)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                let offset = i32::try_from(index * 8)
+                    .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?;
+                builder
+                    .ins()
+                    .store(MemFlagsData::new(), value, pointer, offset);
+            }
+            values.insert(*output, pointer);
+            Ok(())
+        }
+        MirInstruction::FieldLoad {
+            output,
+            receiver,
+            index,
+            ..
+        } => {
+            let pointer = values
+                .get(receiver)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let offset = i32::try_from(index * 8)
+                .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?;
+            let value = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, offset);
+            values.insert(*output, value);
             Ok(())
         }
         MirInstruction::ArrayAssign { local, value, .. } => {

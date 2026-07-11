@@ -3576,6 +3576,7 @@ fn expression_node_kind(kind: AstNodeKind) -> bool {
             | AstNodeKind::BinaryExpression
             | AstNodeKind::UnaryExpression
             | AstNodeKind::CallExpression
+            | AstNodeKind::NewExpression
             | AstNodeKind::MemberExpression
             | AstNodeKind::ArrayLiteralExpression
             | AstNodeKind::IndexExpression

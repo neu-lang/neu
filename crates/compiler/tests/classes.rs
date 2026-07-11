@@ -132,13 +132,13 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 }
 
 #[test]
-fn class_source_stops_before_backend_until_object_lowering_exists() {
+fn invalid_class_source_stops_before_backend() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-class-boundary-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let error = compiler::driver::compile_source_to_executable(
-        "class Point(val x: Int) {} public fun main(): Int { val point: Point = new Point(7); return 0; }",
+        "class Point { protected val x: Int; } public fun main(): Int { return 0; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6808),
             ModuleName::parse("classes").unwrap(),
@@ -149,6 +149,31 @@ fn class_source_stops_before_backend_until_object_lowering_exists() {
         ),
     )
     .unwrap_err();
-    assert!(format!("{error:?}").contains("UnsupportedExecutableForms"));
+    assert!(format!("{error:?}").contains("ParseDiagnostics"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn constructs_a_minimal_owned_class_through_the_target_pack() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-class-smoke-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Point(val value: Int) {} public fun main(): Int { val point: Point = new Point(7); return point.value; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6809),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(7)
+    );
     let _ = fs::remove_dir_all(workspace);
 }

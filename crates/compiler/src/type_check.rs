@@ -901,6 +901,40 @@ pub fn apply_m0068_class_type_facts(
     });
 }
 
+pub fn apply_m0068_field_access_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+) {
+    for member in &parsed.member_expressions {
+        if member.name == "length" {
+            continue;
+        }
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        let Some(class) = classes
+            .classes
+            .iter()
+            .find(|class| class.type_id == receiver_type)
+        else {
+            continue;
+        };
+        let Some(field) = classes
+            .fields
+            .iter()
+            .find(|field| field.owner == class.declaration && field.name == member.name)
+        else {
+            continue;
+        };
+        report.replace_expression_type(ExpressionType::new(member.expression, field.type_id));
+        report.retain_diagnostics(|diagnostic| {
+            diagnostic.node() != member.expression
+                || diagnostic.rule() != TypeRuleDiagnostic::MemberExpressionDeferred
+        });
+    }
+}
+
 fn primitive_annotation_type_for_node(
     annotation: AstNodeId,
     references: &[ParsedTypeNameReference],
@@ -2022,8 +2056,6 @@ pub fn check_m0028_unsupported_executable_forms(
             matches!(
                 node.kind,
                 AstNodeKind::ImportDeclaration
-                    | AstNodeKind::ClassDeclaration
-                    | AstNodeKind::NewExpression
                     | AstNodeKind::StructDeclaration
                     | AstNodeKind::EnumDeclaration
                     | AstNodeKind::InterfaceDeclaration
@@ -2058,7 +2090,10 @@ pub fn check_m0028_unsupported_executable_forms(
                 !matches!(
                     reference.name.as_str(),
                     "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte"
-                )
+                ) && !parsed
+                    .class_declarations
+                    .iter()
+                    .any(|class| class.name == reference.name)
             })
             .map(|reference| reference.name_span),
     );

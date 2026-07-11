@@ -509,6 +509,7 @@ fn lower_expression(
                 ty,
                 receiver,
                 member.name.clone(),
+                field_index_for_receiver(source, member.receiver, &member.name),
             ));
         }
         return Ok(id);
@@ -700,6 +701,80 @@ fn lower_expression(
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn field_index_for_receiver(
+    source: &CheckedHirSource<'_>,
+    receiver: crate::ast::AstNodeId,
+    field_name: &str,
+) -> usize {
+    let class_name = source
+        .parsed
+        .new_expressions
+        .iter()
+        .find(|expression| expression.expression == receiver)
+        .map(|expression| expression.type_name.clone())
+        .or_else(|| {
+            let name = source
+                .parsed
+                .name_references
+                .iter()
+                .find(|name| name.reference == receiver)?;
+            let binding = source
+                .parsed
+                .local_binding_names
+                .iter()
+                .find(|binding| binding.name == name.name)?;
+            let declaration = source
+                .parsed
+                .local_declarations
+                .iter()
+                .find(|declaration| declaration.declaration == binding.binding)?;
+            let annotation = declaration.annotation?;
+            source
+                .parsed
+                .type_name_references
+                .iter()
+                .find(|reference| reference.reference == annotation)
+                .map(|reference| reference.name.clone())
+        });
+    let Some(class_name) = class_name else {
+        return 0;
+    };
+    let Some(class) = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name)
+    else {
+        return 0;
+    };
+    let mut index = 0;
+    for parameter in class
+        .constructor_parameters
+        .iter()
+        .filter(|parameter| parameter.field)
+    {
+        if parameter.name == field_name {
+            return index;
+        }
+        index += 1;
+    }
+    for field in &class.fields {
+        let Some(field) = source
+            .parsed
+            .field_declarations
+            .iter()
+            .find(|candidate| candidate.declaration == *field)
+        else {
+            continue;
+        };
+        if field.name == field_name {
+            return index;
+        }
+        index += 1;
+    }
+    0
 }
 
 fn lower_control_flow_block(
@@ -1242,6 +1317,7 @@ pub enum HirExpressionKind {
     FieldAccess {
         receiver: HirExpressionId,
         name: String,
+        index: usize,
     },
     NewObject {
         type_name: String,
@@ -1423,12 +1499,17 @@ impl HirExpression {
         ty: TypeId,
         receiver: HirExpressionId,
         name: String,
+        index: usize,
     ) -> Self {
         Self {
             id,
             span,
             ty,
-            kind: HirExpressionKind::FieldAccess { receiver, name },
+            kind: HirExpressionKind::FieldAccess {
+                receiver,
+                name,
+                index,
+            },
         }
     }
 

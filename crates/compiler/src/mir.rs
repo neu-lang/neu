@@ -229,6 +229,17 @@ pub enum MirInstruction {
         negate: bool,
         span: ByteSpan,
     },
+    NewObject {
+        output: MirValueId,
+        arguments: Vec<MirValueId>,
+        span: ByteSpan,
+    },
+    FieldLoad {
+        output: MirValueId,
+        receiver: MirValueId,
+        index: usize,
+        span: ByteSpan,
+    },
 }
 impl MirInstruction {
     pub fn int_constant(output: MirValueId, value: i64, span: ByteSpan) -> Self {
@@ -302,6 +313,8 @@ impl MirInstruction {
             | Self::StringClone { span, .. }
             | Self::StringConcat { span, .. }
             | Self::StringCompare { span, .. } => *span,
+            Self::NewObject { span, .. } => *span,
+            Self::FieldLoad { span, .. } => *span,
         }
     }
 }
@@ -749,8 +762,25 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         });
                     }
                 }
-                HirExpressionKind::FieldAccess { .. } | HirExpressionKind::NewObject { .. } => {
-                    return Err(MirLoweringError::UnsupportedExpression);
+                HirExpressionKind::FieldAccess {
+                    receiver, index, ..
+                } => {
+                    instructions.push(MirInstruction::FieldLoad {
+                        output,
+                        receiver: MirValueId::from_raw(receiver.index()),
+                        index: *index,
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::NewObject { arguments, .. } => {
+                    instructions.push(MirInstruction::NewObject {
+                        output,
+                        arguments: arguments
+                            .iter()
+                            .map(|argument| MirValueId::from_raw(argument.index()))
+                            .collect(),
+                        span: expression.span(),
+                    });
                 }
             }
             for local in function.locals() {
@@ -1691,6 +1721,7 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
             | PrimitiveType::Unit,
         )) => Ok(()),
         Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
+        Some(TypeKind::Nominal(_)) => Ok(()),
         _ => Err(MirLoweringError::UnsupportedRuntimeType),
     }
 }
