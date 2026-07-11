@@ -77,6 +77,9 @@ pub enum TargetPackError {
 pub enum TargetPackRegistryError {
     UnknownTarget(Triple),
     InvalidPack(TargetPackError),
+    MissingRegistryRoot,
+    InvalidTargetDirectory(String),
+    DirectoryTargetMismatch { directory: String, manifest: Triple },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -258,6 +261,42 @@ impl TargetPackRegistry {
 
         TargetPack::resolve_toml(&pack_root, &manifest, requested_target)
             .map_err(TargetPackRegistryError::InvalidPack)
+    }
+
+    pub fn available_targets(&self) -> Result<Vec<Triple>, TargetPackRegistryError> {
+        let entries =
+            fs::read_dir(&self.root).map_err(|_| TargetPackRegistryError::MissingRegistryRoot)?;
+        let mut directories = entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                entry
+                    .file_type()
+                    .ok()
+                    .filter(|file_type| file_type.is_dir())
+                    .map(|_| entry.file_name().to_string_lossy().into_owned())
+            })
+            .collect::<Vec<_>>();
+        directories.sort();
+
+        directories
+            .into_iter()
+            .map(|directory| {
+                let target = directory.parse::<Triple>().map_err(|_| {
+                    TargetPackRegistryError::InvalidTargetDirectory(directory.clone())
+                })?;
+                let manifest = fs::read_to_string(self.root.join(&directory).join("manifest.toml"))
+                    .map_err(|_| TargetPackRegistryError::UnknownTarget(target.clone()))?;
+                let parsed = TargetPackManifest::from_toml(&manifest)
+                    .map_err(TargetPackRegistryError::InvalidPack)?;
+                if parsed.target != target {
+                    return Err(TargetPackRegistryError::DirectoryTargetMismatch {
+                        directory,
+                        manifest: parsed.target,
+                    });
+                }
+                Ok(target)
+            })
+            .collect()
     }
 }
 
