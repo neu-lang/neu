@@ -89,8 +89,13 @@ fn emit_mir_function_to_object_impl(
     } else {
         bootstrap_symbol(identity)
     };
+    let linkage = if function.is_entry() {
+        Linkage::Export
+    } else {
+        Linkage::Local
+    };
     let function_id = module
-        .declare_function(&symbol, Linkage::Local, &clif_function.signature)
+        .declare_function(&symbol, linkage, &clif_function.signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let mut context = cranelift_codegen::Context::for_function(clif_function);
     module

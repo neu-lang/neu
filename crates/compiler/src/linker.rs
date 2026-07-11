@@ -9,10 +9,12 @@ use crate::{
     bootstrap::{BootstrapOutcome, map_main_result},
     target_pack::TargetPack,
 };
+use target_lexicon::{Aarch64Architecture, Architecture};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LinkInvocationError {
     MissingObject,
+    UnsupportedTarget,
     LinkerUnavailable,
     LinkerFailed(Option<i32>),
     MissingOutput,
@@ -56,7 +58,18 @@ impl LinkInvocation {
         }
 
         let output = output.as_ref().to_owned();
+        let target = pack.target();
+        let target_architecture = match target.architecture {
+            Architecture::Aarch64(Aarch64Architecture::Aarch64) => "arm64",
+            _ => return Err(LinkInvocationError::UnsupportedTarget),
+        };
         let arguments = vec![
+            OsString::from("-arch"),
+            OsString::from(target_architecture),
+            OsString::from("-platform_version"),
+            OsString::from("macos"),
+            OsString::from("15.0"),
+            OsString::from("15.0"),
             OsString::from("-o"),
             output.as_os_str().to_owned(),
             OsString::from("-e"),

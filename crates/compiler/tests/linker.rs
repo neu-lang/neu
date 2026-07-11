@@ -76,7 +76,11 @@ fn executable_linker(root: &Path, exit_code: i32) {
 fn output_producing_linker(root: &Path) {
     use std::os::unix::fs::PermissionsExt;
 
-    fs::write(root.join("bin/lld"), "#!/bin/sh\ntouch \"$2\"\nexit 0\n").unwrap();
+    fs::write(
+        root.join("bin/lld"),
+        "#!/bin/sh\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-o\" ]; then\n    shift\n    touch \"$1\"\n    exit 0\n  fi\n  shift\ndone\nexit 2\n",
+    )
+    .unwrap();
     let mut permissions = fs::metadata(root.join("bin/lld")).unwrap().permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(root.join("bin/lld"), permissions).unwrap();
@@ -120,14 +124,20 @@ fn m0032_builds_deterministic_link_invocation_plan() {
     let canonical_root = root.canonicalize().unwrap();
 
     assert_eq!(plan.program(), pack.linker_path());
-    assert_eq!(plan.arguments()[0], "-o");
-    assert_eq!(plan.arguments()[2], "-e");
-    assert_eq!(plan.arguments()[3], "_start");
+    assert_eq!(plan.arguments()[0], "-arch");
+    assert_eq!(plan.arguments()[1], "arm64");
+    assert_eq!(plan.arguments()[2], "-platform_version");
+    assert_eq!(plan.arguments()[3], "macos");
+    assert_eq!(plan.arguments()[4], "15.0");
+    assert_eq!(plan.arguments()[5], "15.0");
+    assert_eq!(plan.arguments()[6], "-o");
+    assert_eq!(plan.arguments()[8], "-e");
+    assert_eq!(plan.arguments()[9], "_start");
     assert_eq!(
-        PathBuf::from(&plan.arguments()[4]),
+        PathBuf::from(&plan.arguments()[10]),
         canonical_root.join("runtime/startup.o")
     );
-    assert_eq!(PathBuf::from(&plan.arguments()[5]), root.join("program.o"));
+    assert_eq!(PathBuf::from(&plan.arguments()[11]), root.join("program.o"));
     assert_eq!(plan.language_entry_symbol(), "neu_lang_main");
     let _ = fs::remove_dir_all(root);
 }
