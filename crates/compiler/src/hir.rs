@@ -99,6 +99,70 @@ pub struct HirDirectCall {
     callee: HirFunctionId,
     arguments: Vec<HirExpressionId>,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HirUnaryOperator {
+    Plus,
+    Minus,
+    BitwiseNot,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HirBinaryOperator {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Remainder,
+    Exponent,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    ShiftLeft,
+    ShiftRight,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HirUnary {
+    operator: HirUnaryOperator,
+    operand: HirExpressionId,
+}
+impl HirUnary {
+    pub fn new(operator: HirUnaryOperator, operand: HirExpressionId) -> Self {
+        Self { operator, operand }
+    }
+    pub fn operator(&self) -> HirUnaryOperator {
+        self.operator
+    }
+    pub fn operand(&self) -> HirExpressionId {
+        self.operand
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HirBinary {
+    operator: HirBinaryOperator,
+    left: HirExpressionId,
+    right: HirExpressionId,
+}
+impl HirBinary {
+    pub fn new(operator: HirBinaryOperator, left: HirExpressionId, right: HirExpressionId) -> Self {
+        Self {
+            operator,
+            left,
+            right,
+        }
+    }
+    pub fn operator(&self) -> HirBinaryOperator {
+        self.operator
+    }
+    pub fn left(&self) -> HirExpressionId {
+        self.left
+    }
+    pub fn right(&self) -> HirExpressionId {
+        self.right
+    }
+}
 impl HirDirectCall {
     pub fn new(callee: HirFunctionId, arguments: Vec<HirExpressionId>) -> Self {
         Self { callee, arguments }
@@ -114,6 +178,9 @@ impl HirDirectCall {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HirExpressionKind {
     IntLiteral(i64),
+    LocalRead(HirLocalId),
+    Unary(HirUnary),
+    Binary(HirBinary),
     DirectCall(HirDirectCall),
 }
 
@@ -131,6 +198,43 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::IntLiteral(value),
+        }
+    }
+    pub fn local_read(id: HirExpressionId, span: ByteSpan, ty: TypeId, local: HirLocalId) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::LocalRead(local),
+        }
+    }
+    pub fn unary(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        operator: HirUnaryOperator,
+        operand: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::Unary(HirUnary::new(operator, operand)),
+        }
+    }
+    pub fn binary(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        operator: HirBinaryOperator,
+        left: HirExpressionId,
+        right: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::Binary(HirBinary::new(operator, left, right)),
         }
     }
     pub fn direct_call(
@@ -164,6 +268,31 @@ impl HirExpression {
 pub struct HirReturn {
     span: ByteSpan,
     expression: HirExpressionId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HirAssignment {
+    span: ByteSpan,
+    target: HirLocalId,
+    value: HirExpressionId,
+}
+impl HirAssignment {
+    pub fn new(span: ByteSpan, target: HirLocalId, value: HirExpressionId) -> Self {
+        Self {
+            span,
+            target,
+            value,
+        }
+    }
+    pub fn span(&self) -> ByteSpan {
+        self.span
+    }
+    pub fn target(&self) -> HirLocalId {
+        self.target
+    }
+    pub fn value(&self) -> HirExpressionId {
+        self.value
+    }
 }
 impl HirReturn {
     pub fn new(span: ByteSpan, expression: HirExpressionId) -> Self {
@@ -217,6 +346,7 @@ pub struct HirFunction {
     locals: Vec<HirLocal>,
     expressions: Vec<HirExpression>,
     returns: Vec<HirReturn>,
+    assignments: Vec<HirAssignment>,
     safety_facts: HirSafetyFacts,
     unsupported_forms: Vec<HirUnsupportedForm>,
 }
@@ -247,6 +377,7 @@ impl HirFunction {
             locals,
             expressions,
             returns,
+            assignments: Vec::new(),
             safety_facts,
             unsupported_forms,
         }
@@ -281,6 +412,13 @@ impl HirFunction {
     pub fn returns(&self) -> &[HirReturn] {
         &self.returns
     }
+    pub fn with_assignments(mut self, assignments: Vec<HirAssignment>) -> Self {
+        self.assignments = assignments;
+        self
+    }
+    pub fn assignments(&self) -> &[HirAssignment] {
+        &self.assignments
+    }
     pub fn safety_facts(&self) -> &HirSafetyFacts {
         &self.safety_facts
     }
@@ -293,6 +431,33 @@ impl HirFunction {
             .find(|expression| expression.id == id)
             .and_then(|expression| match &expression.kind {
                 HirExpressionKind::DirectCall(call) => Some(call),
+                _ => None,
+            })
+    }
+    pub fn local_read(&self, id: HirExpressionId) -> Option<HirLocalId> {
+        self.expressions
+            .iter()
+            .find(|expression| expression.id == id)
+            .and_then(|expression| match expression.kind {
+                HirExpressionKind::LocalRead(local) => Some(local),
+                _ => None,
+            })
+    }
+    pub fn unary(&self, id: HirExpressionId) -> Option<&HirUnary> {
+        self.expressions
+            .iter()
+            .find(|expression| expression.id == id)
+            .and_then(|expression| match &expression.kind {
+                HirExpressionKind::Unary(unary) => Some(unary),
+                _ => None,
+            })
+    }
+    pub fn binary(&self, id: HirExpressionId) -> Option<&HirBinary> {
+        self.expressions
+            .iter()
+            .find(|expression| expression.id == id)
+            .and_then(|expression| match &expression.kind {
+                HirExpressionKind::Binary(binary) => Some(binary),
                 _ => None,
             })
     }

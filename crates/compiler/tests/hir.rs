@@ -1,8 +1,8 @@
 use compiler::{
     hir::{
-        HirDirectCall, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirLocal,
-        HirLocalId, HirModule, HirParameter, HirParameterId, HirReturn, HirSafetyFacts,
-        HirUnsupportedForm,
+        HirAssignment, HirBinaryOperator, HirDirectCall, HirExpression, HirExpressionId,
+        HirFunction, HirFunctionId, HirLocal, HirLocalId, HirModule, HirParameter, HirParameterId,
+        HirReturn, HirSafetyFacts, HirUnaryOperator, HirUnsupportedForm,
     },
     module::{ModuleName, PackageNamespace},
     source::{ByteSpan, SourceFileId},
@@ -77,5 +77,73 @@ fn m0029_hir_model_preserves_typed_source_mapped_executable_facts() {
     assert_eq!(
         function.unsupported_forms()[0].span(),
         ByteSpan::new(file, 50, 60).unwrap()
+    );
+}
+
+#[test]
+fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() {
+    let file = SourceFileId::from_raw(201);
+    let span = ByteSpan::new(file, 0, 1).unwrap();
+    let int = TypeId::from_raw(1);
+    let function = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("app").unwrap(),
+        PackageNamespace::parse("app").unwrap(),
+        span,
+        false,
+        int,
+        vec![],
+        vec![HirLocal::new(HirLocalId::from_raw(0), span, int, true)],
+        vec![
+            HirExpression::local_read(
+                HirExpressionId::from_raw(0),
+                span,
+                int,
+                HirLocalId::from_raw(0),
+            ),
+            HirExpression::unary(
+                HirExpressionId::from_raw(1),
+                span,
+                int,
+                HirUnaryOperator::Minus,
+                HirExpressionId::from_raw(0),
+            ),
+            HirExpression::binary(
+                HirExpressionId::from_raw(2),
+                span,
+                int,
+                HirBinaryOperator::Exponent,
+                HirExpressionId::from_raw(0),
+                HirExpressionId::from_raw(1),
+            ),
+        ],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    )
+    .with_assignments(vec![HirAssignment::new(
+        span,
+        HirLocalId::from_raw(0),
+        HirExpressionId::from_raw(2),
+    )]);
+
+    assert_eq!(
+        function.local_read(HirExpressionId::from_raw(0)),
+        Some(HirLocalId::from_raw(0))
+    );
+    assert_eq!(
+        function
+            .unary(HirExpressionId::from_raw(1))
+            .unwrap()
+            .operator(),
+        HirUnaryOperator::Minus
+    );
+    let binary = function.binary(HirExpressionId::from_raw(2)).unwrap();
+    assert_eq!(binary.operator(), HirBinaryOperator::Exponent);
+    assert_eq!(binary.left(), HirExpressionId::from_raw(0));
+    assert_eq!(binary.right(), HirExpressionId::from_raw(1));
+    assert_eq!(
+        function.assignments()[0].value(),
+        HirExpressionId::from_raw(2)
     );
 }
