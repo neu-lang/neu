@@ -7,9 +7,9 @@ use compiler::{
         build_scoped_local_binding_index,
     },
     parser::{
-        ParsedAssignmentStatement, ParsedBinaryOperator, ParsedGroupedExpression,
-        ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
-        parse_source,
+        ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
+        ParsedGroupedExpression, ParsedIfExpression, ParsedLiteralExpression, ParsedLiteralKind,
+        ParsedLocalDeclaration, ParsedUnaryExpression, ParsedUnaryOperator, parse_source,
     },
     source::ByteSpan,
     source::SourceFileId,
@@ -34,7 +34,7 @@ use compiler::{
         type_m0028_executable_core, type_m0028_executable_core_in,
         type_m0028_executable_int_operators, type_m0028_function_signatures,
         type_m0028_function_signatures_in, type_m0028_static_integer_diagnostics,
-        type_parser_literals, type_primitive_local_declarations,
+        type_m0035_primitive_operators, type_parser_literals, type_primitive_local_declarations,
         type_primitive_local_initializer_declarations, type_resolved_name_expressions,
         type_unsupported_m0018_expressions,
     },
@@ -1646,6 +1646,72 @@ fn primitive_local_initializer_rejects_byte_literal_out_of_range() {
         report.diagnostics()[0].rule(),
         TypeRuleDiagnostic::ByteLiteralOutOfRange
     );
+}
+
+#[test]
+fn m0035_primitive_operators_type_bool_float_and_byte_families() {
+    let bool_type = TypeId::from_raw(0);
+    let float_type = TypeId::from_raw(5);
+    let byte_type = TypeId::from_raw(6);
+    let unit_type = TypeId::from_raw(3);
+    let bool_left = AstNodeId::from_raw(700);
+    let bool_right = AstNodeId::from_raw(701);
+    let bool_result = AstNodeId::from_raw(702);
+    let float_left = AstNodeId::from_raw(703);
+    let float_right = AstNodeId::from_raw(704);
+    let float_result = AstNodeId::from_raw(705);
+    let byte_left = AstNodeId::from_raw(706);
+    let byte_right = AstNodeId::from_raw(707);
+    let byte_result = AstNodeId::from_raw(708);
+    let unary_result = AstNodeId::from_raw(709);
+
+    let known = vec![
+        ExpressionType::new(bool_left, bool_type),
+        ExpressionType::new(bool_right, bool_type),
+        ExpressionType::new(float_left, float_type),
+        ExpressionType::new(float_right, float_type),
+        ExpressionType::new(byte_left, byte_type),
+        ExpressionType::new(byte_right, byte_type),
+    ];
+    let unary = vec![ParsedUnaryExpression {
+        expression: unary_result,
+        operator: ParsedUnaryOperator::Not,
+        operand: bool_left,
+        span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
+    }];
+    let binary = vec![
+        ParsedBinaryExpression {
+            expression: bool_result,
+            left: bool_left,
+            operator: ParsedBinaryOperator::LogicalAnd,
+            right: bool_right,
+            span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
+        },
+        ParsedBinaryExpression {
+            expression: float_result,
+            left: float_left,
+            operator: ParsedBinaryOperator::Less,
+            right: float_right,
+            span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
+        },
+        ParsedBinaryExpression {
+            expression: byte_result,
+            left: byte_left,
+            operator: ParsedBinaryOperator::BitwiseXor,
+            right: byte_right,
+            span: ByteSpan::new(SourceFileId::from_raw(700), 0, 1).unwrap(),
+        },
+    ];
+
+    let report = type_m0035_primitive_operators(
+        &unary, &binary, &known, bool_type, float_type, byte_type, unit_type,
+    );
+
+    assert!(report.diagnostics().is_empty());
+    assert_eq!(report.expression_type(unary_result), Some(bool_type));
+    assert_eq!(report.expression_type(bool_result), Some(bool_type));
+    assert_eq!(report.expression_type(float_result), Some(bool_type));
+    assert_eq!(report.expression_type(byte_result), Some(byte_type));
 }
 
 #[test]

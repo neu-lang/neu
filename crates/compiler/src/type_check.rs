@@ -2242,6 +2242,143 @@ fn is_m0028_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
     )
 }
 
+pub fn type_m0035_primitive_operators(
+    unary_expressions: &[ParsedUnaryExpression],
+    binary_expressions: &[ParsedBinaryExpression],
+    known_expression_types: &[ExpressionType],
+    bool_type: TypeId,
+    float_type: TypeId,
+    byte_type: TypeId,
+    unit_type: TypeId,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+
+    for unary in unary_expressions {
+        let Some(operand_type) = report.expression_type(unary.operand) else {
+            continue;
+        };
+        if unary.operator == crate::parser::ParsedUnaryOperator::Not {
+            if operand_type == bool_type {
+                report.record_expression_type(ExpressionType::new(unary.expression, bool_type));
+            } else {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    unary.operand,
+                    bool_type,
+                    operand_type,
+                ));
+            }
+        }
+    }
+
+    for binary in binary_expressions {
+        let (Some(left), Some(right)) = (
+            report.expression_type(binary.left),
+            report.expression_type(binary.right),
+        ) else {
+            continue;
+        };
+        let (expected, result) = match binary.operator {
+            ParsedBinaryOperator::LogicalAnd | ParsedBinaryOperator::LogicalOr => {
+                (Some(bool_type), Some(bool_type))
+            }
+            ParsedBinaryOperator::Equal | ParsedBinaryOperator::NotEqual
+                if left == right && left != unit_type =>
+            {
+                (None, Some(bool_type))
+            }
+            ParsedBinaryOperator::Plus
+            | ParsedBinaryOperator::Minus
+            | ParsedBinaryOperator::Star
+            | ParsedBinaryOperator::Slash
+                if left == float_type && right == float_type =>
+            {
+                (Some(float_type), Some(float_type))
+            }
+            ParsedBinaryOperator::Plus
+            | ParsedBinaryOperator::Minus
+            | ParsedBinaryOperator::Star
+            | ParsedBinaryOperator::Slash
+                if left == float_type || right == float_type =>
+            {
+                (Some(float_type), Some(float_type))
+            }
+            ParsedBinaryOperator::Less
+            | ParsedBinaryOperator::Greater
+            | ParsedBinaryOperator::LessEqual
+            | ParsedBinaryOperator::GreaterEqual
+                if left == float_type && right == float_type =>
+            {
+                (Some(float_type), Some(bool_type))
+            }
+            ParsedBinaryOperator::Less
+            | ParsedBinaryOperator::Greater
+            | ParsedBinaryOperator::LessEqual
+            | ParsedBinaryOperator::GreaterEqual
+                if left == float_type || right == float_type =>
+            {
+                (Some(float_type), Some(bool_type))
+            }
+            ParsedBinaryOperator::Plus
+            | ParsedBinaryOperator::Minus
+            | ParsedBinaryOperator::Star
+            | ParsedBinaryOperator::Slash
+            | ParsedBinaryOperator::Percent
+            | ParsedBinaryOperator::ShiftLeft
+            | ParsedBinaryOperator::ShiftRight
+            | ParsedBinaryOperator::BitwiseAnd
+            | ParsedBinaryOperator::BitwiseOr
+            | ParsedBinaryOperator::BitwiseXor
+                if left == byte_type && right == byte_type =>
+            {
+                (Some(byte_type), Some(byte_type))
+            }
+            ParsedBinaryOperator::Plus
+            | ParsedBinaryOperator::Minus
+            | ParsedBinaryOperator::Star
+            | ParsedBinaryOperator::Slash
+            | ParsedBinaryOperator::Percent
+            | ParsedBinaryOperator::ShiftLeft
+            | ParsedBinaryOperator::ShiftRight
+            | ParsedBinaryOperator::BitwiseAnd
+            | ParsedBinaryOperator::BitwiseOr
+            | ParsedBinaryOperator::BitwiseXor
+                if left == byte_type || right == byte_type =>
+            {
+                (Some(byte_type), Some(byte_type))
+            }
+            _ => (None, None),
+        };
+        let Some(result) = result else {
+            continue;
+        };
+        if let Some(expected) = expected {
+            if left != expected {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    binary.left,
+                    expected,
+                    left,
+                ));
+                continue;
+            }
+            if right != expected {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    binary.right,
+                    expected,
+                    right,
+                ));
+                continue;
+            }
+        } else if left != right {
+            continue;
+        }
+        report.record_expression_type(ExpressionType::new(binary.expression, result));
+    }
+    report
+}
+
 pub fn type_m0028_static_integer_diagnostics(
     literals: &[ParsedIntegerLiteral],
     grouped: &[ParsedGroupedExpression],
@@ -2353,6 +2490,7 @@ pub fn type_m0028_static_integer_diagnostics(
                     .map(Some)
                     .ok_or(TypeRuleDiagnostic::IntegerOverflow),
                 (crate::parser::ParsedUnaryOperator::BitwiseNot, Some(value)) => Ok(Some(!value)),
+                (crate::parser::ParsedUnaryOperator::Not, Some(_)) => Ok(None),
             };
         }
         let Some(expression) = binaries

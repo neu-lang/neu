@@ -240,6 +240,7 @@ pub struct ParsedGroupedExpression {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParsedUnaryOperator {
+    Not,
     Plus,
     Minus,
     BitwiseNot,
@@ -2672,6 +2673,7 @@ fn parsed_binary_operator(kind: TokenKind) -> Option<ParsedBinaryOperator> {
 
 fn parsed_unary_operator(kind: TokenKind) -> Option<ParsedUnaryOperator> {
     match kind {
+        TokenKind::Bang => Some(ParsedUnaryOperator::Not),
         TokenKind::Plus => Some(ParsedUnaryOperator::Plus),
         TokenKind::Minus => Some(ParsedUnaryOperator::Minus),
         TokenKind::Tilde => Some(ParsedUnaryOperator::BitwiseNot),
