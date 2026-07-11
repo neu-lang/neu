@@ -70,6 +70,44 @@ fn compiles_current_control_flow_and_primitive_examples() {
 }
 
 #[test]
+fn compiles_primitive_parameter_and_return_matrix() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-primitive-matrix-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun bool_identity(value: Bool): Bool { return value; }
+        public fun float_identity(value: Float): Float { return value; }
+        public fun byte_identity(value: Byte): Byte { return value; }
+        public fun unit_identity(value: Unit): Unit { return (); }
+        public fun main(): Int {
+            bool_identity(true);
+            float_identity(2.5);
+            val byte: Byte = 7;
+            byte_identity(byte);
+            unit_identity(());
+            return 0;
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9300),
+            compiler::module::ModuleName::parse("matrix").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn rejects_runtime_calls_in_const_initializers() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-const-driver-{}", std::process::id()));
