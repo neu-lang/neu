@@ -470,6 +470,100 @@ fn m0031_lowers_unary_int_operations() {
 }
 
 #[test]
+fn m0035_lowers_float_byte_bool_and_comparison_operations() {
+    let file = SourceFileId::from_raw(913);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
+    let byte_type = types.insert(TypeRecord::primitive(PrimitiveType::Byte));
+
+    let float_function = MirFunction::new(
+        MirFunctionId::from_raw(60),
+        span,
+        vec![],
+        float_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![
+                MirInstruction::float_constant(MirValueId::from_raw(0), 1.5f64.to_bits(), span),
+                MirInstruction::float_constant(MirValueId::from_raw(1), 2.0f64.to_bits(), span),
+                MirInstruction::CheckedArithmetic {
+                    output: MirValueId::from_raw(2),
+                    operation: MirArithmetic::Multiply,
+                    left: MirValueId::from_raw(0),
+                    right: MirValueId::from_raw(1),
+                    span,
+                },
+            ],
+            MirTerminator::return_value(MirValueId::from_raw(2), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let float_ir = lower_mir_function_to_cranelift(&float_function, &types).unwrap();
+    assert!(float_ir.contains("fmul"), "{float_ir}");
+    assert!(!float_ir.contains("imul"), "{float_ir}");
+
+    let byte_function = MirFunction::new(
+        MirFunctionId::from_raw(61),
+        span,
+        vec![],
+        byte_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![
+                MirInstruction::byte_constant(MirValueId::from_raw(0), 2, span),
+                MirInstruction::byte_constant(MirValueId::from_raw(1), 3, span),
+                MirInstruction::CheckedArithmetic {
+                    output: MirValueId::from_raw(2),
+                    operation: MirArithmetic::Multiply,
+                    left: MirValueId::from_raw(0),
+                    right: MirValueId::from_raw(1),
+                    span,
+                },
+            ],
+            MirTerminator::return_value(MirValueId::from_raw(2), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let byte_ir = lower_mir_function_to_cranelift(&byte_function, &types).unwrap();
+    assert!(byte_ir.contains("imul"), "{byte_ir}");
+
+    let bool_function = MirFunction::new(
+        MirFunctionId::from_raw(62),
+        span,
+        vec![],
+        bool_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![
+                MirInstruction::bool_constant(MirValueId::from_raw(0), true, span),
+                MirInstruction::LogicalNot {
+                    output: MirValueId::from_raw(1),
+                    operand: MirValueId::from_raw(0),
+                    span,
+                },
+                MirInstruction::Compare {
+                    output: MirValueId::from_raw(2),
+                    operation: compiler::mir::MirComparison::Equal,
+                    left: MirValueId::from_raw(0),
+                    right: MirValueId::from_raw(1),
+                    span,
+                },
+            ],
+            MirTerminator::return_value(MirValueId::from_raw(2), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let bool_ir = lower_mir_function_to_cranelift(&bool_function, &types).unwrap();
+    assert!(bool_ir.contains("icmp"), "{bool_ir}");
+    assert!(bool_ir.contains("select"), "{bool_ir}");
+}
+
+#[test]
 fn m0031_lowers_checked_exponentiation() {
     let file = SourceFileId::from_raw(410);
     let span = ByteSpan::new(file, 0, 10).unwrap();

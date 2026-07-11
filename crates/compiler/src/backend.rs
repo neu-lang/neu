@@ -3,7 +3,9 @@ use std::{collections::HashMap, fmt::Write as _};
 use cranelift_codegen::{
     ir::{
         AbiParam, Function, InstBuilder, Signature, TrapCode, UserFuncName, Value,
-        condcodes::IntCC, immediates::Ieee64, types,
+        condcodes::{FloatCC, IntCC},
+        immediates::Ieee64,
+        types,
     },
     isa::CallConv,
     settings, verify_function,
@@ -14,7 +16,10 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
 
 use crate::{
-    mir::{MirArithmetic, MirFunction, MirInstruction, MirTerminator, MirUnary, MirValueId},
+    mir::{
+        MirArithmetic, MirComparison, MirFunction, MirInstruction, MirTerminator, MirUnary,
+        MirValueId,
+    },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
 
@@ -207,6 +212,139 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
     }
 }
 
+fn lower_basic_arithmetic(
+    operation: MirArithmetic,
+    left: Value,
+    right: Value,
+    builder: &mut FunctionBuilder<'_>,
+) -> Value {
+    let value_type = builder.func.dfg.value_type(left);
+    if value_type == types::F64 {
+        return match operation {
+            MirArithmetic::Add => builder.ins().fadd(left, right),
+            MirArithmetic::Subtract => builder.ins().fsub(left, right),
+            MirArithmetic::Multiply => builder.ins().fmul(left, right),
+            MirArithmetic::Divide => builder.ins().fdiv(left, right),
+            _ => unreachable!("unsupported Float arithmetic operation"),
+        };
+    }
+
+    if value_type == types::I8 {
+        let left_wide = builder.ins().uextend(types::I64, left);
+        let right_wide = builder.ins().uextend(types::I64, right);
+        let value = match operation {
+            MirArithmetic::Add => {
+                let result = builder.ins().iadd(left_wide, right_wide);
+                let overflow =
+                    builder
+                        .ins()
+                        .icmp_imm(IntCC::UnsignedGreaterThan, result, i64::from(u8::MAX));
+                builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+                builder.ins().ireduce(types::I8, result)
+            }
+            MirArithmetic::Subtract => {
+                let underflow = builder
+                    .ins()
+                    .icmp(IntCC::UnsignedLessThan, left_wide, right_wide);
+                builder.ins().trapnz(underflow, TrapCode::INTEGER_OVERFLOW);
+                let result = builder.ins().isub(left_wide, right_wide);
+                builder.ins().ireduce(types::I8, result)
+            }
+            MirArithmetic::Multiply => {
+                let result = builder.ins().imul(left_wide, right_wide);
+                let overflow =
+                    builder
+                        .ins()
+                        .icmp_imm(IntCC::UnsignedGreaterThan, result, i64::from(u8::MAX));
+                builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+                builder.ins().ireduce(types::I8, result)
+            }
+            MirArithmetic::Divide => {
+                let zero = builder.ins().icmp_imm(IntCC::Equal, right, 0);
+                builder
+                    .ins()
+                    .trapnz(zero, TrapCode::INTEGER_DIVISION_BY_ZERO);
+                builder.ins().udiv(left, right)
+            }
+            MirArithmetic::Remainder => {
+                let zero = builder.ins().icmp_imm(IntCC::Equal, right, 0);
+                builder
+                    .ins()
+                    .trapnz(zero, TrapCode::INTEGER_DIVISION_BY_ZERO);
+                builder.ins().urem(left, right)
+            }
+            _ => unreachable!("unsupported Byte arithmetic operation"),
+        };
+        return value;
+    }
+
+    match operation {
+        MirArithmetic::Add => {
+            let sum = builder.ins().iadd(left, right);
+            let left_sign_change = builder.ins().bxor(left, sum);
+            let right_sign_change = builder.ins().bxor(right, sum);
+            let signed_change = builder.ins().band(left_sign_change, right_sign_change);
+            let overflow = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, signed_change, 0);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            sum
+        }
+        MirArithmetic::Subtract => {
+            let difference = builder.ins().isub(left, right);
+            let operand_sign_difference = builder.ins().bxor(left, right);
+            let result_sign_difference = builder.ins().bxor(left, difference);
+            let signed_change = builder
+                .ins()
+                .band(operand_sign_difference, result_sign_difference);
+            let overflow = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, signed_change, 0);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            difference
+        }
+        MirArithmetic::Multiply => {
+            let product = builder.ins().imul(left, right);
+            let high_half = builder.ins().smulhi(left, right);
+            let sign_extension = builder.ins().sshr_imm(product, 63);
+            let overflow = builder
+                .ins()
+                .icmp(IntCC::NotEqual, high_half, sign_extension);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            product
+        }
+        MirArithmetic::Divide => builder.ins().sdiv(left, right),
+        MirArithmetic::Remainder => builder.ins().srem(left, right),
+        _ => unreachable!("unsupported basic arithmetic operation"),
+    }
+}
+
+fn int_cc(operation: MirComparison, unsigned: bool) -> IntCC {
+    match operation {
+        MirComparison::Equal => IntCC::Equal,
+        MirComparison::NotEqual => IntCC::NotEqual,
+        MirComparison::Less if unsigned => IntCC::UnsignedLessThan,
+        MirComparison::Greater if unsigned => IntCC::UnsignedGreaterThan,
+        MirComparison::LessEqual if unsigned => IntCC::UnsignedLessThanOrEqual,
+        MirComparison::GreaterEqual if unsigned => IntCC::UnsignedGreaterThanOrEqual,
+        MirComparison::Less => IntCC::SignedLessThan,
+        MirComparison::Greater => IntCC::SignedGreaterThan,
+        MirComparison::LessEqual => IntCC::SignedLessThanOrEqual,
+        MirComparison::GreaterEqual => IntCC::SignedGreaterThanOrEqual,
+    }
+}
+
+fn float_cc(operation: MirComparison) -> FloatCC {
+    match operation {
+        MirComparison::Equal => FloatCC::Equal,
+        MirComparison::NotEqual => FloatCC::NotEqual,
+        MirComparison::Less => FloatCC::LessThan,
+        MirComparison::Greater => FloatCC::GreaterThan,
+        MirComparison::LessEqual => FloatCC::LessThanOrEqual,
+        MirComparison::GreaterEqual => FloatCC::GreaterThanOrEqual,
+    }
+}
+
 fn lower_instruction(
     instruction: &MirInstruction,
     builder: &mut FunctionBuilder<'_>,
@@ -253,9 +391,14 @@ fn lower_instruction(
                 .get(operand)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let is_min = builder.ins().icmp_imm(IntCC::Equal, operand, i64::MIN);
-            builder.ins().trapnz(is_min, TrapCode::INTEGER_OVERFLOW);
-            values.insert(*output, builder.ins().ineg(operand));
+            let value = if builder.func.dfg.value_type(operand) == types::F64 {
+                builder.ins().fneg(operand)
+            } else {
+                let is_min = builder.ins().icmp_imm(IntCC::Equal, operand, i64::MIN);
+                builder.ins().trapnz(is_min, TrapCode::INTEGER_OVERFLOW);
+                builder.ins().ineg(operand)
+            };
+            values.insert(*output, value);
             Ok(())
         }
         MirInstruction::Unary {
@@ -271,9 +414,22 @@ fn lower_instruction(
             values.insert(*output, builder.ins().bnot(operand));
             Ok(())
         }
-        MirInstruction::CheckedArithmetic {
+        MirInstruction::LogicalNot {
+            output, operand, ..
+        } => {
+            let operand = values
+                .get(operand)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let is_false = builder.ins().icmp_imm(IntCC::Equal, operand, 0);
+            let one = builder.ins().iconst(types::I8, 1);
+            let zero = builder.ins().iconst(types::I8, 0);
+            values.insert(*output, builder.ins().select(is_false, one, zero));
+            Ok(())
+        }
+        MirInstruction::Compare {
             output,
-            operation: MirArithmetic::Add,
+            operation,
             left,
             right,
             ..
@@ -286,24 +442,34 @@ fn lower_instruction(
                 .get(right)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let sum = builder.ins().iadd(left, right);
-            let left_sign_change = builder.ins().bxor(left, sum);
-            let right_sign_change = builder.ins().bxor(right, sum);
-            let signed_change = builder.ins().band(left_sign_change, right_sign_change);
-            let overflow = builder
-                .ins()
-                .icmp_imm(IntCC::SignedLessThan, signed_change, 0);
-            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
-            values.insert(*output, sum);
+            let left_type = builder.func.dfg.value_type(left);
+            let condition = if left_type == types::F64 {
+                builder.ins().fcmp(float_cc(*operation), left, right)
+            } else {
+                builder
+                    .ins()
+                    .icmp(int_cc(*operation, left_type == types::I8), left, right)
+            };
+            let one = builder.ins().iconst(types::I8, 1);
+            let zero = builder.ins().iconst(types::I8, 0);
+            values.insert(*output, builder.ins().select(condition, one, zero));
             Ok(())
         }
         MirInstruction::CheckedArithmetic {
             output,
-            operation: MirArithmetic::Subtract,
+            operation,
             left,
             right,
             ..
-        } => {
+        } if matches!(
+            operation,
+            MirArithmetic::Add
+                | MirArithmetic::Subtract
+                | MirArithmetic::Multiply
+                | MirArithmetic::Divide
+                | MirArithmetic::Remainder
+        ) =>
+        {
             let left = values
                 .get(left)
                 .copied()
@@ -312,78 +478,8 @@ fn lower_instruction(
                 .get(right)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let difference = builder.ins().isub(left, right);
-            let operand_sign_difference = builder.ins().bxor(left, right);
-            let result_sign_difference = builder.ins().bxor(left, difference);
-            let signed_change = builder
-                .ins()
-                .band(operand_sign_difference, result_sign_difference);
-            let overflow = builder
-                .ins()
-                .icmp_imm(IntCC::SignedLessThan, signed_change, 0);
-            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
-            values.insert(*output, difference);
-            Ok(())
-        }
-        MirInstruction::CheckedArithmetic {
-            output,
-            operation: MirArithmetic::Multiply,
-            left,
-            right,
-            ..
-        } => {
-            let left = values
-                .get(left)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            let right = values
-                .get(right)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            let product = builder.ins().imul(left, right);
-            let high_half = builder.ins().smulhi(left, right);
-            let sign_extension = builder.ins().sshr_imm(product, 63);
-            let overflow = builder
-                .ins()
-                .icmp(IntCC::NotEqual, high_half, sign_extension);
-            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
-            values.insert(*output, product);
-            Ok(())
-        }
-        MirInstruction::CheckedArithmetic {
-            output,
-            operation: MirArithmetic::Divide,
-            left,
-            right,
-            ..
-        } => {
-            let left = values
-                .get(left)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            let right = values
-                .get(right)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            values.insert(*output, builder.ins().sdiv(left, right));
-            Ok(())
-        }
-        MirInstruction::CheckedArithmetic {
-            output,
-            operation: MirArithmetic::Remainder,
-            left,
-            right,
-            ..
-        } => {
-            let left = values
-                .get(left)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            let right = values
-                .get(right)
-                .copied()
-                .ok_or(CraneliftLoweringError::MissingValue)?;
-            values.insert(*output, builder.ins().srem(left, right));
+            let value = lower_basic_arithmetic(*operation, left, right, builder);
+            values.insert(*output, value);
             Ok(())
         }
         MirInstruction::CheckedArithmetic {
@@ -433,14 +529,20 @@ fn lower_instruction(
                 .get(right)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let invalid_count = builder
-                .ins()
-                .icmp_imm(IntCC::UnsignedGreaterThan, right, 63);
+            let left_type = builder.func.dfg.value_type(left);
+            let max_shift = if left_type == types::I8 { 7 } else { 63 };
+            let invalid_count =
+                builder
+                    .ins()
+                    .icmp_imm(IntCC::UnsignedGreaterThan, right, max_shift);
             builder
                 .ins()
                 .trapnz(invalid_count, INVALID_SHIFT_COUNT_TRAP);
             let value = match operation {
                 MirArithmetic::ShiftLeft => builder.ins().ishl(left, right),
+                MirArithmetic::ShiftRight if left_type == types::I8 => {
+                    builder.ins().ushr(left, right)
+                }
                 MirArithmetic::ShiftRight => builder.ins().sshr(left, right),
                 _ => unreachable!("guard accepts only shift operations"),
             };
