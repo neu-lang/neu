@@ -3,11 +3,16 @@ use compiler::{
         CraneliftLoweringError, emit_mir_module_to_object, lower_mir_function_to_cranelift,
         lower_mir_module_to_cranelift,
     },
+    hir::{CheckedHirSource, lower_checked_hir_source},
     mir::{
         MirArithmetic, MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId,
         MirInstruction, MirLocalId, MirTerminator, MirUnary, MirValueId,
     },
     source::{ByteSpan, SourceFileId},
+    type_check::{
+        ExecutableSourceTypes, apply_m0028_direct_call_results, check_m0028_direct_calls,
+        type_m0028_executable_core_in, type_m0028_function_signatures_in,
+    },
     types::{PrimitiveType, TypeArena, TypeRecord},
 };
 
@@ -887,6 +892,61 @@ fn m0035_lowers_unit_direct_call_without_abi_result() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[test]
+fn m0035_source_float_helper_call_reaches_object_emission() {
+    let parsed = compiler::parser::parse_source(
+        SourceFileId::from_raw(929),
+        "fun helper(): Float { return 1.5; } fun caller(): Float { return helper(); }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = TypeArena::new();
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    assert_eq!(signatures.len(), 2);
+
+    let mut report = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &compiler::name_resolution::ResolutionTable::new(),
+        &[],
+    );
+    let package = compiler::module::PackageNamespace::parse("app").unwrap();
+    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+        &package,
+        &parsed,
+        &signatures,
+        report.expression_types(),
+    )]);
+    assert!(calls.diagnostics().is_empty());
+    apply_m0028_direct_call_results(&mut report, &parsed, &calls);
+
+    let hir = lower_checked_hir_source(CheckedHirSource::new(
+        compiler::module::ModuleName::parse("app").unwrap(),
+        package,
+        &parsed,
+        &signatures,
+        report.expression_types(),
+        true,
+    ))
+    .unwrap();
+    let mir = compiler::mir::lower_hir_to_mir(&hir, &types).unwrap();
+    let object = emit_mir_module_to_object(&mir, &types, "neu_main").unwrap();
+    assert!(!object.is_empty());
 }
 
 #[test]
