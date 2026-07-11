@@ -11,18 +11,23 @@ use crate::{
     linker::{LinkInvocation, LinkInvocationError},
     mir::{MirLoweringError, lower_hir_to_mir},
     module::{ModuleName, PackageNamespace},
+    name_resolution::{
+        bind_local_name_references, build_local_scope_tree, build_scoped_local_binding_index,
+    },
+    ownership::analyze_ownership,
     ownership_effects::infer_source_parameter_effects,
     parser,
     source::SourceFileId,
     target_pack::{TargetPackRegistry, TargetPackRegistryError},
     type_check::{
-        DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes, ReturnPathDiagnostic,
-        ReturnTypeDiagnostic, TypeCheckDiagnostic, UnsupportedExecutableFormDiagnostic,
-        apply_m0028_direct_call_results, apply_m0060_control_flow_results,
-        check_m0028_direct_calls, check_m0028_entry_point, check_m0028_return_expression_types,
-        check_m0028_straight_line_returns, check_m0028_unsupported_executable_forms,
-        type_m0028_executable_core_in, type_m0060_control_flow, type_m0063_array_expressions,
-        type_m0063_function_signatures_in, validate_m0061_compile_time_constants,
+        DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes,
+        ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
+        UnsupportedExecutableFormDiagnostic, apply_m0028_direct_call_results,
+        apply_m0060_control_flow_results, check_m0028_direct_calls, check_m0028_entry_point,
+        check_m0028_return_expression_types, check_m0028_straight_line_returns,
+        check_m0028_unsupported_executable_forms, type_m0028_executable_core_in,
+        type_m0060_control_flow, type_m0063_array_expressions, type_m0063_function_signatures_in,
+        type_m0064_string_operations, validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -95,6 +100,7 @@ pub enum DriverError {
     UnsupportedExecutableForms(Vec<UnsupportedExecutableFormDiagnostic>),
     TypeDiagnostics(Vec<TypeCheckDiagnostic>),
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
+    OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
     Hir(HirLoweringError),
     Mir(MirLoweringError),
     Backend(CraneliftLoweringError),
@@ -152,6 +158,7 @@ pub fn compile_source_to_executable(
         &crate::name_resolution::ResolutionTable::new(),
         &[],
     );
+    type_m0064_string_operations(&parsed, &mut report, &types);
     let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
         options.package(),
         &parsed,
@@ -217,6 +224,63 @@ pub fn compile_source_to_executable(
     }
     if !report.diagnostics().is_empty() {
         return Err(DriverError::TypeDiagnostics(report.diagnostics().to_vec()));
+    }
+
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = crate::symbol::SymbolInterner::new();
+    let local_index = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    let resolved_locals = bind_local_name_references(
+        &parsed.arena,
+        &parsed.name_references,
+        &scopes,
+        local_index.index(),
+        &mut interner,
+    );
+    let local_signatures = parsed
+        .local_declarations
+        .iter()
+        .filter_map(|declaration| {
+            let annotation = declaration.annotation?;
+            let name = parsed
+                .type_name_references
+                .iter()
+                .find(|reference| reference.reference == annotation)?
+                .name
+                .as_str();
+            let ty = types
+                .records()
+                .iter()
+                .find(|record| {
+                    matches!(
+                        (name, record.kind()),
+                        ("Bool", TypeKind::Primitive(PrimitiveType::Bool))
+                            | ("Int", TypeKind::Primitive(PrimitiveType::Int))
+                            | ("Unit", TypeKind::Primitive(PrimitiveType::Unit))
+                            | ("Float", TypeKind::Primitive(PrimitiveType::Float))
+                            | ("Byte", TypeKind::Primitive(PrimitiveType::Byte))
+                            | ("String", TypeKind::Primitive(PrimitiveType::String))
+                    )
+                })
+                .map(|record| record.id())?;
+            Some(DeclarationSignature::new(declaration.declaration, ty))
+        })
+        .collect::<Vec<_>>();
+    let ownership = analyze_ownership(
+        &parsed.local_declarations,
+        &parsed.assignment_statements,
+        resolved_locals.resolved_local_bindings(),
+        &local_signatures,
+        &types,
+    );
+    if !ownership.diagnostics().is_empty() {
+        return Err(DriverError::OwnershipDiagnostics(
+            ownership.diagnostics().to_vec(),
+        ));
     }
 
     let byte_type = types

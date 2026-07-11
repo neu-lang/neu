@@ -49,8 +49,9 @@ The bootstrap ownership pass classifies values by accepted type identity:
 - Explicitly copyable user-defined types: deferred.
 
 This classification is a language-semantic bootstrap rule only. It does not
-define ABI layout, destructor behavior, heap representation, string storage,
-clone behavior, traits, interfaces, or generic capability satisfaction.
+define ABI layout, destructor behavior, heap representation, traits, interfaces,
+or generic capability satisfaction. Owned string storage, cloning, cleanup, and
+runtime allocation are defined by ADR-0064.
 
 ## Move Sites
 
@@ -145,10 +146,9 @@ use-after-move diagnostic using existing local binding and type metadata.
 M0023 borrow checking can depend on the fact that a moved binding is not usable
 through later bare-name local expressions in the analyzed subset.
 
-`String` becomes move-only in this bootstrap rule even though it is a primitive
-type-checking identity, because ADR-0005 says primitive scalar types copy and
-strings are not scalar. A later accepted decision may define string cloning,
-borrowing, interning, or representation.
+`String` remains move-only, while its cloning, borrowing, cleanup, and opaque
+runtime representation are now defined by ADR-0064. That ADR supersedes this
+ADR's string-storage deferral without changing the move-only classification.
 
 ## Dependencies And Supersession
 

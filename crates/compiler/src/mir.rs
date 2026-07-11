@@ -185,6 +185,40 @@ pub enum MirInstruction {
         value: MirValueId,
         span: ByteSpan,
     },
+    StringConstant {
+        output: MirValueId,
+        bytes: Vec<u8>,
+        span: ByteSpan,
+    },
+    StringLength {
+        output: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    StringIndex {
+        output: MirValueId,
+        value: MirValueId,
+        index: MirValueId,
+        span: ByteSpan,
+    },
+    StringClone {
+        output: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    StringConcat {
+        output: MirValueId,
+        left: MirValueId,
+        right: MirValueId,
+        span: ByteSpan,
+    },
+    StringCompare {
+        output: MirValueId,
+        left: MirValueId,
+        right: MirValueId,
+        negate: bool,
+        span: ByteSpan,
+    },
 }
 impl MirInstruction {
     pub fn int_constant(output: MirValueId, value: i64, span: ByteSpan) -> Self {
@@ -250,6 +284,12 @@ impl MirInstruction {
             | Self::ArrayInit { span, .. }
             | Self::ArrayLoad { span, .. }
             | Self::ArrayStore { span, .. } => *span,
+            Self::StringConstant { span, .. }
+            | Self::StringLength { span, .. }
+            | Self::StringIndex { span, .. }
+            | Self::StringClone { span, .. }
+            | Self::StringConcat { span, .. }
+            | Self::StringCompare { span, .. } => *span,
         }
     }
 }
@@ -506,7 +546,35 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::Binary(binary) => {
                     let left = MirValueId::from_raw(binary.left().index());
                     let right = MirValueId::from_raw(binary.right().index());
-                    if let Some(operation) = lower_comparison(binary.operator()) {
+                    let left_is_string = function
+                        .expressions()
+                        .get(binary.left().index())
+                        .is_some_and(|candidate| {
+                            types.get(candidate.ty()).is_some_and(|record| {
+                                record.kind() == &TypeKind::Primitive(PrimitiveType::String)
+                            })
+                        });
+                    if left_is_string && binary.operator() == HirBinaryOperator::Plus {
+                        instructions.push(MirInstruction::StringConcat {
+                            output,
+                            left,
+                            right,
+                            span: expression.span(),
+                        });
+                    } else if left_is_string
+                        && matches!(
+                            binary.operator(),
+                            HirBinaryOperator::Equal | HirBinaryOperator::NotEqual
+                        )
+                    {
+                        instructions.push(MirInstruction::StringCompare {
+                            output,
+                            left,
+                            right,
+                            negate: binary.operator() == HirBinaryOperator::NotEqual,
+                            span: expression.span(),
+                        });
+                    } else if let Some(operation) = lower_comparison(binary.operator()) {
                         instructions.push(MirInstruction::Compare {
                             output,
                             operation,
@@ -569,22 +637,54 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     });
                 }
+                HirExpressionKind::StringLiteral(bytes) => {
+                    instructions.push(MirInstruction::StringConstant {
+                        output,
+                        bytes: bytes.clone(),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::StringLength(value) => {
+                    instructions.push(MirInstruction::StringLength {
+                        output,
+                        value: MirValueId::from_raw(value.index()),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::StringClone(value) => {
+                    instructions.push(MirInstruction::StringClone {
+                        output,
+                        value: MirValueId::from_raw(value.index()),
+                        span: expression.span(),
+                    });
+                }
                 HirExpressionKind::Index { array, index } => {
-                    let local = match function
+                    let array_expression = function
                         .expressions()
                         .iter()
                         .find(|candidate| candidate.id() == *array)
-                        .map(|candidate| candidate.kind())
-                    {
-                        Some(HirExpressionKind::LocalRead(local)) => *local,
-                        _ => return Err(MirLoweringError::UnsupportedExpression),
-                    };
-                    instructions.push(MirInstruction::ArrayLoad {
-                        output,
-                        local: MirLocalId::from_raw(local.index()),
-                        index: MirValueId::from_raw(index.index()),
-                        span: expression.span(),
-                    });
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    if types.get(array_expression.ty()).is_some_and(|record| {
+                        record.kind() == &TypeKind::Primitive(PrimitiveType::String)
+                    }) {
+                        instructions.push(MirInstruction::StringIndex {
+                            output,
+                            value: MirValueId::from_raw(array.index()),
+                            index: MirValueId::from_raw(index.index()),
+                            span: expression.span(),
+                        });
+                    } else {
+                        let local = match array_expression.kind() {
+                            HirExpressionKind::LocalRead(local) => *local,
+                            _ => return Err(MirLoweringError::UnsupportedExpression),
+                        };
+                        instructions.push(MirInstruction::ArrayLoad {
+                            output,
+                            local: MirLocalId::from_raw(local.index()),
+                            index: MirValueId::from_raw(index.index()),
+                            span: expression.span(),
+                        });
+                    }
                 }
             }
             for local in function.locals() {
@@ -958,7 +1058,11 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::ArrayLiteral(_) | HirExpressionKind::Index { .. } => {
+            HirExpressionKind::ArrayLiteral(_)
+            | HirExpressionKind::Index { .. }
+            | HirExpressionKind::StringLiteral(_)
+            | HirExpressionKind::StringLength(_)
+            | HirExpressionKind::StringClone(_) => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -1247,7 +1351,11 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::ArrayLiteral(_) | HirExpressionKind::Index { .. } => {
+            HirExpressionKind::ArrayLiteral(_)
+            | HirExpressionKind::Index { .. }
+            | HirExpressionKind::StringLiteral(_)
+            | HirExpressionKind::StringLength(_)
+            | HirExpressionKind::StringClone(_) => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -1500,6 +1608,7 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
             | PrimitiveType::Int
             | PrimitiveType::Float
             | PrimitiveType::Byte
+            | PrimitiveType::String
             | PrimitiveType::Unit,
         )) => Ok(()),
         Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
@@ -1516,6 +1625,7 @@ fn require_hir_expression_type(
         HirExpressionKind::BoolLiteral(_) => PrimitiveType::Bool,
         HirExpressionKind::FloatLiteral(_) => PrimitiveType::Float,
         HirExpressionKind::ByteLiteral(_) => PrimitiveType::Byte,
+        HirExpressionKind::StringLiteral(_) => PrimitiveType::String,
         HirExpressionKind::UnitLiteral => PrimitiveType::Unit,
         _ => return require_bootstrap_runtime_type(expression.ty(), types),
     };

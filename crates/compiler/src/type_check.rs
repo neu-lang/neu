@@ -72,6 +72,9 @@ pub enum TypeRuleDiagnostic {
     ArrayIndexTypeMismatch,
     ArrayIndexOutOfBounds,
     ImmutableArrayMutation,
+    StringIndexTypeMismatch,
+    StringIndexOutOfBounds,
+    StringOperationUnsupported,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -558,6 +561,9 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 ));
                 continue;
             };
+            if callee_name.name == "clone" {
+                continue;
+            }
             let targets: Vec<_> = sources
                 .iter()
                 .enumerate()
@@ -1553,12 +1559,7 @@ pub fn check_m0028_unsupported_executable_forms(
         parsed
             .literal_expressions
             .iter()
-            .filter(|literal| {
-                matches!(
-                    literal.kind,
-                    ParsedLiteralKind::AcceptedString | ParsedLiteralKind::Null
-                )
-            })
+            .filter(|literal| matches!(literal.kind, ParsedLiteralKind::Null))
             .map(|literal| literal.span),
     );
     candidates.extend(
@@ -1568,7 +1569,7 @@ pub fn check_m0028_unsupported_executable_forms(
             .filter(|reference| {
                 !matches!(
                     reference.name.as_str(),
-                    "Bool" | "Int" | "Unit" | "Float" | "Byte"
+                    "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte"
                 )
             })
             .map(|reference| reference.name_span),
@@ -1680,6 +1681,7 @@ pub fn type_m0063_function_signatures_in(
         Some(match name {
             "Bool" => primitives.bool_id,
             "Int" => primitives.int_id,
+            "String" => primitives.string_id,
             "Unit" => primitives.unit_id,
             "Float" => primitives.float_id,
             "Byte" => primitives.byte_id,
@@ -1887,6 +1889,220 @@ pub fn type_m0063_array_expressions(
                 TypeRuleDiagnostic::ImmutableArrayMutation,
                 assignment.target,
             ));
+        }
+    }
+}
+
+pub fn type_m0064_string_operations(
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    let Some(string_type) = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::String)).then_some(record.id())
+    }) else {
+        return;
+    };
+    let byte_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Byte)).then_some(record.id())
+    });
+    let int_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Int)).then_some(record.id())
+    });
+    let bool_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Bool)).then_some(record.id())
+    });
+
+    for name in &parsed.name_references {
+        let Some(binding) = parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == name.name)
+        else {
+            continue;
+        };
+        if let Some(ty) = report.declaration_signature(binding.binding) {
+            report.replace_expression_type(ExpressionType::new(name.reference, ty));
+        }
+    }
+
+    for parameter in &parsed.function_parameters {
+        let Some(type_reference) = parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == parameter.annotation)
+        else {
+            continue;
+        };
+        let Some(parameter_type) = types.records().iter().find_map(|record| {
+            let matches = match type_reference.name.as_str() {
+                "Bool" => record.kind() == &TypeKind::Primitive(PrimitiveType::Bool),
+                "Int" => record.kind() == &TypeKind::Primitive(PrimitiveType::Int),
+                "String" => record.kind() == &TypeKind::Primitive(PrimitiveType::String),
+                "Unit" => record.kind() == &TypeKind::Primitive(PrimitiveType::Unit),
+                "Float" => record.kind() == &TypeKind::Primitive(PrimitiveType::Float),
+                "Byte" => record.kind() == &TypeKind::Primitive(PrimitiveType::Byte),
+                _ => false,
+            };
+            matches.then_some(record.id())
+        }) else {
+            continue;
+        };
+        for reference in parsed.name_references.iter().filter(|reference| {
+            reference.name == parameter.name
+                && parsed
+                    .arena
+                    .node(reference.reference)
+                    .is_some_and(|node| node.span.start() >= parameter.name_span.start())
+        }) {
+            report
+                .replace_expression_type(ExpressionType::new(reference.reference, parameter_type));
+        }
+    }
+
+    for member in &parsed.member_expressions {
+        if member.name == "length" && report.expression_type(member.receiver) == Some(string_type) {
+            if let Some(int_type) = int_type {
+                report.replace_expression_type(ExpressionType::new(member.expression, int_type));
+            }
+            report.retain_diagnostics(|diagnostic| {
+                diagnostic.node() != member.expression
+                    || diagnostic.rule() != TypeRuleDiagnostic::MemberExpressionDeferred
+            });
+            continue;
+        }
+        report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+            TypeRuleDiagnostic::MemberExpressionDeferred,
+            member.expression,
+        ));
+    }
+
+    for index in &parsed.index_expressions {
+        if report.expression_type(index.array) != Some(string_type) {
+            continue;
+        }
+        if report.expression_type(index.index) != int_type {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::StringIndexTypeMismatch,
+                index.index,
+            ));
+            continue;
+        }
+        if let Some(byte_type) = byte_type {
+            report.replace_expression_type(ExpressionType::new(index.expression, byte_type));
+        }
+        let literal_length = parsed
+            .string_literals
+            .iter()
+            .find(|literal| literal.expression == index.array)
+            .map(|literal| literal.bytes.len())
+            .or_else(|| {
+                let name = parsed
+                    .name_references
+                    .iter()
+                    .find(|name| name.reference == index.array)?;
+                let binding = parsed
+                    .local_binding_names
+                    .iter()
+                    .find(|binding| binding.name == name.name)?;
+                let declaration = parsed
+                    .local_declarations
+                    .iter()
+                    .find(|declaration| declaration.declaration == binding.binding)?;
+                let initializer = declaration.initializer?;
+                parsed
+                    .string_literals
+                    .iter()
+                    .find(|literal| literal.expression == initializer)
+                    .map(|literal| literal.bytes.len())
+            });
+        let static_index = parsed
+            .integer_literals
+            .iter()
+            .find(|literal| literal.expression == index.index)
+            .and_then(|literal| literal.value.map(|value| value as i128))
+            .or_else(|| {
+                let unary = parsed
+                    .unary_expressions
+                    .iter()
+                    .find(|unary| unary.expression == index.index)?;
+                if unary.operator != crate::parser::ParsedUnaryOperator::Minus {
+                    return None;
+                }
+                parsed
+                    .integer_literals
+                    .iter()
+                    .find(|literal| literal.expression == unary.operand)
+                    .and_then(|literal| literal.value.map(|value| -(value as i128)))
+            });
+        if let (Some(length), Some(value)) = (literal_length, static_index)
+            && (value < 0 || value >= length as i128)
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::StringIndexOutOfBounds,
+                index.index,
+            ));
+        }
+    }
+
+    for binary in &parsed.binary_expressions {
+        let left = report.expression_type(binary.left);
+        let right = report.expression_type(binary.right);
+        if left != Some(string_type) || right != Some(string_type) {
+            continue;
+        }
+        match binary.operator {
+            ParsedBinaryOperator::Equal | ParsedBinaryOperator::NotEqual => {
+                if let Some(bool_type) = bool_type {
+                    report
+                        .replace_expression_type(ExpressionType::new(binary.expression, bool_type));
+                }
+            }
+            ParsedBinaryOperator::Plus => {
+                report.replace_expression_type(ExpressionType::new(binary.expression, string_type));
+            }
+            _ => report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::StringOperationUnsupported,
+                binary.expression,
+            )),
+        }
+    }
+
+    for call in &parsed.call_expressions {
+        let is_clone = parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == call.callee)
+            .is_some_and(|name| name.name == "clone");
+        if is_clone
+            && call.arguments.len() == 1
+            && report.expression_type(call.arguments[0]) == Some(string_type)
+        {
+            report.replace_expression_type(ExpressionType::new(call.expression, string_type));
+            report.retain_diagnostics(|diagnostic| {
+                diagnostic.node() != call.expression
+                    || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
+            });
+        }
+    }
+
+    for binary in &parsed.binary_expressions {
+        let left = report.expression_type(binary.left);
+        let right = report.expression_type(binary.right);
+        if left != Some(string_type) || right != Some(string_type) {
+            continue;
+        }
+        match binary.operator {
+            ParsedBinaryOperator::Equal | ParsedBinaryOperator::NotEqual => {
+                if let Some(bool_type) = bool_type {
+                    report
+                        .replace_expression_type(ExpressionType::new(binary.expression, bool_type));
+                }
+            }
+            ParsedBinaryOperator::Plus => {
+                report.replace_expression_type(ExpressionType::new(binary.expression, string_type));
+            }
+            _ => {}
         }
     }
 }

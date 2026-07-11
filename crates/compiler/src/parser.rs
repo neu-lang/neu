@@ -71,6 +71,8 @@ pub struct ParseOutput {
     pub binary_expressions: Vec<ParsedBinaryExpression>,
     pub array_literals: Vec<ParsedArrayLiteral>,
     pub index_expressions: Vec<ParsedIndexExpression>,
+    pub string_literals: Vec<ParsedStringLiteral>,
+    pub member_expressions: Vec<ParsedMemberExpression>,
     pub if_expressions: Vec<ParsedIfExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
@@ -270,6 +272,21 @@ pub struct ParsedIndexExpression {
     pub span: ByteSpan,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedStringLiteral {
+    pub expression: AstNodeId,
+    pub bytes: Vec<u8>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedMemberExpression {
+    pub expression: AstNodeId,
+    pub receiver: AstNodeId,
+    pub name: String,
+    pub span: ByteSpan,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParsedLiteralKind {
     BoolTrue,
@@ -415,6 +432,8 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         binary_expressions: parser.binary_expressions,
         array_literals: parser.array_literals,
         index_expressions: parser.index_expressions,
+        string_literals: parser.string_literals,
+        member_expressions: parser.member_expressions,
         if_expressions: parser.if_expressions,
         local_declarations: parser.local_declarations,
         assignment_statements: parser.assignment_statements,
@@ -455,6 +474,8 @@ struct Parser<'source> {
     binary_expressions: Vec<ParsedBinaryExpression>,
     array_literals: Vec<ParsedArrayLiteral>,
     index_expressions: Vec<ParsedIndexExpression>,
+    string_literals: Vec<ParsedStringLiteral>,
+    member_expressions: Vec<ParsedMemberExpression>,
     if_expressions: Vec<ParsedIfExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
     assignment_statements: Vec<ParsedAssignmentStatement>,
@@ -514,6 +535,8 @@ impl<'source> Parser<'source> {
             binary_expressions: Vec::new(),
             array_literals: Vec::new(),
             index_expressions: Vec::new(),
+            string_literals: Vec::new(),
+            member_expressions: Vec::new(),
             if_expressions: Vec::new(),
             local_declarations: Vec::new(),
             assignment_statements: Vec::new(),
@@ -1587,13 +1610,30 @@ impl<'source> Parser<'source> {
                 }
                 Some(TokenKind::Dot) => {
                     let start = span.start();
+                    let receiver = self.latest_expression_node_for_span(span);
                     let dot_span = self.current().expect("dot exists").span;
                     self.advance();
                     if self.current_kind() == Some(TokenKind::Identifier) {
                         let end = self.current().expect("member identifier exists").span.end();
+                        let name = self.text[self
+                            .current()
+                            .expect("member identifier exists")
+                            .span
+                            .start()..end]
+                            .to_owned();
                         self.advance();
                         span = self.span(start, end);
-                        self.arena.add_member_expression(span);
+                        let expression = self.arena.add_member_expression(span);
+                        let Some(receiver) = receiver else {
+                            self.diagnostic(DiagnosticKind::MalformedMemberAccess, span);
+                            return Some(span);
+                        };
+                        self.member_expressions.push(ParsedMemberExpression {
+                            expression,
+                            receiver,
+                            name,
+                            span,
+                        });
                     } else {
                         self.diagnostic(DiagnosticKind::MalformedMemberAccess, dot_span);
                         if self.current_kind() == Some(TokenKind::LeftParen) {
@@ -1706,6 +1746,15 @@ impl<'source> Parser<'source> {
                     kind: parsed_literal_kind(token.kind),
                     span,
                 });
+                if token.kind == TokenKind::String
+                    && let Some(bytes) = decode_string_literal(&self.text[span.start()..span.end()])
+                {
+                    self.string_literals.push(ParsedStringLiteral {
+                        expression,
+                        bytes,
+                        span,
+                    });
+                }
                 if matches!(
                     token.kind,
                     TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex
@@ -3112,4 +3161,28 @@ fn expression_node_kind(kind: AstNodeKind) -> bool {
             | AstNodeKind::ArrayLiteralExpression
             | AstNodeKind::IndexExpression
     )
+}
+
+fn decode_string_literal(text: &str) -> Option<Vec<u8>> {
+    let inner = text.strip_prefix('"')?.strip_suffix('"')?;
+    let mut bytes = Vec::new();
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\\' {
+            let mut encoded = [0; 4];
+            bytes.extend_from_slice(ch.encode_utf8(&mut encoded).as_bytes());
+            continue;
+        }
+        let escaped = chars.next()?;
+        match escaped {
+            '0' => bytes.push(0),
+            'n' => bytes.push(b'\n'),
+            'r' => bytes.push(b'\r'),
+            't' => bytes.push(b'\t'),
+            '"' => bytes.push(b'"'),
+            '\\' => bytes.push(b'\\'),
+            _ => return None,
+        }
+    }
+    Some(bytes)
 }

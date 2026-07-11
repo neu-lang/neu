@@ -36,8 +36,9 @@ do not own, duplicate, or reinterpret the arena.
 
 The lowering boundary must resolve a `TypeId` through that supplied arena
 before selecting a bootstrap runtime representation. For the executable subset,
-bootstrap primitives and recursively supported inline arrays from ADR-0063 are
-accepted runtime values and lower under ADR-0043, ADR-0046, and ADR-0063.
+bootstrap primitives, recursively supported inline arrays from ADR-0063, and
+owned UTF-8 strings from ADR-0064 are accepted runtime values and lower under
+ADR-0043, ADR-0046, ADR-0063, and ADR-0064.
 Missing, foreign, or unsupported type identities fail as explicit
 unsupported-lowering conditions; they must not be interpreted from raw numeric
 IDs.

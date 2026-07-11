@@ -45,9 +45,10 @@ because stack behavior and recursion diagnostics are not yet specified.
 
 Arguments are evaluated left-to-right before entering the callee. For bootstrap
 values, parameter passing is by value. `Bool`, `Int`, `Unit`, and `Null` are
-copyable under ADR-0035. Only `Int` participates in the first executable
-smoke. `String` and user-defined move-only values remain out of the first
-executable subset.
+copyable under ADR-0035. Only `Int` participates in the arithmetic bootstrap
+smoke. Owned `String` calls are additionally accepted exactly as specified by
+ADR-0064; user-defined move-only values remain out of the first executable
+subset.
 
 Only explicit `return expression;` returns a value from a function in the first
 executable subset. Implicit returns from trailing expressions are deferred for

@@ -1,0 +1,8 @@
+package examples.current
+
+public fun main(): Int {
+    val prefix: String = "Neu";
+    val text: String = clone(prefix) + "!";
+    val length: Int = text.length;
+    return length + 3;
+}

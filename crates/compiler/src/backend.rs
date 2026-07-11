@@ -2,13 +2,16 @@ use std::{collections::HashMap, fmt::Write as _};
 
 use cranelift_codegen::{
     ir::{
-        AbiParam, Function, InstBuilder, Signature, TrapCode, UserFuncName, Value,
+        AbiParam, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, MemFlagsData,
+        Signature, TrapCode, UserExternalName, UserFuncName, Value,
         condcodes::{FloatCC, IntCC},
         immediates::Ieee64,
         types,
     },
     isa::CallConv,
-    settings, verify_function,
+    settings,
+    settings::Configurable,
+    verify_function,
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
@@ -26,10 +29,52 @@ use crate::{
 const INVALID_SHIFT_COUNT_TRAP: TrapCode = TrapCode::unwrap_user(1);
 const NEGATIVE_EXPONENT_TRAP: TrapCode = TrapCode::unwrap_user(2);
 
+fn codegen_flags() -> settings::Flags {
+    let mut builder = settings::builder();
+    builder
+        .set("is_pic", "false")
+        .expect("known Cranelift setting");
+    settings::Flags::new(builder)
+}
+
 struct LoweringContext<'a> {
     function: &'a MirFunction,
     type_arena: &'a TypeArena,
     function_return_types: &'a HashMap<crate::mir::MirFunctionId, TypeId>,
+    runtime: Option<&'a RuntimeFunctions>,
+}
+
+#[derive(Clone, Copy)]
+struct RuntimeFunctions {
+    malloc: FuncId,
+    memcpy: FuncId,
+    memcmp: FuncId,
+    call_conv: CallConv,
+}
+
+impl RuntimeFunctions {
+    fn reference(&self, function: &mut Function, id: FuncId, memory: bool) -> FuncRef {
+        let mut signature = Signature::new(self.call_conv);
+        if memory {
+            signature.params.push(AbiParam::new(types::I64));
+            signature.params.push(AbiParam::new(types::I64));
+            signature.params.push(AbiParam::new(types::I64));
+        } else {
+            signature.params.push(AbiParam::new(types::I64));
+        }
+        signature.returns.push(AbiParam::new(types::I64));
+        let signature = function.import_signature(signature);
+        let user_name = function.declare_imported_user_function(UserExternalName {
+            namespace: 0,
+            index: id.as_u32(),
+        });
+        function.import_function(ExtFuncData {
+            name: ExternalName::user(user_name),
+            signature,
+            colocated: true,
+            patchable: false,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -66,13 +111,14 @@ pub fn lower_mir_module_to_cranelift(
     let isa_builder = cranelift_codegen::isa::lookup(target.clone())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let isa = isa_builder
-        .finish(settings::Flags::new(settings::builder()))
+        .finish(codegen_flags())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let mut object_module = ObjectModule::new(
         ObjectBuilder::new(isa, "neu", default_libcall_names())
             .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
     );
     let mut function_ids = HashMap::new();
+    let runtime = declare_runtime_functions(&mut object_module, &target)?;
     let function_return_types = module
         .functions()
         .iter()
@@ -98,6 +144,7 @@ pub fn lower_mir_module_to_cranelift(
             Some(&mut object_module),
             &function_ids,
             &function_return_types,
+            Some(&runtime),
         )?;
         output.push(clif_function.display().to_string());
     }
@@ -121,13 +168,14 @@ pub fn emit_mir_module_to_object_for_target(
     let isa_builder = cranelift_codegen::isa::lookup(target.clone())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let isa = isa_builder
-        .finish(settings::Flags::new(settings::builder()))
+        .finish(codegen_flags())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let mut object_module = ObjectModule::new(
         ObjectBuilder::new(isa, "neu", default_libcall_names())
             .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
     );
     let mut function_ids = HashMap::new();
+    let runtime = declare_runtime_functions(&mut object_module, &target)?;
     let function_return_types = module
         .functions()
         .iter()
@@ -165,6 +213,7 @@ pub fn emit_mir_module_to_object_for_target(
             Some(&mut object_module),
             &function_ids,
             &function_return_types,
+            Some(&runtime),
         )?;
         let function_id = function_ids
             .get(&function.id())
@@ -219,16 +268,18 @@ fn emit_mir_function_to_object_impl(
     let identity = function
         .symbol_identity()
         .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
-    let clif_function = lower_mir_function(function, type_arena, &target)?;
     let isa_builder = cranelift_codegen::isa::lookup(target.clone())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let isa = isa_builder
-        .finish(settings::Flags::new(settings::builder()))
+        .finish(codegen_flags())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let mut module = ObjectModule::new(
         ObjectBuilder::new(isa, "neu", default_libcall_names())
             .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
     );
+    let runtime = declare_runtime_functions(&mut module, &target)?;
+    let clif_function =
+        lower_mir_function_with_runtime(function, type_arena, &target, Some(&runtime))?;
     let symbol = if function.is_entry() {
         let symbol = language_entry_symbol
             .filter(|symbol| !symbol.is_empty())
@@ -260,6 +311,15 @@ fn lower_mir_function(
     type_arena: &TypeArena,
     target: &Triple,
 ) -> Result<Function, CraneliftLoweringError> {
+    lower_mir_function_with_runtime(function, type_arena, target, None)
+}
+
+fn lower_mir_function_with_runtime(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+    target: &Triple,
+    runtime: Option<&RuntimeFunctions>,
+) -> Result<Function, CraneliftLoweringError> {
     lower_mir_function_with_module(
         function,
         type_arena,
@@ -267,6 +327,7 @@ fn lower_mir_function(
         None,
         &HashMap::new(),
         &HashMap::new(),
+        runtime,
     )
 }
 
@@ -277,6 +338,7 @@ fn lower_mir_function_with_module(
     module: Option<&mut ObjectModule>,
     function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
     function_return_types: &HashMap<crate::mir::MirFunctionId, TypeId>,
+    runtime: Option<&RuntimeFunctions>,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
     if function.blocks().is_empty() {
@@ -298,6 +360,7 @@ fn lower_mir_function_with_module(
             function,
             type_arena,
             function_return_types,
+            runtime,
         };
         let mut clif_blocks = HashMap::new();
         let mut locals = HashMap::new();
@@ -362,7 +425,7 @@ fn lower_mir_function_with_module(
         builder.finalize();
     }
 
-    let flags = settings::Flags::new(settings::builder());
+    let flags = codegen_flags();
     verify_function(&clif_function, &flags)
         .map_err(|_| CraneliftLoweringError::VerificationFailed)?;
     Ok(clif_function)
@@ -383,6 +446,35 @@ fn mir_signature(
         signature.returns.push(AbiParam::new(return_type));
     }
     Ok(signature)
+}
+
+fn declare_runtime_functions(
+    module: &mut ObjectModule,
+    target: &Triple,
+) -> Result<RuntimeFunctions, CraneliftLoweringError> {
+    let mut malloc_signature = Signature::new(CallConv::triple_default(target));
+    malloc_signature.params.push(AbiParam::new(types::I64));
+    malloc_signature.returns.push(AbiParam::new(types::I64));
+    let mut memory_signature = Signature::new(CallConv::triple_default(target));
+    memory_signature.params.push(AbiParam::new(types::I64));
+    memory_signature.params.push(AbiParam::new(types::I64));
+    memory_signature.params.push(AbiParam::new(types::I64));
+    memory_signature.returns.push(AbiParam::new(types::I64));
+    let malloc = module
+        .declare_function("malloc", Linkage::Import, &malloc_signature)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let memcpy = module
+        .declare_function("memcpy", Linkage::Import, &memory_signature)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let memcmp = module
+        .declare_function("memcmp", Linkage::Import, &memory_signature)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    Ok(RuntimeFunctions {
+        malloc,
+        memcpy,
+        memcmp,
+        call_conv: CallConv::triple_default(target),
+    })
 }
 
 fn bootstrap_symbol(identity: &crate::module::FunctionSymbolIdentity) -> String {
@@ -426,6 +518,7 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Int)) => Some(types::I64),
         Some(TypeKind::Primitive(PrimitiveType::Float)) => Some(types::F64),
         Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
+        Some(TypeKind::Primitive(PrimitiveType::String)) => Some(types::I64),
         _ => None,
     }
 }
@@ -777,6 +870,206 @@ fn lower_instruction(
                 let selected = builder.ins().select(matches, replacement, current);
                 builder.def_var(variable, selected);
             }
+            Ok(())
+        }
+        MirInstruction::StringConstant { output, bytes, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let function_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let size = builder.ins().iconst(
+                types::I64,
+                i64::try_from(bytes.len() + 8)
+                    .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?,
+            );
+            let call = builder.ins().call(function_ref, &[size]);
+            let pointer = *builder
+                .inst_results(call)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(pointer, TrapCode::unwrap_user(4));
+            let length = builder.ins().iconst(
+                types::I64,
+                i64::try_from(bytes.len())
+                    .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?,
+            );
+            builder.ins().store(MemFlagsData::new(), length, pointer, 0);
+            for (offset, byte) in bytes.iter().copied().enumerate() {
+                let value = builder.ins().iconst(types::I8, i64::from(byte));
+                builder.ins().store(
+                    MemFlagsData::new(),
+                    value,
+                    pointer,
+                    i32::try_from(offset + 8)
+                        .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?,
+                );
+            }
+            values.insert(*output, pointer);
+            Ok(())
+        }
+        MirInstruction::StringLength { output, value, .. } => {
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(
+                *output,
+                builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::new(), pointer, 0),
+            );
+            Ok(())
+        }
+        MirInstruction::StringIndex {
+            output,
+            value,
+            index,
+            ..
+        } => {
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let index = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let negative = builder.ins().icmp_imm(IntCC::SignedLessThan, index, 0);
+            let too_large = builder
+                .ins()
+                .icmp(IntCC::UnsignedGreaterThanOrEqual, index, length);
+            builder.ins().trapnz(negative, TrapCode::unwrap_user(3));
+            builder.ins().trapnz(too_large, TrapCode::unwrap_user(3));
+            let data = builder.ins().iadd_imm(pointer, 8);
+            let address = builder.ins().iadd(data, index);
+            let byte = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), address, 0);
+            values.insert(*output, builder.ins().ireduce(types::I8, byte));
+            Ok(())
+        }
+        MirInstruction::StringClone { output, value, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let source = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), source, 0);
+            let size = builder.ins().iadd_imm(length, 8);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let allocation = builder.ins().call(malloc_ref, &[size]);
+            let destination = *builder
+                .inst_results(allocation)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(destination, TrapCode::unwrap_user(4));
+            let memcpy_ref = runtime.reference(builder.func, runtime.memcpy, true);
+            builder.ins().call(memcpy_ref, &[destination, source, size]);
+            values.insert(*output, destination);
+            Ok(())
+        }
+        MirInstruction::StringConcat {
+            output,
+            left,
+            right,
+            ..
+        } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let left_length = builder.ins().load(types::I64, MemFlagsData::new(), left, 0);
+            let right_length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), right, 0);
+            let length = builder.ins().iadd(left_length, right_length);
+            let size = builder.ins().iadd_imm(length, 8);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let allocation = builder.ins().call(malloc_ref, &[size]);
+            let destination = *builder
+                .inst_results(allocation)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(destination, TrapCode::unwrap_user(4));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), length, destination, 0);
+            let memcpy_ref = runtime.reference(builder.func, runtime.memcpy, true);
+            let destination_data = builder.ins().iadd_imm(destination, 8);
+            let left_data = builder.ins().iadd_imm(left, 8);
+            builder
+                .ins()
+                .call(memcpy_ref, &[destination_data, left_data, left_length]);
+            let right_destination = builder.ins().iadd(destination_data, left_length);
+            let right_data = builder.ins().iadd_imm(right, 8);
+            builder
+                .ins()
+                .call(memcpy_ref, &[right_destination, right_data, right_length]);
+            values.insert(*output, destination);
+            Ok(())
+        }
+        MirInstruction::StringCompare {
+            output,
+            left,
+            right,
+            negate,
+            ..
+        } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let left_length = builder.ins().load(types::I64, MemFlagsData::new(), left, 0);
+            let right_length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), right, 0);
+            let same_length = builder.ins().icmp(IntCC::Equal, left_length, right_length);
+            let shorter_left =
+                builder
+                    .ins()
+                    .icmp(IntCC::UnsignedLessThan, left_length, right_length);
+            let compare_length = builder
+                .ins()
+                .select(shorter_left, left_length, right_length);
+            let left_data = builder.ins().iadd_imm(left, 8);
+            let right_data = builder.ins().iadd_imm(right, 8);
+            let memcmp_ref = runtime.reference(builder.func, runtime.memcmp, true);
+            let comparison = builder
+                .ins()
+                .call(memcmp_ref, &[left_data, right_data, compare_length]);
+            let comparison = *builder
+                .inst_results(comparison)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let equal = builder.ins().icmp_imm(IntCC::Equal, comparison, 0);
+            let equal = builder.ins().band(equal, same_length);
+            let result = if *negate {
+                builder.ins().bxor_imm(equal, 1)
+            } else {
+                equal
+            };
+            values.insert(*output, result);
             Ok(())
         }
         MirInstruction::Unary {

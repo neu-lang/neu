@@ -439,7 +439,18 @@ fn lower_expression(
                 }
             }
             ParsedLiteralKind::AcceptedString | ParsedLiteralKind::Null => {
-                return Err(HirLoweringError::UnsupportedExpression);
+                let string = source
+                    .parsed
+                    .string_literals
+                    .iter()
+                    .find(|string| string.expression == expression)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                output.push(HirExpression::string_literal(
+                    id,
+                    span,
+                    ty,
+                    string.bytes.clone(),
+                ));
             }
         }
         return Ok(id);
@@ -472,6 +483,25 @@ fn lower_expression(
             left,
             right,
         ));
+        return Ok(id);
+    }
+    if let Some(member) = source
+        .parsed
+        .member_expressions
+        .iter()
+        .find(|member| member.expression == expression)
+    {
+        if member.name != "length" {
+            return Err(HirLoweringError::UnsupportedExpression);
+        }
+        let receiver = lower_expression(
+            source,
+            function_declaration,
+            member.receiver,
+            local_bindings,
+            output,
+        )?;
+        output.push(HirExpression::string_length(id, span, ty, receiver));
         return Ok(id);
     }
     if let Some(array) = source
@@ -572,6 +602,27 @@ fn lower_expression(
         .iter()
         .find(|call| call.expression == expression)
     {
+        let is_clone = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == call.callee)
+            .is_some_and(|name| name.name == "clone");
+        if is_clone {
+            let argument = *call
+                .arguments
+                .first()
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let argument = lower_expression(
+                source,
+                function_declaration,
+                argument,
+                local_bindings,
+                output,
+            )?;
+            output.push(HirExpression::string_clone(id, span, ty, argument));
+            return Ok(id);
+        }
         let name = source
             .parsed
             .name_references
@@ -1142,6 +1193,9 @@ pub enum HirExpressionKind {
         array: HirExpressionId,
         index: HirExpressionId,
     },
+    StringLiteral(Vec<u8>),
+    StringLength(HirExpressionId),
+    StringClone(HirExpressionId),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1286,6 +1340,43 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::Index { array, index },
+        }
+    }
+
+    pub fn string_literal(id: HirExpressionId, span: ByteSpan, ty: TypeId, bytes: Vec<u8>) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::StringLiteral(bytes),
+        }
+    }
+
+    pub fn string_length(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        receiver: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::StringLength(receiver),
+        }
+    }
+
+    pub fn string_clone(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        value: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::StringClone(value),
         }
     }
     pub fn id(&self) -> HirExpressionId {

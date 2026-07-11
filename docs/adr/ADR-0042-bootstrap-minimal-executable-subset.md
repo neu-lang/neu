@@ -58,10 +58,12 @@ The first required runnable program shape is:
 The subset explicitly defers classes, structs at runtime, interfaces, enums at
 runtime, generics, nullable runtime representation, heap allocation,
 destructuring, pattern matching, loops, branches beyond straight-line return
-analysis, coroutines, unsafe, FFI, printing, strings, standard library calls,
+analysis, coroutines, unsafe, FFI, printing, string operations outside ADR-0064,
+standard library calls,
 scheduler/runtime work, exceptions/panics as language constructs, closures,
 methods, and member access. Fixed-size inline arrays are accepted only by
-ADR-0063; dynamic arrays, slices, and target-pack APIs remain deferred.
+ADR-0063. Owned UTF-8 strings are accepted only by ADR-0064; dynamic arrays,
+slices, and target-pack APIs remain deferred.
 
 This ADR extends the executable subset beyond ADR-0024 where needed for
 operators not previously parsed. M0028 must add parser and type-checker support

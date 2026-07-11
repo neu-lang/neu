@@ -224,7 +224,9 @@ M0018 defines a small bootstrap type checker with primitive type-checking identi
 
 Typed output is side-table metadata: an expression type table, declaration signature table, assignment check table, and diagnostics list. The type checker does not rewrite the AST.
 
-Primitive identities `Bool`, `Int`, `String`, `Unit`, and `Null` are type-checking identities only and have no ABI or layout meaning.
+Primitive identities `Bool`, `Int`, `String`, `Unit`, and `Null` are type-checking
+identities. `String` receives the compiler-owned opaque runtime representation
+defined by ADR-0064; it has no stable public layout or FFI meaning.
 
 Assignment compatibility is exact type identity, except `Null` is assignment-compatible only with nullable target types and non-null base values are assignment-compatible with their nullable wrapper.
 
@@ -485,11 +487,13 @@ arithmetic and bitwise operations and `main` returning the helper result as the
 process exit code.
 Classes, structs at runtime, interfaces, enums at runtime, generics, nullable
 runtime representation, heap allocation, destructuring, pattern matching,
-loops, broader branching, coroutines, unsafe, FFI, printing, strings, standard
+loops, broader branching, coroutines, unsafe, FFI, printing, string operations
+outside ADR-0064, standard
 library calls, scheduler/runtime work, exceptions or panics as language
-constructs, closures, methods, and member access remain deferred. Fixed-size
-inline arrays are accepted only as defined by ADR-0063; dynamic arrays, slices,
-and target-pack APIs remain deferred. Unsupported parsed forms must fail before
+constructs, closures, methods, and general member access remain deferred.
+Fixed-size inline arrays are accepted only as defined by ADR-0063. Owned UTF-8
+strings are accepted only as defined by ADR-0064. Dynamic arrays, slices, and
+target-pack APIs remain deferred. Unsupported parsed forms must fail before
 backend lowering with
 `unsupported_executable_form` or a more specific existing diagnostic. M0028
 must add parser and type-checker support for executable operators not already
@@ -738,6 +742,7 @@ Bindings are usable after branches and loops only when every reachable path
 proves them available. Separate compilation requires exported effect metadata;
 missing or stale metadata is an error. No explicit reference, dereference,
 lifetime, or move syntax is introduced. Methods, fields, closures, coroutines,
-move-only nominal runtime values, arrays, slices, strings, allocation, and FFI
+move-only nominal runtime values, slices, allocation outside ADR-0064, and FFI
 remain deferred where their existing frontend or backend contracts are absent;
-fixed-size inline arrays follow ADR-0063.
+fixed-size inline arrays follow ADR-0063 and owned UTF-8 strings follow
+ADR-0064.
