@@ -1280,3 +1280,41 @@ fn m0028_records_return_statement_enclosing_blocks_in_source_order() {
     assert_eq!(output.return_statements[1].block, branch_body);
     assert_eq!(output.return_statements[2].block, function_body);
 }
+
+#[test]
+fn m0029_records_executable_body_statements_in_function_source_order() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(202),
+        "fun run(): Int { const value: Int = 1; var next: Int = value; next = next + 1; return next; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let statements = &parsed.executable_body_statements;
+    assert_eq!(statements.len(), 4);
+    assert!(
+        statements
+            .windows(2)
+            .all(|pair| pair[0].span.start() < pair[1].span.start())
+    );
+    assert!(
+        statements
+            .iter()
+            .all(|statement| statement.function == parsed.function_declarations[0].declaration)
+    );
+    assert_eq!(
+        statements[0].statement,
+        parsed.local_declarations[0].declaration
+    );
+    assert_eq!(
+        statements[1].statement,
+        parsed.local_declarations[1].declaration
+    );
+    assert_eq!(
+        statements[2].statement,
+        parsed.assignment_statements[0].statement
+    );
+    assert_eq!(
+        statements[3].statement,
+        parsed.return_statements[0].statement
+    );
+}

@@ -70,6 +70,7 @@ pub struct ParseOutput {
     pub function_parameters: Vec<ParsedFunctionParameter>,
     pub function_declarations: Vec<ParsedFunctionDeclaration>,
     pub return_statements: Vec<ParsedReturnStatement>,
+    pub executable_body_statements: Vec<ParsedExecutableBodyStatement>,
     pub call_expressions: Vec<ParsedCallExpression>,
     pub enum_variants: Vec<ParsedEnumVariant>,
     pub when_expressions: Vec<ParsedWhenExpression>,
@@ -116,6 +117,13 @@ pub struct ParsedReturnStatement {
     pub function: AstNodeId,
     pub block: AstNodeId,
     pub value: Option<AstNodeId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedExecutableBodyStatement {
+    pub function: AstNodeId,
+    pub statement: AstNodeId,
+    pub span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -327,6 +335,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         function_parameters: parser.function_parameters,
         function_declarations: parser.function_declarations,
         return_statements: parser.return_statements,
+        executable_body_statements: parser.executable_body_statements,
         call_expressions: parser.call_expressions,
         enum_variants: parser.enum_variants,
         when_expressions: parser.when_expressions,
@@ -358,6 +367,7 @@ struct Parser<'source> {
     function_parameters: Vec<ParsedFunctionParameter>,
     function_declarations: Vec<ParsedFunctionDeclaration>,
     return_statements: Vec<ParsedReturnStatement>,
+    executable_body_statements: Vec<ParsedExecutableBodyStatement>,
     call_expressions: Vec<ParsedCallExpression>,
     enum_variants: Vec<ParsedEnumVariant>,
     when_expressions: Vec<ParsedWhenExpression>,
@@ -384,6 +394,7 @@ impl<'source> Parser<'source> {
             function_parameters: Vec::new(),
             function_declarations: Vec::new(),
             return_statements: Vec::new(),
+            executable_body_statements: Vec::new(),
             call_expressions: Vec::new(),
             enum_variants: Vec::new(),
             when_expressions: Vec::new(),
@@ -978,6 +989,7 @@ impl<'source> Parser<'source> {
                                         target,
                                         value,
                                     });
+                                    self.record_executable_body_statement(statement);
                                 }
                             } else {
                                 self.diagnostic_current_or_span(
@@ -1119,6 +1131,7 @@ impl<'source> Parser<'source> {
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 name_span: name.span,
             });
+            self.record_executable_body_statement(binding);
         } else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedVariableDeclaration,
@@ -1157,6 +1170,7 @@ impl<'source> Parser<'source> {
                     block: AstNodeId::from_raw(usize::MAX),
                     value,
                 });
+                self.record_executable_body_statement(statement);
                 if let Some(indices) = self.block_return_indices.last_mut() {
                     indices.push(return_index);
                 }
@@ -1168,6 +1182,23 @@ impl<'source> Parser<'source> {
             );
             self.skip_to_statement_boundary();
         }
+    }
+
+    fn record_executable_body_statement(&mut self, statement: AstNodeId) {
+        let Some(function) = self.current_function else {
+            return;
+        };
+        let span = self
+            .arena
+            .node(statement)
+            .expect("parsed executable statement")
+            .span;
+        self.executable_body_statements
+            .push(ParsedExecutableBodyStatement {
+                function,
+                statement,
+                span,
+            });
     }
 
     fn parse_expression(&mut self) -> Option<ByteSpan> {
