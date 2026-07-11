@@ -662,3 +662,20 @@ MIR function ID is not a substitute. The backend derives a deterministic,
 collision-free internal object symbol from those components. Exact escaping
 and encoding are compiler implementation details and do not define a public
 ABI or new language semantics.
+
+## ADR-0057: Bootstrap Target-Pack Linker Contract
+
+The initial host target pack owns a pinned executable `lld` linker artifact and
+a target-specific startup-shim object. Its manifest identifies the exact target
+triple, native object and executable formats, linker path, startup-shim path,
+platform entry symbol, canonical language-entry symbol, and test-visible
+non-success trap status. Paths are pack-relative; absolute paths, traversal,
+missing artifacts, and target mismatches are rejected.
+
+The compiler receives an explicit target-pack root and never searches `PATH` or
+falls back to a host linker. The startup shim calls the selected language
+`main`, maps an `Int` in `0..255` to process exit status, and exits
+unsuccessfully for bootstrap traps or unsupported exit values. It is not a
+standard library and provides no printing, allocation, scheduling, CLI
+arguments, or panic formatting. M0032 covers the current host pack; additional
+target-pack distribution remains M0033 work.

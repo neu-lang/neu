@@ -6,7 +6,7 @@
 - Milestone: `M0032`
 - Milestone File: `docs/milestones/M0032-object-and-bundled-linker-pipeline.md`
 - Specification: `docs/SPEC.md`
-- Status: `blocked`
+- Status: `completed`
 
 ## Goal
 
@@ -47,10 +47,10 @@ into a runnable executable without a hidden host-tool dependency.
 
 - The ambiguity report quotes every missing linker/startup rule.
 - Competing designs and their ADR-0020/ADR-0047 trade-offs are recorded.
-- The affected M0032 implementation remains blocked rather than invoking a
-  hidden host dependency.
-- A future accepted ADR or SPEC revision names the target-pack inputs needed by
-  the implementation task.
+- The affected M0032 implementation now has explicit target-pack inputs and
+  remains prohibited from invoking hidden host dependencies.
+- ADR-0057 and the SPEC summary name the target-pack inputs needed by
+  M0032-004 and later link tasks.
 
 ## Execution Log
 
@@ -63,16 +63,20 @@ into a runnable executable without a hidden host-tool dependency.
 - 2026-07-11 main_task=main phase=validation result=pass evidence=contract
   validator confirms the open ambiguity and unchanged linker/runtime checklist.
   handoff=main-task architecture
+- 2026-07-11 main_task=main phase=resolution result=pass evidence=ADR-0057
+  accepts a pack-owned pinned `lld`, startup shim, explicit pack root, and no
+  host `PATH` fallback. handoff=M0032-004
 
 ## Required Outputs
 
-- Authority read: ADR-0020, ADR-0046, ADR-0047, and M0032.
-- Files changed: this task, the ambiguity report, and the validator.
+- Authority read: ADR-0020, ADR-0046, ADR-0047, ADR-0057, and M0032.
+- Files changed: this task, the accepted ADR and reviews, the SPEC summary,
+  the resolved ambiguity report, the milestone input list, and M0032-004.
 - Tests written before implementation and expected failure: no compiler test;
   the contract validator is the applicable pre-implementation check.
-- Validation commands and results: `docs/tests/m0032-bundled-linker-contract.sh`
-  and `git diff --check` passed.
-- Open questions: linker artifact, target-pack ownership, invocation, startup
-  shim object, and trap-to-process behavior.
-- Remaining risk and next main-task action: resolve the ambiguity through an
-  accepted ADR/SPEC update before implementing executable linking.
+- Validation commands and results: the contract validator and `git diff --check`
+  passed before and after ADR-0057 acceptance.
+- Open questions: actual pack artifact distribution and linker invocation are
+  later M0032 tasks.
+- Remaining risk and next main-task action: implement M0032-004's resolver;
+  actual linker invocation and startup validation remain later tasks.

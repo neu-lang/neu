@@ -7,7 +7,7 @@
 - Related Milestone: `M0032`
 - Filed By: `main-task architecture review`
 - Date: `2026-07-11`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `main-task semantic design and build architecture`
 
 ## Ambiguous Or Missing Authority
@@ -76,3 +76,15 @@ An accepted ADR or SPEC revision must define:
 
 No executable-link implementation may begin until these requirements are
 accepted. The object emitter remains valid and independently testable.
+
+## Resolution
+
+ADR-0057 accepts a pack-owned pinned `lld` artifact and target-specific
+startup-shim object. The compiler receives an explicit pack root, resolves only
+validated pack-relative paths, and never falls back to host `PATH` tools. The
+manifest, canonical language-entry symbol, and non-success trap status are
+logical source-of-truth fields; serialization and Rust API shape remain
+implementation details.
+
+The affected resolver task is `M0032-004`. Link invocation and executable
+smoke work remain downstream tasks.

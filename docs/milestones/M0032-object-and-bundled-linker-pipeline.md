@@ -31,6 +31,7 @@ ADR-0020 requires no hidden host dependency for ordinary builds.
 - `docs/adr/ADR-0020-portability-targets-and-platform-semantics.md`
 - `docs/adr/ADR-0047-bootstrap-object-link-runtime-model.md`
 - `docs/adr/ADR-0056-bootstrap-function-symbol-identity.md`
+- `docs/adr/ADR-0057-bootstrap-target-pack-linker-contract.md`
 
 ## Outputs
 
