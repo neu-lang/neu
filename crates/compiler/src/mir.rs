@@ -843,7 +843,18 @@ impl<'a> ShortCircuitLowerer<'a> {
                     });
                 }
             }
-            _ => return Err(MirLoweringError::UnsupportedExpression),
+            HirExpressionKind::DirectCall(call) => {
+                self.push(MirInstruction::DirectCall {
+                    output,
+                    callee: MirFunctionId::from_raw(call.callee().index()),
+                    arguments: call
+                        .arguments()
+                        .iter()
+                        .map(|argument| MirValueId::from_raw(argument.index()))
+                        .collect(),
+                    span: expression.span(),
+                });
+            }
         }
         for local in self.function.locals() {
             if local.initializer() == Some(expression.id()) {
