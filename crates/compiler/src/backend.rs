@@ -42,7 +42,7 @@ pub fn lower_mir_function_to_cranelift(
     function: &MirFunction,
     type_arena: &TypeArena,
 ) -> Result<String, CraneliftLoweringError> {
-    Ok(lower_mir_function(function, type_arena)?
+    Ok(lower_mir_function(function, type_arena, &Triple::host())?
         .display()
         .to_string())
 }
@@ -51,7 +51,7 @@ pub fn emit_mir_function_to_object(
     function: &MirFunction,
     type_arena: &TypeArena,
 ) -> Result<Vec<u8>, CraneliftLoweringError> {
-    emit_mir_function_to_object_impl(function, type_arena, None)
+    emit_mir_function_to_object_impl(function, type_arena, None, Triple::host())
 }
 
 pub fn emit_mir_function_to_object_with_entry_symbol(
@@ -59,20 +59,34 @@ pub fn emit_mir_function_to_object_with_entry_symbol(
     type_arena: &TypeArena,
     language_entry_symbol: &str,
 ) -> Result<Vec<u8>, CraneliftLoweringError> {
-    emit_mir_function_to_object_impl(function, type_arena, Some(language_entry_symbol))
+    emit_mir_function_to_object_impl(
+        function,
+        type_arena,
+        Some(language_entry_symbol),
+        Triple::host(),
+    )
+}
+
+pub fn emit_mir_function_to_object_for_target(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+    language_entry_symbol: &str,
+    target: Triple,
+) -> Result<Vec<u8>, CraneliftLoweringError> {
+    emit_mir_function_to_object_impl(function, type_arena, Some(language_entry_symbol), target)
 }
 
 fn emit_mir_function_to_object_impl(
     function: &MirFunction,
     type_arena: &TypeArena,
     language_entry_symbol: Option<&str>,
+    target: Triple,
 ) -> Result<Vec<u8>, CraneliftLoweringError> {
     let identity = function
         .symbol_identity()
         .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
-    let clif_function = lower_mir_function(function, type_arena)?;
-    let triple = Triple::host();
-    let isa_builder = cranelift_codegen::isa::lookup_by_name(&triple.to_string())
+    let clif_function = lower_mir_function(function, type_arena, &target)?;
+    let isa_builder = cranelift_codegen::isa::lookup(target.clone())
         .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
     let isa = isa_builder
         .finish(settings::Flags::new(settings::builder()))
@@ -110,6 +124,7 @@ fn emit_mir_function_to_object_impl(
 fn lower_mir_function(
     function: &MirFunction,
     type_arena: &TypeArena,
+    target: &Triple,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
     if !function.parameters().is_empty() || function.blocks().len() != 1 {
@@ -118,7 +133,7 @@ fn lower_mir_function(
 
     let function_index = u32::try_from(function.id().index())
         .map_err(|_| CraneliftLoweringError::FunctionIdOutOfRange)?;
-    let mut signature = Signature::new(CallConv::triple_default(&Triple::host()));
+    let mut signature = Signature::new(CallConv::triple_default(target));
     signature.returns.push(AbiParam::new(types::I64));
     let mut clif_function =
         Function::with_name_signature(UserFuncName::user(0, function_index), signature);

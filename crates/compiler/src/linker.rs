@@ -59,24 +59,26 @@ impl LinkInvocation {
 
         let output = output.as_ref().to_owned();
         let target = pack.target();
-        let target_architecture = match target.architecture {
-            Architecture::Aarch64(Aarch64Architecture::Aarch64) => "arm64",
+        let mut arguments = match target.architecture {
+            Architecture::Aarch64(Aarch64Architecture::Aarch64) => vec![
+                OsString::from("-arch"),
+                OsString::from("arm64"),
+                OsString::from("-platform_version"),
+                OsString::from("macos"),
+                OsString::from("15.0"),
+                OsString::from("15.0"),
+            ],
+            Architecture::X86_64 => vec![OsString::from("-flavor"), OsString::from("gnu")],
             _ => return Err(LinkInvocationError::UnsupportedTarget),
         };
-        let arguments = vec![
-            OsString::from("-arch"),
-            OsString::from(target_architecture),
-            OsString::from("-platform_version"),
-            OsString::from("macos"),
-            OsString::from("15.0"),
-            OsString::from("15.0"),
+        arguments.extend([
             OsString::from("-o"),
             output.as_os_str().to_owned(),
             OsString::from("-e"),
             OsString::from(pack.entry_symbol()),
             pack.startup_shim_path().as_os_str().to_owned(),
             object.as_os_str().to_owned(),
-        ];
+        ]);
         Ok(Self {
             program: pack.linker_path().to_owned(),
             arguments,
