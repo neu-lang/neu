@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Write as _};
 use cranelift_codegen::{
     ir::{
         AbiParam, Function, InstBuilder, Signature, TrapCode, UserFuncName, Value,
-        condcodes::IntCC, types,
+        condcodes::IntCC, immediates::Ieee64, types,
     },
     isa::CallConv,
     settings, verify_function,
@@ -134,7 +134,9 @@ fn lower_mir_function(
     let function_index = u32::try_from(function.id().index())
         .map_err(|_| CraneliftLoweringError::FunctionIdOutOfRange)?;
     let mut signature = Signature::new(CallConv::triple_default(target));
-    signature.returns.push(AbiParam::new(types::I64));
+    if let Some(return_type) = cranelift_type(function.return_type(), type_arena) {
+        signature.returns.push(AbiParam::new(return_type));
+    }
     let mut clif_function =
         Function::with_name_signature(UserFuncName::user(0, function_index), signature);
     let mut builder_context = FunctionBuilderContext::new();
@@ -183,10 +185,26 @@ fn require_bootstrap_int(
 ) -> Result<(), CraneliftLoweringError> {
     matches!(
         type_arena.get(ty).map(|record| record.kind()),
-        Some(TypeKind::Primitive(PrimitiveType::Int))
+        Some(TypeKind::Primitive(
+            PrimitiveType::Bool
+                | PrimitiveType::Int
+                | PrimitiveType::Float
+                | PrimitiveType::Byte
+                | PrimitiveType::Unit
+        ))
     )
     .then_some(())
     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)
+}
+
+fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<types::Type> {
+    match type_arena.get(ty).map(|record| record.kind()) {
+        Some(TypeKind::Primitive(PrimitiveType::Bool | PrimitiveType::Byte)) => Some(types::I8),
+        Some(TypeKind::Primitive(PrimitiveType::Int)) => Some(types::I64),
+        Some(TypeKind::Primitive(PrimitiveType::Float)) => Some(types::F64),
+        Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
+        _ => None,
+    }
 }
 
 fn lower_instruction(
@@ -199,6 +217,19 @@ fn lower_instruction(
             values.insert(*output, builder.ins().iconst(types::I64, *value));
             Ok(())
         }
+        MirInstruction::BoolConstant { output, value, .. } => {
+            values.insert(*output, builder.ins().iconst(types::I8, i64::from(*value)));
+            Ok(())
+        }
+        MirInstruction::ByteConstant { output, value, .. } => {
+            values.insert(*output, builder.ins().iconst(types::I8, i64::from(*value)));
+            Ok(())
+        }
+        MirInstruction::FloatConstant { output, bits, .. } => {
+            values.insert(*output, builder.ins().f64const(Ieee64::with_bits(*bits)));
+            Ok(())
+        }
+        MirInstruction::UnitConstant { .. } => Ok(()),
         MirInstruction::Unary {
             output,
             operation: MirUnary::Plus,
@@ -508,6 +539,10 @@ fn lower_terminator(
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             builder.ins().return_(&[value]);
+            Ok(())
+        }
+        MirTerminator::ReturnUnit { .. } => {
+            builder.ins().return_(&[]);
             Ok(())
         }
         _ => Err(CraneliftLoweringError::UnsupportedTerminator),

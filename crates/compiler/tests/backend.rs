@@ -40,6 +40,96 @@ fn m0031_lowers_int_constant_return_to_verified_cranelift_ir() {
 }
 
 #[test]
+fn m0035_lowers_bool_byte_float_and_unit_returns() {
+    let file = SourceFileId::from_raw(906);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let byte_type = types.insert(TypeRecord::primitive(PrimitiveType::Byte));
+    let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
+    let unit_type = types.insert(TypeRecord::primitive(PrimitiveType::Unit));
+
+    let bool_function = MirFunction::new(
+        MirFunctionId::from_raw(50),
+        span,
+        vec![],
+        bool_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::bool_constant(
+                MirValueId::from_raw(0),
+                true,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let bool_ir = lower_mir_function_to_cranelift(&bool_function, &types).unwrap();
+    assert!(bool_ir.contains("-> i8"), "{bool_ir}");
+    assert!(bool_ir.contains("iconst.i8 1"), "{bool_ir}");
+
+    let byte_function = MirFunction::new(
+        MirFunctionId::from_raw(51),
+        span,
+        vec![],
+        byte_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::byte_constant(
+                MirValueId::from_raw(0),
+                255,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let byte_ir = lower_mir_function_to_cranelift(&byte_function, &types).unwrap();
+    assert!(byte_ir.contains("-> i8"), "{byte_ir}");
+    assert!(byte_ir.contains("iconst.i8 -1"), "{byte_ir}");
+
+    let float_function = MirFunction::new(
+        MirFunctionId::from_raw(52),
+        span,
+        vec![],
+        float_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::float_constant(
+                MirValueId::from_raw(0),
+                1.5f64.to_bits(),
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let float_ir = lower_mir_function_to_cranelift(&float_function, &types).unwrap();
+    assert!(float_ir.contains("-> f64"), "{float_ir}");
+
+    let unit_function = MirFunction::new(
+        MirFunctionId::from_raw(53),
+        span,
+        vec![],
+        unit_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::unit_constant(span)],
+            MirTerminator::return_unit(span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let unit_ir = lower_mir_function_to_cranelift(&unit_function, &types).unwrap();
+    assert!(unit_ir.contains("return"), "{unit_ir}");
+    assert!(!unit_ir.contains("->"), "{unit_ir}");
+}
+
+#[test]
 fn m0031_rejects_unsupported_mir_instruction() {
     let file = SourceFileId::from_raw(401);
     let span = ByteSpan::new(file, 0, 10).unwrap();
