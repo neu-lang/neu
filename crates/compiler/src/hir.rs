@@ -1,5 +1,5 @@
 use crate::{
-    module::{ModuleName, PackageNamespace},
+    module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
     parser::{ParseOutput, ParsedBinaryOperator},
     source::ByteSpan,
     type_check::{ExpressionType, FunctionSignature},
@@ -82,6 +82,19 @@ pub fn lower_checked_hir_source(
             .node(function.declaration)
             .ok_or(HirLoweringError::UnsupportedExpression)?
             .span;
+        let symbol_identity = source
+            .parsed
+            .declaration_names
+            .iter()
+            .find(|name| name.declaration == function.declaration)
+            .map(|name| {
+                FunctionSymbolIdentity::new(
+                    source.module.clone(),
+                    source.package.clone(),
+                    name.name.clone(),
+                )
+            })
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
         let id = HirFunctionId::from_raw(functions.len());
         let mut expressions = Vec::new();
         let mut returns = Vec::new();
@@ -103,20 +116,23 @@ pub fn lower_checked_hir_source(
                 .span;
             returns.push(HirReturn::new(return_span, expression));
         }
-        functions.push(HirFunction::new(
-            id,
-            source.module.clone(),
-            source.package.clone(),
-            span,
-            declaration_is_main(source.parsed, function.declaration),
-            signature.return_type(),
-            vec![],
-            vec![],
-            expressions,
-            returns,
-            HirSafetyFacts::executable_subset_checked(),
-            vec![],
-        ));
+        functions.push(
+            HirFunction::new(
+                id,
+                source.module.clone(),
+                source.package.clone(),
+                span,
+                declaration_is_main(source.parsed, function.declaration),
+                signature.return_type(),
+                vec![],
+                vec![],
+                expressions,
+                returns,
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_symbol_identity(symbol_identity),
+        );
     }
     Ok(HirModule::new(source.module, functions))
 }
@@ -553,6 +569,7 @@ pub struct HirFunction {
     assignments: Vec<HirAssignment>,
     safety_facts: HirSafetyFacts,
     unsupported_forms: Vec<HirUnsupportedForm>,
+    symbol_identity: Option<FunctionSymbolIdentity>,
 }
 impl HirFunction {
     #[allow(clippy::too_many_arguments)]
@@ -584,6 +601,7 @@ impl HirFunction {
             assignments: Vec::new(),
             safety_facts,
             unsupported_forms,
+            symbol_identity: None,
         }
     }
     pub fn id(&self) -> HirFunctionId {
@@ -628,6 +646,13 @@ impl HirFunction {
     }
     pub fn unsupported_forms(&self) -> &[HirUnsupportedForm] {
         &self.unsupported_forms
+    }
+    pub fn with_symbol_identity(mut self, identity: FunctionSymbolIdentity) -> Self {
+        self.symbol_identity = Some(identity);
+        self
+    }
+    pub fn symbol_identity(&self) -> Option<&FunctionSymbolIdentity> {
+        self.symbol_identity.as_ref()
     }
     pub fn direct_call(&self, id: HirExpressionId) -> Option<&HirDirectCall> {
         self.expressions

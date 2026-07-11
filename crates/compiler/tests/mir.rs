@@ -13,6 +13,47 @@ use compiler::{
 };
 
 #[test]
+fn m0032_hir_to_mir_preserves_function_symbol_identity() {
+    let file = SourceFileId::from_raw(304);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("app").unwrap(),
+                compiler::module::PackageNamespace::parse("demo").unwrap(),
+                span,
+                true,
+                int,
+                vec![],
+                vec![],
+                vec![HirExpression::int_literal(
+                    HirExpressionId::from_raw(0),
+                    span,
+                    int,
+                    0,
+                )],
+                vec![HirReturn::new(span, HirExpressionId::from_raw(0))],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_symbol_identity(compiler::module::FunctionSymbolIdentity::new(
+                ModuleName::parse("app").unwrap(),
+                compiler::module::PackageNamespace::parse("demo").unwrap(),
+                "main",
+            )),
+        ],
+    );
+
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+
+    assert_eq!(mir.functions()[0].symbol_identity().unwrap().name(), "main");
+}
+
+#[test]
 fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
     let file = SourceFileId::from_raw(300);
     let span = ByteSpan::new(file, 0, 4).unwrap();

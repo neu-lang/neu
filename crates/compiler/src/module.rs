@@ -62,6 +62,35 @@ impl PackageNamespace {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FunctionSymbolIdentity {
+    module: ModuleName,
+    package: PackageNamespace,
+    name: String,
+}
+
+impl FunctionSymbolIdentity {
+    pub fn new(module: ModuleName, package: PackageNamespace, name: impl Into<String>) -> Self {
+        Self {
+            module,
+            package,
+            name: name.into(),
+        }
+    }
+
+    pub fn module(&self) -> &ModuleName {
+        &self.module
+    }
+
+    pub fn package(&self) -> &PackageNamespace {
+        &self.package
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceFilePackage {
     source_file: SourceFileId,
     namespace: PackageNamespace,

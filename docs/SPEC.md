@@ -651,3 +651,14 @@ M0032 must use the planned bundled linker path for the initial host target. Any
 temporary host-tool dependency must be documented as a blocker or explicit
 limitation and must not be presented as satisfying Go-like target-pack
 semantics.
+
+## ADR-0056: Bootstrap Function Symbol Identity
+
+HIR and MIR preserve structured bootstrap function identity containing the
+accepted module identity, package namespace, and source function name. The
+identity is carried from parsed declaration metadata through HIR and MIR to
+object emission. Missing identity is an explicit lowering failure; a numeric
+MIR function ID is not a substitute. The backend derives a deterministic,
+collision-free internal object symbol from those components. Exact escaping
+and encoding are compiler implementation details and do not define a public
+ABI or new language semantics.

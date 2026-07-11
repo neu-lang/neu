@@ -201,9 +201,22 @@ fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
 
     assert_eq!(module.functions().len(), 2);
     assert_eq!(module.functions()[0].expressions().len(), 3);
+    assert_eq!(
+        module.functions()[0].symbol_identity().unwrap().name(),
+        "helper"
+    );
+    assert_eq!(
+        module.functions()[1].symbol_identity().unwrap().name(),
+        "main"
+    );
     assert!(
         module.functions()[1]
             .direct_call(HirExpressionId::from_raw(0))
             .is_some()
     );
+}
+
+#[test]
+fn m0032_checked_source_preserves_function_symbol_identity() {
+    m0029_checked_source_lowers_integer_helpers_and_direct_calls();
 }

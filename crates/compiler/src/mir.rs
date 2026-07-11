@@ -1,6 +1,6 @@
 use crate::{
     hir::{HirBinaryOperator, HirExpressionKind, HirModule, HirUnaryOperator},
-    module::ModuleName,
+    module::{FunctionSymbolIdentity, ModuleName},
     source::ByteSpan,
     types::{PrimitiveType, TypeArena, TypeId, TypeKind},
 };
@@ -228,6 +228,7 @@ pub struct MirFunction {
     locals: Vec<MirLocal>,
     blocks: Vec<MirBasicBlock>,
     cleanup_boundary: MirCleanupBoundary,
+    symbol_identity: Option<FunctionSymbolIdentity>,
 }
 impl MirFunction {
     pub fn new(
@@ -247,6 +248,7 @@ impl MirFunction {
             locals,
             blocks,
             cleanup_boundary,
+            symbol_identity: None,
         }
     }
     pub fn id(&self) -> MirFunctionId {
@@ -269,6 +271,13 @@ impl MirFunction {
     }
     pub fn cleanup_boundary(&self) -> MirCleanupBoundary {
         self.cleanup_boundary
+    }
+    pub fn with_symbol_identity(mut self, identity: FunctionSymbolIdentity) -> Self {
+        self.symbol_identity = Some(identity);
+        self
+    }
+    pub fn symbol_identity(&self) -> Option<&FunctionSymbolIdentity> {
+        self.symbol_identity.as_ref()
     }
 }
 
@@ -324,7 +333,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             .returns()
             .first()
             .ok_or(MirLoweringError::MissingReturn)?;
-        functions.push(MirFunction::new(
+        let mir_function = MirFunction::new(
             MirFunctionId::from_raw(function.id().index()),
             function.span(),
             vec![],
@@ -339,7 +348,11 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 ),
             )],
             MirCleanupBoundary::empty(),
-        ));
+        );
+        functions.push(match function.symbol_identity() {
+            Some(identity) => mir_function.with_symbol_identity(identity.clone()),
+            None => mir_function,
+        });
     }
     Ok(MirModule::new(hir.name().clone(), functions))
 }
