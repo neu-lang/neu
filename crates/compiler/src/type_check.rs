@@ -548,6 +548,59 @@ pub fn check_m0069_constructor_calls(
     diagnostics
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClassLifecycleFacts {
+    class: AstNodeId,
+    initialization_order: Vec<String>,
+    destruction_order: Vec<String>,
+}
+
+impl ClassLifecycleFacts {
+    pub fn class(&self) -> AstNodeId {
+        self.class
+    }
+    pub fn initialization_order(&self) -> &[String] {
+        &self.initialization_order
+    }
+    pub fn destruction_order(&self) -> &[String] {
+        &self.destruction_order
+    }
+}
+
+pub fn class_lifecycle_facts(parsed: &ParseOutput) -> Vec<ClassLifecycleFacts> {
+    parsed
+        .class_declarations
+        .iter()
+        .map(|class| {
+            let mut initialization_order: Vec<String> = class
+                .fields
+                .iter()
+                .filter_map(|field| {
+                    parsed
+                        .field_declarations
+                        .iter()
+                        .find(|candidate| candidate.declaration == *field)
+                        .map(|field| field.name.clone())
+                })
+                .collect();
+            initialization_order.extend(
+                class
+                    .constructor_parameters
+                    .iter()
+                    .filter(|parameter| parameter.field)
+                    .map(|parameter| parameter.name.clone()),
+            );
+            let mut destruction_order = initialization_order.clone();
+            destruction_order.reverse();
+            ClassLifecycleFacts {
+                class: class.declaration,
+                initialization_order,
+                destruction_order,
+            }
+        })
+        .collect()
+}
+
 impl ClassTypeReport {
     pub fn classes(&self) -> &[ClassTypeRecord] {
         &self.classes

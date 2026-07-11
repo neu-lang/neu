@@ -152,6 +152,7 @@ pub struct ParsedFunctionParameter {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedFunctionDeclaration {
     pub declaration: AstNodeId,
+    pub owner: Option<AstNodeId>,
     pub body: Option<AstNodeId>,
     pub return_annotation: Option<AstNodeId>,
     pub parameters: Vec<AstNodeId>,
@@ -545,6 +546,7 @@ struct Parser<'source> {
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
     current_function: Option<AstNodeId>,
+    current_class: Option<AstNodeId>,
 }
 
 impl<'source> Parser<'source> {
@@ -595,6 +597,7 @@ impl<'source> Parser<'source> {
             saw_package_or_import: false,
             saw_top_level_declaration: false,
             current_function: None,
+            current_class: None,
         }
     }
 
@@ -761,6 +764,7 @@ impl<'source> Parser<'source> {
                 self.saw_top_level_declaration |= !in_body;
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
+                    owner: self.current_class,
                     body: None,
                     return_annotation,
                     parameters: parameters
@@ -795,6 +799,7 @@ impl<'source> Parser<'source> {
                 self.current_function = previous_function;
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
+                    owner: self.current_class,
                     body,
                     return_annotation,
                     parameters: parameter_nodes,
@@ -1052,7 +1057,9 @@ impl<'source> Parser<'source> {
         if kind == AstNodeKind::EnumDeclaration {
             self.parse_enum_body(declaration);
         } else if kind == AstNodeKind::ClassDeclaration {
+            let previous_class = self.current_class.replace(declaration);
             let fields = self.parse_class_body(declaration);
+            self.current_class = previous_class;
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
@@ -1063,7 +1070,9 @@ impl<'source> Parser<'source> {
                 interface: false,
             });
         } else if kind == AstNodeKind::InterfaceDeclaration {
+            let previous_class = self.current_class.replace(declaration);
             self.parse_declaration_body();
+            self.current_class = previous_class;
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
@@ -1082,6 +1091,10 @@ impl<'source> Parser<'source> {
         let mut fields = Vec::new();
         self.advance();
         while !self.is_eof() && self.current_kind() != Some(TokenKind::RightBrace) {
+            if self.current_kind() == Some(TokenKind::KwFun) {
+                self.parse_function(true);
+                continue;
+            }
             let visibility = if self.is_visibility() {
                 let value = self.current_text().unwrap_or("internal").to_owned();
                 self.advance();
@@ -2062,7 +2075,9 @@ impl<'source> Parser<'source> {
                 }
                 Some(span)
             }
-            Some(TokenKind::Identifier) => self.parse_name_expression(),
+            Some(TokenKind::Identifier | TokenKind::KwThis | TokenKind::KwSuper) => {
+                self.parse_name_expression()
+            }
             Some(TokenKind::LeftParen) if self.peek_kind() == Some(TokenKind::RightParen) => {
                 let start = self.current().expect("left paren exists").span.start();
                 self.advance();
