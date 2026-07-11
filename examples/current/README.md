@@ -17,6 +17,9 @@ declaration syntax is separate, so `parsed_surface.neu` retains its member
   invalid literal trees produce the ADR-0043 overflow, division-by-zero,
   negative-exponent, and invalid-shift diagnostics. Runtime values are not
   statically evaluated under ADR-0048.
+- `unsupported_executable_form_error.neu` is a negative executable example:
+  runtime declarations and non-`Int` literals outside ADR-0042 report only
+  their outermost unsupported executable form before HIR.
 - `executable_entry_point.neu` shows the accepted bootstrap entry signature:
   one top-level `main` in the selected package, with no parameters, an `Int`
   return annotation, and a body. It also shows a same-package direct helper

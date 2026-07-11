@@ -24,7 +24,8 @@ use compiler::{
         apply_m0028_direct_call_results, build_m0020_capability_bound_records,
         build_m0020_generic_parameter_types, check_m0028_direct_calls, check_m0028_entry_point,
         check_m0028_return_expression_types, check_m0028_straight_line_returns,
-        known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
+        check_m0028_unsupported_executable_forms, known_local_symbol_types,
+        recognize_m0019_null_tests, record_m0019_branch_refinements,
         record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
         type_m0018_accepted_expressions, type_m0018_core,
@@ -4442,5 +4443,30 @@ fn m0028_return_expression_types_report_known_mismatches_only() {
     assert_eq!(
         report.diagnostics()[0].span(),
         parsed.arena.node(return_value).unwrap().span
+    );
+}
+
+#[test]
+fn m0028_unsupported_executable_forms_report_outermost_source_spans() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(129),
+        "struct Box<T> {} fun main(): Int { return \"not executable\"; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let report = check_m0028_unsupported_executable_forms(&parsed);
+
+    assert_eq!(report.diagnostics().len(), 2);
+    assert_eq!(
+        report.diagnostics()[0].span(),
+        parsed
+            .arena
+            .node(parsed.declaration_names[0].declaration)
+            .unwrap()
+            .span
+    );
+    assert_eq!(
+        report.diagnostics()[1].span(),
+        parsed.literal_expressions[0].span
     );
 }

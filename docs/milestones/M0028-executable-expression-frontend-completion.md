@@ -114,4 +114,4 @@ runtime behavior for arithmetic, exponentiation, bitwise, and shift operators.
 - [x] Bootstrap constant-tree integer diagnostics exist.
 - [x] Entry-point candidate and signature checks exist.
 - [x] Entry, call, and return checks exist.
-- [ ] Unsupported executable forms are rejected before HIR.
+- [x] Unsupported executable forms are rejected before HIR.

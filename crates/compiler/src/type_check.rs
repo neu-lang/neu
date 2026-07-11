@@ -354,6 +354,26 @@ pub struct ReturnTypeReport {
     diagnostics: Vec<ReturnTypeDiagnostic>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UnsupportedExecutableFormDiagnostic {
+    span: ByteSpan,
+}
+
+impl UnsupportedExecutableFormDiagnostic {
+    fn new(span: ByteSpan) -> Self {
+        Self { span }
+    }
+
+    pub fn span(self) -> ByteSpan {
+        self.span
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct UnsupportedExecutableFormReport {
+    diagnostics: Vec<UnsupportedExecutableFormDiagnostic>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionSignature {
     declaration: AstNodeId,
@@ -713,6 +733,12 @@ impl ReturnPathReport {
 
 impl ReturnTypeReport {
     pub fn diagnostics(&self) -> &[ReturnTypeDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+impl UnsupportedExecutableFormReport {
+    pub fn diagnostics(&self) -> &[UnsupportedExecutableFormDiagnostic] {
         &self.diagnostics
     }
 }
@@ -1397,6 +1423,132 @@ pub fn check_m0028_return_expression_types(
     }
 
     ReturnTypeReport { diagnostics }
+}
+
+pub fn check_m0028_unsupported_executable_forms(
+    parsed: &ParseOutput,
+) -> UnsupportedExecutableFormReport {
+    let specific_form_spans: Vec<_> = parsed
+        .arena
+        .nodes()
+        .iter()
+        .filter(|node| {
+            matches!(
+                node.kind,
+                AstNodeKind::IfExpression
+                    | AstNodeKind::BinaryExpression
+                    | AstNodeKind::UnaryExpression
+                    | AstNodeKind::CallExpression
+                    | AstNodeKind::MemberExpression
+            )
+        })
+        .map(|node| node.span)
+        .collect();
+    let mut candidates: Vec<_> = parsed
+        .arena
+        .nodes()
+        .iter()
+        .filter(|node| {
+            matches!(
+                node.kind,
+                AstNodeKind::ImportDeclaration
+                    | AstNodeKind::StructDeclaration
+                    | AstNodeKind::EnumDeclaration
+                    | AstNodeKind::InterfaceDeclaration
+                    | AstNodeKind::NullableType
+                    | AstNodeKind::GenericParameter
+                    | AstNodeKind::GenericArgument
+                    | AstNodeKind::CapabilityBound
+                    | AstNodeKind::FunctionType
+                    | AstNodeKind::GroupedType
+                    | AstNodeKind::WhenExpression
+            )
+        })
+        .map(|node| node.span)
+        .collect();
+
+    candidates.extend(
+        parsed
+            .literal_expressions
+            .iter()
+            .filter(|literal| literal.kind != ParsedLiteralKind::AcceptedInteger)
+            .map(|literal| literal.span),
+    );
+    candidates.extend(
+        parsed
+            .type_name_references
+            .iter()
+            .filter(|reference| reference.name != "Int")
+            .map(|reference| reference.name_span),
+    );
+    candidates.extend(
+        parsed
+            .function_declarations
+            .iter()
+            .filter(|function| function.body.is_none())
+            .filter_map(|function| {
+                parsed
+                    .arena
+                    .node(function.declaration)
+                    .map(|node| node.span)
+            }),
+    );
+    candidates.extend(
+        parsed
+            .local_declarations
+            .iter()
+            .filter(|declaration| declaration.initializer.is_none())
+            .filter_map(|declaration| {
+                parsed
+                    .arena
+                    .node(declaration.declaration)
+                    .map(|node| node.span)
+            }),
+    );
+    candidates.extend(
+        parsed
+            .return_statements
+            .iter()
+            .filter(|returned| returned.value.is_none())
+            .filter_map(|returned| parsed.arena.node(returned.statement).map(|node| node.span)),
+    );
+
+    candidates.sort_by(|left, right| {
+        left.file()
+            .index()
+            .cmp(&right.file().index())
+            .then(left.start().cmp(&right.start()))
+            .then(right.end().cmp(&left.end()))
+    });
+    candidates.dedup();
+
+    let mut diagnostics = Vec::new();
+    for span in candidates {
+        if specific_form_spans
+            .iter()
+            .any(|specific| m0028_span_contains(*specific, span))
+        {
+            continue;
+        }
+        if diagnostics
+            .iter()
+            .any(|diagnostic: &UnsupportedExecutableFormDiagnostic| {
+                m0028_span_contains(diagnostic.span, span)
+            })
+        {
+            continue;
+        }
+        diagnostics.push(UnsupportedExecutableFormDiagnostic::new(span));
+    }
+
+    UnsupportedExecutableFormReport { diagnostics }
+}
+
+fn m0028_span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+    outer.file() == inner.file()
+        && outer.start() <= inner.start()
+        && inner.end() <= outer.end()
+        && outer != inner
 }
 
 pub fn type_m0028_function_signatures(
