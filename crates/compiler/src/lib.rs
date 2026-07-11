@@ -3,6 +3,7 @@
 
 pub mod ast;
 pub mod backend;
+pub mod bootstrap;
 pub mod borrow;
 pub mod coroutine;
 pub mod hir;
