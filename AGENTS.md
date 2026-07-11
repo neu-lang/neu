@@ -1,115 +1,88 @@
-# Main Task Operating Rules
+# Neu Compiler Operating Rules
 
-This compiler project is executed in the main task. Do not delegate repository
-work or rely on role-specific configuration.
+Work in the main task. Do not delegate repository work or rely on role-specific
+configuration.
 
 ## Authority
 
 1. Project owner instructions.
 2. `docs/SPEC.md`.
-3. Accepted ADRs under `docs/adr/`.
+3. Accepted ADRs in `docs/adr/`.
 4. This file.
-5. Roadmap, milestone, and task files.
+5. The current task note.
 6. Existing implementation behavior.
 
 Existing behavior never overrides the specification or accepted ADRs. Do not
-invent language semantics. When accepted authority is ambiguous, missing, or
-contradictory, file an ambiguity report and stop the affected implementation.
+invent language semantics. If the authority is ambiguous or contradictory,
+file an ambiguity report and stop the affected implementation.
 
-The project owner delegates future ADR acceptance to the main-task Chief
-Architect decision after the required semantic, diagnostic, adversarial,
-simplicity, and spec-compliance reviews are complete. No separate owner
-acceptance message is required for ADR-0036 and later unless the Chief
-Architect explicitly escalates the decision back to the owner.
+## Normal Workflow
 
-## Main Task Workflow
+For ordinary implementation work:
 
-1. Read the assigned task and its Authority Extract.
-2. Read only the cited specification sections, ADRs, source paths, and tests.
-3. Create or update the task before implementation when no accepted task
-   exists.
-4. Write tests before implementation and verify their expected failure.
-5. Implement the smallest change justified by accepted authority.
-6. Run ordinary tests, then adversarial checks, then review checks, then CI.
-7. Record concise evidence in the task execution log.
-8. Update examples immediately before a commit only when user-visible language
-   support changes. Skip examples for internal-only changes.
-9. Stage only task-scoped files and commit only after all required gates pass.
+1. Write one concise task note in the main task, referencing exactly one
+   milestone. Do not create a persistent `docs/tasks/` record.
+2. Read only the note's cited specification, ADRs, source paths, and tests.
+3. Write focused tests first and verify the expected failure.
+4. Implement the smallest complete change justified by accepted authority.
+5. Run focused tests, Clippy, and relevant full CI gates.
+6. Perform a brief scope and source-of-truth review in the main task note.
+7. Update examples only when the runnable language surface changes.
+8. Stage scoped files and commit locally.
+9. Do not push.
 
-## Required Inputs
+Create or revise an ADR or lengthy review document only when the
+change introduces new language semantics, ownership/thread-safety rules, ABI
+behavior, or another irreversible architectural decision. Accepted ADRs and
+`docs/SPEC.md` must be updated before implementation relies on such a decision.
 
-- The current user request or accepted task.
-- This file.
-- The task Authority Extract.
-- The cited `docs/SPEC.md` sections and accepted ADRs.
-- Relevant tests and validation commands.
+## Required Task Contents
 
-Do not scan unrelated ADRs, tasks, or implementation files unless the bounded
-context cannot answer a necessary question.
+The concise task note must state:
 
-## Context, Parallelism, And Report Budget
+- authority read and bounded context;
+- goal, scope, and out of scope;
+- tests and objectively testable acceptance criteria;
+- the expected pre-implementation test failure;
+- files changed;
+- validation commands and results;
+- a brief scope/spec review;
+- open questions, remaining risk, and next action.
 
-Use the task Authority Extract as the default bounded context. Do not delegate
-or parallelize repository work: all planning, testing, implementation, review,
-and release work occurs in the main task. Keep routine task records concise;
-persist detailed reports only for an ambiguity, a soundness finding, or an
-explicit user request.
-
-## Required Outputs
-
-Every task record must state:
-
-- Authority read.
-- Files changed.
-- Tests written before implementation and their expected pre-implementation
-  failure.
-- Validation commands and results.
-- Open questions or `none`.
-- Remaining risk and the next main-task action.
+Keep the note concise. Do not create separate task, review, soundness, or
+validator files under `docs/` for ordinary work. Persist a separate ambiguity
+report only when an ambiguity blocks safe implementation, or a soundness report
+when an explicit soundness finding requires durable tracking.
 
 ## Non-Negotiable Rules
 
 - `docs/SPEC.md` and accepted ADRs are the source of truth.
-- Do not weaken, delete, skip, or rewrite failing tests to pass CI without an
-  explicit review record justified by accepted authority.
+- Do not modify accepted ADRs except through an explicit revision or
+  superseding ADR.
+- Do not weaken, delete, skip, or rewrite failing tests to pass CI without a
+  written review record justified by accepted authority.
 - Do not silently broaden task scope.
 - Do not treat Kotlin, Rust, or existing behavior as a substitute for a project
   decision.
-- Do not modify accepted ADRs except through an explicit revision or
-  superseding ADR.
-- Do not implement a semantic decision while an ambiguity report is unresolved.
 - Keep abstractions proportional to accepted requirements.
 
-## Review And Escalation
+## Ambiguity And Escalation
 
-Review each implementation for task scope, source-of-truth compliance,
-maintainability, test-first integrity, diagnostics, and unnecessary complexity.
-For ownership, borrowing, lifetime, thread-safety, async, unsafe, FFI, or other
-soundness boundaries, perform explicit adversarial checks after ordinary tests.
+Record an ambiguity in the main task note when a semantic rule, required
+diagnostic, recovery behavior, source span, or architectural boundary is
+missing or contradictory. Quote the ambiguity, list competing interpretations,
+explain why guessing is unsafe, and identify affected source-of-truth files.
 
-Escalate by filing an ambiguity report when:
-
-- a semantic rule is missing or contradictory;
-- a required diagnostic, recovery behavior, or source span is unspecified; or
-- an architectural conflict cannot be settled by the authority hierarchy.
-
-The report must quote the ambiguity, list competing interpretations, explain
-why guessing is unsafe, and identify affected source-of-truth files.
-
-For ADRs, the main-task Chief Architect may approve the atomic acceptance
-bundle after the required reviews are satisfied. The acceptance bundle still
-must update accepted ADRs, `docs/SPEC.md`, ambiguity reports, tasks, and any
-other source-of-truth files called out by the decision before implementation
-can rely on the new semantics.
+Do not implement a semantic decision while its ambiguity remains unresolved.
 
 ## Commit And CI
 
 Use branch names `codex/<topic>` unless the project owner requests another
-name. Commit subjects use the existing project prefixes, such as `compiler:`,
+name. Use concise subjects with existing prefixes such as `compiler:`,
 `tests:`, `docs:`, `adr:`, `spec:`, `roadmap:`, or `build:`.
 
 A task is complete only when its tests were created first, scope remains
-bounded, required review and adversarial checks pass, and CI passes. Minimum CI
-for implementation changes is formatting, linting, unit tests, relevant
-negative tests, relevant diagnostic tests, compiler smoke tests, and
+bounded, the brief source-of-truth review passes, and CI passes. Minimum CI for
+implementation changes is formatting, Clippy with warnings denied, workspace
+tests, relevant negative/diagnostic tests, compiler smoke tests, and
 cross-target smoke tests when target behavior changes.

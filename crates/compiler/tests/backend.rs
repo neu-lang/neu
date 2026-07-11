@@ -564,6 +564,63 @@ fn m0035_lowers_float_byte_bool_and_comparison_operations() {
 }
 
 #[test]
+fn m0035_lowers_conditional_mir_cfg_to_cranelift() {
+    let file = SourceFileId::from_raw(920);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let int_type = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(70),
+        span,
+        vec![],
+        int_type,
+        vec![],
+        vec![
+            MirBasicBlock::new(
+                MirBlockId::from_raw(0),
+                vec![MirInstruction::bool_constant(
+                    MirValueId::from_raw(0),
+                    true,
+                    span,
+                )],
+                MirTerminator::branch_if(
+                    MirValueId::from_raw(0),
+                    MirBlockId::from_raw(1),
+                    MirBlockId::from_raw(2),
+                    span,
+                ),
+            ),
+            MirBasicBlock::new(
+                MirBlockId::from_raw(1),
+                vec![MirInstruction::int_constant(
+                    MirValueId::from_raw(1),
+                    1,
+                    span,
+                )],
+                MirTerminator::return_value(MirValueId::from_raw(1), span),
+            ),
+            MirBasicBlock::new(
+                MirBlockId::from_raw(2),
+                vec![MirInstruction::int_constant(
+                    MirValueId::from_raw(2),
+                    2,
+                    span,
+                )],
+                MirTerminator::return_value(MirValueId::from_raw(2), span),
+            ),
+        ],
+        MirCleanupBoundary::empty(),
+    );
+
+    let ir = lower_mir_function_to_cranelift(&function, &types).unwrap();
+    assert!(ir.contains("brif"), "{ir}");
+    assert!(ir.contains("block1"), "{ir}");
+    assert!(ir.contains("block2"), "{ir}");
+    let _ = bool_type;
+}
+
+#[test]
 fn m0031_lowers_checked_exponentiation() {
     let file = SourceFileId::from_raw(410);
     let span = ByteSpan::new(file, 0, 10).unwrap();

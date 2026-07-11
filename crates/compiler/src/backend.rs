@@ -132,7 +132,7 @@ fn lower_mir_function(
     target: &Triple,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
-    if !function.parameters().is_empty() || function.blocks().len() != 1 {
+    if !function.parameters().is_empty() || function.blocks().is_empty() {
         return Err(CraneliftLoweringError::UnsupportedFunctionShape);
     }
 
@@ -149,15 +149,24 @@ fn lower_mir_function(
 
     {
         let mut builder = FunctionBuilder::new(&mut clif_function, &mut builder_context);
-        let mir_block = &function.blocks()[0];
-        let clif_block = builder.create_block();
-        builder.switch_to_block(clif_block);
-        builder.seal_block(clif_block);
-
-        for instruction in mir_block.instructions() {
-            lower_instruction(instruction, &mut builder, &mut values)?;
+        let mut clif_blocks = HashMap::new();
+        for mir_block in function.blocks() {
+            clif_blocks.insert(mir_block.id(), builder.create_block());
         }
-        lower_terminator(mir_block.terminator(), &mut builder, &values)?;
+
+        for mir_block in function.blocks() {
+            let clif_block = *clif_blocks
+                .get(&mir_block.id())
+                .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
+            builder.switch_to_block(clif_block);
+            for instruction in mir_block.instructions() {
+                lower_instruction(instruction, &mut builder, &mut values)?;
+            }
+            lower_terminator(mir_block.terminator(), &clif_blocks, &mut builder, &values)?;
+        }
+        for clif_block in clif_blocks.values().copied() {
+            builder.seal_block(clif_block);
+        }
         builder.finalize();
     }
 
@@ -631,6 +640,7 @@ fn lower_instruction(
 
 fn lower_terminator(
     terminator: MirTerminator,
+    blocks: &HashMap<crate::mir::MirBlockId, cranelift_codegen::ir::Block>,
     builder: &mut FunctionBuilder<'_>,
     values: &HashMap<MirValueId, Value>,
 ) -> Result<(), CraneliftLoweringError> {
@@ -647,6 +657,37 @@ fn lower_terminator(
             builder.ins().return_(&[]);
             Ok(())
         }
-        _ => Err(CraneliftLoweringError::UnsupportedTerminator),
+        MirTerminator::Branch { target, .. } => {
+            let target = blocks
+                .get(&target)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
+            builder.ins().jump(target, &[]);
+            Ok(())
+        }
+        MirTerminator::BranchIf {
+            condition,
+            then_target,
+            else_target,
+            ..
+        } => {
+            let condition = values
+                .get(&condition)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let then_target = blocks
+                .get(&then_target)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
+            let else_target = blocks
+                .get(&else_target)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
+            builder
+                .ins()
+                .brif(condition, then_target, &[], else_target, &[]);
+            Ok(())
+        }
+        MirTerminator::Trap { .. } => Err(CraneliftLoweringError::UnsupportedTerminator),
     }
 }

@@ -233,10 +233,27 @@ pub enum MirTrap {
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MirTerminator {
-    Return { value: MirValueId, span: ByteSpan },
-    ReturnUnit { span: ByteSpan },
-    Branch { target: MirBlockId, span: ByteSpan },
-    Trap { reason: MirTrap, span: ByteSpan },
+    Return {
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    ReturnUnit {
+        span: ByteSpan,
+    },
+    Branch {
+        target: MirBlockId,
+        span: ByteSpan,
+    },
+    BranchIf {
+        condition: MirValueId,
+        then_target: MirBlockId,
+        else_target: MirBlockId,
+        span: ByteSpan,
+    },
+    Trap {
+        reason: MirTrap,
+        span: ByteSpan,
+    },
 }
 impl MirTerminator {
     pub fn return_value(value: MirValueId, span: ByteSpan) -> Self {
@@ -246,11 +263,25 @@ impl MirTerminator {
     pub fn return_unit(span: ByteSpan) -> Self {
         Self::ReturnUnit { span }
     }
+    pub fn branch_if(
+        condition: MirValueId,
+        then_target: MirBlockId,
+        else_target: MirBlockId,
+        span: ByteSpan,
+    ) -> Self {
+        Self::BranchIf {
+            condition,
+            then_target,
+            else_target,
+            span,
+        }
+    }
     pub fn span(&self) -> ByteSpan {
         match self {
             Self::Return { span, .. }
             | Self::ReturnUnit { span }
             | Self::Branch { span, .. }
+            | Self::BranchIf { span, .. }
             | Self::Trap { span, .. } => *span,
         }
     }
