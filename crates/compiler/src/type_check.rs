@@ -1492,14 +1492,24 @@ pub fn check_m0028_unsupported_executable_forms(
         parsed
             .literal_expressions
             .iter()
-            .filter(|literal| literal.kind != ParsedLiteralKind::AcceptedInteger)
+            .filter(|literal| {
+                matches!(
+                    literal.kind,
+                    ParsedLiteralKind::AcceptedString | ParsedLiteralKind::Null
+                )
+            })
             .map(|literal| literal.span),
     );
     candidates.extend(
         parsed
             .type_name_references
             .iter()
-            .filter(|reference| reference.name != "Int")
+            .filter(|reference| {
+                !matches!(
+                    reference.name.as_str(),
+                    "Bool" | "Int" | "Unit" | "Float" | "Byte"
+                )
+            })
             .map(|reference| reference.name_span),
     );
     candidates.extend(

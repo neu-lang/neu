@@ -1,10 +1,10 @@
 # Current Language Examples
 
 Only source that fits the current end-to-end Cranelift bootstrap boundary is
-kept here. The example has one top-level `main`, no parameters, an `Int`
-return, one block, and an expression composed of integer literals and checked
-arithmetic. It requires no locals, calls, runtime library, printing, or linker
-runtime features.
+kept here. Every example has one top-level `main` with no parameters and an
+`Int` return, and requires no runtime library, printing, or linker runtime
+features. The examples cover integer arithmetic, structured control flow, and
+the accepted `Bool`, `Unit`, `Float`, and `Byte` primitive runtime forms.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by

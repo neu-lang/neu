@@ -1,0 +1,14 @@
+package examples.current
+
+public fun main(): Int {
+    for (index in 0..3) {
+        if (index == 0) {
+            continue;
+        } else {
+            if (index == 2) {
+                break;
+            }
+        }
+    }
+    return 7;
+}

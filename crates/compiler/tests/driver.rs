@@ -36,6 +36,35 @@ fn compiles_current_example_to_host_executable_with_exit_status_seven() {
 }
 
 #[test]
+fn compiles_current_control_flow_and_primitive_examples() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (name, expected_status) in [("control_flow", 7), ("primitive_values", 7)] {
+        let source_path = repo_root.join(format!("examples/current/{name}.neu"));
+        let source = fs::read_to_string(&source_path).unwrap();
+        let workspace =
+            std::env::temp_dir().join(format!("neu-example-driver-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&workspace);
+        fs::create_dir_all(&workspace).unwrap();
+        let executable = workspace.join("program");
+        let output = compile_source_to_executable(
+            &source,
+            SourceDriverOptions::new(
+                SourceFileId::from_raw(1002),
+                ModuleName::parse("examples.current").unwrap(),
+                PackageNamespace::parse("examples.current").unwrap(),
+                Triple::host(),
+                repo_root.join("target-packs"),
+                &executable,
+            ),
+        )
+        .unwrap_or_else(|error| panic!("example {name}: {error:?}"));
+        let status = Command::new(output).status().unwrap();
+        assert_eq!(status.code(), Some(expected_status), "example {name}");
+        let _ = fs::remove_dir_all(workspace);
+    }
+}
+
+#[test]
 fn compiles_if_for_break_and_continue_to_host_executable() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-control-driver-{}", std::process::id()));
