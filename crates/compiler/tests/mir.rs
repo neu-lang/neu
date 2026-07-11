@@ -1,7 +1,7 @@
 use compiler::{
     hir::{
         HirBinaryOperator, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirModule,
-        HirReturn, HirSafetyFacts,
+        HirReturn, HirSafetyFacts, HirUnaryOperator,
     },
     mir::{
         MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
@@ -126,6 +126,56 @@ fn m0030_hir_to_mir_requires_owning_type_arena() {
         lower_hir_to_mir(&hir, &foreign_types),
         Err(compiler::mir::MirLoweringError::UnsupportedRuntimeType)
     );
+}
+
+#[test]
+fn m0030_hir_unary_ints_lower_to_mir() {
+    let file = SourceFileId::from_raw(304);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            int,
+            vec![],
+            vec![],
+            vec![
+                HirExpression::int_literal(HirExpressionId::from_raw(0), span, int, 42),
+                HirExpression::unary(
+                    HirExpressionId::from_raw(1),
+                    span,
+                    int,
+                    HirUnaryOperator::Plus,
+                    HirExpressionId::from_raw(0),
+                ),
+                HirExpression::unary(
+                    HirExpressionId::from_raw(2),
+                    span,
+                    int,
+                    HirUnaryOperator::Minus,
+                    HirExpressionId::from_raw(1),
+                ),
+                HirExpression::unary(
+                    HirExpressionId::from_raw(3),
+                    span,
+                    int,
+                    HirUnaryOperator::BitwiseNot,
+                    HirExpressionId::from_raw(2),
+                ),
+            ],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(3))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    assert_eq!(mir.functions()[0].blocks()[0].instructions().len(), 4);
 }
 
 #[test]

@@ -1,5 +1,5 @@
 use crate::{
-    hir::{HirBinaryOperator, HirExpressionKind, HirModule},
+    hir::{HirBinaryOperator, HirExpressionKind, HirModule, HirUnaryOperator},
     module::ModuleName,
     source::ByteSpan,
     types::{PrimitiveType, TypeArena, TypeId, TypeKind},
@@ -76,6 +76,12 @@ pub enum MirArithmetic {
     ShiftLeft,
     ShiftRight,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MirUnary {
+    Plus,
+    Negate,
+    BitwiseNot,
+}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MirInstruction {
     IntConstant {
@@ -88,6 +94,12 @@ pub enum MirInstruction {
         operation: MirArithmetic,
         left: MirValueId,
         right: MirValueId,
+        span: ByteSpan,
+    },
+    Unary {
+        output: MirValueId,
+        operation: MirUnary,
+        operand: MirValueId,
         span: ByteSpan,
     },
     LoadLocal {
@@ -133,6 +145,7 @@ impl MirInstruction {
         match self {
             Self::IntConstant { span, .. }
             | Self::CheckedArithmetic { span, .. }
+            | Self::Unary { span, .. }
             | Self::LoadLocal { span, .. }
             | Self::StoreLocal { span, .. }
             | Self::DirectCall { span, .. } => *span,
@@ -286,6 +299,12 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     })
                 }
+                HirExpressionKind::Unary(unary) => instructions.push(MirInstruction::Unary {
+                    output,
+                    operation: lower_unary(unary.operator()),
+                    operand: MirValueId::from_raw(unary.operand().index()),
+                    span: expression.span(),
+                }),
                 HirExpressionKind::DirectCall(call) => {
                     instructions.push(MirInstruction::DirectCall {
                         output,
@@ -348,4 +367,11 @@ fn lower_binary(operator: HirBinaryOperator) -> Result<MirArithmetic, MirLowerin
         HirBinaryOperator::ShiftLeft => MirArithmetic::ShiftLeft,
         HirBinaryOperator::ShiftRight => MirArithmetic::ShiftRight,
     })
+}
+fn lower_unary(operator: HirUnaryOperator) -> MirUnary {
+    match operator {
+        HirUnaryOperator::Plus => MirUnary::Plus,
+        HirUnaryOperator::Minus => MirUnary::Negate,
+        HirUnaryOperator::BitwiseNot => MirUnary::BitwiseNot,
+    }
 }
