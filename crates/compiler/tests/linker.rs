@@ -31,6 +31,16 @@ fn executable_linker(root: &Path, exit_code: i32) {
     fs::set_permissions(root.join("bin/lld"), permissions).unwrap();
 }
 
+#[cfg(unix)]
+fn output_producing_linker(root: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::write(root.join("bin/lld"), "#!/bin/sh\ntouch \"$2\"\nexit 0\n").unwrap();
+    let mut permissions = fs::metadata(root.join("bin/lld")).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(root.join("bin/lld"), permissions).unwrap();
+}
+
 #[test]
 fn m0032_builds_deterministic_link_invocation_plan() {
     let root = fixture_root("valid");
@@ -98,7 +108,7 @@ fn m0032_link_plan_rejects_missing_object() {
 #[test]
 fn m0032_executes_resolved_linker_successfully() {
     let root = fixture_root("execute-success");
-    executable_linker(&root, 0);
+    output_producing_linker(&root);
     let pack = compiler::target_pack::TargetPack::resolve(
         &root,
         TargetPackManifest::new(
@@ -179,6 +189,65 @@ fn m0032_reports_linker_launch_failure() {
     assert_eq!(
         plan.execute(),
         Err(compiler::linker::LinkInvocationError::LinkerUnavailable)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn m0032_accepts_linker_output_file() {
+    let root = fixture_root("output-present");
+    output_producing_linker(&root);
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let output = root.join("program");
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), &output).unwrap();
+
+    assert_eq!(plan.execute(), Ok(()));
+    assert!(output.is_file());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn m0032_rejects_linker_success_without_output() {
+    let root = fixture_root("output-missing");
+    executable_linker(&root, 0);
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), root.join("program")).unwrap();
+
+    assert_eq!(
+        plan.execute(),
+        Err(compiler::linker::LinkInvocationError::MissingOutput)
     );
     let _ = fs::remove_dir_all(root);
 }

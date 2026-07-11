@@ -12,6 +12,7 @@ pub enum LinkInvocationError {
     MissingObject,
     LinkerUnavailable,
     LinkerFailed(Option<i32>),
+    MissingOutput,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -19,6 +20,7 @@ pub struct LinkInvocation {
     program: PathBuf,
     arguments: Vec<OsString>,
     language_entry_symbol: String,
+    output: PathBuf,
 }
 
 impl LinkInvocation {
@@ -32,7 +34,7 @@ impl LinkInvocation {
             return Err(LinkInvocationError::MissingObject);
         }
 
-        let output = output.as_ref();
+        let output = output.as_ref().to_owned();
         let arguments = vec![
             OsString::from("-o"),
             output.as_os_str().to_owned(),
@@ -45,6 +47,7 @@ impl LinkInvocation {
             program: pack.linker_path().to_owned(),
             arguments,
             language_entry_symbol: pack.language_entry_symbol().to_owned(),
+            output,
         })
     }
 
@@ -66,7 +69,10 @@ impl LinkInvocation {
             .status()
             .map_err(|_| LinkInvocationError::LinkerUnavailable)?;
         if status.success() {
-            Ok(())
+            fs::metadata(&self.output)
+                .is_ok_and(|metadata| metadata.is_file())
+                .then_some(())
+                .ok_or(LinkInvocationError::MissingOutput)
         } else {
             Err(LinkInvocationError::LinkerFailed(status.code()))
         }
