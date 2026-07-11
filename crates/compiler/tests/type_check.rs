@@ -1396,7 +1396,7 @@ fn literal_expression_typing_records_adr0027_primitive_types() {
         ]
     );
 
-    assert_eq!(arena.records().len(), 5);
+    assert_eq!(arena.records().len(), 7);
     assert_eq!(
         arena.get(TypeId::from_raw(0)).unwrap().kind(),
         &TypeKind::Primitive(PrimitiveType::Bool)
@@ -1447,7 +1447,7 @@ fn parser_literal_metadata_types_to_adr0027_primitives() {
 
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.expression_types().len(), 4);
-    assert_eq!(arena.records().len(), 5);
+    assert_eq!(arena.records().len(), 7);
 
     let literal_nodes: Vec<_> = parsed
         .literal_expressions
@@ -1477,7 +1477,7 @@ fn parser_literal_metadata_types_to_adr0027_primitives() {
 fn primitive_local_declaration_annotations_record_declaration_signatures() {
     let parsed = parse_source(
         SourceFileId::from_raw(61),
-        "fun run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const done: Unit; const absent: Null = null; }",
+        "fun run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const done: Unit; const absent: Null = null; const ratio: Float = value; const octet: Byte = value; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1489,7 +1489,7 @@ fn primitive_local_declaration_annotations_record_declaration_signatures() {
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.expression_types(), &[]);
     assert_eq!(report.assignment_checks(), &[]);
-    assert_eq!(arena.records().len(), 5);
+    assert_eq!(arena.records().len(), 7);
 
     let declarations: Vec<_> = parsed
         .local_declarations
@@ -1504,6 +1504,8 @@ fn primitive_local_declaration_annotations_record_declaration_signatures() {
             DeclarationSignature::new(declarations[2], TypeId::from_raw(2)),
             DeclarationSignature::new(declarations[3], TypeId::from_raw(3)),
             DeclarationSignature::new(declarations[4], TypeId::from_raw(4)),
+            DeclarationSignature::new(declarations[5], TypeId::from_raw(5)),
+            DeclarationSignature::new(declarations[6], TypeId::from_raw(6)),
         ]
     );
     assert_eq!(
@@ -1513,6 +1515,14 @@ fn primitive_local_declaration_annotations_record_declaration_signatures() {
     assert_eq!(
         arena.get(TypeId::from_raw(4)).unwrap().kind(),
         &TypeKind::Primitive(PrimitiveType::Null)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(5)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Float)
+    );
+    assert_eq!(
+        arena.get(TypeId::from_raw(6)).unwrap().kind(),
+        &TypeKind::Primitive(PrimitiveType::Byte)
     );
 }
 
@@ -1579,7 +1589,7 @@ fn primitive_local_initializer_checks_record_matching_assignments() {
     );
 
     assert_eq!(report.diagnostics(), &[]);
-    assert_eq!(arena.records().len(), 5);
+    assert_eq!(arena.records().len(), 7);
     assert_eq!(report.declaration_signatures().len(), 3);
     assert_eq!(report.expression_types().len(), 3);
 
@@ -3109,7 +3119,7 @@ fn accepted_expression_composition_records_literals_names_and_groups() {
     let (arena, report) =
         type_m0018_accepted_expressions(&literals, &grouped, &resolutions, &known);
 
-    assert_eq!(arena.records().len(), 5);
+    assert_eq!(arena.records().len(), 7);
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.declaration_signatures(), &[]);
     assert_eq!(report.assignment_checks(), &[]);
@@ -3945,7 +3955,7 @@ fn m0028_function_signatures_share_the_caller_owned_module_arena() {
         &second.type_name_references,
     );
 
-    assert_eq!(types.records().len(), 5);
+    assert_eq!(types.records().len(), 7);
     assert_eq!(
         first_signatures[0].return_type(),
         second_signatures[0].return_type()
@@ -3992,7 +4002,7 @@ fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
         &[],
     );
 
-    assert_eq!(types.records().len(), 5);
+    assert_eq!(types.records().len(), 7);
     assert_eq!(
         first_report.expression_types()[0].ty(),
         second_report.expression_types()[0].ty()

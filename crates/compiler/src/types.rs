@@ -87,6 +87,8 @@ pub enum PrimitiveType {
     String,
     Unit,
     Null,
+    Float,
+    Byte,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

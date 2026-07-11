@@ -61,6 +61,10 @@ Source of truth: `docs/SPEC.md` and `docs/adr/`. This roadmap does not modify la
 
 - M0034: Milestone Release Hardening
 
+### Phase 7: Primitive Runtime Support
+
+- M0035: Bool, Unit, Float, And Byte Runtime Support
+
 ## Milestone Ordering
 
 1. M0001 Source of Truth Alignment
@@ -97,6 +101,7 @@ Source of truth: `docs/SPEC.md` and `docs/adr/`. This roadmap does not modify la
 32. M0032 Object And Bundled Linker Pipeline
 33. M0033 Target Packs And Cross Compilation Smoke
 34. M0034 Milestone Release Hardening
+35. M0035 Bool, Unit, Float, And Byte Runtime Support
 
 ## Dependency Graph
 
@@ -135,6 +140,7 @@ M0001
   -> M0032
   -> M0033
   -> M0034
+  -> M0035
 ```
 
 Each milestone may depend only on earlier milestones. No milestone depends on later work.
@@ -150,12 +156,13 @@ Each milestone may depend only on earlier milestones. No milestone depends on la
 | Phase 4 | M0027-M0030 | 13-22 working days |
 | Phase 5 | M0031-M0033 | 9-15 working days |
 | Phase 6 | M0034 | 3-5 working days |
+| Phase 7 | M0035 | 10-18 working days |
 
 Total critical-path estimate: 92-150 working days for one serial implementation lane.
 
 ## Project Critical Path
 
-The critical path is the full milestone chain from M0001 through M0034 because every phase builds on the prior phase's architecture and validation surface. Parallel work should be limited to review, test design, and ambiguity resolution for future milestones. Implementation should remain strictly ordered until the frontend contracts stabilize.
+The critical path is the full milestone chain from M0001 through M0035 because every phase builds on the prior phase's architecture and validation surface. Parallel work should be limited to review, test design, and ambiguity resolution for future milestones. Implementation should remain strictly ordered until the frontend contracts stabilize.
 
 Critical path checkpoints:
 
@@ -168,6 +175,7 @@ Critical path checkpoints:
 - M0028 proves the frontend accepts and rejects the first executable subset.
 - M0030 proves backend-independent lowering exists.
 - M0033 proves Go-like target-pack direction is viable.
+- M0035 proves non-`Int` primitive values survive the complete compiler pipeline.
 
 ## Optional Milestones
 

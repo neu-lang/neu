@@ -695,3 +695,21 @@ Deferred capabilities are unavailable to executable forms, and an empty
 platform API list means no platform API or standard library is provided. Future
 target packs must declare their own profile and require accepted ABI, layout,
 atomic, or platform API semantics before using non-deferred values.
+
+## ADR-0059: Bootstrap Primitive Runtime Support
+
+The bootstrap runtime supports `Bool`, `Unit`, `Float`, and `Byte` in addition
+to `Int`. `Bool` uses `true` and `false`, one-byte `0`/`1` representation,
+logical `!`, short-circuit `&&`/`||`, and equality. `Unit` has the single value
+`()`, no payload, and no ABI return value. `Float` is IEEE 754 binary64 with
+decimal/exponent literals, arithmetic, comparisons, and IEEE NaN behavior.
+`Byte` is unsigned eight-bit `0..255`, has checked arithmetic and bitwise
+operations, and has no implicit conversion to or from `Int`.
+
+Primitive operations require exact operand types. HIR and MIR preserve literal
+kind, value, type, source mapping, and safety facts. Cranelift lowers `Bool` to
+`i8` normalized to `0` or `1`, `Byte` to unsigned `i8`, `Float` to `f64`, and
+`Unit` without an ABI result. Byte range, overflow, division, shift, malformed
+float, and exact primitive mismatch diagnostics follow ADR-0059. The entry
+point remains an `Int`-returning `main`; additional primitives are supported in
+helpers, locals, parameters, returns, calls, and backend smokes.

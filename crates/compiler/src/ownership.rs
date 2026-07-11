@@ -14,9 +14,13 @@ pub enum OwnershipCategory {
 
 pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<OwnershipCategory> {
     match types.get(ty)?.kind() {
-        TypeKind::Primitive(PrimitiveType::Bool | PrimitiveType::Int | PrimitiveType::Unit) => {
-            Some(OwnershipCategory::Copyable)
-        }
+        TypeKind::Primitive(
+            PrimitiveType::Bool
+            | PrimitiveType::Int
+            | PrimitiveType::Unit
+            | PrimitiveType::Float
+            | PrimitiveType::Byte,
+        ) => Some(OwnershipCategory::Copyable),
         TypeKind::Primitive(PrimitiveType::Null) => Some(OwnershipCategory::Copyable),
         TypeKind::Primitive(PrimitiveType::String) | TypeKind::Nominal(_) => {
             Some(OwnershipCategory::MoveOnly)

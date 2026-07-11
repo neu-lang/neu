@@ -1839,6 +1839,8 @@ struct PrimitiveTypeIds {
     string_id: TypeId,
     unit_id: TypeId,
     null_id: TypeId,
+    float_id: TypeId,
+    byte_id: TypeId,
 }
 
 impl PrimitiveTypeIds {
@@ -1849,6 +1851,8 @@ impl PrimitiveTypeIds {
             string_id: arena.insert(TypeRecord::primitive(PrimitiveType::String)),
             unit_id: arena.insert(TypeRecord::primitive(PrimitiveType::Unit)),
             null_id: arena.insert(TypeRecord::primitive(PrimitiveType::Null)),
+            float_id: arena.insert(TypeRecord::primitive(PrimitiveType::Float)),
+            byte_id: arena.insert(TypeRecord::primitive(PrimitiveType::Byte)),
         }
     }
 
@@ -1871,6 +1875,8 @@ impl PrimitiveTypeIds {
             string_id: primitive(PrimitiveType::String),
             unit_id: primitive(PrimitiveType::Unit),
             null_id: primitive(PrimitiveType::Null),
+            float_id: primitive(PrimitiveType::Float),
+            byte_id: primitive(PrimitiveType::Byte),
         }
     }
 
@@ -1890,6 +1896,8 @@ impl PrimitiveTypeIds {
             "String" => Some(self.string_id),
             "Unit" => Some(self.unit_id),
             "Null" => Some(self.null_id),
+            "Float" => Some(self.float_id),
+            "Byte" => Some(self.byte_id),
             _ => None,
         }
     }

@@ -20,7 +20,13 @@ pub fn satisfies_thread_capability(
     };
 
     match record.kind() {
-        TypeKind::Primitive(PrimitiveType::Bool | PrimitiveType::Int | PrimitiveType::Unit) => true,
+        TypeKind::Primitive(
+            PrimitiveType::Bool
+            | PrimitiveType::Int
+            | PrimitiveType::Unit
+            | PrimitiveType::Float
+            | PrimitiveType::Byte,
+        ) => true,
         TypeKind::Primitive(PrimitiveType::Null) => true,
         TypeKind::Primitive(PrimitiveType::String) => capability == ThreadCapability::Send,
         TypeKind::Nullable(nullable) => {
