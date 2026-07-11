@@ -2,13 +2,16 @@ use std::{
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use crate::target_pack::TargetPack;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LinkInvocationError {
     MissingObject,
+    LinkerUnavailable,
+    LinkerFailed(Option<i32>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,5 +58,17 @@ impl LinkInvocation {
 
     pub fn language_entry_symbol(&self) -> &str {
         &self.language_entry_symbol
+    }
+
+    pub fn execute(&self) -> Result<(), LinkInvocationError> {
+        let status = Command::new(&self.program)
+            .args(&self.arguments)
+            .status()
+            .map_err(|_| LinkInvocationError::LinkerUnavailable)?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(LinkInvocationError::LinkerFailed(status.code()))
+        }
     }
 }
