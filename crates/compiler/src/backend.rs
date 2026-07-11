@@ -166,6 +166,24 @@ fn lower_instruction(
             values.insert(*output, product);
             Ok(())
         }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation: MirArithmetic::Divide,
+            left,
+            right,
+            ..
+        } => {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, builder.ins().sdiv(left, right));
+            Ok(())
+        }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),
     }
 }
