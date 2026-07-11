@@ -11,14 +11,14 @@ use cranelift_codegen::{
     settings, verify_function,
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
 
 use crate::{
     mir::{
-        MirArithmetic, MirComparison, MirFunction, MirInstruction, MirTerminator, MirUnary,
-        MirValueId,
+        MirArithmetic, MirComparison, MirFunction, MirInstruction, MirModule, MirTerminator,
+        MirUnary, MirValueId,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -50,6 +50,46 @@ pub fn lower_mir_function_to_cranelift(
     Ok(lower_mir_function(function, type_arena, &Triple::host())?
         .display()
         .to_string())
+}
+
+pub fn lower_mir_module_to_cranelift(
+    module: &MirModule,
+    type_arena: &TypeArena,
+) -> Result<Vec<String>, CraneliftLoweringError> {
+    let target = Triple::host();
+    let isa_builder = cranelift_codegen::isa::lookup(target.clone())
+        .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
+    let isa = isa_builder
+        .finish(settings::Flags::new(settings::builder()))
+        .map_err(|_| CraneliftLoweringError::TargetIsaUnavailable)?;
+    let mut object_module = ObjectModule::new(
+        ObjectBuilder::new(isa, "neu", default_libcall_names())
+            .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
+    );
+    let mut function_ids = HashMap::new();
+    for function in module.functions() {
+        let identity = function
+            .symbol_identity()
+            .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
+        let signature = mir_signature(function, type_arena, &target)?;
+        let function_id = object_module
+            .declare_function(&bootstrap_symbol(identity), Linkage::Local, &signature)
+            .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+        function_ids.insert(function.id(), function_id);
+    }
+
+    let mut output = Vec::new();
+    for function in module.functions() {
+        let clif_function = lower_mir_function_with_module(
+            function,
+            type_arena,
+            &target,
+            Some(&mut object_module),
+            &function_ids,
+        )?;
+        output.push(clif_function.display().to_string());
+    }
+    Ok(output)
 }
 
 pub fn emit_mir_function_to_object(
@@ -131,6 +171,16 @@ fn lower_mir_function(
     type_arena: &TypeArena,
     target: &Triple,
 ) -> Result<Function, CraneliftLoweringError> {
+    lower_mir_function_with_module(function, type_arena, target, None, &HashMap::new())
+}
+
+fn lower_mir_function_with_module(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+    target: &Triple,
+    module: Option<&mut ObjectModule>,
+    function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
+) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
     if function.blocks().is_empty() {
         return Err(CraneliftLoweringError::UnsupportedFunctionShape);
@@ -138,15 +188,7 @@ fn lower_mir_function(
 
     let function_index = u32::try_from(function.id().index())
         .map_err(|_| CraneliftLoweringError::FunctionIdOutOfRange)?;
-    let mut signature = Signature::new(CallConv::triple_default(target));
-    for (_, parameter_type) in function.parameters() {
-        let parameter_type = cranelift_type(*parameter_type, type_arena)
-            .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
-        signature.params.push(AbiParam::new(parameter_type));
-    }
-    if let Some(return_type) = cranelift_type(function.return_type(), type_arena) {
-        signature.returns.push(AbiParam::new(return_type));
-    }
+    let signature = mir_signature(function, type_arena, target)?;
     let mut clif_function =
         Function::with_name_signature(UserFuncName::user(0, function_index), signature);
     let mut builder_context = FunctionBuilderContext::new();
@@ -154,6 +196,7 @@ fn lower_mir_function(
 
     {
         let mut builder = FunctionBuilder::new(&mut clif_function, &mut builder_context);
+        let mut module = module;
         let mut clif_blocks = HashMap::new();
         let mut locals = HashMap::new();
         for local in function.locals() {
@@ -183,7 +226,14 @@ fn lower_mir_function(
                 .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
             builder.switch_to_block(clif_block);
             for instruction in mir_block.instructions() {
-                lower_instruction(instruction, &mut builder, &mut values, &locals)?;
+                lower_instruction(
+                    instruction,
+                    &mut builder,
+                    &mut values,
+                    &locals,
+                    &mut module,
+                    function_ids,
+                )?;
             }
             lower_terminator(mir_block.terminator(), &clif_blocks, &mut builder, &values)?;
         }
@@ -197,6 +247,23 @@ fn lower_mir_function(
     verify_function(&clif_function, &flags)
         .map_err(|_| CraneliftLoweringError::VerificationFailed)?;
     Ok(clif_function)
+}
+
+fn mir_signature(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+    target: &Triple,
+) -> Result<Signature, CraneliftLoweringError> {
+    let mut signature = Signature::new(CallConv::triple_default(target));
+    for (_, parameter_type) in function.parameters() {
+        let parameter_type = cranelift_type(*parameter_type, type_arena)
+            .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+        signature.params.push(AbiParam::new(parameter_type));
+    }
+    if let Some(return_type) = cranelift_type(function.return_type(), type_arena) {
+        signature.returns.push(AbiParam::new(return_type));
+    }
+    Ok(signature)
 }
 
 fn bootstrap_symbol(identity: &crate::module::FunctionSymbolIdentity) -> String {
@@ -382,6 +449,8 @@ fn lower_instruction(
     builder: &mut FunctionBuilder<'_>,
     values: &mut HashMap<MirValueId, Value>,
     locals: &HashMap<crate::mir::MirLocalId, Variable>,
+    module: &mut Option<&mut ObjectModule>,
+    function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
 ) -> Result<(), CraneliftLoweringError> {
     match instruction {
         MirInstruction::IntConstant { output, value, .. } => {
@@ -409,6 +478,35 @@ fn lower_instruction(
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             values.insert(*output, value);
+            Ok(())
+        }
+        MirInstruction::DirectCall {
+            output,
+            callee,
+            arguments,
+            ..
+        } => {
+            let function_id = function_ids
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let module = module
+                .as_deref_mut()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let function_ref = module.declare_func_in_func(function_id, builder.func);
+            let arguments = arguments
+                .iter()
+                .map(|argument| {
+                    values
+                        .get(argument)
+                        .copied()
+                        .ok_or(CraneliftLoweringError::MissingValue)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let call = builder.ins().call(function_ref, &arguments);
+            if let Some(value) = builder.inst_results(call).first().copied() {
+                values.insert(*output, value);
+            }
             Ok(())
         }
         MirInstruction::Unary {

@@ -1,5 +1,7 @@
 use compiler::{
-    backend::{CraneliftLoweringError, lower_mir_function_to_cranelift},
+    backend::{
+        CraneliftLoweringError, lower_mir_function_to_cranelift, lower_mir_module_to_cranelift,
+    },
     mir::{
         MirArithmetic, MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId,
         MirInstruction, MirLocalId, MirTerminator, MirUnary, MirValueId,
@@ -758,6 +760,69 @@ fn m0035_lowers_typed_primitive_parameters() {
     );
     let byte_ir = lower_mir_function_to_cranelift(&byte_function, &types).unwrap();
     assert!(byte_ir.contains("i8"), "{byte_ir}");
+}
+
+#[test]
+fn m0035_lowers_primitive_direct_call_through_module_context() {
+    let file = SourceFileId::from_raw(927);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let helper_identity = compiler::module::FunctionSymbolIdentity::new(
+        compiler::module::ModuleName::parse("app").unwrap(),
+        compiler::module::PackageNamespace::parse("demo").unwrap(),
+        "helper",
+    );
+    let caller_identity = compiler::module::FunctionSymbolIdentity::new(
+        compiler::module::ModuleName::parse("app").unwrap(),
+        compiler::module::PackageNamespace::parse("demo").unwrap(),
+        "caller",
+    );
+    let helper = MirFunction::new(
+        MirFunctionId::from_raw(1),
+        span,
+        vec![],
+        bool_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::bool_constant(
+                MirValueId::from_raw(0),
+                true,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(helper_identity);
+    let caller = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        vec![],
+        bool_type,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::DirectCall {
+                output: MirValueId::from_raw(0),
+                callee: MirFunctionId::from_raw(1),
+                arguments: vec![],
+                span,
+            }],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(caller_identity);
+    let module = compiler::mir::MirModule::new(
+        compiler::module::ModuleName::parse("app").unwrap(),
+        vec![caller, helper],
+    );
+
+    let ir = lower_mir_module_to_cranelift(&module, &types).unwrap();
+    assert_eq!(ir.len(), 2);
+    assert!(ir[0].contains("call"), "{}", ir[0]);
 }
 
 #[test]
