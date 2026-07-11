@@ -58,6 +58,7 @@ pub enum TypeRuleDiagnostic {
     AmbiguousLocalBindingFlow,
     AmbiguousNullTestRegion,
     IntegerLiteralOutOfRange,
+    ByteLiteralOutOfRange,
     IntegerOverflow,
     DivisionByZero,
     NegativeExponent,
@@ -1975,6 +1976,7 @@ pub fn type_primitive_local_initializer_declarations(
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
     literals: &[ParsedLiteralExpression],
+    integer_literals: &[ParsedIntegerLiteral],
 ) -> (TypeArena, TypeCheckReport) {
     let mut arena = TypeArena::new();
     let primitives = PrimitiveTypeIds::insert_into(&mut arena);
@@ -2009,6 +2011,30 @@ pub fn type_primitive_local_initializer_declarations(
         let Some(initializer_type) = report.expression_type(initializer) else {
             continue;
         };
+
+        if annotation_type == primitives.byte_id
+            && let Some(integer) = integer_literals
+                .iter()
+                .find(|literal| literal.expression == initializer)
+        {
+            match integer.value {
+                Some(value) if value <= u64::from(u8::MAX) => {
+                    report.record_assignment_check(AssignmentCheck::new(
+                        declaration.declaration,
+                        annotation_type,
+                        annotation_type,
+                    ));
+                    continue;
+                }
+                Some(_) | None => {
+                    report.record_diagnostic(TypeCheckDiagnostic::static_integer(
+                        TypeRuleDiagnostic::ByteLiteralOutOfRange,
+                        initializer,
+                    ));
+                    continue;
+                }
+            }
+        }
 
         if initializer_type == annotation_type {
             report.record_assignment_check(AssignmentCheck::new(

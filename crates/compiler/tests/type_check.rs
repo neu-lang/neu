@@ -1586,6 +1586,7 @@ fn primitive_local_initializer_checks_record_matching_assignments() {
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
+        &parsed.integer_literals,
     );
 
     assert_eq!(report.diagnostics(), &[]);
@@ -1609,6 +1610,45 @@ fn primitive_local_initializer_checks_record_matching_assignments() {
 }
 
 #[test]
+fn primitive_local_initializers_type_float_and_in_range_byte_literals() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(63),
+        "fun run() { const ratio: Float = 1.5; const first: Byte = 0; const last: Byte = 255; }",
+    );
+
+    let (_arena, report) = type_primitive_local_initializer_declarations(
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+    );
+
+    assert!(report.diagnostics().is_empty());
+    assert_eq!(report.assignment_checks().len(), 3);
+}
+
+#[test]
+fn primitive_local_initializer_rejects_byte_literal_out_of_range() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(64),
+        "fun run() { const value: Byte = 256; }",
+    );
+
+    let (_arena, report) = type_primitive_local_initializer_declarations(
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+    );
+
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].rule(),
+        TypeRuleDiagnostic::ByteLiteralOutOfRange
+    );
+}
+
+#[test]
 fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
     let parsed = parse_source(
         SourceFileId::from_raw(64),
@@ -1622,6 +1662,7 @@ fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
+        &parsed.integer_literals,
     );
 
     let ready_initializer = parsed.local_declarations[0].initializer.unwrap();
