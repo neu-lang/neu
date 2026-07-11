@@ -398,15 +398,36 @@ impl DirectCallDiagnostic {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DirectCallExpressionType {
+    expression_span: ByteSpan,
+    ty: TypeId,
+}
+
+impl DirectCallExpressionType {
+    pub fn expression_span(self) -> ByteSpan {
+        self.expression_span
+    }
+
+    pub fn ty(self) -> TypeId {
+        self.ty
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DirectCallReport {
     expression_types: Vec<ExpressionType>,
+    source_expression_types: Vec<DirectCallExpressionType>,
     diagnostics: Vec<DirectCallDiagnostic>,
 }
 
 impl DirectCallReport {
     pub fn expression_types(&self) -> &[ExpressionType] {
         &self.expression_types
+    }
+
+    pub fn source_expression_types(&self) -> &[DirectCallExpressionType] {
+        &self.source_expression_types
     }
 
     pub fn diagnostics(&self) -> &[DirectCallDiagnostic] {
@@ -567,12 +588,51 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
             }
         }
         if !argument_error {
+            let call_span = source
+                .parsed
+                .arena
+                .node(call.expression)
+                .expect("parsed call expression")
+                .span;
             report
                 .expression_types
                 .push(ExpressionType::new(call.expression, target.return_type));
+            report
+                .source_expression_types
+                .push(DirectCallExpressionType {
+                    expression_span: call_span,
+                    ty: target.return_type,
+                });
         }
     }
     report
+}
+
+pub fn apply_m0028_direct_call_results(
+    report: &mut TypeCheckReport,
+    parsed: &ParseOutput,
+    direct_calls: &DirectCallReport,
+) {
+    for call in &parsed.call_expressions {
+        let span = parsed
+            .arena
+            .node(call.expression)
+            .expect("parsed call expression")
+            .span;
+        let Some(ty) = direct_calls
+            .source_expression_types
+            .iter()
+            .find(|typed| typed.expression_span == span)
+            .map(|typed| typed.ty)
+        else {
+            continue;
+        };
+        report.record_expression_type(ExpressionType::new(call.expression, ty));
+        report.diagnostics.retain(|diagnostic| {
+            diagnostic.node() != call.expression
+                || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
+        });
+    }
 }
 
 fn m0028_call_path_exists(

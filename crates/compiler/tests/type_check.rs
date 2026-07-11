@@ -20,12 +20,13 @@ use compiler::{
         ExecutableSourceTypes, ExpressionType, KnownSymbolType, LiteralExpressionInput,
         LiteralKind, NullTestRefinedBranch, RecognizedNullTest, RefinedExpressionType,
         RefinementRecord, ReturnPathDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport, TypeRuleDiagnostic, build_m0020_capability_bound_records,
-        build_m0020_generic_parameter_types, check_m0028_direct_calls, check_m0028_entry_point,
-        check_m0028_straight_line_returns, known_local_symbol_types, recognize_m0019_null_tests,
-        record_m0019_branch_refinements, record_m0019_refined_expression_types,
-        select_m0019_eligible_null_tests, type_assignment_statements, type_grouped_expressions,
-        type_literal_expressions, type_m0018_accepted_expressions, type_m0018_core,
+        TypeCheckReport, TypeRuleDiagnostic, apply_m0028_direct_call_results,
+        build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
+        check_m0028_direct_calls, check_m0028_entry_point, check_m0028_straight_line_returns,
+        known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
+        record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
+        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
+        type_m0018_accepted_expressions, type_m0018_core,
         type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
         type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
         type_m0028_executable_core, type_m0028_executable_core_in,
@@ -4271,4 +4272,131 @@ fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodie
             .iter()
             .any(|diagnostic| diagnostic.kind() == DirectCallDiagnosticKind::InvalidCallTarget)
     );
+}
+
+#[test]
+fn m0028_executable_core_accepts_checked_direct_calls() {
+    let helper = parse_source(
+        SourceFileId::from_raw(125),
+        "fun increment(value: Int): Int { return value + 1; }",
+    );
+    let caller = parse_source(
+        SourceFileId::from_raw(126),
+        "fun main(): Int { return increment(41); }",
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let mut types = TypeArena::new();
+    let helper_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &helper.function_declarations,
+        &helper.function_parameters,
+        &helper.type_name_references,
+    );
+    let caller_signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &caller.function_declarations,
+        &caller.function_parameters,
+        &caller.type_name_references,
+    );
+    let helper_types = type_m0028_executable_core_in(
+        &mut types,
+        &helper.arena,
+        &helper.local_declarations,
+        &helper.type_name_references,
+        &helper.literal_expressions,
+        &helper.integer_literals,
+        &helper.grouped_expressions,
+        &helper.unary_expressions,
+        &helper.binary_expressions,
+        &helper.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let mut caller_types = type_m0028_executable_core_in(
+        &mut types,
+        &caller.arena,
+        &caller.local_declarations,
+        &caller.type_name_references,
+        &caller.literal_expressions,
+        &caller.integer_literals,
+        &caller.grouped_expressions,
+        &caller.unary_expressions,
+        &caller.binary_expressions,
+        &caller.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let calls = check_m0028_direct_calls(&[
+        ExecutableSourceTypes::new(
+            &package,
+            &helper,
+            &helper_signatures,
+            helper_types.expression_types(),
+        ),
+        ExecutableSourceTypes::new(
+            &package,
+            &caller,
+            &caller_signatures,
+            caller_types.expression_types(),
+        ),
+    ]);
+
+    apply_m0028_direct_call_results(&mut caller_types, &caller, &calls);
+
+    let call = &caller.call_expressions[0];
+    assert_eq!(
+        caller_types.expression_type(call.expression),
+        Some(calls.expression_types()[0].ty())
+    );
+    assert!(!caller_types.diagnostics().iter().any(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
+            && diagnostic.rule() == TypeRuleDiagnostic::DirectCallDeferred
+            && diagnostic.node() == call.expression
+    }));
+}
+
+#[test]
+fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(127),
+        "fun main(): Int { return missing(); }",
+    );
+    let package = PackageNamespace::parse("app").unwrap();
+    let mut types = TypeArena::new();
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    let mut executable_types = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+        &package,
+        &parsed,
+        &signatures,
+        executable_types.expression_types(),
+    )]);
+
+    apply_m0028_direct_call_results(&mut executable_types, &parsed, &calls);
+
+    let call = &parsed.call_expressions[0];
+    assert_eq!(executable_types.expression_type(call.expression), None);
+    assert!(executable_types.diagnostics().iter().any(|diagnostic| {
+        diagnostic.kind() == TypeCheckDiagnosticKind::UnsupportedTypeRule
+            && diagnostic.rule() == TypeRuleDiagnostic::DirectCallDeferred
+            && diagnostic.node() == call.expression
+    }));
 }
