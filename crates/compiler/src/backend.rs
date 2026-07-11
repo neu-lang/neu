@@ -20,11 +20,17 @@ use crate::{
         MirArithmetic, MirComparison, MirFunction, MirInstruction, MirModule, MirTerminator,
         MirUnary, MirValueId,
     },
-    types::{PrimitiveType, TypeArena, TypeKind},
+    types::{PrimitiveType, TypeArena, TypeId, TypeKind},
 };
 
 const INVALID_SHIFT_COUNT_TRAP: TrapCode = TrapCode::unwrap_user(1);
 const NEGATIVE_EXPONENT_TRAP: TrapCode = TrapCode::unwrap_user(2);
+
+struct LoweringContext<'a> {
+    function: &'a MirFunction,
+    type_arena: &'a TypeArena,
+    function_return_types: &'a HashMap<crate::mir::MirFunctionId, TypeId>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CraneliftLoweringError {
@@ -67,6 +73,11 @@ pub fn lower_mir_module_to_cranelift(
             .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
     );
     let mut function_ids = HashMap::new();
+    let function_return_types = module
+        .functions()
+        .iter()
+        .map(|function| (function.id(), function.return_type()))
+        .collect::<HashMap<_, _>>();
     for function in module.functions() {
         let identity = function
             .symbol_identity()
@@ -86,6 +97,7 @@ pub fn lower_mir_module_to_cranelift(
             &target,
             Some(&mut object_module),
             &function_ids,
+            &function_return_types,
         )?;
         output.push(clif_function.display().to_string());
     }
@@ -108,6 +120,11 @@ pub fn emit_mir_module_to_object(
             .map_err(|_| CraneliftLoweringError::ObjectBuilderFailed)?,
     );
     let mut function_ids = HashMap::new();
+    let function_return_types = module
+        .functions()
+        .iter()
+        .map(|function| (function.id(), function.return_type()))
+        .collect::<HashMap<_, _>>();
     for function in module.functions() {
         let identity = function
             .symbol_identity()
@@ -139,6 +156,7 @@ pub fn emit_mir_module_to_object(
             &target,
             Some(&mut object_module),
             &function_ids,
+            &function_return_types,
         )?;
         let function_id = function_ids
             .get(&function.id())
@@ -234,7 +252,14 @@ fn lower_mir_function(
     type_arena: &TypeArena,
     target: &Triple,
 ) -> Result<Function, CraneliftLoweringError> {
-    lower_mir_function_with_module(function, type_arena, target, None, &HashMap::new())
+    lower_mir_function_with_module(
+        function,
+        type_arena,
+        target,
+        None,
+        &HashMap::new(),
+        &HashMap::new(),
+    )
 }
 
 fn lower_mir_function_with_module(
@@ -243,6 +268,7 @@ fn lower_mir_function_with_module(
     target: &Triple,
     module: Option<&mut ObjectModule>,
     function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
+    function_return_types: &HashMap<crate::mir::MirFunctionId, TypeId>,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_int(function.return_type(), type_arena)?;
     if function.blocks().is_empty() {
@@ -260,6 +286,11 @@ fn lower_mir_function_with_module(
     {
         let mut builder = FunctionBuilder::new(&mut clif_function, &mut builder_context);
         let mut module = module;
+        let lowering_context = LoweringContext {
+            function,
+            type_arena,
+            function_return_types,
+        };
         let mut clif_blocks = HashMap::new();
         let mut locals = HashMap::new();
         for local in function.locals() {
@@ -296,6 +327,7 @@ fn lower_mir_function_with_module(
                     &locals,
                     &mut module,
                     function_ids,
+                    &lowering_context,
                 )?;
             }
             lower_terminator(mir_block.terminator(), &clif_blocks, &mut builder, &values)?;
@@ -507,6 +539,24 @@ fn float_cc(operation: MirComparison) -> FloatCC {
     }
 }
 
+fn normalize_bool_value(
+    value: Value,
+    ty: TypeId,
+    type_arena: &TypeArena,
+    builder: &mut FunctionBuilder<'_>,
+) -> Value {
+    if !matches!(
+        type_arena.get(ty).map(|record| record.kind()),
+        Some(TypeKind::Primitive(PrimitiveType::Bool))
+    ) {
+        return value;
+    }
+    let nonzero = builder.ins().icmp_imm(IntCC::NotEqual, value, 0);
+    let one = builder.ins().iconst(types::I8, 1);
+    let zero = builder.ins().iconst(types::I8, 0);
+    builder.ins().select(nonzero, one, zero)
+}
+
 fn lower_instruction(
     instruction: &MirInstruction,
     builder: &mut FunctionBuilder<'_>,
@@ -514,6 +564,7 @@ fn lower_instruction(
     locals: &HashMap<crate::mir::MirLocalId, Variable>,
     module: &mut Option<&mut ObjectModule>,
     function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
+    context: &LoweringContext<'_>,
 ) -> Result<(), CraneliftLoweringError> {
     match instruction {
         MirInstruction::IntConstant { output, value, .. } => {
@@ -540,7 +591,16 @@ fn lower_instruction(
                 .get(&MirValueId::from_raw(parameter.index()))
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            values.insert(*output, value);
+            let ty = context
+                .function
+                .parameters()
+                .get(parameter.index())
+                .map(|(_, ty)| *ty)
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(
+                *output,
+                normalize_bool_value(value, ty, context.type_arena, builder),
+            );
             Ok(())
         }
         MirInstruction::DirectCall {
@@ -568,7 +628,15 @@ fn lower_instruction(
                 .collect::<Result<Vec<_>, _>>()?;
             let call = builder.ins().call(function_ref, &arguments);
             if let Some(value) = builder.inst_results(call).first().copied() {
-                values.insert(*output, value);
+                let ty = context
+                    .function_return_types
+                    .get(callee)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                values.insert(
+                    *output,
+                    normalize_bool_value(value, ty, context.type_arena, builder),
+                );
             }
             Ok(())
         }
@@ -660,11 +728,23 @@ fn lower_instruction(
             Ok(())
         }
         MirInstruction::LoadLocal { output, local, .. } => {
-            let local = locals
-                .get(local)
+            let local_id = *local;
+            let variable = locals
+                .get(&local_id)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            values.insert(*output, builder.use_var(local));
+            let value = builder.use_var(variable);
+            let ty = context
+                .function
+                .locals()
+                .iter()
+                .find(|candidate| candidate.id() == local_id)
+                .map(|candidate| candidate.ty())
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(
+                *output,
+                normalize_bool_value(value, ty, context.type_arena, builder),
+            );
             Ok(())
         }
         MirInstruction::StoreLocal { local, value, .. } => {

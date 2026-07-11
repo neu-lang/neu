@@ -733,6 +733,7 @@ fn m0035_lowers_typed_primitive_parameters() {
     );
     let bool_ir = lower_mir_function_to_cranelift(&bool_function, &types).unwrap();
     assert!(bool_ir.contains("i8"), "{bool_ir}");
+    assert!(bool_ir.contains("select"), "{bool_ir}");
     assert!(bool_ir.contains("return"), "{bool_ir}");
 
     let float_function = MirFunction::new(
@@ -829,6 +830,7 @@ fn m0035_lowers_primitive_direct_call_through_module_context() {
     let ir = lower_mir_module_to_cranelift(&module, &types).unwrap();
     assert_eq!(ir.len(), 2);
     assert!(ir[0].contains("call"), "{}", ir[0]);
+    assert!(ir[0].contains("select"), "{}", ir[0]);
     let object = emit_mir_module_to_object(&module, &types, "neu_main").unwrap();
     assert!(!object.is_empty());
 }
