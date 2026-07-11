@@ -398,6 +398,10 @@ impl HirDirectCall {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HirExpressionKind {
     IntLiteral(i64),
+    BoolLiteral(bool),
+    UnitLiteral,
+    FloatLiteral(u64),
+    ByteLiteral(u8),
     LocalRead(HirLocalId),
     Unary(HirUnary),
     Binary(HirBinary),
@@ -418,6 +422,42 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::IntLiteral(value),
+        }
+    }
+
+    pub fn bool_literal(id: HirExpressionId, span: ByteSpan, ty: TypeId, value: bool) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::BoolLiteral(value),
+        }
+    }
+
+    pub fn unit_literal(id: HirExpressionId, span: ByteSpan, ty: TypeId) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::UnitLiteral,
+        }
+    }
+
+    pub fn float_literal(id: HirExpressionId, span: ByteSpan, ty: TypeId, value: f64) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::FloatLiteral(value.to_bits()),
+        }
+    }
+
+    pub fn byte_literal(id: HirExpressionId, span: ByteSpan, ty: TypeId, value: u8) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ByteLiteral(value),
         }
     }
     pub fn local_read(id: HirExpressionId, span: ByteSpan, ty: TypeId, local: HirLocalId) -> Self {

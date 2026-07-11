@@ -1,9 +1,9 @@
 use compiler::{
     hir::{
         CheckedHirSource, HirAssignment, HirBinaryOperator, HirDirectCall, HirExpression,
-        HirExpressionId, HirFunction, HirFunctionId, HirLocal, HirLocalId, HirModule, HirParameter,
-        HirParameterId, HirReturn, HirSafetyFacts, HirUnaryOperator, HirUnsupportedForm,
-        lower_checked_hir_source,
+        HirExpressionId, HirExpressionKind, HirFunction, HirFunctionId, HirLocal, HirLocalId,
+        HirModule, HirParameter, HirParameterId, HirReturn, HirSafetyFacts, HirUnaryOperator,
+        HirUnsupportedForm, lower_checked_hir_source,
     },
     module::{ModuleName, PackageNamespace},
     parser::parse_source,
@@ -84,6 +84,34 @@ fn m0029_hir_model_preserves_typed_source_mapped_executable_facts() {
         function.unsupported_forms()[0].span(),
         ByteSpan::new(file, 50, 60).unwrap()
     );
+}
+
+#[test]
+fn m0035_hir_preserves_non_integer_primitive_literal_payloads() {
+    let file = SourceFileId::from_raw(904);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let bool_type = TypeId::from_raw(1);
+    let unit_type = TypeId::from_raw(2);
+    let float_type = TypeId::from_raw(3);
+    let byte_type = TypeId::from_raw(4);
+
+    let bool_literal =
+        HirExpression::bool_literal(HirExpressionId::from_raw(0), span, bool_type, true);
+    let unit_literal = HirExpression::unit_literal(HirExpressionId::from_raw(1), span, unit_type);
+    let float_literal =
+        HirExpression::float_literal(HirExpressionId::from_raw(2), span, float_type, -0.0);
+    let byte_literal =
+        HirExpression::byte_literal(HirExpressionId::from_raw(3), span, byte_type, 255);
+
+    assert_eq!(bool_literal.kind(), &HirExpressionKind::BoolLiteral(true));
+    assert_eq!(unit_literal.kind(), &HirExpressionKind::UnitLiteral);
+    assert_eq!(
+        float_literal.kind(),
+        &HirExpressionKind::FloatLiteral((-0.0f64).to_bits())
+    );
+    assert_eq!(byte_literal.kind(), &HirExpressionKind::ByteLiteral(255));
+    assert_eq!(float_literal.ty(), float_type);
+    assert_eq!(byte_literal.span(), span);
 }
 
 #[test]
