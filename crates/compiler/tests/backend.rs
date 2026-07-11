@@ -2,7 +2,7 @@ use compiler::{
     backend::{CraneliftLoweringError, lower_mir_function_to_cranelift},
     mir::{
         MirArithmetic, MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId,
-        MirInstruction, MirTerminator, MirValueId,
+        MirInstruction, MirTerminator, MirUnary, MirValueId,
     },
     source::{ByteSpan, SourceFileId},
     types::{PrimitiveType, TypeArena, TypeRecord},
@@ -334,4 +334,49 @@ fn m0031_lowers_checked_shifts() {
     assert!(ir.contains("ishl"), "{ir}");
     assert!(ir.contains("sshr"), "{ir}");
     assert!(ir.contains("trapnz"), "{ir}");
+}
+
+#[test]
+fn m0031_lowers_unary_int_operations() {
+    let file = SourceFileId::from_raw(409);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(9),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![
+                MirInstruction::int_constant(MirValueId::from_raw(0), 8, span),
+                MirInstruction::Unary {
+                    output: MirValueId::from_raw(1),
+                    operation: MirUnary::Plus,
+                    operand: MirValueId::from_raw(0),
+                    span,
+                },
+                MirInstruction::Unary {
+                    output: MirValueId::from_raw(2),
+                    operation: MirUnary::Negate,
+                    operand: MirValueId::from_raw(1),
+                    span,
+                },
+                MirInstruction::Unary {
+                    output: MirValueId::from_raw(3),
+                    operation: MirUnary::BitwiseNot,
+                    operand: MirValueId::from_raw(2),
+                    span,
+                },
+            ],
+            MirTerminator::return_value(MirValueId::from_raw(3), span),
+        )],
+        MirCleanupBoundary::empty(),
+    );
+    let ir = lower_mir_function_to_cranelift(&function, &types).unwrap();
+    assert!(ir.contains("ineg"), "{ir}");
+    assert!(ir.contains("bnot"), "{ir}");
+    assert!(ir.contains("int_ovf"), "{ir}");
 }

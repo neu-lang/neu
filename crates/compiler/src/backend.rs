@@ -12,7 +12,7 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use target_lexicon::Triple;
 
 use crate::{
-    mir::{MirArithmetic, MirFunction, MirInstruction, MirTerminator, MirValueId},
+    mir::{MirArithmetic, MirFunction, MirInstruction, MirTerminator, MirUnary, MirValueId},
     types::{PrimitiveType, TypeArena, TypeKind},
 };
 
@@ -87,6 +87,47 @@ fn lower_instruction(
     match instruction {
         MirInstruction::IntConstant { output, value, .. } => {
             values.insert(*output, builder.ins().iconst(types::I64, *value));
+            Ok(())
+        }
+        MirInstruction::Unary {
+            output,
+            operation: MirUnary::Plus,
+            operand,
+            ..
+        } => {
+            let operand = values
+                .get(operand)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, operand);
+            Ok(())
+        }
+        MirInstruction::Unary {
+            output,
+            operation: MirUnary::Negate,
+            operand,
+            ..
+        } => {
+            let operand = values
+                .get(operand)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let is_min = builder.ins().icmp_imm(IntCC::Equal, operand, i64::MIN);
+            builder.ins().trapnz(is_min, TrapCode::INTEGER_OVERFLOW);
+            values.insert(*output, builder.ins().ineg(operand));
+            Ok(())
+        }
+        MirInstruction::Unary {
+            output,
+            operation: MirUnary::BitwiseNot,
+            operand,
+            ..
+        } => {
+            let operand = values
+                .get(operand)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, builder.ins().bnot(operand));
             Ok(())
         }
         MirInstruction::CheckedArithmetic {
