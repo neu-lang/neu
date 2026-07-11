@@ -254,6 +254,63 @@ fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
 }
 
 #[test]
+fn m0035_checked_source_lowers_float_local_and_read_to_hir() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(919),
+        "fun ratio(): Float { const value: Float = 1.5; return value; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = compiler::types::TypeArena::new();
+    let mut report = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &compiler::name_resolution::ResolutionTable::new(),
+        &[],
+    );
+    let name = parsed
+        .name_references
+        .iter()
+        .find(|name| name.name == "value")
+        .unwrap();
+    report.record_expression_type(ExpressionType::new(name.reference, TypeId::from_raw(5)));
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+
+    let module = lower_checked_hir_source(CheckedHirSource::new(
+        ModuleName::parse("app").unwrap(),
+        PackageNamespace::parse("app").unwrap(),
+        &parsed,
+        &signatures,
+        report.expression_types(),
+        true,
+    ))
+    .unwrap();
+
+    assert_eq!(module.functions()[0].locals().len(), 1);
+    assert!(matches!(
+        module.functions()[0].expressions()[0].kind(),
+        HirExpressionKind::FloatLiteral(bits) if *bits == 1.5f64.to_bits()
+    ));
+    assert!(matches!(
+        module.functions()[0].expressions()[1].kind(),
+        HirExpressionKind::LocalRead(_)
+    ));
+}
+
+#[test]
 fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() {
     let file = SourceFileId::from_raw(201);
     let span = ByteSpan::new(file, 0, 1).unwrap();

@@ -1,5 +1,6 @@
 use crate::{
     module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
+    name_resolution::LocalBindingKind,
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
     type_check::{ExpressionType, FunctionSignature},
@@ -105,6 +106,43 @@ pub fn lower_checked_hir_source(
         let id = HirFunctionId::from_raw(functions.len());
         let mut expressions = Vec::new();
         let mut returns = Vec::new();
+        let mut locals = Vec::new();
+        let mut local_bindings = Vec::new();
+        for local in source.parsed.local_declarations.iter().filter(|local| {
+            source
+                .parsed
+                .executable_body_statements
+                .iter()
+                .any(|statement| {
+                    statement.function == function.declaration
+                        && statement.statement == local.declaration
+                })
+        }) {
+            let Some(initializer) = local.initializer else {
+                continue;
+            };
+            let ty = source
+                .expression_types
+                .iter()
+                .find(|typed| typed.expression() == initializer)
+                .map(|typed| typed.ty())
+                .ok_or(HirLoweringError::MissingType)?;
+            let span = source
+                .parsed
+                .arena
+                .node(local.declaration)
+                .ok_or(HirLoweringError::UnsupportedExpression)?
+                .span;
+            let mutable = source
+                .parsed
+                .local_binding_names
+                .iter()
+                .find(|binding| binding.binding == local.declaration)
+                .is_some_and(|binding| binding.kind == LocalBindingKind::Var);
+            let local_id = HirLocalId::from_raw(locals.len());
+            locals.push(HirLocal::new(local_id, span, ty, mutable));
+            local_bindings.push((local.declaration, local_id));
+        }
         let parameters = source
             .parsed
             .function_parameters
@@ -129,24 +167,82 @@ pub fn lower_checked_hir_source(
                 ))
             })
             .collect::<Result<Vec<_>, HirLoweringError>>()?;
-        for returned in source
+        let mut assignments = Vec::new();
+        for statement in source
             .parsed
-            .return_statements
+            .executable_body_statements
             .iter()
-            .filter(|returned| returned.function == function.declaration)
+            .filter(|statement| statement.function == function.declaration)
         {
-            let value = returned
-                .value
-                .ok_or(HirLoweringError::UnsupportedExpression)?;
-            let expression =
-                lower_expression(&source, function.declaration, value, &mut expressions)?;
-            let return_span = source
+            if let Some(local) = source
                 .parsed
-                .arena
-                .node(returned.statement)
-                .ok_or(HirLoweringError::UnsupportedExpression)?
-                .span;
-            returns.push(HirReturn::new(return_span, expression));
+                .local_declarations
+                .iter()
+                .find(|local| local.declaration == statement.statement)
+            {
+                let value = local
+                    .initializer
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                let expression = lower_expression(
+                    &source,
+                    function.declaration,
+                    value,
+                    &local_bindings,
+                    &mut expressions,
+                )?;
+                let local_id = local_bindings
+                    .iter()
+                    .find(|(binding, _)| *binding == local.declaration)
+                    .map(|(_, local_id)| *local_id)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                locals
+                    .iter_mut()
+                    .find(|local| local.id() == local_id)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?
+                    .set_initializer(expression);
+                continue;
+            }
+            if let Some(assignment) = source
+                .parsed
+                .assignment_statements
+                .iter()
+                .find(|assignment| assignment.statement == statement.statement)
+            {
+                let target = local_binding_id(
+                    &source,
+                    function.declaration,
+                    assignment.target,
+                    &local_bindings,
+                )
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+                let value = lower_expression(
+                    &source,
+                    function.declaration,
+                    assignment.value,
+                    &local_bindings,
+                    &mut expressions,
+                )?;
+                assignments.push(HirAssignment::new(statement.span, target, value));
+                continue;
+            }
+            if let Some(returned) = source
+                .parsed
+                .return_statements
+                .iter()
+                .find(|returned| returned.statement == statement.statement)
+            {
+                let value = returned
+                    .value
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                let expression = lower_expression(
+                    &source,
+                    function.declaration,
+                    value,
+                    &local_bindings,
+                    &mut expressions,
+                )?;
+                returns.push(HirReturn::new(statement.span, expression));
+            }
         }
         functions.push(
             HirFunction::new(
@@ -157,12 +253,13 @@ pub fn lower_checked_hir_source(
                 declaration_is_main(source.parsed, function.declaration),
                 signature.return_type(),
                 parameters,
-                vec![],
+                locals,
                 expressions,
                 returns,
                 HirSafetyFacts::executable_subset_checked(),
                 vec![],
             )
+            .with_assignments(assignments)
             .with_symbol_identity(symbol_identity),
         );
     }
@@ -173,6 +270,7 @@ fn lower_expression(
     source: &CheckedHirSource<'_>,
     function_declaration: crate::ast::AstNodeId,
     expression: crate::ast::AstNodeId,
+    local_bindings: &[(crate::ast::AstNodeId, HirLocalId)],
     output: &mut Vec<HirExpression>,
 ) -> Result<HirExpressionId, HirLoweringError> {
     let ty = source
@@ -248,8 +346,20 @@ fn lower_expression(
         .iter()
         .find(|binary| binary.expression == expression)
     {
-        let left = lower_expression(source, function_declaration, binary.left, output)?;
-        let right = lower_expression(source, function_declaration, binary.right, output)?;
+        let left = lower_expression(
+            source,
+            function_declaration,
+            binary.left,
+            local_bindings,
+            output,
+        )?;
+        let right = lower_expression(
+            source,
+            function_declaration,
+            binary.right,
+            local_bindings,
+            output,
+        )?;
         output.push(HirExpression::binary(
             id,
             span,
@@ -266,7 +376,13 @@ fn lower_expression(
         .iter()
         .find(|unary| unary.expression == expression)
     {
-        let operand = lower_expression(source, function_declaration, unary.operand, output)?;
+        let operand = lower_expression(
+            source,
+            function_declaration,
+            unary.operand,
+            local_bindings,
+            output,
+        )?;
         output.push(HirExpression::unary(
             id,
             span,
@@ -296,6 +412,11 @@ fn lower_expression(
         ));
         return Ok(id);
     }
+    if let Some(local) = local_binding_id(source, function_declaration, expression, local_bindings)
+    {
+        output.push(HirExpression::local_read(id, span, ty, local));
+        return Ok(id);
+    }
     if let Some(call) = source
         .parsed
         .call_expressions
@@ -317,7 +438,15 @@ fn lower_expression(
         let arguments = call
             .arguments
             .iter()
-            .map(|argument| lower_expression(source, function_declaration, *argument, output))
+            .map(|argument| {
+                lower_expression(
+                    source,
+                    function_declaration,
+                    *argument,
+                    local_bindings,
+                    output,
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
         output.push(HirExpression::direct_call(
             id,
@@ -328,6 +457,49 @@ fn lower_expression(
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn local_binding_id(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    expression: crate::ast::AstNodeId,
+    local_bindings: &[(crate::ast::AstNodeId, HirLocalId)],
+) -> Option<HirLocalId> {
+    let name = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == expression)?;
+    let expression_span = source.parsed.arena.node(expression)?.span;
+    local_bindings
+        .iter()
+        .filter_map(|(binding, local_id)| {
+            let binding_name = source
+                .parsed
+                .local_binding_names
+                .iter()
+                .find(|candidate| candidate.binding == *binding)?;
+            if binding_name.name != name.name {
+                return None;
+            }
+            let belongs_to_function =
+                source
+                    .parsed
+                    .executable_body_statements
+                    .iter()
+                    .any(|statement| {
+                        statement.function == function_declaration
+                            && statement.statement == *binding
+                    });
+            if !belongs_to_function {
+                return None;
+            }
+            let binding_span = source.parsed.arena.node(*binding)?.span;
+            (binding_span.end() <= expression_span.start())
+                .then_some((*local_id, binding_span.end()))
+        })
+        .max_by_key(|(_, end)| *end)
+        .map(|(local_id, _)| local_id)
 }
 
 fn declaration_is_main(parsed: &ParseOutput, declaration: crate::ast::AstNodeId) -> bool {
@@ -418,6 +590,7 @@ pub struct HirLocal {
     span: ByteSpan,
     ty: TypeId,
     mutable: bool,
+    initializer: Option<HirExpressionId>,
 }
 impl HirLocal {
     pub fn new(id: HirLocalId, span: ByteSpan, ty: TypeId, mutable: bool) -> Self {
@@ -426,6 +599,7 @@ impl HirLocal {
             span,
             ty,
             mutable,
+            initializer: None,
         }
     }
     pub fn id(&self) -> HirLocalId {
@@ -439,6 +613,12 @@ impl HirLocal {
     }
     pub fn is_mutable(&self) -> bool {
         self.mutable
+    }
+    pub fn initializer(&self) -> Option<HirExpressionId> {
+        self.initializer
+    }
+    fn set_initializer(&mut self, initializer: HirExpressionId) {
+        self.initializer = Some(initializer);
     }
 }
 

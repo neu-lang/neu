@@ -457,6 +457,13 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     });
                 }
+                HirExpressionKind::LocalRead(local) => {
+                    instructions.push(MirInstruction::LoadLocal {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        span: expression.span(),
+                    });
+                }
                 HirExpressionKind::Binary(binary) => {
                     let left = MirValueId::from_raw(binary.left().index());
                     let right = MirValueId::from_raw(binary.right().index());
@@ -507,7 +514,24 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     })
                 }
-                _ => return Err(MirLoweringError::UnsupportedExpression),
+            }
+            for local in function.locals() {
+                if local.initializer() == Some(expression.id()) {
+                    instructions.push(MirInstruction::StoreLocal {
+                        local: MirLocalId::from_raw(local.id().index()),
+                        value: output,
+                        span: expression.span(),
+                    });
+                }
+            }
+            for assignment in function.assignments() {
+                if assignment.value().index() == expression.id().index() {
+                    instructions.push(MirInstruction::StoreLocal {
+                        local: MirLocalId::from_raw(assignment.target().index()),
+                        value: output,
+                        span: assignment.span(),
+                    });
+                }
             }
         }
         let returned = function
@@ -536,7 +560,17 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 .map(|parameter| (MirValueId::from_raw(parameter.id().index()), parameter.ty()))
                 .collect(),
             function.return_type(),
-            vec![],
+            function
+                .locals()
+                .iter()
+                .map(|local| {
+                    MirLocal::new(
+                        MirLocalId::from_raw(local.id().index()),
+                        local.ty(),
+                        local.span(),
+                    )
+                })
+                .collect(),
             vec![MirBasicBlock::new(
                 MirBlockId::from_raw(0),
                 instructions,
