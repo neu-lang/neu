@@ -6,6 +6,8 @@ public fun main(): Int {
     val mask: Byte = 0xff;
     val complete: Unit = ();
     const answer: Int = 1 + 2;
+    var exit_code: Int = 6;
+    exit_code = 7;
     if (true) {
         val selected: Int = 7;
     } else {
