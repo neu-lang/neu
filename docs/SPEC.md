@@ -713,3 +713,16 @@ kind, value, type, source mapping, and safety facts. Cranelift lowers `Bool` to
 float, and exact primitive mismatch diagnostics follow ADR-0059. The entry
 point remains an `Int`-returning `main`; additional primitives are supported in
 helpers, locals, parameters, returns, calls, and backend smokes.
+
+## ADR-0060: Bootstrap Control Flow
+
+The bootstrap executable subset accepts Boolean `if`/`else` conditionals and
+inclusive integer range loops written as `for (name in start..end)`. `if` and
+`else` are control-flow statements; value-producing conditional expressions
+are deferred, and an `if` without an `else` has `Unit` behavior. The loop
+binding is immutable, `Int`, scoped to the loop body, and advances by one.
+`break` leaves the
+innermost loop and `continue` advances it; neither carries a value or label.
+`while` remains unsupported. Branches and loop back-edges preserve ownership,
+borrowing, initialization, cleanup, and source-mapping obligations. No runtime,
+stdlib, printing, or scheduler behavior is added.

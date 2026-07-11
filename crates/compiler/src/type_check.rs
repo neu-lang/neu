@@ -1479,7 +1479,11 @@ pub fn check_m0028_unsupported_executable_forms(
                     | AstNodeKind::FunctionType
                     | AstNodeKind::GroupedType
                     | AstNodeKind::WhenExpression
-            )
+            ) || (node.kind == AstNodeKind::IfExpression
+                && !parsed
+                    .if_statements
+                    .iter()
+                    .any(|statement| statement.expression == node.id))
         })
         .map(|node| node.span)
         .collect();
@@ -2165,7 +2169,6 @@ pub fn type_m0028_executable_int_operators(
     for expression_type in known_expression_types {
         report.record_expression_type(*expression_type);
     }
-
     let mut completed = Vec::new();
     loop {
         let mut changed = false;
@@ -2413,6 +2416,134 @@ pub fn type_m0035_primitive_operators(
         report.record_expression_type(ExpressionType::new(binary.expression, result));
     }
     report
+}
+
+pub fn type_m0060_control_flow(
+    parsed: &ParseOutput,
+    known_expression_types: &[ExpressionType],
+    int_type: TypeId,
+    bool_type: TypeId,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+    let statement_conditionals: Vec<_> = parsed
+        .if_statements
+        .iter()
+        .map(|statement| statement.expression)
+        .collect();
+    report.diagnostics.retain(|diagnostic| {
+        !(diagnostic.rule() == TypeRuleDiagnostic::IfValueDeferred
+            && statement_conditionals.contains(&diagnostic.node()))
+    });
+
+    for loop_statement in &parsed.for_statements {
+        let Some(binding_span) = parsed.arena.node(loop_statement.body).map(|node| node.span)
+        else {
+            continue;
+        };
+        for reference in parsed.name_references.iter().filter(|reference| {
+            reference.name == loop_statement.binding_name
+                && binding_span.file() == reference.name_span.file()
+                && binding_span.start() <= reference.name_span.start()
+                && reference.name_span.end() <= binding_span.end()
+        }) {
+            report.record_expression_type(ExpressionType::new(reference.reference, int_type));
+        }
+        for expression in [loop_statement.start, loop_statement.end] {
+            if let Some(actual) = report.expression_type(expression)
+                && actual != int_type
+            {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    expression, int_type, actual,
+                ));
+            }
+        }
+    }
+
+    for if_statement in &parsed.if_statements {
+        let Some(if_expression) = parsed
+            .if_expressions
+            .iter()
+            .find(|expression| expression.expression == if_statement.expression)
+        else {
+            continue;
+        };
+        if let Some(actual) = report.expression_type(if_expression.condition)
+            && actual != bool_type
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                if_expression.condition,
+                bool_type,
+                actual,
+            ));
+        }
+    }
+
+    let int_unary = parsed
+        .unary_expressions
+        .iter()
+        .filter(|expression| report.expression_type(expression.operand) == Some(int_type))
+        .cloned()
+        .collect::<Vec<_>>();
+    let int_binary = parsed
+        .binary_expressions
+        .iter()
+        .filter(|expression| {
+            report.expression_type(expression.left) == Some(int_type)
+                || report.expression_type(expression.right) == Some(int_type)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let int_report = type_m0028_executable_int_operators(
+        &int_unary,
+        &int_binary,
+        &parsed.grouped_expressions,
+        report.expression_types(),
+        int_type,
+    );
+    merge_type_check_report(&mut report, int_report);
+    for binary in &parsed.binary_expressions {
+        let Some(left) = report.expression_type(binary.left) else {
+            continue;
+        };
+        let Some(right) = report.expression_type(binary.right) else {
+            continue;
+        };
+        if left == int_type
+            && right == int_type
+            && matches!(
+                binary.operator,
+                ParsedBinaryOperator::Equal
+                    | ParsedBinaryOperator::NotEqual
+                    | ParsedBinaryOperator::Less
+                    | ParsedBinaryOperator::Greater
+                    | ParsedBinaryOperator::LessEqual
+                    | ParsedBinaryOperator::GreaterEqual
+            )
+        {
+            report.record_expression_type(ExpressionType::new(binary.expression, bool_type));
+        }
+    }
+    report
+}
+
+pub fn apply_m0060_control_flow_results(
+    target: &mut TypeCheckReport,
+    parsed: &ParseOutput,
+    source: &TypeCheckReport,
+) {
+    let statement_conditionals: Vec<_> = parsed
+        .if_statements
+        .iter()
+        .map(|statement| statement.expression)
+        .collect();
+    target.diagnostics.retain(|diagnostic| {
+        !(diagnostic.rule() == TypeRuleDiagnostic::IfValueDeferred
+            && statement_conditionals.contains(&diagnostic.node()))
+    });
+    merge_type_check_report(target, source.clone());
 }
 
 pub fn type_m0028_static_integer_diagnostics(

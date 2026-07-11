@@ -17,10 +17,10 @@ use crate::{
     type_check::{
         DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes, ReturnPathDiagnostic,
         ReturnTypeDiagnostic, TypeCheckDiagnostic, UnsupportedExecutableFormDiagnostic,
-        apply_m0028_direct_call_results, check_m0028_direct_calls, check_m0028_entry_point,
-        check_m0028_return_expression_types, check_m0028_straight_line_returns,
-        check_m0028_unsupported_executable_forms, type_m0028_executable_core_in,
-        type_m0028_function_signatures_in,
+        apply_m0028_direct_call_results, apply_m0060_control_flow_results,
+        check_m0028_direct_calls, check_m0028_entry_point, check_m0028_return_expression_types,
+        check_m0028_straight_line_returns, check_m0028_unsupported_executable_forms,
+        type_m0028_executable_core_in, type_m0028_function_signatures_in, type_m0060_control_flow,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -161,6 +161,21 @@ pub fn compile_source_to_executable(
         ));
     }
     apply_m0028_direct_call_results(&mut report, &parsed, &calls);
+    let int_type = types
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
+        .map(|record| record.id())
+        .expect("bootstrap type checker creates Int");
+    let bool_type = types
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Bool))
+        .map(|record| record.id())
+        .expect("bootstrap type checker creates Bool");
+    let control_flow =
+        type_m0060_control_flow(&parsed, report.expression_types(), int_type, bool_type);
+    apply_m0060_control_flow_results(&mut report, &parsed, &control_flow);
 
     let return_paths = check_m0028_straight_line_returns(&parsed);
     if !return_paths.diagnostics().is_empty() {

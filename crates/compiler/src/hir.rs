@@ -143,6 +143,28 @@ pub fn lower_checked_hir_source(
             locals.push(HirLocal::new(local_id, span, ty, mutable));
             local_bindings.push((local.declaration, local_id));
         }
+        for loop_ in source
+            .parsed
+            .for_statements
+            .iter()
+            .filter(|loop_| loop_.function == function.declaration)
+        {
+            let ty = source
+                .expression_types
+                .iter()
+                .find(|typed| typed.expression() == loop_.start)
+                .map(|typed| typed.ty())
+                .ok_or(HirLoweringError::MissingType)?;
+            let span = source
+                .parsed
+                .arena
+                .node(loop_.statement)
+                .ok_or(HirLoweringError::UnsupportedExpression)?
+                .span;
+            let local_id = HirLocalId::from_raw(locals.len());
+            locals.push(HirLocal::new(local_id, span, ty, false));
+            local_bindings.push((loop_.binding, local_id));
+        }
         let parameters = source
             .parsed
             .function_parameters
@@ -244,6 +266,36 @@ pub fn lower_checked_hir_source(
                 returns.push(HirReturn::new(statement.span, expression));
             }
         }
+        let has_control_flow = source
+            .parsed
+            .if_statements
+            .iter()
+            .any(|statement| statement.function == function.declaration)
+            || source
+                .parsed
+                .for_statements
+                .iter()
+                .any(|statement| statement.function == function.declaration)
+            || source
+                .parsed
+                .loop_control_statements
+                .iter()
+                .any(|statement| statement.function == function.declaration);
+        let control_flow = if has_control_flow {
+            if let Some(body) = function.body {
+                lower_control_flow_block(
+                    &source,
+                    function.declaration,
+                    body,
+                    &local_bindings,
+                    &mut expressions,
+                )?
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
         functions.push(
             HirFunction::new(
                 id,
@@ -260,6 +312,7 @@ pub fn lower_checked_hir_source(
                 vec![],
             )
             .with_assignments(assignments)
+            .with_control_flow(control_flow)
             .with_symbol_identity(symbol_identity),
         );
     }
@@ -285,6 +338,9 @@ fn lower_expression(
         .node(expression)
         .ok_or(HirLoweringError::UnsupportedExpression)?
         .span;
+    if let Some(existing) = output.iter().find(|candidate| candidate.span() == span) {
+        return Ok(existing.id());
+    }
     let id = HirExpressionId::from_raw(output.len());
     if let Some(literal) = source
         .parsed
@@ -459,6 +515,243 @@ fn lower_expression(
     Err(HirLoweringError::UnsupportedExpression)
 }
 
+fn lower_control_flow_block(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    block: crate::ast::AstNodeId,
+    local_bindings: &[(crate::ast::AstNodeId, HirLocalId)],
+    expressions: &mut Vec<HirExpression>,
+) -> Result<Vec<HirControlFlow>, HirLoweringError> {
+    let block_span = source
+        .parsed
+        .arena
+        .node(block)
+        .ok_or(HirLoweringError::UnsupportedExpression)?
+        .span;
+    let nested_bodies: Vec<_> = source
+        .parsed
+        .if_statements
+        .iter()
+        .filter(|statement| statement.function == function_declaration)
+        .flat_map(|statement| [Some(statement.then_block), statement.else_block])
+        .chain(
+            source
+                .parsed
+                .for_statements
+                .iter()
+                .filter(|statement| statement.function == function_declaration)
+                .map(|statement| Some(statement.body)),
+        )
+        .flatten()
+        .filter_map(|body| source.parsed.arena.node(body).map(|node| node.span))
+        .collect();
+
+    let direct_statements: Vec<_> = source
+        .parsed
+        .executable_body_statements
+        .iter()
+        .filter(|statement| {
+            statement.function == function_declaration
+                && span_contains(block_span, statement.span)
+                && !nested_bodies
+                    .iter()
+                    .any(|body| *body != block_span && span_contains(*body, statement.span))
+        })
+        .collect();
+    let mut output = Vec::new();
+    for statement in direct_statements {
+        if let Some(if_statement) = source
+            .parsed
+            .if_statements
+            .iter()
+            .find(|candidate| candidate.statement == statement.statement)
+        {
+            let condition = lower_expression(
+                source,
+                function_declaration,
+                source
+                    .parsed
+                    .if_expressions
+                    .iter()
+                    .find(|expression| expression.expression == if_statement.expression)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?
+                    .condition,
+                local_bindings,
+                expressions,
+            )?;
+            let then_body = lower_control_flow_block(
+                source,
+                function_declaration,
+                if_statement.then_block,
+                local_bindings,
+                expressions,
+            )?;
+            let else_body = if let Some(else_block) = if_statement.else_block {
+                lower_control_flow_block(
+                    source,
+                    function_declaration,
+                    else_block,
+                    local_bindings,
+                    expressions,
+                )?
+            } else {
+                Vec::new()
+            };
+            output.push(HirControlFlow::If {
+                condition,
+                then_body,
+                else_body,
+                span: if_statement.span,
+            });
+            continue;
+        }
+        if let Some(for_statement) = source
+            .parsed
+            .for_statements
+            .iter()
+            .find(|candidate| candidate.statement == statement.statement)
+        {
+            let start = lower_expression(
+                source,
+                function_declaration,
+                for_statement.start,
+                local_bindings,
+                expressions,
+            )?;
+            let end = lower_expression(
+                source,
+                function_declaration,
+                for_statement.end,
+                local_bindings,
+                expressions,
+            )?;
+            let binding = local_binding_id(
+                source,
+                function_declaration,
+                for_statement.start,
+                local_bindings,
+            )
+            .or_else(|| {
+                local_bindings
+                    .iter()
+                    .find(|(candidate, _)| *candidate == for_statement.binding)
+                    .map(|(_, local)| *local)
+            })
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let body = lower_control_flow_block(
+                source,
+                function_declaration,
+                for_statement.body,
+                local_bindings,
+                expressions,
+            )?;
+            output.push(HirControlFlow::For {
+                binding,
+                start,
+                end,
+                body,
+                span: for_statement.span,
+            });
+            continue;
+        }
+        if let Some(local) = source
+            .parsed
+            .local_declarations
+            .iter()
+            .find(|local| local.declaration == statement.statement)
+        {
+            let value = lower_expression(
+                source,
+                function_declaration,
+                local
+                    .initializer
+                    .ok_or(HirLoweringError::UnsupportedExpression)?,
+                local_bindings,
+                expressions,
+            )?;
+            let local_id = local_bindings
+                .iter()
+                .find(|(binding, _)| *binding == local.declaration)
+                .map(|(_, local)| *local)
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            output.push(HirControlFlow::LocalInitializer {
+                local: local_id,
+                value,
+                span: statement.span,
+            });
+            continue;
+        }
+        if let Some(assignment) = source
+            .parsed
+            .assignment_statements
+            .iter()
+            .find(|assignment| assignment.statement == statement.statement)
+        {
+            let target = local_binding_id(
+                source,
+                function_declaration,
+                assignment.target,
+                local_bindings,
+            )
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let value = lower_expression(
+                source,
+                function_declaration,
+                assignment.value,
+                local_bindings,
+                expressions,
+            )?;
+            output.push(HirControlFlow::Assignment(HirAssignment::new(
+                statement.span,
+                target,
+                value,
+            )));
+            continue;
+        }
+        if let Some(returned) = source
+            .parsed
+            .return_statements
+            .iter()
+            .find(|returned| returned.statement == statement.statement)
+        {
+            let value = lower_expression(
+                source,
+                function_declaration,
+                returned
+                    .value
+                    .ok_or(HirLoweringError::UnsupportedExpression)?,
+                local_bindings,
+                expressions,
+            )?;
+            output.push(HirControlFlow::Return(HirReturn::new(
+                statement.span,
+                value,
+            )));
+            continue;
+        }
+        if let Some(control) = source
+            .parsed
+            .loop_control_statements
+            .iter()
+            .find(|control| control.statement == statement.statement)
+        {
+            output.push(match control.kind {
+                crate::parser::ParsedLoopControlKind::Break => {
+                    HirControlFlow::Break { span: control.span }
+                }
+                crate::parser::ParsedLoopControlKind::Continue => {
+                    HirControlFlow::Continue { span: control.span }
+                }
+            });
+        }
+    }
+    Ok(output)
+}
+
+fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+    outer.file() == inner.file() && outer.start() <= inner.start() && inner.end() <= outer.end()
+}
+
 fn local_binding_id(
     source: &CheckedHirSource<'_>,
     function_declaration: crate::ast::AstNodeId,
@@ -494,7 +787,13 @@ fn local_binding_id(
             if !belongs_to_function {
                 return None;
             }
-            let binding_span = source.parsed.arena.node(*binding)?.span;
+            let binding_span = source
+                .parsed
+                .for_statements
+                .iter()
+                .find(|loop_| loop_.binding == *binding)
+                .map(|loop_| loop_.binding_name_span)
+                .or_else(|| source.parsed.arena.node(*binding).map(|node| node.span))?;
             (binding_span.end() <= expression_span.start())
                 .then_some((*local_id, binding_span.end()))
         })
@@ -867,6 +1166,36 @@ pub struct HirAssignment {
     target: HirLocalId,
     value: HirExpressionId,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum HirControlFlow {
+    LocalInitializer {
+        local: HirLocalId,
+        value: HirExpressionId,
+        span: ByteSpan,
+    },
+    Assignment(HirAssignment),
+    Return(HirReturn),
+    If {
+        condition: HirExpressionId,
+        then_body: Vec<HirControlFlow>,
+        else_body: Vec<HirControlFlow>,
+        span: ByteSpan,
+    },
+    For {
+        binding: HirLocalId,
+        start: HirExpressionId,
+        end: HirExpressionId,
+        body: Vec<HirControlFlow>,
+        span: ByteSpan,
+    },
+    Break {
+        span: ByteSpan,
+    },
+    Continue {
+        span: ByteSpan,
+    },
+}
 impl HirAssignment {
     pub fn new(span: ByteSpan, target: HirLocalId, value: HirExpressionId) -> Self {
         Self {
@@ -938,6 +1267,7 @@ pub struct HirFunction {
     expressions: Vec<HirExpression>,
     returns: Vec<HirReturn>,
     assignments: Vec<HirAssignment>,
+    control_flow: Vec<HirControlFlow>,
     safety_facts: HirSafetyFacts,
     unsupported_forms: Vec<HirUnsupportedForm>,
     symbol_identity: Option<FunctionSymbolIdentity>,
@@ -970,6 +1300,7 @@ impl HirFunction {
             expressions,
             returns,
             assignments: Vec::new(),
+            control_flow: Vec::new(),
             safety_facts,
             unsupported_forms,
             symbol_identity: None,
@@ -1011,6 +1342,13 @@ impl HirFunction {
     }
     pub fn assignments(&self) -> &[HirAssignment] {
         &self.assignments
+    }
+    pub fn with_control_flow(mut self, control_flow: Vec<HirControlFlow>) -> Self {
+        self.control_flow = control_flow;
+        self
+    }
+    pub fn control_flow(&self) -> &[HirControlFlow] {
+        &self.control_flow
     }
     pub fn safety_facts(&self) -> &HirSafetyFacts {
         &self.safety_facts

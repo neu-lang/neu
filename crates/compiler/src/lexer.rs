@@ -252,7 +252,7 @@ impl<'source> Lexer<'source> {
         self.consume_decimal_digits();
         let mut is_float = false;
         let mut malformed = false;
-        if self.current_char() == Some('.') {
+        if self.current_char() == Some('.') && !self.remaining().starts_with("..") {
             is_float = true;
             self.bump_char();
             if !self.consume_decimal_digits() {

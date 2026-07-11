@@ -46,6 +46,9 @@ pub enum AstNodeKind {
     AssignmentStatement,
     ReturnStatement,
     ExpressionStatement,
+    ForStatement,
+    BreakStatement,
+    ContinueStatement,
     WildcardPattern,
     LiteralPattern,
     BindingPattern,
@@ -193,6 +196,18 @@ impl AstArena {
 
     pub fn add_expression_statement(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::ExpressionStatement, span)
+    }
+
+    pub fn add_for_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ForStatement, span)
+    }
+
+    pub fn add_break_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::BreakStatement, span)
+    }
+
+    pub fn add_continue_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ContinueStatement, span)
     }
 
     pub fn add_wildcard_pattern(&mut self, span: ByteSpan) -> AstNodeId {

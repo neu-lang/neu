@@ -72,6 +72,9 @@ pub struct ParseOutput {
     pub function_declarations: Vec<ParsedFunctionDeclaration>,
     pub return_statements: Vec<ParsedReturnStatement>,
     pub executable_body_statements: Vec<ParsedExecutableBodyStatement>,
+    pub for_statements: Vec<ParsedForStatement>,
+    pub if_statements: Vec<ParsedIfStatement>,
+    pub loop_control_statements: Vec<ParsedLoopControlStatement>,
     pub call_expressions: Vec<ParsedCallExpression>,
     pub enum_variants: Vec<ParsedEnumVariant>,
     pub when_expressions: Vec<ParsedWhenExpression>,
@@ -124,6 +127,43 @@ pub struct ParsedReturnStatement {
 pub struct ParsedExecutableBodyStatement {
     pub function: AstNodeId,
     pub statement: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedForStatement {
+    pub statement: AstNodeId,
+    pub function: AstNodeId,
+    pub binding: AstNodeId,
+    pub binding_name: String,
+    pub binding_name_span: ByteSpan,
+    pub start: AstNodeId,
+    pub end: AstNodeId,
+    pub body: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedIfStatement {
+    pub statement: AstNodeId,
+    pub function: AstNodeId,
+    pub expression: AstNodeId,
+    pub then_block: AstNodeId,
+    pub else_block: Option<AstNodeId>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ParsedLoopControlKind {
+    Break,
+    Continue,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedLoopControlStatement {
+    pub statement: AstNodeId,
+    pub function: AstNodeId,
+    pub kind: ParsedLoopControlKind,
     pub span: ByteSpan,
 }
 
@@ -348,6 +388,9 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         function_declarations: parser.function_declarations,
         return_statements: parser.return_statements,
         executable_body_statements: parser.executable_body_statements,
+        for_statements: parser.for_statements,
+        if_statements: parser.if_statements,
+        loop_control_statements: parser.loop_control_statements,
         call_expressions: parser.call_expressions,
         enum_variants: parser.enum_variants,
         when_expressions: parser.when_expressions,
@@ -381,6 +424,9 @@ struct Parser<'source> {
     function_declarations: Vec<ParsedFunctionDeclaration>,
     return_statements: Vec<ParsedReturnStatement>,
     executable_body_statements: Vec<ParsedExecutableBodyStatement>,
+    for_statements: Vec<ParsedForStatement>,
+    if_statements: Vec<ParsedIfStatement>,
+    loop_control_statements: Vec<ParsedLoopControlStatement>,
     call_expressions: Vec<ParsedCallExpression>,
     enum_variants: Vec<ParsedEnumVariant>,
     when_expressions: Vec<ParsedWhenExpression>,
@@ -408,6 +454,9 @@ impl<'source> Parser<'source> {
             function_declarations: Vec::new(),
             return_statements: Vec::new(),
             executable_body_statements: Vec::new(),
+            for_statements: Vec::new(),
+            if_statements: Vec::new(),
+            loop_control_statements: Vec::new(),
             call_expressions: Vec::new(),
             enum_variants: Vec::new(),
             when_expressions: Vec::new(),
@@ -953,6 +1002,7 @@ impl<'source> Parser<'source> {
                     self.advance();
                     self.skip_deferred_construct();
                 }
+                Some(TokenKind::KwIf) => self.parse_if_statement(),
                 Some(kind) if self.can_start_expression_kind(kind) => {
                     let checkpoint = self.index;
                     let expression_start = self.current().map_or(start, |token| token.span.start());
@@ -1023,12 +1073,16 @@ impl<'source> Parser<'source> {
                         }
                     }
                 }
+                Some(TokenKind::KwFor) => self.parse_for_statement(),
+                Some(TokenKind::KwBreak | TokenKind::KwContinue) => {
+                    self.parse_loop_control_statement()
+                }
                 Some(TokenKind::KwUnsafe) => {
                     self.diagnostic_current(DiagnosticKind::MalformedUnsafeBlock);
                     self.advance();
                     self.skip_deferred_construct();
                 }
-                Some(TokenKind::KwFor | TokenKind::KwWhile | TokenKind::KwWhen) => {
+                Some(TokenKind::KwWhile | TokenKind::KwWhen) => {
                     self.diagnostic_current(DiagnosticKind::UnsupportedStatementForm);
                     self.advance();
                     self.skip_deferred_construct();
@@ -1055,6 +1109,8 @@ impl<'source> Parser<'source> {
                 self.parse_variable_declaration_statement()
             }
             Some(TokenKind::KwReturn) => self.parse_return_statement(),
+            Some(TokenKind::KwFor) => self.parse_for_statement(),
+            Some(TokenKind::KwBreak | TokenKind::KwContinue) => self.parse_loop_control_statement(),
             Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
                 self.diagnostic_current(DiagnosticKind::MalformedCoroutineConstruct);
                 self.advance();
@@ -1066,6 +1122,177 @@ impl<'source> Parser<'source> {
             }
             None => {}
         }
+    }
+
+    fn parse_for_statement(&mut self) {
+        let start = self.current().expect("for token exists").span.start();
+        self.advance();
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+        self.advance();
+        let Some(binding_token) = self.current().cloned() else {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            return;
+        };
+        if binding_token.kind != TokenKind::Identifier {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+        let binding_name =
+            self.text[binding_token.span.start()..binding_token.span.end()].to_owned();
+        self.advance();
+        if self.current_kind() != Some(TokenKind::KwIn) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+        self.advance();
+        let Some(start_span) = self.parse_expression() else {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        };
+        if self.current_kind() != Some(TokenKind::DotDot) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+        self.advance();
+        let Some(end_span) = self.parse_expression() else {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        };
+        if self.current_kind() != Some(TokenKind::RightParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_statement_boundary();
+            return;
+        }
+        self.advance();
+        let Some(body_span) = self.parse_body_block() else {
+            return;
+        };
+        let Some(start_expression) = self.latest_expression_node_for_span(start_span) else {
+            return;
+        };
+        let Some(end_expression) = self.latest_expression_node_for_span(end_span) else {
+            return;
+        };
+        let Some(body) = self.latest_node_for_span(body_span, AstNodeKind::Block) else {
+            return;
+        };
+        let end = body_span.end();
+        let span = self.span(start, end);
+        let statement = self.arena.add_for_statement(span);
+        self.for_statements.push(ParsedForStatement {
+            statement,
+            function: self.current_function.expect("for is inside a function"),
+            binding: statement,
+            binding_name,
+            binding_name_span: binding_token.span,
+            start: start_expression,
+            end: end_expression,
+            body,
+            span,
+        });
+        self.record_executable_body_statement(statement);
+        self.local_binding_names.push(ParsedLocalBindingName {
+            binding: statement,
+            kind: LocalBindingKind::Immutable,
+            name: self.for_statements.last().unwrap().binding_name.clone(),
+            name_span: binding_token.span,
+        });
+    }
+
+    fn parse_if_statement(&mut self) {
+        let start = self.current().expect("if token exists").span.start();
+        let Some(span) = self.parse_if_expression() else {
+            return;
+        };
+        let Some(if_expression) = self
+            .if_expressions
+            .iter()
+            .find(|expression| expression.span == span)
+            .cloned()
+        else {
+            return;
+        };
+        if self.current_kind() == Some(TokenKind::Semicolon) {
+            self.advance();
+        }
+        let statement = self
+            .arena
+            .add_expression_statement(self.span(start, span.end()));
+        self.if_statements.push(ParsedIfStatement {
+            statement,
+            function: self.current_function.expect("if is inside a function"),
+            expression: if_expression.expression,
+            then_block: if_expression.then_block,
+            else_block: if_expression.else_block,
+            span,
+        });
+        self.record_executable_body_statement(statement);
+    }
+
+    fn parse_loop_control_statement(&mut self) {
+        let token = self.current().expect("loop control token exists").clone();
+        let kind = match token.kind {
+            TokenKind::KwBreak => ParsedLoopControlKind::Break,
+            TokenKind::KwContinue => ParsedLoopControlKind::Continue,
+            _ => unreachable!(),
+        };
+        self.advance();
+        let end = if self.current_kind() == Some(TokenKind::Semicolon) {
+            let end = self.current().expect("semicolon exists").span.end();
+            self.advance();
+            end
+        } else {
+            self.diagnostic_current_or_span(DiagnosticKind::UnexpectedTokenInStatement, token.span);
+            token.span.end()
+        };
+        let span = self.span(token.span.start(), end);
+        let statement = match kind {
+            ParsedLoopControlKind::Break => self.arena.add_break_statement(span),
+            ParsedLoopControlKind::Continue => self.arena.add_continue_statement(span),
+        };
+        self.loop_control_statements
+            .push(ParsedLoopControlStatement {
+                statement,
+                function: self
+                    .current_function
+                    .expect("loop control is inside a function"),
+                kind,
+                span,
+            });
+        self.record_executable_body_statement(statement);
     }
 
     fn parse_variable_declaration_statement(&mut self) {

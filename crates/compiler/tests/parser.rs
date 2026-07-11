@@ -1329,3 +1329,32 @@ fn m0029_records_executable_body_statements_in_function_source_order() {
         parsed.return_statements[0].statement
     );
 }
+
+#[test]
+fn m0060_records_for_range_and_loop_controls() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(203),
+        "fun run(): Int { for (index in 0..3) { continue; break; } return 0; }",
+    );
+
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert_eq!(parsed.for_statements.len(), 1);
+    assert_eq!(parsed.for_statements[0].binding_name, "index");
+    assert_eq!(parsed.loop_control_statements.len(), 2);
+}
+
+#[test]
+fn m0060_keeps_while_unsupported() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(204),
+        "fun run(): Int { while (true) { return 1; } return 0; }",
+    );
+
+    assert!(
+        parsed
+            .diagnostics
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == DiagnosticKind::UnsupportedStatementForm })
+    );
+}
