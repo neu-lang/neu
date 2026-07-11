@@ -3,8 +3,50 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use compiler::{linker::LinkInvocation, target_pack::TargetPackManifest};
+use compiler::{
+    backend::emit_mir_function_to_object_with_entry_symbol,
+    linker::LinkInvocation,
+    mir::{
+        MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
+        MirTerminator, MirValueId,
+    },
+    module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
+    source::{ByteSpan, SourceFileId},
+    target_pack::TargetPackManifest,
+    types::{PrimitiveType, TypeArena, TypeRecord},
+};
 use target_lexicon::Triple;
+
+fn startup_shim_fixture() -> Vec<u8> {
+    let file = SourceFileId::from_raw(800);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::int_constant(
+                MirValueId::from_raw(0),
+                0,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(FunctionSymbolIdentity::new(
+        ModuleName::parse("runtime").unwrap(),
+        PackageNamespace::parse("bootstrap").unwrap(),
+        "start",
+    ))
+    .with_entry(true);
+    emit_mir_function_to_object_with_entry_symbol(&function, &types, "start").unwrap()
+}
 
 fn fixture_root(name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("neu-link-plan-{}-{name}", std::process::id()));
@@ -12,7 +54,7 @@ fn fixture_root(name: &str) -> PathBuf {
     fs::create_dir_all(root.join("bin")).unwrap();
     fs::create_dir_all(root.join("runtime")).unwrap();
     fs::write(root.join("bin/lld"), b"lld").unwrap();
-    fs::write(root.join("runtime/startup.o"), b"shim").unwrap();
+    fs::write(root.join("runtime/startup.o"), startup_shim_fixture()).unwrap();
     fs::write(root.join("program.o"), b"object").unwrap();
     root
 }

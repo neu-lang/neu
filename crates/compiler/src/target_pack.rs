@@ -3,6 +3,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+use object::{Object, ObjectSymbol};
 use serde::Deserialize;
 use target_lexicon::Triple;
 
@@ -52,6 +53,9 @@ pub enum TargetPackError {
     TraversalArtifactPath(ArtifactKind),
     MissingArtifact(ArtifactKind),
     ArtifactOutsidePack(ArtifactKind),
+    InvalidStartupShim,
+    StartupShimFormatMismatch,
+    MissingStartupEntrySymbol,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -118,6 +122,8 @@ impl TargetPackManifest {
             || self.entry_symbol.is_empty()
             || self.language_entry_symbol.is_empty()
             || self.trap_exit_code == 0
+            || binary_format(&self.object_format).is_none()
+            || binary_format(&self.executable_format).is_none()
         {
             return Err(TargetPackError::InvalidManifest);
         }
@@ -169,6 +175,11 @@ impl TargetPack {
             &root,
             &manifest.startup_shim_path,
             ArtifactKind::StartupShim,
+        )?;
+        validate_startup_shim(
+            &startup_shim_path,
+            &manifest.object_format,
+            &manifest.entry_symbol,
         )?;
 
         Ok(Self {
@@ -242,4 +253,37 @@ fn resolve_artifact(
         return Err(TargetPackError::MissingArtifact(kind));
     }
     Ok(canonical)
+}
+
+fn binary_format(name: &str) -> Option<object::BinaryFormat> {
+    match name.to_ascii_lowercase().as_str() {
+        "coff" => Some(object::BinaryFormat::Coff),
+        "elf" => Some(object::BinaryFormat::Elf),
+        "macho" | "mach-o" => Some(object::BinaryFormat::MachO),
+        "pe" => Some(object::BinaryFormat::Pe),
+        "wasm" => Some(object::BinaryFormat::Wasm),
+        "xcoff" => Some(object::BinaryFormat::Xcoff),
+        _ => None,
+    }
+}
+
+fn validate_startup_shim(
+    path: &Path,
+    object_format: &str,
+    entry_symbol: &str,
+) -> Result<(), TargetPackError> {
+    let bytes = fs::read(path).map_err(|_| TargetPackError::InvalidStartupShim)?;
+    let object =
+        object::File::parse(bytes.as_slice()).map_err(|_| TargetPackError::InvalidStartupShim)?;
+    let expected_format = binary_format(object_format).ok_or(TargetPackError::InvalidManifest)?;
+    if object.format() != expected_format {
+        return Err(TargetPackError::StartupShimFormatMismatch);
+    }
+    if !object
+        .symbols()
+        .any(|symbol| symbol.name().is_ok_and(|name| name == entry_symbol))
+    {
+        return Err(TargetPackError::MissingStartupEntrySymbol);
+    }
+    Ok(())
 }

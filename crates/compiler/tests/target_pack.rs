@@ -1,6 +1,16 @@
 use std::{fs, path::PathBuf};
 
-use compiler::target_pack::{ArtifactKind, TargetPack, TargetPackError, TargetPackManifest};
+use compiler::{
+    backend::emit_mir_function_to_object_with_entry_symbol,
+    mir::{
+        MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
+        MirTerminator, MirValueId,
+    },
+    module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
+    source::{ByteSpan, SourceFileId},
+    target_pack::{ArtifactKind, TargetPack, TargetPackError, TargetPackManifest},
+    types::{PrimitiveType, TypeArena, TypeRecord},
+};
 use target_lexicon::Triple;
 
 fn fixture_root(name: &str) -> PathBuf {
@@ -25,13 +35,44 @@ fn manifest(linker: &str, startup_shim: &str) -> TargetPackManifest {
     .unwrap()
 }
 
+fn startup_shim_fixture(symbol: &str) -> Vec<u8> {
+    let file = SourceFileId::from_raw(700);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::int_constant(
+                MirValueId::from_raw(0),
+                0,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(FunctionSymbolIdentity::new(
+        ModuleName::parse("runtime").unwrap(),
+        PackageNamespace::parse("bootstrap").unwrap(),
+        "start",
+    ))
+    .with_entry(true);
+    emit_mir_function_to_object_with_entry_symbol(&function, &types, symbol).unwrap()
+}
+
 #[test]
 fn m0032_resolves_valid_target_pack() {
     let root = fixture_root("valid");
     let linker = root.join("bin/linker");
     let shim = root.join("runtime/startup.o");
     fs::write(&linker, b"linker").unwrap();
-    fs::write(&shim, b"shim").unwrap();
+    fs::write(&shim, startup_shim_fixture("start")).unwrap();
 
     let pack = TargetPack::resolve(
         &root,
@@ -52,7 +93,11 @@ fn m0032_resolves_valid_target_pack() {
 fn m0032_rejects_target_mismatch() {
     let root = fixture_root("target-mismatch");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
-    fs::write(root.join("runtime/startup.o"), b"shim").unwrap();
+    fs::write(
+        root.join("runtime/startup.o"),
+        startup_shim_fixture("start"),
+    )
+    .unwrap();
     let other_target = "x86_64-unknown-linux-gnu".parse::<Triple>().unwrap();
 
     assert_eq!(
@@ -70,7 +115,11 @@ fn m0032_rejects_target_mismatch() {
 fn m0032_rejects_unsafe_and_missing_artifacts() {
     let root = fixture_root("unsafe");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
-    fs::write(root.join("runtime/startup.o"), b"shim").unwrap();
+    fs::write(
+        root.join("runtime/startup.o"),
+        startup_shim_fixture("start"),
+    )
+    .unwrap();
 
     assert_eq!(
         TargetPack::resolve(
@@ -133,7 +182,11 @@ fn m0032_rejects_invalid_manifest() {
 fn m0032_loads_target_pack_manifest_from_toml() {
     let root = fixture_root("toml");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
-    fs::write(root.join("runtime/startup.o"), b"shim").unwrap();
+    fs::write(
+        root.join("runtime/startup.o"),
+        startup_shim_fixture("start"),
+    )
+    .unwrap();
     let manifest = format!(
         "[target]\ntriple = \"{}\"\nobject_format = \"macho\"\nexecutable_format = \"macho\"\n[linker]\npath = \"bin/linker\"\n[startup_shim]\npath = \"runtime/startup.o\"\n[entry]\nplatform_symbol = \"_start\"\nlanguage_symbol = \"neu_lang_main\"\ntrap_exit_code = 1\n",
         Triple::host()
@@ -158,4 +211,70 @@ fn m0032_rejects_malformed_target_pack_toml() {
         ),
         Err(TargetPackError::InvalidManifest)
     );
+}
+
+#[test]
+fn m0032_rejects_malformed_startup_shim_object() {
+    let root = fixture_root("malformed-startup");
+    fs::write(root.join("bin/linker"), b"linker").unwrap();
+    fs::write(root.join("runtime/startup.o"), b"not an object").unwrap();
+
+    assert_eq!(
+        TargetPack::resolve(
+            &root,
+            manifest("bin/linker", "runtime/startup.o"),
+            Triple::host()
+        ),
+        Err(TargetPackError::InvalidStartupShim)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn m0032_rejects_startup_shim_format_mismatch() {
+    let root = fixture_root("startup-format-mismatch");
+    fs::write(root.join("bin/linker"), b"linker").unwrap();
+    fs::write(
+        root.join("runtime/startup.o"),
+        startup_shim_fixture("start"),
+    )
+    .unwrap();
+    let mismatch = TargetPackManifest::new(
+        Triple::host(),
+        "elf",
+        "macho",
+        "bin/linker",
+        "runtime/startup.o",
+        "_start",
+        "neu_lang_main",
+        1,
+    )
+    .unwrap();
+
+    assert_eq!(
+        TargetPack::resolve(&root, mismatch, Triple::host()),
+        Err(TargetPackError::StartupShimFormatMismatch)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn m0032_rejects_startup_shim_without_platform_entry() {
+    let root = fixture_root("startup-entry-missing");
+    fs::write(root.join("bin/linker"), b"linker").unwrap();
+    fs::write(
+        root.join("runtime/startup.o"),
+        startup_shim_fixture("other_start"),
+    )
+    .unwrap();
+
+    assert_eq!(
+        TargetPack::resolve(
+            &root,
+            manifest("bin/linker", "runtime/startup.o"),
+            Triple::host()
+        ),
+        Err(TargetPackError::MissingStartupEntrySymbol)
+    );
+    let _ = fs::remove_dir_all(root);
 }
