@@ -103,6 +103,33 @@ fn compiles_string_equality_inequality_and_empty_concat() {
 }
 
 #[test]
+fn string_equality_results_cover_unequal_lengths_and_empty_values() {
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-string-equality-results-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public fun score(value: Bool): Int {
+            if (value) { return 1; }
+            return 0;
+        }
+        public fun main(): Int {
+            return score("a" == "a")
+                + score("a" != "ab")
+                + score("ab" != "a")
+                + score("" == "")
+                + 3;
+        }
+    "#;
+    let output = compile_source_to_executable(source, options(&executable)).unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn string_parameter_return_and_clone_preserve_ownership() {
     let workspace =
         std::env::temp_dir().join(format!("neu-string-functions-{}", std::process::id()));
