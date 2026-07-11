@@ -20,10 +20,12 @@ pub enum AstNodeKind {
     ImportDeclaration,
     FunctionDeclaration,
     FunctionParameter,
+    ClassDeclaration,
     StructDeclaration,
     EnumDeclaration,
     EnumVariant,
     InterfaceDeclaration,
+    FieldDeclaration,
     DeclarationBody,
     NamedType,
     NullableType,
@@ -101,6 +103,10 @@ impl AstArena {
         self.push(AstNodeKind::StructDeclaration, span)
     }
 
+    pub fn add_class_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ClassDeclaration, span)
+    }
+
     pub fn add_enum_declaration(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::EnumDeclaration, span)
     }
@@ -111,6 +117,10 @@ impl AstArena {
 
     pub fn add_interface_declaration(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::InterfaceDeclaration, span)
+    }
+
+    pub fn add_field_declaration(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::FieldDeclaration, span)
     }
 
     pub fn add_declaration_body(&mut self, span: ByteSpan) -> AstNodeId {

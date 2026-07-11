@@ -89,6 +89,29 @@ pub struct ParseOutput {
     pub when_expressions: Vec<ParsedWhenExpression>,
     pub match_arms: Vec<ParsedMatchArm>,
     pub qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
+    pub class_declarations: Vec<ParsedClassDeclaration>,
+    pub field_declarations: Vec<ParsedFieldDeclaration>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedClassDeclaration {
+    pub declaration: AstNodeId,
+    pub name: String,
+    pub superclass: Option<String>,
+    pub interfaces: Vec<String>,
+    pub fields: Vec<AstNodeId>,
+    pub interface: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedFieldDeclaration {
+    pub declaration: AstNodeId,
+    pub owner: AstNodeId,
+    pub name: String,
+    pub visibility: String,
+    pub mutable: bool,
+    pub annotation: AstNodeId,
+    pub span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -450,6 +473,8 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         when_expressions: parser.when_expressions,
         match_arms: parser.match_arms,
         qualified_case_patterns: parser.qualified_case_patterns,
+        class_declarations: parser.class_declarations,
+        field_declarations: parser.field_declarations,
     }
 }
 
@@ -492,6 +517,8 @@ struct Parser<'source> {
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
     qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
+    class_declarations: Vec<ParsedClassDeclaration>,
+    field_declarations: Vec<ParsedFieldDeclaration>,
     block_return_indices: Vec<Vec<usize>>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
@@ -523,6 +550,8 @@ impl<'source> Parser<'source> {
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
             qualified_case_patterns: Vec::new(),
+            class_declarations: Vec::new(),
+            field_declarations: Vec::new(),
             block_return_indices: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
@@ -618,6 +647,9 @@ impl<'source> Parser<'source> {
 
         match self.current_kind() {
             Some(TokenKind::KwFun) => self.parse_function(in_body),
+            Some(TokenKind::KwClass) => {
+                self.parse_named_body_declaration(AstNodeKind::ClassDeclaration, in_body)
+            }
             Some(TokenKind::KwStruct) => {
                 self.parse_named_body_declaration(AstNodeKind::StructDeclaration, in_body)
             }
@@ -915,6 +947,50 @@ impl<'source> Parser<'source> {
 
         self.parse_generic_parameters();
 
+        let mut superclass = None;
+        let mut interfaces = Vec::new();
+        if self.current_kind() == Some(TokenKind::Colon) {
+            self.advance();
+            loop {
+                let Some(reference) = self.current().cloned() else {
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                        self.span_at(start),
+                    );
+                    self.skip_to_declaration_boundary(in_body);
+                    return;
+                };
+                if reference.kind != TokenKind::Identifier {
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                        reference.span,
+                    );
+                    self.skip_to_declaration_boundary(in_body);
+                    return;
+                }
+                let name = self.text[reference.span.start()..reference.span.end()].to_owned();
+                self.advance();
+                let is_superclass = self.current_kind() == Some(TokenKind::LeftParen);
+                if is_superclass && !self.consume_balanced_parentheses() {
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                        reference.span,
+                    );
+                    self.skip_to_declaration_boundary(in_body);
+                    return;
+                }
+                if is_superclass && superclass.is_none() {
+                    superclass = Some(name);
+                } else {
+                    interfaces.push(name);
+                }
+                if self.current_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.advance();
+            }
+        }
+
         if self.current_kind() != Some(TokenKind::LeftBrace) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedDeclarationHeader,
@@ -926,6 +1002,9 @@ impl<'source> Parser<'source> {
 
         let body_start = self.current().expect("body exists").span.start();
         let declaration = match kind {
+            AstNodeKind::ClassDeclaration => self
+                .arena
+                .add_class_declaration(self.span(start, body_start)),
             AstNodeKind::StructDeclaration => self
                 .arena
                 .add_struct_declaration(self.span(start, body_start)),
@@ -941,9 +1020,114 @@ impl<'source> Parser<'source> {
         self.saw_top_level_declaration |= !in_body;
         if kind == AstNodeKind::EnumDeclaration {
             self.parse_enum_body(declaration);
+        } else if kind == AstNodeKind::ClassDeclaration {
+            let fields = self.parse_class_body(declaration);
+            self.class_declarations.push(ParsedClassDeclaration {
+                declaration,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                superclass,
+                interfaces,
+                fields,
+                interface: false,
+            });
+        } else if kind == AstNodeKind::InterfaceDeclaration {
+            self.parse_declaration_body();
+            self.class_declarations.push(ParsedClassDeclaration {
+                declaration,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                superclass,
+                interfaces,
+                fields: Vec::new(),
+                interface: true,
+            });
         } else {
             self.parse_declaration_body();
         }
+    }
+
+    fn parse_class_body(&mut self, owner: AstNodeId) -> Vec<AstNodeId> {
+        let mut fields = Vec::new();
+        self.advance();
+        while !self.is_eof() && self.current_kind() != Some(TokenKind::RightBrace) {
+            let visibility = if self.is_visibility() {
+                let value = self.current_text().unwrap_or("internal").to_owned();
+                self.advance();
+                value
+            } else {
+                "internal".to_owned()
+            };
+            let mutable = match self.current_kind() {
+                Some(TokenKind::KwVal) => {
+                    self.advance();
+                    false
+                }
+                Some(TokenKind::KwVar) => {
+                    self.advance();
+                    true
+                }
+                Some(TokenKind::Identifier) if self.current_text() == Some("protected") => {
+                    self.diagnostic_current(DiagnosticKind::UnsupportedDeclarationModifier);
+                    self.advance();
+                    false
+                }
+                _ => {
+                    self.diagnostic_current(DiagnosticKind::UnexpectedTokenInDeclarationBody);
+                    self.skip_to_declaration_boundary(true);
+                    continue;
+                }
+            };
+            let Some(name) = self.current().cloned() else {
+                break;
+            };
+            if name.kind != TokenKind::Identifier {
+                self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+                self.skip_to_declaration_boundary(true);
+                continue;
+            }
+            self.advance();
+            if self.current_kind() != Some(TokenKind::Colon) {
+                self.diagnostic_current_or_span(DiagnosticKind::MissingTypeName, name.span);
+                self.skip_to_declaration_boundary(true);
+                continue;
+            }
+            self.advance();
+            let Some(annotation_span) = self.parse_type() else {
+                self.skip_to_declaration_boundary(true);
+                continue;
+            };
+            let Some(annotation) = self.latest_type_node_for_span(annotation_span) else {
+                self.diagnostic_current_or_span(DiagnosticKind::MissingTypeName, name.span);
+                self.skip_to_declaration_boundary(true);
+                continue;
+            };
+            if self.current_kind() != Some(TokenKind::Semicolon) {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    name.span,
+                );
+                self.skip_to_declaration_boundary(true);
+                continue;
+            }
+            let end = self.current().expect("field terminator exists").span.end();
+            self.advance();
+            let declaration = self
+                .arena
+                .add_field_declaration(self.span(name.span.start(), end));
+            fields.push(declaration);
+            self.field_declarations.push(ParsedFieldDeclaration {
+                declaration,
+                owner,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                visibility,
+                mutable,
+                annotation,
+                span: self.span(name.span.start(), end),
+            });
+        }
+        if self.current_kind() == Some(TokenKind::RightBrace) {
+            self.advance();
+        }
+        fields
     }
 
     fn record_declaration_name(

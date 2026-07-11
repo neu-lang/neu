@@ -1,6 +1,6 @@
 use crate::{
     ast::{AstArena, AstNodeId, AstNodeKind},
-    module::PackageNamespace,
+    module::{ModuleName, PackageNamespace},
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
         ParseOutput, ParsedArrayType, ParsedAssignmentStatement, ParsedBinaryExpression,
@@ -75,6 +75,7 @@ pub enum TypeRuleDiagnostic {
     StringIndexTypeMismatch,
     StringIndexOutOfBounds,
     StringOperationUnsupported,
+    DuplicateField,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -430,6 +431,148 @@ pub struct FunctionSignature {
     declaration: AstNodeId,
     parameter_types: Vec<TypeId>,
     return_type: TypeId,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClassTypeRecord {
+    declaration: AstNodeId,
+    type_id: TypeId,
+    superclass: Option<String>,
+    interfaces: Vec<String>,
+}
+
+impl ClassTypeRecord {
+    pub fn declaration(&self) -> AstNodeId {
+        self.declaration
+    }
+    pub fn type_id(&self) -> TypeId {
+        self.type_id
+    }
+    pub fn superclass(&self) -> Option<&str> {
+        self.superclass.as_deref()
+    }
+    pub fn interfaces(&self) -> &[String] {
+        &self.interfaces
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FieldTypeRecord {
+    declaration: AstNodeId,
+    owner: AstNodeId,
+    type_id: TypeId,
+    name: String,
+    visibility: String,
+    mutable: bool,
+}
+
+impl FieldTypeRecord {
+    pub fn declaration(&self) -> AstNodeId {
+        self.declaration
+    }
+    pub fn owner(&self) -> AstNodeId {
+        self.owner
+    }
+    pub fn type_id(&self) -> TypeId {
+        self.type_id
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn visibility(&self) -> &str {
+        &self.visibility
+    }
+    pub fn mutable(&self) -> bool {
+        self.mutable
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ClassTypeReport {
+    classes: Vec<ClassTypeRecord>,
+    fields: Vec<FieldTypeRecord>,
+    diagnostics: Vec<TypeCheckDiagnostic>,
+}
+
+impl ClassTypeReport {
+    pub fn classes(&self) -> &[ClassTypeRecord] {
+        &self.classes
+    }
+    pub fn fields(&self) -> &[FieldTypeRecord] {
+        &self.fields
+    }
+    pub fn diagnostics(&self) -> &[TypeCheckDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+pub fn type_m0068_class_types(
+    parsed: &ParseOutput,
+    module: &ModuleName,
+    package: &PackageNamespace,
+) -> (TypeArena, ClassTypeReport) {
+    let mut types = TypeArena::new();
+    let primitives = PrimitiveTypeIds::insert_into(&mut types);
+    let mut interner = SymbolInterner::new();
+    let mut report = ClassTypeReport::default();
+    let mut class_ids = Vec::new();
+    for declaration in &parsed.class_declarations {
+        let symbol = interner.intern(&declaration.name);
+        let type_id = types.nominal(crate::types::NominalTypeIdentity::new(
+            module.clone(),
+            package.clone(),
+            declaration.declaration,
+            symbol,
+        ));
+        class_ids.push((declaration.declaration, type_id));
+        report.classes.push(ClassTypeRecord {
+            declaration: declaration.declaration,
+            type_id,
+            superclass: declaration.superclass.clone(),
+            interfaces: declaration.interfaces.clone(),
+        });
+    }
+    for field in &parsed.field_declarations {
+        let Some(type_id) = primitive_annotation_type_for_node(
+            field.annotation,
+            &parsed.type_name_references,
+            primitives,
+        ) else {
+            continue;
+        };
+        if report.fields.iter().any(|existing: &FieldTypeRecord| {
+            existing.owner == field.owner && existing.name == field.name
+        }) {
+            report
+                .diagnostics
+                .push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::DuplicateField,
+                    field.declaration,
+                ));
+            continue;
+        }
+        report.fields.push(FieldTypeRecord {
+            declaration: field.declaration,
+            owner: field.owner,
+            type_id,
+            name: field.name.clone(),
+            visibility: field.visibility.clone(),
+            mutable: field.mutable,
+        });
+    }
+    let _ = class_ids;
+    (types, report)
+}
+
+fn primitive_annotation_type_for_node(
+    annotation: AstNodeId,
+    references: &[ParsedTypeNameReference],
+    primitives: PrimitiveTypeIds,
+) -> Option<TypeId> {
+    let reference = references
+        .iter()
+        .find(|reference| reference.reference == annotation)?;
+    primitives.type_for_primitive_name(&reference.name)
 }
 
 pub struct ExecutableSourceTypes<'a> {
@@ -1536,6 +1679,7 @@ pub fn check_m0028_unsupported_executable_forms(
             matches!(
                 node.kind,
                 AstNodeKind::ImportDeclaration
+                    | AstNodeKind::ClassDeclaration
                     | AstNodeKind::StructDeclaration
                     | AstNodeKind::EnumDeclaration
                     | AstNodeKind::InterfaceDeclaration

@@ -10,6 +10,7 @@ pub enum TokenKind {
     String,
     KwAs,
     KwBreak,
+    KwClass,
     KwConst,
     KwContinue,
     KwElse,
@@ -513,6 +514,7 @@ fn keyword_kind(text: &str) -> Option<TokenKind> {
     Some(match text {
         "as" => TokenKind::KwAs,
         "break" => TokenKind::KwBreak,
+        "class" => TokenKind::KwClass,
         "const" => TokenKind::KwConst,
         "continue" => TokenKind::KwContinue,
         "else" => TokenKind::KwElse,

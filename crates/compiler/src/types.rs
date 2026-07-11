@@ -268,6 +268,14 @@ impl TypeArena {
         self.insert(TypeRecord::array(ArrayType::new(element, length)))
     }
 
+    pub fn nominal(&mut self, identity: NominalTypeIdentity) -> TypeId {
+        let kind = TypeKind::Nominal(identity.clone());
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::nominal(identity))
+    }
+
     pub fn get(&self, id: TypeId) -> Option<&TypeRecord> {
         self.records.get(id.index())
     }
