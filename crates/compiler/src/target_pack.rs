@@ -60,6 +60,12 @@ pub enum TargetPackError {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TargetPackRegistryError {
+    UnknownTarget(Triple),
+    InvalidPack(TargetPackError),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TargetPackManifest {
     target: Triple,
     object_format: String,
@@ -142,6 +148,27 @@ pub struct TargetPack {
     entry_symbol: String,
     language_entry_symbol: String,
     trap_exit_code: u8,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TargetPackRegistry {
+    root: PathBuf,
+}
+
+impl TargetPackRegistry {
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self { root: root.into() }
+    }
+
+    pub fn resolve(&self, requested_target: Triple) -> Result<TargetPack, TargetPackRegistryError> {
+        let pack_root = self.root.join(requested_target.to_string());
+        let manifest_path = pack_root.join("manifest.toml");
+        let manifest = fs::read_to_string(&manifest_path)
+            .map_err(|_| TargetPackRegistryError::UnknownTarget(requested_target.clone()))?;
+
+        TargetPack::resolve_toml(&pack_root, &manifest, requested_target)
+            .map_err(TargetPackRegistryError::InvalidPack)
+    }
 }
 
 impl TargetPack {
