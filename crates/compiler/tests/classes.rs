@@ -177,3 +177,73 @@ fn constructs_a_minimal_owned_class_through_the_target_pack() {
     );
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn dispatches_a_same_module_class_method() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-class-method-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Point(val value: Int) { open fun answer(): Int { return 9; } } public fun main(): Int { val point: Point = new Point(7); return point.answer(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6810),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(9)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn mutates_a_var_field_and_rejects_val_field_writes() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-class-field-write-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Point(var value: Int) {} public fun main(): Int { val point: Point = new Point(7); point.value = 8; return point.value; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6811),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(8)
+    );
+    let _ = fs::remove_dir_all(workspace);
+
+    let readonly =
+        std::env::temp_dir().join(format!("neu-class-field-readonly-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&readonly);
+    fs::create_dir_all(&readonly).unwrap();
+    let error = compiler::driver::compile_source_to_executable(
+        "class Point(val value: Int) {} public fun main(): Int { val point: Point = new Point(7); point.value = 8; return 0; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6812),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            readonly.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("ImmutableFieldMutation"));
+    let _ = fs::remove_dir_all(readonly);
+}

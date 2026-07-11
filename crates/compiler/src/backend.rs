@@ -890,6 +890,27 @@ fn lower_instruction(
             values.insert(*output, value);
             Ok(())
         }
+        MirInstruction::FieldStore {
+            receiver,
+            index,
+            value,
+            ..
+        } => {
+            let pointer = values
+                .get(receiver)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let value = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let offset = i32::try_from(index * 8)
+                .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?;
+            builder
+                .ins()
+                .store(MemFlagsData::new(), value, pointer, offset);
+            Ok(())
+        }
         MirInstruction::ArrayAssign { local, value, .. } => {
             let source = aggregate_values
                 .get(value)

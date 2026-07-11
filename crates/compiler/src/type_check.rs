@@ -76,6 +76,7 @@ pub enum TypeRuleDiagnostic {
     StringIndexOutOfBounds,
     StringOperationUnsupported,
     DuplicateField,
+    ImmutableFieldMutation,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -928,9 +929,78 @@ pub fn apply_m0068_field_access_facts(
             continue;
         };
         report.replace_expression_type(ExpressionType::new(member.expression, field.type_id));
+        if parsed
+            .assignment_statements
+            .iter()
+            .any(|assignment| assignment.target == member.expression)
+            && !field.mutable
+        {
+            report
+                .diagnostics
+                .push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::ImmutableFieldMutation,
+                    member.expression,
+                ));
+        }
         report.retain_diagnostics(|diagnostic| {
             diagnostic.node() != member.expression
                 || diagnostic.rule() != TypeRuleDiagnostic::MemberExpressionDeferred
+        });
+    }
+}
+
+pub fn apply_m0070_method_call_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+) {
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        let Some(class) = classes
+            .classes
+            .iter()
+            .find(|class| class.type_id == receiver_type)
+        else {
+            continue;
+        };
+        let Some(method) = parsed
+            .function_declarations
+            .iter()
+            .find(|method| method.owner == Some(class.declaration) && method.name == member.name)
+        else {
+            continue;
+        };
+        let Some(return_annotation) = method.return_annotation else {
+            continue;
+        };
+        let Some(reference) = parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == return_annotation)
+        else {
+            continue;
+        };
+        let primitives = PrimitiveTypeIds::module_owned(&mut TypeArena::new());
+        let Some(return_type) = primitives.type_for_primitive_name(&reference.name) else {
+            continue;
+        };
+        report.replace_expression_type(ExpressionType::new(call.expression, return_type));
+        report.retain_diagnostics(|diagnostic| {
+            (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                || !matches!(
+                    diagnostic.rule(),
+                    TypeRuleDiagnostic::DirectCallDeferred
+                        | TypeRuleDiagnostic::MemberExpressionDeferred
+                )
         });
     }
 }
@@ -1063,6 +1133,14 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 .iter()
                 .find(|reference| reference.reference == call.callee)
             else {
+                if source
+                    .parsed
+                    .member_expressions
+                    .iter()
+                    .any(|member| member.expression == call.callee)
+                {
+                    continue;
+                }
                 let span = source
                     .parsed
                     .arena

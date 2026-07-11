@@ -240,6 +240,12 @@ pub enum MirInstruction {
         index: usize,
         span: ByteSpan,
     },
+    FieldStore {
+        receiver: MirValueId,
+        index: usize,
+        value: MirValueId,
+        span: ByteSpan,
+    },
 }
 impl MirInstruction {
     pub fn int_constant(output: MirValueId, value: i64, span: ByteSpan) -> Self {
@@ -315,6 +321,7 @@ impl MirInstruction {
             | Self::StringCompare { span, .. } => *span,
             Self::NewObject { span, .. } => *span,
             Self::FieldLoad { span, .. } => *span,
+            Self::FieldStore { span, .. } => *span,
         }
     }
 }
@@ -413,6 +420,7 @@ impl MirBasicBlock {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MirCleanupBoundary {
     owned_locals: Vec<MirLocalId>,
+    owned_objects: Vec<MirLocalId>,
     owned_parameters: Vec<MirValueId>,
     returns_owned: bool,
 }
@@ -420,6 +428,7 @@ impl MirCleanupBoundary {
     pub fn empty() -> Self {
         Self {
             owned_locals: Vec::new(),
+            owned_objects: Vec::new(),
             owned_parameters: Vec::new(),
             returns_owned: false,
         }
@@ -437,6 +446,16 @@ impl MirCleanupBoundary {
                 .filter(|local| is_string(local.ty()))
                 .map(|local| MirLocalId::from_raw(local.id().index()))
                 .collect(),
+            owned_objects: function
+                .locals()
+                .iter()
+                .filter(|local| {
+                    types
+                        .get(local.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Nominal(_)))
+                })
+                .map(|local| MirLocalId::from_raw(local.id().index()))
+                .collect(),
             owned_parameters: function
                 .parameters()
                 .iter()
@@ -447,13 +466,19 @@ impl MirCleanupBoundary {
         }
     }
     pub fn is_empty(&self) -> bool {
-        self.owned_locals.is_empty() && self.owned_parameters.is_empty() && !self.returns_owned
+        self.owned_locals.is_empty()
+            && self.owned_objects.is_empty()
+            && self.owned_parameters.is_empty()
+            && !self.returns_owned
     }
     pub fn owned_locals(&self) -> &[MirLocalId] {
         &self.owned_locals
     }
     pub fn owned_parameters(&self) -> &[MirValueId] {
         &self.owned_parameters
+    }
+    pub fn owned_objects(&self) -> &[MirLocalId] {
+        &self.owned_objects
     }
     pub fn returns_owned(&self) -> bool {
         self.returns_owned
@@ -807,6 +832,17 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
             }
             for assignment in function.assignments() {
+                if assignment.value().index() == expression.id().index()
+                    && let Some((receiver, index)) = assignment.field()
+                {
+                    instructions.push(MirInstruction::FieldStore {
+                        receiver: MirValueId::from_raw(receiver.index()),
+                        index,
+                        value: output,
+                        span: assignment.span(),
+                    });
+                    continue;
+                }
                 if assignment.value().index() == expression.id().index()
                     && !matches!(
                         function

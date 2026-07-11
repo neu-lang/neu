@@ -113,7 +113,13 @@ pub fn lower_checked_hir_source(
                     name.name.clone(),
                 )
             })
-            .ok_or(HirLoweringError::UnsupportedExpression)?;
+            .unwrap_or_else(|| {
+                FunctionSymbolIdentity::new(
+                    source.module.clone(),
+                    source.package.clone(),
+                    function.name.clone(),
+                )
+            });
         let id = HirFunctionId::from_raw(functions.len());
         let mut expressions = Vec::new();
         let mut returns = Vec::new();
@@ -241,6 +247,34 @@ pub fn lower_checked_hir_source(
                 .iter()
                 .find(|assignment| assignment.statement == statement.statement)
             {
+                if let Some(member) = source
+                    .parsed
+                    .member_expressions
+                    .iter()
+                    .find(|member| member.expression == assignment.target)
+                {
+                    let receiver = lower_expression(
+                        &source,
+                        function.declaration,
+                        member.receiver,
+                        &local_bindings,
+                        &mut expressions,
+                    )?;
+                    let value = lower_expression(
+                        &source,
+                        function.declaration,
+                        assignment.value,
+                        &local_bindings,
+                        &mut expressions,
+                    )?;
+                    assignments.push(HirAssignment::field_assignment(
+                        statement.span,
+                        receiver,
+                        field_index_for_receiver(&source, member.receiver, &member.name),
+                        value,
+                    ));
+                    continue;
+                }
                 let (target, index) = if let Some(index) = source
                     .parsed
                     .index_expressions
@@ -666,18 +700,22 @@ fn lower_expression(
             output.push(HirExpression::string_clone(id, span, ty, argument));
             return Ok(id);
         }
-        let name = source
+        let declaration = if let Some(name) = source
             .parsed
             .name_references
             .iter()
             .find(|name| name.reference == call.callee)
-            .ok_or(HirLoweringError::UnsupportedExpression)?;
-        let declaration = source
-            .parsed
-            .declaration_names
-            .iter()
-            .position(|declaration| declaration.name == name.name)
-            .ok_or(HirLoweringError::UnsupportedExpression)?;
+        {
+            source
+                .parsed
+                .function_declarations
+                .iter()
+                .position(|function| function.name == name.name)
+                .ok_or(HirLoweringError::UnsupportedExpression)?
+        } else {
+            method_declaration_index(source, call.callee)
+                .ok_or(HirLoweringError::UnsupportedExpression)?
+        };
         let arguments = call
             .arguments
             .iter()
@@ -775,6 +813,52 @@ fn field_index_for_receiver(
         index += 1;
     }
     0
+}
+
+fn method_declaration_index(
+    source: &CheckedHirSource<'_>,
+    callee: crate::ast::AstNodeId,
+) -> Option<usize> {
+    let member = source
+        .parsed
+        .member_expressions
+        .iter()
+        .find(|member| member.expression == callee)?;
+    let receiver = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == member.receiver)?;
+    let binding = source
+        .parsed
+        .local_binding_names
+        .iter()
+        .find(|binding| binding.name == receiver.name)?;
+    let declaration = source
+        .parsed
+        .local_declarations
+        .iter()
+        .find(|declaration| declaration.declaration == binding.binding)?;
+    let annotation = declaration.annotation?;
+    let class_name = source
+        .parsed
+        .type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)?
+        .name
+        .clone();
+    let class = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name)?;
+    source
+        .parsed
+        .function_declarations
+        .iter()
+        .position(|function| {
+            function.owner == Some(class.declaration) && function.name == member.name
+        })
 }
 
 fn lower_control_flow_block(
@@ -1570,6 +1654,7 @@ pub struct HirAssignment {
     target: HirLocalId,
     value: HirExpressionId,
     index: Option<HirExpressionId>,
+    field: Option<(HirExpressionId, usize)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1608,6 +1693,7 @@ impl HirAssignment {
             target,
             value,
             index: None,
+            field: None,
         }
     }
     pub fn indexed(
@@ -1621,6 +1707,7 @@ impl HirAssignment {
             target,
             value,
             index: Some(index),
+            field: None,
         }
     }
     pub fn span(&self) -> ByteSpan {
@@ -1634,6 +1721,23 @@ impl HirAssignment {
     }
     pub fn index(&self) -> Option<HirExpressionId> {
         self.index
+    }
+    pub fn field(&self) -> Option<(HirExpressionId, usize)> {
+        self.field
+    }
+    pub fn field_assignment(
+        span: ByteSpan,
+        receiver: HirExpressionId,
+        index: usize,
+        value: HirExpressionId,
+    ) -> Self {
+        Self {
+            span,
+            target: HirLocalId::from_raw(usize::MAX),
+            value,
+            index: None,
+            field: Some((receiver, index)),
+        }
     }
 }
 impl HirReturn {
