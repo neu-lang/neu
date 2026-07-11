@@ -16,6 +16,8 @@ use crate::{
     types::{PrimitiveType, TypeArena, TypeKind},
 };
 
+const INVALID_SHIFT_COUNT_TRAP: TrapCode = TrapCode::unwrap_user(1);
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CraneliftLoweringError {
     UnsupportedRuntimeType,
@@ -226,6 +228,39 @@ fn lower_instruction(
                 MirArithmetic::BitwiseOr => builder.ins().bor(left, right),
                 MirArithmetic::BitwiseXor => builder.ins().bxor(left, right),
                 _ => unreachable!("guard accepts only bitwise operations"),
+            };
+            values.insert(*output, value);
+            Ok(())
+        }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation,
+            left,
+            right,
+            ..
+        } if matches!(
+            operation,
+            MirArithmetic::ShiftLeft | MirArithmetic::ShiftRight
+        ) =>
+        {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let invalid_count = builder
+                .ins()
+                .icmp_imm(IntCC::UnsignedGreaterThan, right, 63);
+            builder
+                .ins()
+                .trapnz(invalid_count, INVALID_SHIFT_COUNT_TRAP);
+            let value = match operation {
+                MirArithmetic::ShiftLeft => builder.ins().ishl(left, right),
+                MirArithmetic::ShiftRight => builder.ins().sshr(left, right),
+                _ => unreachable!("guard accepts only shift operations"),
             };
             values.insert(*output, value);
             Ok(())
