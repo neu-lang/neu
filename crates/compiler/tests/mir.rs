@@ -9,7 +9,7 @@ use compiler::{
     },
     module::ModuleName,
     source::{ByteSpan, SourceFileId},
-    types::TypeId,
+    types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
 
 #[test]
@@ -50,7 +50,8 @@ fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
 fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
     let file = SourceFileId::from_raw(301);
     let span = ByteSpan::new(file, 0, 8).unwrap();
-    let int = TypeId::from_raw(1);
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let hir = HirModule::new(
         ModuleName::parse("app").unwrap(),
         vec![HirFunction::new(
@@ -79,10 +80,52 @@ fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
             vec![],
         )],
     );
-    let mir = lower_hir_to_mir(&hir).unwrap();
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
     assert_eq!(mir.functions()[0].blocks()[0].instructions().len(), 3);
     assert_eq!(mir.functions()[0].return_type(), int);
     assert_eq!(mir.functions()[0].blocks()[0].terminator().span(), span);
+}
+
+#[test]
+fn m0030_hir_to_mir_requires_owning_type_arena() {
+    let file = SourceFileId::from_raw(303);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut owning_types = TypeArena::new();
+    let int = owning_types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let hir = HirModule::new(
+        ModuleName::parse("app").unwrap(),
+        vec![HirFunction::new(
+            HirFunctionId::from_raw(0),
+            ModuleName::parse("app").unwrap(),
+            compiler::module::PackageNamespace::parse("app").unwrap(),
+            span,
+            false,
+            int,
+            vec![],
+            vec![],
+            vec![HirExpression::int_literal(
+                HirExpressionId::from_raw(0),
+                span,
+                int,
+                42,
+            )],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(0))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+
+    assert!(lower_hir_to_mir(&hir, &owning_types).is_ok());
+    assert_eq!(
+        lower_hir_to_mir(&hir, &TypeArena::new()),
+        Err(compiler::mir::MirLoweringError::UnsupportedRuntimeType)
+    );
+    let mut foreign_types = TypeArena::new();
+    foreign_types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    assert_eq!(
+        lower_hir_to_mir(&hir, &foreign_types),
+        Err(compiler::mir::MirLoweringError::UnsupportedRuntimeType)
+    );
 }
 
 #[test]

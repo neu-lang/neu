@@ -91,4 +91,4 @@ The expected architecture places MIR before optimization and backend code genera
 - [x] MIR model exists.
 - [x] HIR lowers to MIR.
 - [x] MIR is backend-independent.
-- [ ] Type-environment transport is validated at the HIR-to-MIR boundary.
+- [x] Type-environment transport is validated at the HIR-to-MIR boundary.

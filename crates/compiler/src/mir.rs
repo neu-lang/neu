@@ -2,7 +2,7 @@ use crate::{
     hir::{HirBinaryOperator, HirExpressionKind, HirModule},
     module::ModuleName,
     source::ByteSpan,
-    types::TypeId,
+    types::{PrimitiveType, TypeArena, TypeId, TypeKind},
 };
 
 macro_rules! mir_id {
@@ -263,12 +263,15 @@ impl MirFunction {
 pub enum MirLoweringError {
     UnsupportedExpression,
     MissingReturn,
+    UnsupportedRuntimeType,
 }
-pub fn lower_hir_to_mir(hir: &HirModule) -> Result<MirModule, MirLoweringError> {
+pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule, MirLoweringError> {
     let mut functions = Vec::new();
     for function in hir.functions() {
+        require_bootstrap_int(function.return_type(), types)?;
         let mut instructions = Vec::new();
         for expression in function.expressions() {
+            require_bootstrap_int(expression.ty(), types)?;
             let output = MirValueId::from_raw(expression.id().index());
             match expression.kind() {
                 HirExpressionKind::IntLiteral(value) => instructions.push(
@@ -321,6 +324,16 @@ pub fn lower_hir_to_mir(hir: &HirModule) -> Result<MirModule, MirLoweringError> 
     }
     Ok(MirModule::new(hir.name().clone(), functions))
 }
+
+fn require_bootstrap_int(ty: TypeId, types: &TypeArena) -> Result<(), MirLoweringError> {
+    matches!(
+        types.get(ty).map(|record| record.kind()),
+        Some(TypeKind::Primitive(PrimitiveType::Int))
+    )
+    .then_some(())
+    .ok_or(MirLoweringError::UnsupportedRuntimeType)
+}
+
 fn lower_binary(operator: HirBinaryOperator) -> Result<MirArithmetic, MirLoweringError> {
     Ok(match operator {
         HirBinaryOperator::Plus => MirArithmetic::Add,
