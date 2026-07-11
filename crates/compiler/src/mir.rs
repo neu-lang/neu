@@ -1,4 +1,5 @@
 use crate::{
+    hir::HirExpression,
     hir::{HirBinaryOperator, HirExpressionKind, HirModule, HirUnaryOperator},
     module::{FunctionSymbolIdentity, ModuleName},
     source::ByteSpan,
@@ -351,15 +352,27 @@ pub enum MirLoweringError {
 pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule, MirLoweringError> {
     let mut functions = Vec::new();
     for function in hir.functions() {
-        require_bootstrap_int(function.return_type(), types)?;
+        require_bootstrap_runtime_type(function.return_type(), types)?;
         let mut instructions = Vec::new();
         for expression in function.expressions() {
-            require_bootstrap_int(expression.ty(), types)?;
+            require_hir_expression_type(expression, types)?;
             let output = MirValueId::from_raw(expression.id().index());
             match expression.kind() {
                 HirExpressionKind::IntLiteral(value) => instructions.push(
                     MirInstruction::int_constant(output, *value, expression.span()),
                 ),
+                HirExpressionKind::BoolLiteral(value) => instructions.push(
+                    MirInstruction::bool_constant(output, *value, expression.span()),
+                ),
+                HirExpressionKind::FloatLiteral(bits) => instructions.push(
+                    MirInstruction::float_constant(output, *bits, expression.span()),
+                ),
+                HirExpressionKind::ByteLiteral(value) => instructions.push(
+                    MirInstruction::byte_constant(output, *value, expression.span()),
+                ),
+                HirExpressionKind::UnitLiteral => {
+                    instructions.push(MirInstruction::unit_constant(expression.span()))
+                }
                 HirExpressionKind::Binary(binary) => {
                     instructions.push(MirInstruction::CheckedArithmetic {
                         output,
@@ -394,6 +407,19 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             .returns()
             .first()
             .ok_or(MirLoweringError::MissingReturn)?;
+        let terminator = if matches!(
+            types
+                .get(function.return_type())
+                .map(|record| record.kind()),
+            Some(TypeKind::Primitive(PrimitiveType::Unit))
+        ) {
+            MirTerminator::return_unit(returned.span())
+        } else {
+            MirTerminator::return_value(
+                MirValueId::from_raw(returned.expression().index()),
+                returned.span(),
+            )
+        };
         let mir_function = MirFunction::new(
             MirFunctionId::from_raw(function.id().index()),
             function.span(),
@@ -403,10 +429,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             vec![MirBasicBlock::new(
                 MirBlockId::from_raw(0),
                 instructions,
-                MirTerminator::return_value(
-                    MirValueId::from_raw(returned.expression().index()),
-                    returned.span(),
-                ),
+                terminator,
             )],
             MirCleanupBoundary::empty(),
         )
@@ -419,10 +442,36 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
     Ok(MirModule::new(hir.name().clone(), functions))
 }
 
-fn require_bootstrap_int(ty: TypeId, types: &TypeArena) -> Result<(), MirLoweringError> {
+fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), MirLoweringError> {
     matches!(
         types.get(ty).map(|record| record.kind()),
-        Some(TypeKind::Primitive(PrimitiveType::Int))
+        Some(TypeKind::Primitive(
+            PrimitiveType::Bool
+                | PrimitiveType::Int
+                | PrimitiveType::Float
+                | PrimitiveType::Byte
+                | PrimitiveType::Unit
+        ))
+    )
+    .then_some(())
+    .ok_or(MirLoweringError::UnsupportedRuntimeType)
+}
+
+fn require_hir_expression_type(
+    expression: &HirExpression,
+    types: &TypeArena,
+) -> Result<(), MirLoweringError> {
+    let expected = match expression.kind() {
+        HirExpressionKind::IntLiteral(_) => PrimitiveType::Int,
+        HirExpressionKind::BoolLiteral(_) => PrimitiveType::Bool,
+        HirExpressionKind::FloatLiteral(_) => PrimitiveType::Float,
+        HirExpressionKind::ByteLiteral(_) => PrimitiveType::Byte,
+        HirExpressionKind::UnitLiteral => PrimitiveType::Unit,
+        _ => return require_bootstrap_runtime_type(expression.ty(), types),
+    };
+    matches!(
+        types.get(expression.ty()).map(|record| record.kind()),
+        Some(TypeKind::Primitive(actual)) if *actual == expected
     )
     .then_some(())
     .ok_or(MirLoweringError::UnsupportedRuntimeType)

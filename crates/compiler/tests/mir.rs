@@ -293,3 +293,79 @@ fn m0035_mir_preserves_non_integer_constants_and_unit_return() {
         MirTerminator::ReturnUnit { span }
     );
 }
+
+#[test]
+fn m0035_hir_to_mir_lowers_primitive_literals_and_unit_return() {
+    let file = SourceFileId::from_raw(908);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let mut types = TypeArena::new();
+    let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
+    let byte_type = types.insert(TypeRecord::primitive(PrimitiveType::Byte));
+    let unit_type = types.insert(TypeRecord::primitive(PrimitiveType::Unit));
+    let package = compiler::module::PackageNamespace::parse("demo").unwrap();
+    let module_name = ModuleName::parse("app").unwrap();
+    let function = |id, ty, expression| {
+        HirFunction::new(
+            HirFunctionId::from_raw(id),
+            module_name.clone(),
+            package.clone(),
+            span,
+            false,
+            ty,
+            vec![],
+            vec![],
+            vec![expression],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(0))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )
+    };
+    let hir = HirModule::new(
+        module_name.clone(),
+        vec![
+            function(
+                0,
+                bool_type,
+                HirExpression::bool_literal(HirExpressionId::from_raw(0), span, bool_type, true),
+            ),
+            function(
+                1,
+                float_type,
+                HirExpression::float_literal(HirExpressionId::from_raw(0), span, float_type, 1.5),
+            ),
+            function(
+                2,
+                byte_type,
+                HirExpression::byte_literal(HirExpressionId::from_raw(0), span, byte_type, 255),
+            ),
+            function(
+                3,
+                unit_type,
+                HirExpression::unit_literal(HirExpressionId::from_raw(0), span, unit_type),
+            ),
+        ],
+    );
+
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].instructions()[0],
+        MirInstruction::BoolConstant { .. }
+    ));
+    assert!(matches!(
+        mir.functions()[1].blocks()[0].instructions()[0],
+        MirInstruction::FloatConstant { .. }
+    ));
+    assert!(matches!(
+        mir.functions()[2].blocks()[0].instructions()[0],
+        MirInstruction::ByteConstant { .. }
+    ));
+    assert!(matches!(
+        mir.functions()[3].blocks()[0].instructions()[0],
+        MirInstruction::UnitConstant { .. }
+    ));
+    assert_eq!(
+        mir.functions()[3].blocks()[0].terminator(),
+        MirTerminator::ReturnUnit { span }
+    );
+}
