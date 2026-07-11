@@ -3108,6 +3108,7 @@ pub fn type_m0018_core(
         declarations,
         type_name_references,
         literals,
+        None,
         grouped_expressions,
         assignments,
         resolutions,
@@ -3169,6 +3170,7 @@ pub fn type_m0028_executable_core_in(
         declarations,
         type_name_references,
         literals,
+        Some(integer_literals),
         grouped_expressions,
         assignments,
         resolutions,
@@ -3192,6 +3194,7 @@ fn type_core(
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
     literals: &[ParsedLiteralExpression],
+    integer_literals: Option<&[ParsedIntegerLiteral]>,
     grouped_expressions: &[ParsedGroupedExpression],
     assignments: &[ParsedAssignmentStatement],
     resolutions: &ResolutionTable,
@@ -3205,6 +3208,7 @@ fn type_core(
         declarations,
         type_name_references,
         literals,
+        integer_literals,
         grouped_expressions,
         assignments,
         resolutions,
@@ -3221,6 +3225,7 @@ fn type_core_with_arena(
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
     literals: &[ParsedLiteralExpression],
+    integer_literals: Option<&[ParsedIntegerLiteral]>,
     grouped_expressions: &[ParsedGroupedExpression],
     assignments: &[ParsedAssignmentStatement],
     resolutions: &ResolutionTable,
@@ -3314,6 +3319,28 @@ fn type_core_with_arena(
         let Some(initializer_type) = report.expression_type(initializer) else {
             continue;
         };
+
+        if annotation_type == primitives.byte_id
+            && let Some(integer_literals) = integer_literals
+            && let Some(integer) = integer_literals
+                .iter()
+                .find(|literal| literal.expression == initializer)
+        {
+            match integer.value {
+                Some(value) if value <= u64::from(u8::MAX) => {
+                    report.record_assignment_check(AssignmentCheck::new(
+                        declaration.declaration,
+                        annotation_type,
+                        annotation_type,
+                    ));
+                }
+                Some(_) | None => report.record_diagnostic(TypeCheckDiagnostic::static_integer(
+                    TypeRuleDiagnostic::ByteLiteralOutOfRange,
+                    initializer,
+                )),
+            }
+            continue;
+        }
 
         if assignment_compatible(annotation_type, initializer_type, type_arena) {
             report.record_assignment_check(AssignmentCheck::new(

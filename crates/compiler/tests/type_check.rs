@@ -3882,6 +3882,68 @@ fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
 }
 
 #[test]
+fn m0035_executable_core_types_byte_literal_in_context() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(916),
+        "fun run() { const first: Byte = 0; const last: Byte = 255; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    assert!(
+        report.diagnostics().is_empty(),
+        "{:?}",
+        report.diagnostics()
+    );
+    assert_eq!(report.assignment_checks().len(), 2);
+}
+
+#[test]
+fn m0035_executable_core_rejects_byte_literal_out_of_range() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(917),
+        "fun run() { const invalid: Byte = 256; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (_arena, report) = type_m0028_executable_core(
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    assert!(
+        report
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| { diagnostic.rule() == TypeRuleDiagnostic::ByteLiteralOutOfRange })
+    );
+}
+
+#[test]
 fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
     let parsed = parse_source(
         SourceFileId::from_raw(97),
