@@ -1,6 +1,6 @@
 # ADR-0029: Immutable Local `const` Keyword
 
-Status: Accepted
+Status: Superseded by ADR-0061
 
 ## Question
 

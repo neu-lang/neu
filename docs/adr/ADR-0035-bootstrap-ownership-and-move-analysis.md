@@ -56,7 +56,7 @@ clone behavior, traits, interfaces, or generic capability satisfaction.
 
 M0022 recognizes only these ownership transfer sites:
 
-- a local `const` or `var` initializer whose initializer expression is a bare
+- a local `val` or `var` initializer whose initializer expression is a bare
   resolved local name of move-only type;
 - an assignment statement whose value expression is a bare resolved local name
   of move-only type.

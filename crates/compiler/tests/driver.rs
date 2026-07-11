@@ -65,6 +65,29 @@ fn compiles_current_control_flow_and_primitive_examples() {
 }
 
 #[test]
+fn rejects_runtime_calls_in_const_initializers() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-const-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let error = compiler::driver::compile_source_to_executable(
+        "fun compute(): Int { return 1; } public fun main(): Int { const value = compute(); return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1003),
+            ModuleName::parse("consts").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("ConstInitializerNotConstant"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn compiles_if_for_break_and_continue_to_host_executable() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-control-driver-{}", std::process::id()));

@@ -56,6 +56,7 @@ pub struct ParseOutput {
     pub lex_diagnostics: Vec<lexer::Diagnostic>,
     pub declaration_names: Vec<ParsedDeclarationName>,
     pub local_binding_names: Vec<ParsedLocalBindingName>,
+    pub const_declarations: Vec<AstNodeId>,
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
@@ -372,6 +373,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         lex_diagnostics: lex_output.diagnostics,
         declaration_names: parser.declaration_names,
         local_binding_names: parser.local_binding_names,
+        const_declarations: parser.const_declarations,
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
@@ -408,6 +410,7 @@ struct Parser<'source> {
     diagnostics: Vec<Diagnostic>,
     declaration_names: Vec<ParsedDeclarationName>,
     local_binding_names: Vec<ParsedLocalBindingName>,
+    const_declarations: Vec<AstNodeId>,
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
@@ -449,6 +452,7 @@ impl<'source> Parser<'source> {
             diagnostics: Vec::new(),
             declaration_names: Vec::new(),
             local_binding_names: Vec::new(),
+            const_declarations: Vec::new(),
             generic_parameters: Vec::new(),
             function_parameters: Vec::new(),
             function_declarations: Vec::new(),
@@ -994,7 +998,9 @@ impl<'source> Parser<'source> {
                     }
                     return Some(span);
                 }
-                Some(TokenKind::KwConst | TokenKind::KwVar | TokenKind::KwReturn) => {
+                Some(
+                    TokenKind::KwConst | TokenKind::KwVal | TokenKind::KwVar | TokenKind::KwReturn,
+                ) => {
                     self.parse_statement();
                 }
                 Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
@@ -1105,7 +1111,7 @@ impl<'source> Parser<'source> {
 
     fn parse_statement(&mut self) {
         match self.current_kind() {
-            Some(TokenKind::KwConst | TokenKind::KwVar) => {
+            Some(TokenKind::KwConst | TokenKind::KwVal | TokenKind::KwVar) => {
                 self.parse_variable_declaration_statement()
             }
             Some(TokenKind::KwReturn) => self.parse_return_statement(),
@@ -1298,17 +1304,18 @@ impl<'source> Parser<'source> {
     fn parse_variable_declaration_statement(&mut self) {
         let kind = match self
             .current_kind()
-            .expect("variable declaration starts with const or var")
+            .expect("variable declaration starts with const, val, or var")
         {
-            TokenKind::KwConst => LocalBindingKind::Immutable,
+            TokenKind::KwConst | TokenKind::KwVal => LocalBindingKind::Immutable,
             TokenKind::KwVar => LocalBindingKind::Var,
-            _ => unreachable!("variable declaration starts with const or var"),
+            _ => unreachable!("variable declaration starts with const, val, or var"),
         };
         let start = self
             .current()
-            .expect("variable declaration starts with const or var")
+            .expect("variable declaration starts with const, val, or var")
             .span
             .start();
+        let is_const = self.current_kind() == Some(TokenKind::KwConst);
         self.advance();
 
         if self.current_kind() != Some(TokenKind::Identifier) {
@@ -1366,6 +1373,9 @@ impl<'source> Parser<'source> {
                 annotation,
                 initializer,
             });
+            if is_const {
+                self.const_declarations.push(binding);
+            }
             self.local_binding_names.push(ParsedLocalBindingName {
                 binding,
                 kind,

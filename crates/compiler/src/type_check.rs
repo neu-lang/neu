@@ -7,6 +7,7 @@ use crate::{
         ParsedFunctionDeclaration, ParsedFunctionParameter, ParsedGenericParameter,
         ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral, ParsedLiteralExpression,
         ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference, ParsedUnaryExpression,
+        ParsedUnaryOperator,
     },
     source::ByteSpan,
     symbol::{SymbolId, SymbolInterner},
@@ -63,6 +64,9 @@ pub enum TypeRuleDiagnostic {
     DivisionByZero,
     NegativeExponent,
     InvalidShiftCount,
+    ConstInitializerRequired,
+    ConstInitializerNotConstant,
+    ConstDependencyCycle,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -78,6 +82,44 @@ pub struct TypeCheckDiagnostic {
     node: AstNodeId,
     expected_type: Option<TypeId>,
     actual_type: Option<TypeId>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompileTimeValue {
+    Bool(bool),
+    Int(i64),
+    Float(u64),
+    Byte(u8),
+    Unit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CompileTimeConstant {
+    declaration: AstNodeId,
+    ty: TypeId,
+    value: CompileTimeValue,
+}
+
+impl CompileTimeConstant {
+    pub fn new(declaration: AstNodeId, ty: TypeId, value: CompileTimeValue) -> Self {
+        Self {
+            declaration,
+            ty,
+            value,
+        }
+    }
+
+    pub fn declaration(self) -> AstNodeId {
+        self.declaration
+    }
+
+    pub fn ty(self) -> TypeId {
+        self.ty
+    }
+
+    pub fn value(self) -> CompileTimeValue {
+        self.value
+    }
 }
 
 impl TypeCheckDiagnostic {
@@ -1168,6 +1210,7 @@ pub struct TypeCheckReport {
     refinements: Vec<RefinementRecord>,
     refined_expression_types: Vec<RefinedExpressionType>,
     diagnostics: Vec<TypeCheckDiagnostic>,
+    compile_time_constants: Vec<CompileTimeConstant>,
 }
 
 impl TypeCheckReport {
@@ -1179,6 +1222,7 @@ impl TypeCheckReport {
             refinements: Vec::new(),
             refined_expression_types: Vec::new(),
             diagnostics: Vec::new(),
+            compile_time_constants: Vec::new(),
         }
     }
 
@@ -1279,6 +1323,14 @@ impl TypeCheckReport {
 
     pub fn diagnostics(&self) -> &[TypeCheckDiagnostic] {
         &self.diagnostics
+    }
+
+    pub fn record_compile_time_constant(&mut self, constant: CompileTimeConstant) {
+        self.compile_time_constants.push(constant);
+    }
+
+    pub fn compile_time_constants(&self) -> &[CompileTimeConstant] {
+        &self.compile_time_constants
     }
 }
 
@@ -3352,6 +3404,283 @@ pub fn type_m0028_executable_core_in(
         report.record_diagnostic(diagnostic);
     }
     report
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CompileTimeEvaluationError {
+    NotConstant,
+    DependencyCycle,
+}
+
+pub fn validate_m0061_compile_time_constants(
+    parsed: &ParseOutput,
+    expression_types: &[ExpressionType],
+    type_arena: &TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for declaration_id in &parsed.const_declarations {
+        let Some(declaration) = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == *declaration_id)
+        else {
+            continue;
+        };
+        let Some(initializer) = declaration.initializer else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConstInitializerRequired,
+                *declaration_id,
+            ));
+            continue;
+        };
+        let Some(ty) = expression_types
+            .iter()
+            .find(|entry| entry.expression() == initializer)
+            .map(|entry| entry.ty())
+        else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConstInitializerNotConstant,
+                initializer,
+            ));
+            continue;
+        };
+
+        match evaluate_m0061_constant(initializer, parsed, expression_types, type_arena) {
+            Ok(value) => report.record_compile_time_constant(CompileTimeConstant::new(
+                *declaration_id,
+                ty,
+                value,
+            )),
+            Err(CompileTimeEvaluationError::DependencyCycle) => {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::ConstDependencyCycle,
+                    initializer,
+                ));
+            }
+            Err(CompileTimeEvaluationError::NotConstant) => {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::ConstInitializerNotConstant,
+                    initializer,
+                ));
+            }
+        }
+    }
+}
+
+fn evaluate_m0061_constant(
+    expression: AstNodeId,
+    parsed: &ParseOutput,
+    expression_types: &[ExpressionType],
+    type_arena: &TypeArena,
+) -> Result<CompileTimeValue, CompileTimeEvaluationError> {
+    if let Some(literal) = parsed
+        .literal_expressions
+        .iter()
+        .find(|literal| literal.expression == expression)
+    {
+        return match literal.kind {
+            ParsedLiteralKind::BoolTrue => Ok(CompileTimeValue::Bool(true)),
+            ParsedLiteralKind::BoolFalse => Ok(CompileTimeValue::Bool(false)),
+            ParsedLiteralKind::Unit => Ok(CompileTimeValue::Unit),
+            ParsedLiteralKind::Float => parsed
+                .float_literals
+                .iter()
+                .find(|literal| literal.expression == expression)
+                .and_then(|literal| literal.bits)
+                .map(CompileTimeValue::Float)
+                .ok_or(CompileTimeEvaluationError::NotConstant),
+            ParsedLiteralKind::AcceptedInteger => parsed
+                .integer_literals
+                .iter()
+                .find(|literal| literal.expression == expression)
+                .and_then(|literal| literal.value)
+                .and_then(|value| i64::try_from(value).ok())
+                .map(|value| {
+                    if expression_type_is(
+                        expression,
+                        expression_types,
+                        type_arena,
+                        PrimitiveType::Byte,
+                    ) {
+                        CompileTimeValue::Byte(value as u8)
+                    } else {
+                        CompileTimeValue::Int(value)
+                    }
+                })
+                .ok_or(CompileTimeEvaluationError::NotConstant),
+            ParsedLiteralKind::AcceptedString | ParsedLiteralKind::Null => {
+                Err(CompileTimeEvaluationError::NotConstant)
+            }
+        };
+    }
+    if let Some(grouped) = parsed
+        .grouped_expressions
+        .iter()
+        .find(|grouped| grouped.expression == expression)
+    {
+        return evaluate_m0061_constant(grouped.inner, parsed, expression_types, type_arena);
+    }
+    if let Some(unary) = parsed
+        .unary_expressions
+        .iter()
+        .find(|unary| unary.expression == expression)
+    {
+        let operand = evaluate_m0061_constant(unary.operand, parsed, expression_types, type_arena)?;
+        return evaluate_m0061_unary(unary.operator, operand);
+    }
+    if let Some(binary) = parsed
+        .binary_expressions
+        .iter()
+        .find(|binary| binary.expression == expression)
+    {
+        let left = evaluate_m0061_constant(binary.left, parsed, expression_types, type_arena)?;
+        let right = evaluate_m0061_constant(binary.right, parsed, expression_types, type_arena)?;
+        return evaluate_m0061_binary(binary.operator, left, right);
+    }
+    if let Some(name) = parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == expression)
+        && parsed.local_binding_names.iter().any(|binding| {
+            parsed.const_declarations.contains(&binding.binding) && binding.name == name.name
+        })
+    {
+        return Err(CompileTimeEvaluationError::DependencyCycle);
+    }
+    Err(CompileTimeEvaluationError::NotConstant)
+}
+
+fn expression_type_is(
+    expression: AstNodeId,
+    expression_types: &[ExpressionType],
+    type_arena: &TypeArena,
+    primitive: PrimitiveType,
+) -> bool {
+    expression_types
+        .iter()
+        .find(|entry| entry.expression() == expression)
+        .and_then(|entry| type_arena.get(entry.ty()))
+        .is_some_and(|record| record.kind() == &TypeKind::Primitive(primitive))
+}
+
+fn evaluate_m0061_unary(
+    operator: ParsedUnaryOperator,
+    value: CompileTimeValue,
+) -> Result<CompileTimeValue, CompileTimeEvaluationError> {
+    match (operator, value) {
+        (ParsedUnaryOperator::Not, CompileTimeValue::Bool(value)) => {
+            Ok(CompileTimeValue::Bool(!value))
+        }
+        (ParsedUnaryOperator::Plus, CompileTimeValue::Int(value)) => {
+            Ok(CompileTimeValue::Int(value))
+        }
+        (ParsedUnaryOperator::Minus, CompileTimeValue::Int(value)) => value
+            .checked_neg()
+            .map(CompileTimeValue::Int)
+            .ok_or(CompileTimeEvaluationError::NotConstant),
+        (ParsedUnaryOperator::BitwiseNot, CompileTimeValue::Int(value)) => {
+            Ok(CompileTimeValue::Int(!value))
+        }
+        (ParsedUnaryOperator::Plus, CompileTimeValue::Float(value)) => {
+            Ok(CompileTimeValue::Float(value))
+        }
+        (ParsedUnaryOperator::Minus, CompileTimeValue::Float(value)) => {
+            Ok(CompileTimeValue::Float((-f64::from_bits(value)).to_bits()))
+        }
+        (ParsedUnaryOperator::BitwiseNot, CompileTimeValue::Byte(value)) => {
+            Ok(CompileTimeValue::Byte(!value))
+        }
+        _ => Err(CompileTimeEvaluationError::NotConstant),
+    }
+}
+
+fn evaluate_m0061_binary(
+    operator: ParsedBinaryOperator,
+    left: CompileTimeValue,
+    right: CompileTimeValue,
+) -> Result<CompileTimeValue, CompileTimeEvaluationError> {
+    match (operator, left, right) {
+        (
+            ParsedBinaryOperator::LogicalAnd,
+            CompileTimeValue::Bool(left),
+            CompileTimeValue::Bool(right),
+        ) => Ok(CompileTimeValue::Bool(left && right)),
+        (
+            ParsedBinaryOperator::LogicalOr,
+            CompileTimeValue::Bool(left),
+            CompileTimeValue::Bool(right),
+        ) => Ok(CompileTimeValue::Bool(left || right)),
+        (ParsedBinaryOperator::Equal, left, right) => Ok(CompileTimeValue::Bool(left == right)),
+        (ParsedBinaryOperator::NotEqual, left, right) => Ok(CompileTimeValue::Bool(left != right)),
+        (operator, CompileTimeValue::Int(left), CompileTimeValue::Int(right)) => {
+            let value = match operator {
+                ParsedBinaryOperator::Plus => left.checked_add(right),
+                ParsedBinaryOperator::Minus => left.checked_sub(right),
+                ParsedBinaryOperator::Star => left.checked_mul(right),
+                ParsedBinaryOperator::Slash => left.checked_div(right),
+                ParsedBinaryOperator::Percent => left.checked_rem(right),
+                ParsedBinaryOperator::Exponent => u32::try_from(right)
+                    .ok()
+                    .and_then(|right| left.checked_pow(right)),
+                ParsedBinaryOperator::BitwiseAnd => Some(left & right),
+                ParsedBinaryOperator::BitwiseOr => Some(left | right),
+                ParsedBinaryOperator::BitwiseXor => Some(left ^ right),
+                ParsedBinaryOperator::ShiftLeft => u32::try_from(right)
+                    .ok()
+                    .and_then(|right| left.checked_shl(right)),
+                ParsedBinaryOperator::ShiftRight => u32::try_from(right)
+                    .ok()
+                    .and_then(|right| left.checked_shr(right)),
+                ParsedBinaryOperator::Less => return Ok(CompileTimeValue::Bool(left < right)),
+                ParsedBinaryOperator::Greater => return Ok(CompileTimeValue::Bool(left > right)),
+                ParsedBinaryOperator::LessEqual => {
+                    return Ok(CompileTimeValue::Bool(left <= right));
+                }
+                ParsedBinaryOperator::GreaterEqual => {
+                    return Ok(CompileTimeValue::Bool(left >= right));
+                }
+                _ => None,
+            };
+            value
+                .map(CompileTimeValue::Int)
+                .ok_or(CompileTimeEvaluationError::NotConstant)
+        }
+        (operator, CompileTimeValue::Float(left), CompileTimeValue::Float(right)) => {
+            let left = f64::from_bits(left);
+            let right = f64::from_bits(right);
+            let value = match operator {
+                ParsedBinaryOperator::Plus => CompileTimeValue::Float((left + right).to_bits()),
+                ParsedBinaryOperator::Minus => CompileTimeValue::Float((left - right).to_bits()),
+                ParsedBinaryOperator::Star => CompileTimeValue::Float((left * right).to_bits()),
+                ParsedBinaryOperator::Slash => CompileTimeValue::Float((left / right).to_bits()),
+                ParsedBinaryOperator::Less => CompileTimeValue::Bool(left < right),
+                ParsedBinaryOperator::Greater => CompileTimeValue::Bool(left > right),
+                ParsedBinaryOperator::LessEqual => CompileTimeValue::Bool(left <= right),
+                ParsedBinaryOperator::GreaterEqual => CompileTimeValue::Bool(left >= right),
+                _ => return Err(CompileTimeEvaluationError::NotConstant),
+            };
+            Ok(value)
+        }
+        (operator, CompileTimeValue::Byte(left), CompileTimeValue::Byte(right)) => {
+            let value = match operator {
+                ParsedBinaryOperator::Plus => left.checked_add(right),
+                ParsedBinaryOperator::Minus => left.checked_sub(right),
+                ParsedBinaryOperator::Star => left.checked_mul(right),
+                ParsedBinaryOperator::Slash => left.checked_div(right),
+                ParsedBinaryOperator::Percent => left.checked_rem(right),
+                ParsedBinaryOperator::BitwiseAnd => Some(left & right),
+                ParsedBinaryOperator::BitwiseOr => Some(left | right),
+                ParsedBinaryOperator::BitwiseXor => Some(left ^ right),
+                ParsedBinaryOperator::ShiftLeft => left.checked_shl(u32::from(right)),
+                ParsedBinaryOperator::ShiftRight => left.checked_shr(u32::from(right)),
+                _ => None,
+            };
+            value
+                .map(CompileTimeValue::Byte)
+                .ok_or(CompileTimeEvaluationError::NotConstant)
+        }
+        _ => Err(CompileTimeEvaluationError::NotConstant),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

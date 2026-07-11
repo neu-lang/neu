@@ -15,13 +15,13 @@ use compiler::{
     source::SourceFileId,
     symbol::{SymbolId, SymbolInterner},
     type_check::{
-        AmbiguousTypeRule, AssignmentCheck, DeclarationSignature, DirectCallDiagnosticKind,
-        EligibleNullTestRefinement, EntryPointDiagnosticKind, EntryPointFile,
-        ExecutableSourceTypes, ExpressionType, KnownSymbolType, LiteralExpressionInput,
-        LiteralKind, NullTestRefinedBranch, RecognizedNullTest, RefinedExpressionType,
-        RefinementRecord, ReturnPathDiagnosticKind, ReturnTypeDiagnosticKind, TypeCheckDiagnostic,
-        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
-        apply_m0028_direct_call_results, build_m0020_capability_bound_records,
+        AmbiguousTypeRule, AssignmentCheck, CompileTimeValue, DeclarationSignature,
+        DirectCallDiagnosticKind, EligibleNullTestRefinement, EntryPointDiagnosticKind,
+        EntryPointFile, ExecutableSourceTypes, ExpressionType, KnownSymbolType,
+        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
+        RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
+        ReturnTypeDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
+        TypeRuleDiagnostic, apply_m0028_direct_call_results, build_m0020_capability_bound_records,
         build_m0020_generic_parameter_types, check_m0028_direct_calls, check_m0028_entry_point,
         check_m0028_return_expression_types, check_m0028_straight_line_returns,
         check_m0028_unsupported_executable_forms, known_local_symbol_types,
@@ -36,10 +36,47 @@ use compiler::{
         type_m0028_function_signatures_in, type_m0028_static_integer_diagnostics,
         type_m0035_primitive_operators, type_parser_literals, type_primitive_local_declarations,
         type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        type_unsupported_m0018_expressions,
+        type_unsupported_m0018_expressions, validate_m0061_compile_time_constants,
     },
     types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
 };
+
+#[test]
+fn m0061_const_expression_produces_a_typed_compile_time_fact() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(1004),
+        "fun run() { const answer: Int = 1 + 2; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = TypeArena::new();
+    let mut report = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+    let expression_types = report.expression_types().to_vec();
+    validate_m0061_compile_time_constants(&parsed, &expression_types, &types, &mut report);
+    assert!(
+        report.diagnostics().is_empty(),
+        "{:?}",
+        report.diagnostics()
+    );
+    assert_eq!(report.compile_time_constants().len(), 1);
+    assert_eq!(
+        report.compile_time_constants()[0].value(),
+        CompileTimeValue::Int(3)
+    );
+}
 
 #[test]
 fn m0019_mutation_invalidation_classifies_only_exact_post_region_bare_name_initializer() {

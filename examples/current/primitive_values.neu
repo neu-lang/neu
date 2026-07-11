@@ -1,14 +1,15 @@
 package examples.current
 
 public fun main(): Int {
-    const ready: Bool = true;
-    const ratio: Float = 3.75;
-    const mask: Byte = 0xff;
-    const complete: Unit = ();
+    val ready: Bool = true;
+    val ratio: Float = 3.75;
+    val mask: Byte = 0xff;
+    val complete: Unit = ();
+    const answer: Int = 1 + 2;
     if (true) {
-        const selected: Int = 7;
+        val selected: Int = 7;
     } else {
-        const selected: Int = 0;
+        val selected: Int = 0;
     }
     return 7;
 }

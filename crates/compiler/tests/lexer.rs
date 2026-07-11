@@ -50,10 +50,10 @@ fn lexes_keywords_and_identifiers() {
 }
 
 #[test]
-fn const_is_reserved_and_val_is_an_ordinary_identifier() {
+fn val_and_const_are_reserved_keywords() {
     assert_eq!(
-        kinds("const val var"),
-        vec![TokenKind::KwConst, TokenKind::Identifier, TokenKind::KwVar]
+        format!("{:?}", kinds("val const var")),
+        "[KwVal, KwConst, KwVar]"
     );
 }
 

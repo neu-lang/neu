@@ -756,7 +756,7 @@ fn records_local_immutable_and_var_binding_name_metadata() {
 fn parses_const_declarations_and_val_binding_names() {
     let output = parse_source(
         SourceFileId::from_raw(93),
-        "fun run() { const val: Int = 1; var val = 2; }",
+        "fun run() { val answer: Int = 1; const count: Int = 2; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -766,37 +766,22 @@ fn parses_const_declarations_and_val_binding_names() {
         output.local_binding_names[0].kind,
         LocalBindingKind::Immutable
     );
-    assert_eq!(output.local_binding_names[0].name, "val");
-    assert_eq!(output.local_binding_names[1].kind, LocalBindingKind::Var);
-    assert_eq!(output.local_binding_names[1].name, "val");
+    assert_eq!(output.local_binding_names[0].name, "answer");
+    assert_eq!(
+        output.local_binding_names[1].kind,
+        LocalBindingKind::Immutable
+    );
+    assert_eq!(output.local_binding_names[1].name, "count");
 }
 
 #[test]
-fn removed_val_introducer_uses_ordinary_recovery_without_a_binding_alias() {
-    let source = "fun run() { val removed = 1; var retained = 2; }";
+fn const_requires_a_compile_time_initializer() {
+    let source = "fun run() { const value = compute(); }";
     let output = parse_source(SourceFileId::from_raw(94), source);
 
     assert!(output.lex_diagnostics.is_empty());
-    assert_eq!(
-        output
-            .diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.kind)
-            .collect::<Vec<_>>(),
-        vec![DiagnosticKind::UnexpectedTokenInStatement]
-    );
-    assert_eq!(
-        &source[output.diagnostics[0].span.start()..output.diagnostics[0].span.end()],
-        "val"
-    );
+    assert!(output.diagnostics.is_empty());
     assert_eq!(output.local_binding_names.len(), 1);
-    assert_eq!(output.local_binding_names[0].kind, LocalBindingKind::Var);
-    assert_eq!(output.local_binding_names[0].name, "retained");
-    assert!(
-        output.local_declarations.iter().all(|declaration| {
-            declaration.declaration == output.local_binding_names[0].binding
-        })
-    );
 }
 
 #[test]

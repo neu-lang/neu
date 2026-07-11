@@ -36,7 +36,8 @@ The first executable smoke subset includes only:
   `Int` return types, and bodies;
 - the accepted `main` form from ADR-0040;
 - `Int` parameters and `Int` local bindings;
-- local `const` and `var` declarations whose initializers are executable-subset
+- local `val`, `const`, and `var` declarations whose initializers are
+  executable-subset
   expressions;
 - assignments to local `var` bindings with executable-subset expressions;
 - integer literals in the ADR-0043 bootstrap `Int` range;
