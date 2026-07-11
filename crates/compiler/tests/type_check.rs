@@ -19,10 +19,11 @@ use compiler::{
         EligibleNullTestRefinement, EntryPointDiagnosticKind, EntryPointFile,
         ExecutableSourceTypes, ExpressionType, KnownSymbolType, LiteralExpressionInput,
         LiteralKind, NullTestRefinedBranch, RecognizedNullTest, RefinedExpressionType,
-        RefinementRecord, ReturnPathDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
-        TypeCheckReport, TypeRuleDiagnostic, apply_m0028_direct_call_results,
-        build_m0020_capability_bound_records, build_m0020_generic_parameter_types,
-        check_m0028_direct_calls, check_m0028_entry_point, check_m0028_straight_line_returns,
+        RefinementRecord, ReturnPathDiagnosticKind, ReturnTypeDiagnosticKind, TypeCheckDiagnostic,
+        TypeCheckDiagnosticKind, TypeCheckReport, TypeRuleDiagnostic,
+        apply_m0028_direct_call_results, build_m0020_capability_bound_records,
+        build_m0020_generic_parameter_types, check_m0028_direct_calls, check_m0028_entry_point,
+        check_m0028_return_expression_types, check_m0028_straight_line_returns,
         known_local_symbol_types, recognize_m0019_null_tests, record_m0019_branch_refinements,
         record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
         type_assignment_statements, type_grouped_expressions, type_literal_expressions,
@@ -4399,4 +4400,47 @@ fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
             && diagnostic.rule() == TypeRuleDiagnostic::DirectCallDeferred
             && diagnostic.node() == call.expression
     }));
+}
+
+#[test]
+fn m0028_return_expression_types_report_known_mismatches_only() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(128),
+        "fun bad(): Int { return true; } fun unresolved(): Int { return missing; } fun valid(): Int { return 1; }",
+    );
+    let mut types = TypeArena::new();
+    let signatures = type_m0028_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    let expressions = type_m0028_executable_core_in(
+        &mut types,
+        &parsed.arena,
+        &parsed.local_declarations,
+        &parsed.type_name_references,
+        &parsed.literal_expressions,
+        &parsed.integer_literals,
+        &parsed.grouped_expressions,
+        &parsed.unary_expressions,
+        &parsed.binary_expressions,
+        &parsed.assignment_statements,
+        &ResolutionTable::new(),
+        &[],
+    );
+
+    let report =
+        check_m0028_return_expression_types(&parsed, &signatures, expressions.expression_types());
+
+    assert_eq!(report.diagnostics().len(), 1);
+    assert_eq!(
+        report.diagnostics()[0].kind(),
+        ReturnTypeDiagnosticKind::ReturnTypeMismatch
+    );
+    let return_value = parsed.return_statements[0].value.unwrap();
+    assert_eq!(
+        report.diagnostics()[0].span(),
+        parsed.arena.node(return_value).unwrap().span
+    );
 }

@@ -21,8 +21,9 @@ declaration syntax is separate, so `parsed_surface.neu` retains its member
   one top-level `main` in the selected package, with no parameters, an `Int`
   return annotation, and a body. It also shows a same-package direct helper
   call with an `Int` argument. M0028 validates candidate selection, signature,
-  direct straight-line return paths, and direct-call executable-core typing;
-  compiler-driver orchestration remains later work.
+  direct straight-line return paths, direct-call executable-core typing, and
+  explicit `Int` return-value compatibility. Compiler-driver orchestration
+  remains later work.
 - `accepted_nullability_flow.neu` shows the M0019 nullability and flow-typing surface accepted by ADR-0028. The compiler records direct local null refinements and checks direct assignment-statement and annotated local-initializer values using valid per-use refinements. Grouped refinement propagation and end-to-end flow-pass orchestration remain pending.
 - `region_exit_refinement_error.neu` shows the accepted ADR-0031 diagnostic case: a later direct use of a nullable local after its guarded refinement branch reports `region_exit_invalidated_refinement` and is still treated as nullable for recovery.
 - `accepted_bootstrap_match.neu` shows the accepted ADR-0033 enum and `when` surface with the ADR-0034 typed parameter subject. The compiler validates resolved enum parameter subjects, resolves qualified variant arms, diagnoses duplicate enum and match-arm cases, and requires either every declared variant or a wildcard. Payloads, destructuring, and implicit smart casts remain deferred.

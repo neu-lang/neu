@@ -324,6 +324,36 @@ pub struct ReturnPathReport {
     diagnostics: Vec<ReturnPathDiagnostic>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReturnTypeDiagnosticKind {
+    ReturnTypeMismatch,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ReturnTypeDiagnostic {
+    kind: ReturnTypeDiagnosticKind,
+    span: ByteSpan,
+}
+
+impl ReturnTypeDiagnostic {
+    fn new(kind: ReturnTypeDiagnosticKind, span: ByteSpan) -> Self {
+        Self { kind, span }
+    }
+
+    pub fn kind(self) -> ReturnTypeDiagnosticKind {
+        self.kind
+    }
+
+    pub fn span(self) -> ByteSpan {
+        self.span
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ReturnTypeReport {
+    diagnostics: Vec<ReturnTypeDiagnostic>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionSignature {
     declaration: AstNodeId,
@@ -677,6 +707,12 @@ impl FunctionSignature {
 
 impl ReturnPathReport {
     pub fn diagnostics(&self) -> &[ReturnPathDiagnostic] {
+        &self.diagnostics
+    }
+}
+
+impl ReturnTypeReport {
+    pub fn diagnostics(&self) -> &[ReturnTypeDiagnostic] {
         &self.diagnostics
     }
 }
@@ -1324,6 +1360,43 @@ pub fn check_m0028_straight_line_returns(parsed: &ParseOutput) -> ReturnPathRepo
         }));
     }
     ReturnPathReport { diagnostics }
+}
+
+pub fn check_m0028_return_expression_types(
+    parsed: &ParseOutput,
+    signatures: &[FunctionSignature],
+    expression_types: &[ExpressionType],
+) -> ReturnTypeReport {
+    let mut diagnostics = Vec::new();
+
+    for returned in &parsed.return_statements {
+        let Some(value) = returned.value else {
+            continue;
+        };
+        let Some(expected) = signatures
+            .iter()
+            .find(|signature| signature.declaration == returned.function)
+            .map(|signature| signature.return_type)
+        else {
+            continue;
+        };
+        let Some(actual) = expression_types
+            .iter()
+            .find(|typed| typed.expression == value)
+            .map(|typed| typed.ty)
+        else {
+            continue;
+        };
+        if actual != expected {
+            let span = parsed.arena.node(value).expect("parsed return value").span;
+            diagnostics.push(ReturnTypeDiagnostic::new(
+                ReturnTypeDiagnosticKind::ReturnTypeMismatch,
+                span,
+            ));
+        }
+    }
+
+    ReturnTypeReport { diagnostics }
 }
 
 pub fn type_m0028_function_signatures(
