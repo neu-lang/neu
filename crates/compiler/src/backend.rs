@@ -294,6 +294,12 @@ fn lower_mir_function_with_module(
         let mut clif_blocks = HashMap::new();
         let mut locals = HashMap::new();
         for local in function.locals() {
+            if matches!(
+                type_arena.get(local.ty()).map(|record| record.kind()),
+                Some(TypeKind::Primitive(PrimitiveType::Unit))
+            ) {
+                continue;
+            }
             let local_type = cranelift_type(local.ty(), type_arena)
                 .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
             locals.insert(local.id(), builder.declare_var(local_type));

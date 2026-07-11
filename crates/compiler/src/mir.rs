@@ -458,11 +458,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     });
                 }
                 HirExpressionKind::LocalRead(local) => {
-                    instructions.push(MirInstruction::LoadLocal {
-                        output,
-                        local: MirLocalId::from_raw(local.index()),
-                        span: expression.span(),
-                    });
+                    if !matches!(
+                        types.get(expression.ty()).map(|record| record.kind()),
+                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    ) {
+                        instructions.push(MirInstruction::LoadLocal {
+                            output,
+                            local: MirLocalId::from_raw(local.index()),
+                            span: expression.span(),
+                        });
+                    }
                 }
                 HirExpressionKind::Binary(binary) => {
                     let left = MirValueId::from_raw(binary.left().index());
@@ -516,7 +521,12 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
             }
             for local in function.locals() {
-                if local.initializer() == Some(expression.id()) {
+                if local.initializer() == Some(expression.id())
+                    && !matches!(
+                        types.get(local.ty()).map(|record| record.kind()),
+                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    )
+                {
                     instructions.push(MirInstruction::StoreLocal {
                         local: MirLocalId::from_raw(local.id().index()),
                         value: output,
@@ -525,7 +535,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
             }
             for assignment in function.assignments() {
-                if assignment.value().index() == expression.id().index() {
+                if assignment.value().index() == expression.id().index()
+                    && !matches!(
+                        function
+                            .locals()
+                            .iter()
+                            .find(|local| local.id() == assignment.target())
+                            .map(|local| types.get(local.ty()).map(|record| record.kind())),
+                        Some(Some(TypeKind::Primitive(PrimitiveType::Unit)))
+                    )
+                {
                     instructions.push(MirInstruction::StoreLocal {
                         local: MirLocalId::from_raw(assignment.target().index()),
                         value: output,
@@ -737,11 +756,16 @@ impl<'a> ShortCircuitLowerer<'a> {
                 self.push(MirInstruction::unit_constant(expression.span()));
             }
             HirExpressionKind::LocalRead(local) => {
-                self.push(MirInstruction::LoadLocal {
-                    output,
-                    local: MirLocalId::from_raw(local.index()),
-                    span: expression.span(),
-                });
+                if !matches!(
+                    self.types.get(expression.ty()).map(|record| record.kind()),
+                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                ) {
+                    self.push(MirInstruction::LoadLocal {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        span: expression.span(),
+                    });
+                }
             }
             HirExpressionKind::Binary(binary)
                 if matches!(
@@ -857,7 +881,12 @@ impl<'a> ShortCircuitLowerer<'a> {
             }
         }
         for local in self.function.locals() {
-            if local.initializer() == Some(expression.id()) {
+            if local.initializer() == Some(expression.id())
+                && !matches!(
+                    self.types.get(local.ty()).map(|record| record.kind()),
+                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                )
+            {
                 self.push(MirInstruction::StoreLocal {
                     local: MirLocalId::from_raw(local.id().index()),
                     value: output,
@@ -866,7 +895,16 @@ impl<'a> ShortCircuitLowerer<'a> {
             }
         }
         for assignment in self.function.assignments() {
-            if assignment.value().index() == expression.id().index() {
+            if assignment.value().index() == expression.id().index()
+                && !matches!(
+                    self.function
+                        .locals()
+                        .iter()
+                        .find(|local| local.id() == assignment.target())
+                        .map(|local| self.types.get(local.ty()).map(|record| record.kind())),
+                    Some(Some(TypeKind::Primitive(PrimitiveType::Unit)))
+                )
+            {
                 self.push(MirInstruction::StoreLocal {
                     local: MirLocalId::from_raw(assignment.target().index()),
                     value: output,
