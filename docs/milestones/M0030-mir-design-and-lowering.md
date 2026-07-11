@@ -86,6 +86,6 @@ The expected architecture places MIR before optimization and backend code genera
 
 ## Completion Checklist
 
-- [ ] MIR model exists.
+- [x] MIR model exists.
 - [ ] HIR lowers to MIR.
 - [ ] MIR is backend-independent.
