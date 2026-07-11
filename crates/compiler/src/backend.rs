@@ -113,6 +113,34 @@ fn lower_instruction(
             values.insert(*output, sum);
             Ok(())
         }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation: MirArithmetic::Subtract,
+            left,
+            right,
+            ..
+        } => {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let difference = builder.ins().isub(left, right);
+            let operand_sign_difference = builder.ins().bxor(left, right);
+            let result_sign_difference = builder.ins().bxor(left, difference);
+            let signed_change = builder
+                .ins()
+                .band(operand_sign_difference, result_sign_difference);
+            let overflow = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, signed_change, 0);
+            builder.ins().trapnz(overflow, TrapCode::INTEGER_OVERFLOW);
+            values.insert(*output, difference);
+            Ok(())
+        }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),
     }
 }
