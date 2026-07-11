@@ -84,6 +84,15 @@ ADR-0020 selects bundled target packs with explicit target triples, standard lay
 
 ## Completion Checklist
 
-- [ ] Target metadata exists.
-- [ ] Explicit target selection works.
-- [ ] Cross-compilation smoke path is tested.
+- [x] Target metadata exists for the host and x86-64 Linux packs, including
+  validated capability profiles.
+- [x] Explicit target selection works through the target-pack registry.
+- [x] Cross-compilation smoke emits and links an x86-64 ELF output without
+  claiming foreign-host execution.
+
+## Completion Evidence
+
+- `M0033-001` provides explicit target-pack registry resolution.
+- `M0033-002` accepts and validates ADR-0058 capability profiles.
+- `M0033-003` performs the non-host Cranelift-to-ELF link smoke.
+- `M0033-004` validates deterministic inventory and directory/manifest identity.
