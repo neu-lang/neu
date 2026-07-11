@@ -91,8 +91,8 @@ Before declaring a milestone release, the compiler must be audited against the s
 
 ## Completion Checklist
 
-- [ ] Full CI passes.
-- [ ] Spec compliance report is complete.
-- [ ] Diagnostic report is complete.
-- [ ] Build report is complete.
-- [ ] Deferred decisions are listed.
+- [x] Full CI passes.
+- [x] Spec compliance report is complete.
+- [x] Diagnostic report is complete.
+- [x] Build report is complete.
+- [x] Deferred decisions are listed.
