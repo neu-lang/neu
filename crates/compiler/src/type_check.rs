@@ -884,6 +884,53 @@ pub fn apply_m0068_class_type_facts(
         }
     }
     report.retain_diagnostics(|diagnostic| {
+        if diagnostic.rule() != AmbiguousTypeRule::AssignmentCompatibility {
+            return true;
+        }
+        let Some(declaration) = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == diagnostic.node())
+        else {
+            return true;
+        };
+        let Some(interface_name) = declaration
+            .annotation
+            .and_then(|annotation| {
+                parsed
+                    .type_name_references
+                    .iter()
+                    .find(|reference| reference.reference == annotation)
+            })
+            .map(|reference| reference.name.as_str())
+        else {
+            return true;
+        };
+        let Some(initializer) = declaration.initializer.and_then(|initializer| {
+            parsed
+                .new_expressions
+                .iter()
+                .find(|expression| expression.expression == initializer)
+        }) else {
+            return true;
+        };
+        let Some(concrete) = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == initializer.type_name)
+        else {
+            return true;
+        };
+        !(concrete
+            .interfaces
+            .iter()
+            .any(|interface| interface == interface_name)
+            && parsed
+                .class_declarations
+                .iter()
+                .any(|class| class.interface && class.name == interface_name))
+    });
+    report.retain_diagnostics(|diagnostic| {
         !matches!(diagnostic.rule(), TypeRuleDiagnostic::MissingAnnotationType)
             || !parsed.local_declarations.iter().any(|declaration| {
                 diagnostic.node() == declaration.declaration
@@ -914,13 +961,46 @@ pub fn apply_m0068_field_access_facts(
         let Some(receiver_type) = report.expression_type(member.receiver) else {
             continue;
         };
-        let Some(class) = classes
+        let Some(mut class) = classes
             .classes
             .iter()
             .find(|class| class.type_id == receiver_type)
         else {
             continue;
         };
+        if parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.declaration == class.declaration)
+            .is_some_and(|candidate| candidate.interface)
+            && let Some(name) = parsed
+                .name_references
+                .iter()
+                .find(|name| name.reference == member.receiver)
+            && let Some(binding) = parsed
+                .local_binding_names
+                .iter()
+                .find(|binding| binding.name == name.name)
+            && let Some(local) = parsed
+                .local_declarations
+                .iter()
+                .find(|local| local.declaration == binding.binding)
+            && let Some(initializer) = local.initializer.and_then(|initializer| {
+                parsed
+                    .new_expressions
+                    .iter()
+                    .find(|expression| expression.expression == initializer)
+            })
+            && let Some(concrete) = classes.classes.iter().find(|candidate| {
+                parsed
+                    .class_declarations
+                    .iter()
+                    .find(|class| class.declaration == candidate.declaration)
+                    .is_some_and(|class| class.name == initializer.type_name)
+            })
+        {
+            class = concrete;
+        }
         let Some(field) = classes
             .fields
             .iter()
@@ -2136,7 +2216,6 @@ pub fn check_m0028_unsupported_executable_forms(
                 AstNodeKind::ImportDeclaration
                     | AstNodeKind::StructDeclaration
                     | AstNodeKind::EnumDeclaration
-                    | AstNodeKind::InterfaceDeclaration
                     | AstNodeKind::NullableType
                     | AstNodeKind::GenericParameter
                     | AstNodeKind::GenericArgument
@@ -2179,7 +2258,7 @@ pub fn check_m0028_unsupported_executable_forms(
         parsed
             .function_declarations
             .iter()
-            .filter(|function| function.body.is_none())
+            .filter(|function| function.body.is_none() && function.owner.is_none())
             .filter_map(|function| {
                 parsed
                     .arena

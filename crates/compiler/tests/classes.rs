@@ -247,3 +247,54 @@ fn mutates_a_var_field_and_rejects_val_field_writes() {
     assert!(format!("{error:?}").contains("ImmutableFieldMutation"));
     let _ = fs::remove_dir_all(readonly);
 }
+
+#[test]
+fn dispatches_a_class_through_an_interface_type() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-smoke-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "interface Answer { fun answer(): Int; } class Point: Answer { fun answer(): Int { return 11; } } public fun main(): Int { val value: Answer = new Point(); return value.answer(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6813),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(11)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn accepts_derived_to_base_assignment() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-derived-base-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base() {} class Child: Base() {} public fun main(): Int { val base: Base = new Child(); return 13; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6814),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(13)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}

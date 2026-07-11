@@ -43,6 +43,9 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("primitive_values", 7),
         ("fixed_arrays", 7),
         ("strings", 7),
+        ("classes", 7),
+        ("class_methods", 9),
+        ("interfaces", 11),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

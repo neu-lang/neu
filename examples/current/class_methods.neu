@@ -1,0 +1,12 @@
+package examples.current
+
+class Answer {
+    open fun value(): Int {
+        return 9;
+    }
+}
+
+public fun main(): Int {
+    val answer: Answer = new Answer();
+    return answer.value();
+}

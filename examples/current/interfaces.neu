@@ -1,0 +1,16 @@
+package examples.current
+
+interface Answerable {
+    fun value(): Int;
+}
+
+class Answer: Answerable {
+    fun value(): Int {
+        return 11;
+    }
+}
+
+public fun main(): Int {
+    val answer: Answerable = new Answer();
+    return answer.value();
+}

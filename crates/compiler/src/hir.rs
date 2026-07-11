@@ -88,6 +88,9 @@ pub fn lower_checked_hir_source(
     }
     let mut functions = Vec::new();
     for function in &source.parsed.function_declarations {
+        if function.body.is_none() {
+            continue;
+        }
         let Some(signature) = source
             .signatures
             .iter()
