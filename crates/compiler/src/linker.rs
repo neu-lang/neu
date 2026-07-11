@@ -15,6 +15,17 @@ pub enum LinkInvocationError {
     MissingOutput,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutableRunError {
+    Unavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExecutableRunOutcome {
+    Exited(i32),
+    Signaled,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkInvocation {
     program: PathBuf,
@@ -76,5 +87,14 @@ impl LinkInvocation {
         } else {
             Err(LinkInvocationError::LinkerFailed(status.code()))
         }
+    }
+
+    pub fn run(&self) -> Result<ExecutableRunOutcome, ExecutableRunError> {
+        let status = Command::new(&self.output)
+            .status()
+            .map_err(|_| ExecutableRunError::Unavailable)?;
+        Ok(status
+            .code()
+            .map_or(ExecutableRunOutcome::Signaled, ExecutableRunOutcome::Exited))
     }
 }

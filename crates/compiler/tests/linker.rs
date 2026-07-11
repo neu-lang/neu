@@ -41,6 +41,20 @@ fn output_producing_linker(root: &Path) {
     fs::set_permissions(root.join("bin/lld"), permissions).unwrap();
 }
 
+#[cfg(unix)]
+fn executable_program(root: &Path, exit_code: i32) {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::write(
+        root.join("program"),
+        format!("#!/bin/sh\ntest \"$#\" -eq 0 || exit 99\nexit {exit_code}\n"),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(root.join("program")).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(root.join("program"), permissions).unwrap();
+}
+
 #[test]
 fn m0032_builds_deterministic_link_invocation_plan() {
     let root = fixture_root("valid");
@@ -248,6 +262,65 @@ fn m0032_rejects_linker_success_without_output() {
     assert_eq!(
         plan.execute(),
         Err(compiler::linker::LinkInvocationError::MissingOutput)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn m0032_runs_linked_output_without_arguments() {
+    let root = fixture_root("run-success");
+    executable_program(&root, 17);
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), root.join("program")).unwrap();
+
+    assert_eq!(
+        plan.run(),
+        Ok(compiler::linker::ExecutableRunOutcome::Exited(17))
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[cfg(unix)]
+#[test]
+fn m0032_reports_unavailable_executable() {
+    let root = fixture_root("run-unavailable");
+    let pack = compiler::target_pack::TargetPack::resolve(
+        &root,
+        TargetPackManifest::new(
+            Triple::host(),
+            "macho",
+            "macho",
+            "bin/lld",
+            "runtime/startup.o",
+            "_start",
+            "neu_lang_main",
+            1,
+        )
+        .unwrap(),
+        Triple::host(),
+    )
+    .unwrap();
+    let plan = LinkInvocation::new(&pack, root.join("program.o"), root.join("program")).unwrap();
+
+    assert_eq!(
+        plan.run(),
+        Err(compiler::linker::ExecutableRunError::Unavailable)
     );
     let _ = fs::remove_dir_all(root);
 }
