@@ -3,7 +3,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-use object::{Object, ObjectSymbol};
+use object::{Object, ObjectSection, ObjectSymbol};
 use serde::Deserialize;
 use target_lexicon::Triple;
 
@@ -56,6 +56,7 @@ pub enum TargetPackError {
     InvalidStartupShim,
     StartupShimFormatMismatch,
     MissingStartupEntrySymbol,
+    MissingLanguageEntryRelocation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -180,6 +181,7 @@ impl TargetPack {
             &startup_shim_path,
             &manifest.object_format,
             &manifest.entry_symbol,
+            &manifest.language_entry_symbol,
         )?;
 
         Ok(Self {
@@ -271,6 +273,7 @@ fn validate_startup_shim(
     path: &Path,
     object_format: &str,
     entry_symbol: &str,
+    language_entry_symbol: &str,
 ) -> Result<(), TargetPackError> {
     let bytes = fs::read(path).map_err(|_| TargetPackError::InvalidStartupShim)?;
     let object =
@@ -279,11 +282,32 @@ fn validate_startup_shim(
     if object.format() != expected_format {
         return Err(TargetPackError::StartupShimFormatMismatch);
     }
-    if !object
-        .symbols()
-        .any(|symbol| symbol.name().is_ok_and(|name| name == entry_symbol))
-    {
+    if !object.symbols().any(|symbol| {
+        symbol
+            .name()
+            .is_ok_and(|name| symbol_name_matches(object.format(), name, entry_symbol))
+    }) {
         return Err(TargetPackError::MissingStartupEntrySymbol);
     }
+    let has_language_entry_relocation = object.sections().any(|section| {
+        section.relocations().any(|(_, relocation)| {
+            matches!(relocation.target(), object::RelocationTarget::Symbol(index)
+            if object.symbol_by_index(index).is_ok_and(|symbol| {
+                    symbol
+                        .name()
+                        .is_ok_and(|name| {
+                            symbol_name_matches(object.format(), name, language_entry_symbol)
+                        })
+                }))
+        })
+    });
+    if !has_language_entry_relocation {
+        return Err(TargetPackError::MissingLanguageEntryRelocation);
+    }
     Ok(())
+}
+
+fn symbol_name_matches(format: object::BinaryFormat, actual: &str, expected: &str) -> bool {
+    actual == expected
+        || (format == object::BinaryFormat::MachO && actual == format!("_{expected}"))
 }

@@ -3,49 +3,48 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use compiler::{
-    backend::emit_mir_function_to_object_with_entry_symbol,
-    linker::LinkInvocation,
-    mir::{
-        MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
-        MirTerminator, MirValueId,
-    },
-    module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
-    source::{ByteSpan, SourceFileId},
-    target_pack::TargetPackManifest,
-    types::{PrimitiveType, TypeArena, TypeRecord},
+use compiler::{linker::LinkInvocation, target_pack::TargetPackManifest};
+use cranelift_codegen::{
+    ir::{AbiParam, Function, InstBuilder, UserFuncName, types},
+    settings,
 };
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
 
 fn startup_shim_fixture() -> Vec<u8> {
-    let file = SourceFileId::from_raw(800);
-    let span = ByteSpan::new(file, 0, 10).unwrap();
-    let mut types = TypeArena::new();
-    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
-    let function = MirFunction::new(
-        MirFunctionId::from_raw(0),
-        span,
-        vec![],
-        int,
-        vec![],
-        vec![MirBasicBlock::new(
-            MirBlockId::from_raw(0),
-            vec![MirInstruction::int_constant(
-                MirValueId::from_raw(0),
-                0,
-                span,
-            )],
-            MirTerminator::return_value(MirValueId::from_raw(0), span),
-        )],
-        MirCleanupBoundary::empty(),
-    )
-    .with_symbol_identity(FunctionSymbolIdentity::new(
-        ModuleName::parse("runtime").unwrap(),
-        PackageNamespace::parse("bootstrap").unwrap(),
-        "start",
-    ))
-    .with_entry(true);
-    emit_mir_function_to_object_with_entry_symbol(&function, &types, "start").unwrap()
+    let triple = Triple::host();
+    let isa_builder = cranelift_codegen::isa::lookup_by_name(&triple.to_string()).unwrap();
+    let isa = isa_builder
+        .finish(settings::Flags::new(settings::builder()))
+        .unwrap();
+    let mut module =
+        ObjectModule::new(ObjectBuilder::new(isa, "startup", default_libcall_names()).unwrap());
+    let mut signature = module.make_signature();
+    signature.returns.push(AbiParam::new(types::I64));
+    let start = module
+        .declare_function("start", Linkage::Export, &signature)
+        .unwrap();
+    let language_main = module
+        .declare_function("neu_lang_main", Linkage::Import, &signature)
+        .unwrap();
+    let mut context = cranelift_codegen::Context::new();
+    context.func = Function::with_name_signature(UserFuncName::user(0, start.as_u32()), signature);
+    let mut builder_context = FunctionBuilderContext::new();
+    {
+        let mut builder = FunctionBuilder::new(&mut context.func, &mut builder_context);
+        let block = builder.create_block();
+        builder.switch_to_block(block);
+        let callee = module.declare_func_in_func(language_main, builder.func);
+        let call = builder.ins().call(callee, &[]);
+        let result = builder.inst_results(call)[0];
+        builder.ins().return_(&[result]);
+        builder.seal_block(block);
+        builder.finalize();
+    }
+    module.define_function(start, &mut context).unwrap();
+    module.finish().emit().unwrap()
 }
 
 fn fixture_root(name: &str) -> PathBuf {
