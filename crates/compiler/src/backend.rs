@@ -184,6 +184,24 @@ fn lower_instruction(
             values.insert(*output, builder.ins().sdiv(left, right));
             Ok(())
         }
+        MirInstruction::CheckedArithmetic {
+            output,
+            operation: MirArithmetic::Remainder,
+            left,
+            right,
+            ..
+        } => {
+            let left = values
+                .get(left)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let right = values
+                .get(right)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, builder.ins().srem(left, right));
+            Ok(())
+        }
         _ => Err(CraneliftLoweringError::UnsupportedInstruction),
     }
 }
