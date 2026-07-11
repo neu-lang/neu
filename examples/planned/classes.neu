@@ -1,0 +1,10 @@
+// Planned Neu class surface. Constructors and object lowering are not yet in
+// the runnable current-example set.
+class Point(val x: Int, var y: Int) {
+}
+
+interface Describable {
+}
+
+class ColoredPoint: Point(), Describable {
+}

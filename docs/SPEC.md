@@ -831,3 +831,46 @@ interface tables are compiler-private target-pack contracts. Separate
 compilation carries nominal identity, field types, visibility, lifecycle,
 capability, and ownership metadata, never raw offsets. Public object layout,
 stable object ABI, FFI, and standard-library allocation remain deferred.
+
+## ADR-0069: Primary Constructors And Construction
+
+A class may have one primary constructor parameter list after its name:
+`class Name(val field: T, var other: U) { ... }`. Constructor parameters
+marked `val` or `var` are fields initialized left to right. Unmarked parameters
+are temporary constructor parameters. Names must be unique; duplicate fields
+are diagnostics. The parameter list may be empty.
+
+The only construction expression is `new Name(argument1, argument2)`. Arguments
+evaluate left to right and match the primary constructor parameter types exactly.
+Secondary constructors, overloads, default arguments, implicit default
+constructors, and conversions are deferred. A superclass constructor is called
+explicitly with `super(...)` in the class header and completes before derived
+fields initialize. Interfaces have no constructors.
+
+Construction transfers owned arguments into fields, preserves inferred receiver
+and field effects, and provides no user-visible allocation, deallocation,
+pointer, or layout API. Missing or duplicate initialization is diagnosed before
+lowering; allocation failure and construction failure trap non-successfully,
+with reverse cleanup of fields initialized so far. Constructor bodies,
+secondary construction, reflection, exceptions, and FFI remain deferred until
+their own accepted contracts.
+
+## ADR-0068: Class And Field Surface Syntax
+
+`class` and `interface` are reserved declaration keywords. A class header is
+`class Name` optionally followed by `: Base(), InterfaceName, ...`; an
+interface may extend interfaces after `:`. Generic class and interface headers
+remain deferred.
+
+Class fields use an optional `public`, `internal`, or `private` modifier,
+followed by `val` or `var`, a name, `:`, and a declared type, terminated by
+`;`. `protected` is rejected. Fields have no declaration-time default
+initializer in this foundation; the primary constructor initializes every
+field under ADR-0067. Interface bodies contain required method declarations;
+default methods and interface fields are deferred.
+
+Field access is `receiver.field`. In an instance method or constructor, a bare
+field name means `this.field`; explicit `this.field` disambiguates a shadowed
+field. Task-008 records nominal and field metadata and type-checks projections
+only where an accepted receiver context exists. `new`, constructor calls,
+allocation, initialization, and runtime object access are deferred to task-009.

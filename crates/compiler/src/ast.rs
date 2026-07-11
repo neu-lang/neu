@@ -44,6 +44,7 @@ pub enum AstNodeKind {
     BinaryExpression,
     UnaryExpression,
     CallExpression,
+    NewExpression,
     ArrayLiteralExpression,
     IndexExpression,
     MemberExpression,
@@ -193,6 +194,10 @@ impl AstArena {
 
     pub fn add_call_expression(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::CallExpression, span)
+    }
+
+    pub fn add_new_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::NewExpression, span)
     }
 
     pub fn add_array_literal_expression(&mut self, span: ByteSpan) -> AstNodeId {

@@ -439,6 +439,7 @@ pub struct ClassTypeRecord {
     type_id: TypeId,
     superclass: Option<String>,
     interfaces: Vec<String>,
+    constructor_parameter_count: usize,
 }
 
 impl ClassTypeRecord {
@@ -453,6 +454,9 @@ impl ClassTypeRecord {
     }
     pub fn interfaces(&self) -> &[String] {
         &self.interfaces
+    }
+    pub fn constructor_parameter_count(&self) -> usize {
+        self.constructor_parameter_count
     }
 }
 
@@ -494,6 +498,56 @@ pub struct ClassTypeReport {
     diagnostics: Vec<TypeCheckDiagnostic>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConstructorDiagnosticKind {
+    UnknownClass,
+    ArgumentCountMismatch,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ConstructorDiagnostic {
+    kind: ConstructorDiagnosticKind,
+    span: ByteSpan,
+}
+
+impl ConstructorDiagnostic {
+    pub fn kind(self) -> ConstructorDiagnosticKind {
+        self.kind
+    }
+    pub fn span(self) -> ByteSpan {
+        self.span
+    }
+}
+
+pub fn check_m0069_constructor_calls(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+) -> Vec<ConstructorDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for expression in &parsed.new_expressions {
+        let Some(class) = classes.classes.iter().find(|class| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|declaration| declaration.declaration == class.declaration)
+                .is_some_and(|declaration| declaration.name == expression.type_name)
+        }) else {
+            diagnostics.push(ConstructorDiagnostic {
+                kind: ConstructorDiagnosticKind::UnknownClass,
+                span: expression.type_span,
+            });
+            continue;
+        };
+        if expression.arguments.len() != class.constructor_parameter_count {
+            diagnostics.push(ConstructorDiagnostic {
+                kind: ConstructorDiagnosticKind::ArgumentCountMismatch,
+                span: expression.span,
+            });
+        }
+    }
+    diagnostics
+}
+
 impl ClassTypeReport {
     pub fn classes(&self) -> &[ClassTypeRecord] {
         &self.classes
@@ -530,6 +584,7 @@ pub fn type_m0068_class_types(
             type_id,
             superclass: declaration.superclass.clone(),
             interfaces: declaration.interfaces.clone(),
+            constructor_parameter_count: declaration.constructor_parameters.len(),
         });
     }
     for field in &parsed.field_declarations {

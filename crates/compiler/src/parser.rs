@@ -85,6 +85,7 @@ pub struct ParseOutput {
     pub if_statements: Vec<ParsedIfStatement>,
     pub loop_control_statements: Vec<ParsedLoopControlStatement>,
     pub call_expressions: Vec<ParsedCallExpression>,
+    pub new_expressions: Vec<ParsedNewExpression>,
     pub enum_variants: Vec<ParsedEnumVariant>,
     pub when_expressions: Vec<ParsedWhenExpression>,
     pub match_arms: Vec<ParsedMatchArm>,
@@ -100,7 +101,17 @@ pub struct ParsedClassDeclaration {
     pub superclass: Option<String>,
     pub interfaces: Vec<String>,
     pub fields: Vec<AstNodeId>,
+    pub constructor_parameters: Vec<ParsedConstructorParameter>,
     pub interface: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedConstructorParameter {
+    pub name: String,
+    pub field: bool,
+    pub mutable: bool,
+    pub annotation: AstNodeId,
+    pub span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -205,6 +216,15 @@ pub struct ParsedCallExpression {
     pub function: AstNodeId,
     pub callee: AstNodeId,
     pub arguments: Vec<AstNodeId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedNewExpression {
+    pub expression: AstNodeId,
+    pub type_name: String,
+    pub type_span: ByteSpan,
+    pub arguments: Vec<AstNodeId>,
+    pub span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -469,6 +489,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         if_statements: parser.if_statements,
         loop_control_statements: parser.loop_control_statements,
         call_expressions: parser.call_expressions,
+        new_expressions: parser.new_expressions,
         enum_variants: parser.enum_variants,
         when_expressions: parser.when_expressions,
         match_arms: parser.match_arms,
@@ -513,6 +534,7 @@ struct Parser<'source> {
     if_statements: Vec<ParsedIfStatement>,
     loop_control_statements: Vec<ParsedLoopControlStatement>,
     call_expressions: Vec<ParsedCallExpression>,
+    new_expressions: Vec<ParsedNewExpression>,
     enum_variants: Vec<ParsedEnumVariant>,
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
@@ -546,6 +568,7 @@ impl<'source> Parser<'source> {
             if_statements: Vec::new(),
             loop_control_statements: Vec::new(),
             call_expressions: Vec::new(),
+            new_expressions: Vec::new(),
             enum_variants: Vec::new(),
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
@@ -947,6 +970,14 @@ impl<'source> Parser<'source> {
 
         self.parse_generic_parameters();
 
+        let constructor_parameters = if kind == AstNodeKind::ClassDeclaration
+            && self.current_kind() == Some(TokenKind::LeftParen)
+        {
+            self.parse_constructor_parameters()
+        } else {
+            Vec::new()
+        };
+
         let mut superclass = None;
         let mut interfaces = Vec::new();
         if self.current_kind() == Some(TokenKind::Colon) {
@@ -1028,6 +1059,7 @@ impl<'source> Parser<'source> {
                 superclass,
                 interfaces,
                 fields,
+                constructor_parameters,
                 interface: false,
             });
         } else if kind == AstNodeKind::InterfaceDeclaration {
@@ -1038,6 +1070,7 @@ impl<'source> Parser<'source> {
                 superclass,
                 interfaces,
                 fields: Vec::new(),
+                constructor_parameters: Vec::new(),
                 interface: true,
             });
         } else {
@@ -1128,6 +1161,65 @@ impl<'source> Parser<'source> {
             self.advance();
         }
         fields
+    }
+
+    fn parse_constructor_parameters(&mut self) -> Vec<ParsedConstructorParameter> {
+        self.advance();
+        let mut parameters = Vec::new();
+        while self.current_kind() != Some(TokenKind::RightParen) && !self.is_eof() {
+            let (field, mutable) = match self.current_kind() {
+                Some(TokenKind::KwVal) => {
+                    self.advance();
+                    (true, false)
+                }
+                Some(TokenKind::KwVar) => {
+                    self.advance();
+                    (true, true)
+                }
+                _ => (false, false),
+            };
+            let Some(name) = self.current().cloned() else {
+                self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+                break;
+            };
+            if name.kind != TokenKind::Identifier {
+                self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+                self.skip_to_declaration_boundary(false);
+                break;
+            }
+            self.advance();
+            if self.current_kind() != Some(TokenKind::Colon) {
+                self.diagnostic_current(DiagnosticKind::MissingTypeName);
+                self.skip_to_declaration_boundary(false);
+                break;
+            }
+            self.advance();
+            let Some(annotation_span) = self.parse_type() else {
+                break;
+            };
+            let Some(annotation) = self.latest_type_node_for_span(annotation_span) else {
+                break;
+            };
+            parameters.push(ParsedConstructorParameter {
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                field,
+                mutable,
+                annotation,
+                span: self.span(name.span.start(), annotation_span.end()),
+            });
+            match self.current_kind() {
+                Some(TokenKind::Comma) => self.advance(),
+                Some(TokenKind::RightParen) => break,
+                _ => {
+                    self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+                    break;
+                }
+            }
+        }
+        if self.current_kind() == Some(TokenKind::RightParen) {
+            self.advance();
+        }
+        parameters
     }
 
     fn record_declaration_name(
@@ -1914,6 +2006,7 @@ impl<'source> Parser<'source> {
 
     fn parse_primary_expression(&mut self) -> Option<ByteSpan> {
         match self.current_kind() {
+            Some(TokenKind::KwNew) => self.parse_new_expression(),
             Some(TokenKind::LeftBracket) => self.parse_array_literal(),
             Some(
                 TokenKind::IntDecimal
@@ -2003,6 +2096,57 @@ impl<'source> Parser<'source> {
                 None
             }
         }
+    }
+
+    fn parse_new_expression(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        let type_token = self.current()?.clone();
+        if type_token.kind != TokenKind::Identifier {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedCallExpression,
+                self.span_at(start),
+            );
+            return None;
+        }
+        let type_name = self.text[type_token.span.start()..type_token.span.end()].to_owned();
+        self.advance();
+        if self.current_kind() != Some(TokenKind::LeftParen) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedCallExpression,
+                type_token.span,
+            );
+            return None;
+        }
+        self.advance();
+        let mut arguments = Vec::new();
+        if self.current_kind() != Some(TokenKind::RightParen) {
+            loop {
+                let argument_span = self.parse_expression()?;
+                let argument = self.latest_expression_node_for_span(argument_span)?;
+                arguments.push(argument);
+                match self.current_kind() {
+                    Some(TokenKind::Comma) => self.advance(),
+                    Some(TokenKind::RightParen) => break,
+                    _ => {
+                        self.diagnostic_current(DiagnosticKind::MalformedCallExpression);
+                        return None;
+                    }
+                }
+            }
+        }
+        let end = self.current()?.span.end();
+        self.advance();
+        let span = self.span(start, end);
+        let expression = self.arena.add_new_expression(span);
+        self.new_expressions.push(ParsedNewExpression {
+            expression,
+            type_name,
+            type_span: type_token.span,
+            arguments,
+            span,
+        });
+        Some(span)
     }
 
     fn parse_array_literal(&mut self) -> Option<ByteSpan> {
