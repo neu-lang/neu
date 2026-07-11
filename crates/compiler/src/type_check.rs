@@ -737,7 +737,21 @@ pub fn type_m0068_class_types(
     package: &PackageNamespace,
 ) -> (TypeArena, ClassTypeReport) {
     let mut types = TypeArena::new();
-    let primitives = PrimitiveTypeIds::insert_into(&mut types);
+    let report = type_m0068_class_types_in(&mut types, parsed, module, package);
+    (types, report)
+}
+
+pub fn type_m0068_class_types_in(
+    types: &mut TypeArena,
+    parsed: &ParseOutput,
+    module: &ModuleName,
+    package: &PackageNamespace,
+) -> ClassTypeReport {
+    let primitives = if types.records().is_empty() {
+        PrimitiveTypeIds::insert_into(types)
+    } else {
+        PrimitiveTypeIds::module_owned(types)
+    };
     let mut interner = SymbolInterner::new();
     let mut report = ClassTypeReport::default();
     let mut class_ids = Vec::new();
@@ -823,7 +837,68 @@ pub fn type_m0068_class_types(
         }
     }
     let _ = class_ids;
-    (types, report)
+    report
+}
+
+pub fn apply_m0068_class_type_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+) {
+    for declaration in &parsed.local_declarations {
+        let Some(annotation) = declaration.annotation else {
+            continue;
+        };
+        let Some(reference) = parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == annotation)
+        else {
+            continue;
+        };
+        let Some(class) = classes.classes.iter().find(|class| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.declaration == class.declaration)
+                .is_some_and(|candidate| candidate.name == reference.name)
+        }) else {
+            continue;
+        };
+        report.replace_declaration_signature(DeclarationSignature::new(
+            declaration.declaration,
+            class.type_id,
+        ));
+    }
+    for expression in &parsed.new_expressions {
+        if let Some(class) = classes.classes.iter().find(|class| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.declaration == class.declaration)
+                .is_some_and(|candidate| candidate.name == expression.type_name)
+        }) {
+            report
+                .replace_expression_type(ExpressionType::new(expression.expression, class.type_id));
+        }
+    }
+    report.retain_diagnostics(|diagnostic| {
+        !matches!(diagnostic.rule(), TypeRuleDiagnostic::MissingAnnotationType)
+            || !parsed.local_declarations.iter().any(|declaration| {
+                diagnostic.node() == declaration.declaration
+                    && declaration.annotation.is_some_and(|annotation| {
+                        parsed.type_name_references.iter().any(|reference| {
+                            reference.reference == annotation
+                                && classes.classes.iter().any(|class| {
+                                    parsed.class_declarations.iter().any(|candidate| {
+                                        candidate.declaration == class.declaration
+                                            && candidate.name == reference.name
+                                    })
+                                })
+                        })
+                    })
+            })
+    });
 }
 
 fn primitive_annotation_type_for_node(
@@ -1675,6 +1750,12 @@ impl TypeCheckReport {
     }
 
     pub fn record_declaration_signature(&mut self, signature: DeclarationSignature) {
+        self.declaration_signatures.push(signature);
+    }
+
+    pub fn replace_declaration_signature(&mut self, signature: DeclarationSignature) {
+        self.declaration_signatures
+            .retain(|entry| entry.declaration() != signature.declaration());
         self.declaration_signatures.push(signature);
     }
 

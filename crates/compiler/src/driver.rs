@@ -23,11 +23,12 @@ use crate::{
         DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes,
         ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
         UnsupportedExecutableFormDiagnostic, apply_m0028_direct_call_results,
-        apply_m0060_control_flow_results, check_m0028_direct_calls, check_m0028_entry_point,
-        check_m0028_return_expression_types, check_m0028_straight_line_returns,
-        check_m0028_unsupported_executable_forms, type_m0028_executable_core_in,
-        type_m0060_control_flow, type_m0063_array_expressions, type_m0063_function_signatures_in,
-        type_m0064_string_operations, validate_m0061_compile_time_constants,
+        apply_m0060_control_flow_results, apply_m0068_class_type_facts, check_m0028_direct_calls,
+        check_m0028_entry_point, check_m0028_return_expression_types,
+        check_m0028_straight_line_returns, check_m0028_unsupported_executable_forms,
+        type_m0028_executable_core_in, type_m0060_control_flow, type_m0063_array_expressions,
+        type_m0063_function_signatures_in, type_m0064_string_operations, type_m0068_class_types_in,
+        validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -137,6 +138,8 @@ pub fn compile_source_to_executable(
         .resolve(options.target())
         .map_err(DriverError::TargetPack)?;
     let mut types = TypeArena::new();
+    let class_types =
+        type_m0068_class_types_in(&mut types, &parsed, options.module(), options.package());
     let signatures = type_m0063_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
@@ -158,6 +161,7 @@ pub fn compile_source_to_executable(
         &crate::name_resolution::ResolutionTable::new(),
         &[],
     );
+    apply_m0068_class_type_facts(&parsed, &class_types, &mut report);
     type_m0063_array_expressions(&mut types, &parsed, &mut report);
     type_m0064_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
     let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
