@@ -487,8 +487,10 @@ Classes, structs at runtime, interfaces, enums at runtime, generics, nullable
 runtime representation, heap allocation, destructuring, pattern matching,
 loops, broader branching, coroutines, unsafe, FFI, printing, strings, standard
 library calls, scheduler/runtime work, exceptions or panics as language
-constructs, closures, methods, member access, arrays, and target-pack APIs are
-deferred. Unsupported parsed forms must fail before backend lowering with
+constructs, closures, methods, and member access remain deferred. Fixed-size
+inline arrays are accepted only as defined by ADR-0063; dynamic arrays, slices,
+and target-pack APIs remain deferred. Unsupported parsed forms must fail before
+backend lowering with
 `unsupported_executable_form` or a more specific existing diagnostic. M0028
 must add parser and type-checker support for executable operators not already
 covered by ADR-0024 before HIR lowering consumes executable fixtures.
@@ -579,10 +581,11 @@ The owning module `TypeArena` accompanies typed lowering boundaries that need
 to interpret `TypeId`, including HIR-to-MIR and MIR-to-backend lowering. HIR
 and MIR preserve type identities without owning, duplicating, or reinterpreting
 the arena. A runtime lowering resolves each identity through that exact arena;
-for the bootstrap executable subset, only primitive `Int` is a supported
-runtime value and lowers according to ADR-0043 and ADR-0046. Missing, foreign,
-or non-`Int` identities are explicit unsupported-lowering conditions and must
-not be inferred from raw ID values.
+for the bootstrap executable subset, bootstrap primitives and recursively
+supported inline arrays from ADR-0063 are supported runtime values and lower
+according to ADR-0043, ADR-0046, and ADR-0063. Missing, foreign, or unsupported
+identities are explicit unsupported-lowering conditions and must not be
+inferred from raw ID values.
 
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
@@ -605,8 +608,9 @@ shift operations, direct calls, unconditional branches, conditional branches
 only where already needed, return terminators, and trap terminators.
 
 Cleanup and destruction are a bootstrap boundary. The first executable subset
-has only `Int` runtime values, so there are no user-defined destructors, heap
-resources, async cancellation cleanups, or FFI cleanup edges. MIR must reserve
+has only bootstrap primitives and supported inline arrays as runtime values, so
+there are no user-defined destructors, heap resources, async cancellation
+cleanups, or FFI cleanup edges. MIR must reserve
 a later cleanup insertion boundary without inventing cleanup semantics.
 
 ## ADR-0046: Bootstrap ABI And Calling Convention
@@ -735,4 +739,5 @@ proves them available. Separate compilation requires exported effect metadata;
 missing or stale metadata is an error. No explicit reference, dereference,
 lifetime, or move syntax is introduced. Methods, fields, closures, coroutines,
 move-only nominal runtime values, arrays, slices, strings, allocation, and FFI
-remain deferred where their existing frontend or backend contracts are absent.
+remain deferred where their existing frontend or backend contracts are absent;
+fixed-size inline arrays follow ADR-0063.

@@ -44,11 +44,14 @@ Bootstrap MIR is backend-independent and contains:
 - unconditional branches;
 - conditional branches only when needed by already accepted frontend forms;
 - return terminators; and
-- trap terminators for integer overflow and unsupported runtime traps.
+- trap terminators for integer overflow and unsupported runtime traps;
+- inline aggregate construction, ordered element initialization, indexed
+  loads/stores, and bounds checks accepted by ADR-0063.
 
 MIR cleanup/destruction is a bootstrap boundary. For the first executable
-subset, only `Int` values are runtime values, so there are no user-defined
-destructors, heap resources, async cancellation cleanups, or FFI cleanup edges.
+subset, only bootstrap primitives and supported inline arrays are runtime
+values, so there are no user-defined destructors, heap resources, async
+cancellation cleanups, or FFI cleanup edges.
 MIR must reserve a representation boundary for later cleanup insertion but must
 not invent cleanup semantics.
 

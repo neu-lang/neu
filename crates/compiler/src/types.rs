@@ -96,6 +96,26 @@ pub struct NullableType {
     base: TypeId,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ArrayType {
+    element: TypeId,
+    length: u64,
+}
+
+impl ArrayType {
+    pub fn new(element: TypeId, length: u64) -> Self {
+        Self { element, length }
+    }
+
+    pub fn element(self) -> TypeId {
+        self.element
+    }
+
+    pub fn length(self) -> u64 {
+        self.length
+    }
+}
+
 impl NullableType {
     pub fn new(base: TypeId) -> Self {
         Self { base }
@@ -112,6 +132,7 @@ pub enum TypeKind {
     GenericParameter(GenericParameterType),
     Primitive(PrimitiveType),
     Nullable(NullableType),
+    Array(ArrayType),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -202,6 +223,13 @@ impl TypeRecord {
         }
     }
 
+    pub fn array(array: ArrayType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::Array(array),
+        }
+    }
+
     pub fn id(&self) -> TypeId {
         self.id
     }
@@ -230,6 +258,14 @@ impl TypeArena {
         let id = TypeId::from_raw(self.records.len());
         self.records.push(record.with_id(id));
         id
+    }
+
+    pub fn array(&mut self, element: TypeId, length: u64) -> TypeId {
+        let kind = TypeKind::Array(ArrayType::new(element, length));
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::array(ArrayType::new(element, length)))
     }
 
     pub fn get(&self, id: TypeId) -> Option<&TypeRecord> {

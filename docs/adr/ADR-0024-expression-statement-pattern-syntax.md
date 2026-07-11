@@ -247,7 +247,8 @@ The accepted grammar defers:
 - coroutine syntax
 - loops
 - `break` and `continue`
-- indexing
+- dynamic indexing and slice syntax; fixed-size array indexing is defined by
+  ADR-0063
 - lambdas and closures
 - receiver lambdas
 - destructuring declarations

@@ -21,8 +21,8 @@ use crate::{
         apply_m0028_direct_call_results, apply_m0060_control_flow_results,
         check_m0028_direct_calls, check_m0028_entry_point, check_m0028_return_expression_types,
         check_m0028_straight_line_returns, check_m0028_unsupported_executable_forms,
-        type_m0028_executable_core_in, type_m0028_function_signatures_in, type_m0060_control_flow,
-        validate_m0061_compile_time_constants,
+        type_m0028_executable_core_in, type_m0060_control_flow, type_m0063_array_expressions,
+        type_m0063_function_signatures_in, validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -131,11 +131,12 @@ pub fn compile_source_to_executable(
         .resolve(options.target())
         .map_err(DriverError::TargetPack)?;
     let mut types = TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_m0063_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
+        &parsed.array_types,
     );
     let mut report = type_m0028_executable_core_in(
         &mut types,
@@ -165,6 +166,20 @@ pub fn compile_source_to_executable(
     apply_m0028_direct_call_results(&mut report, &parsed, &calls);
     let expression_types = report.expression_types().to_vec();
     validate_m0061_compile_time_constants(&parsed, &expression_types, &types, &mut report);
+    type_m0063_array_expressions(&mut types, &parsed, &mut report);
+    report.retain_diagnostics(|diagnostic| {
+        !matches!(
+            diagnostic.kind(),
+            crate::type_check::TypeCheckDiagnosticKind::UnresolvedTypeRule
+        ) || !parsed.local_declarations.iter().any(|declaration| {
+            declaration.annotation.is_some_and(|annotation| {
+                parsed
+                    .array_types
+                    .iter()
+                    .any(|array| array.array == annotation)
+            }) && diagnostic.node() == declaration.declaration
+        })
+    });
     let int_type = types
         .records()
         .iter()

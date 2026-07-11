@@ -41,6 +41,9 @@ pub enum DiagnosticKind {
     MissingPatternArmBody,
     MalformedUnsafeBlock,
     MalformedCoroutineConstruct,
+    MalformedArrayType,
+    MalformedArrayLiteral,
+    MalformedIndexExpression,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -59,12 +62,15 @@ pub struct ParseOutput {
     pub const_declarations: Vec<AstNodeId>,
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
+    pub array_types: Vec<ParsedArrayType>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub integer_literals: Vec<ParsedIntegerLiteral>,
     pub float_literals: Vec<ParsedFloatLiteral>,
     pub grouped_expressions: Vec<ParsedGroupedExpression>,
     pub unary_expressions: Vec<ParsedUnaryExpression>,
     pub binary_expressions: Vec<ParsedBinaryExpression>,
+    pub array_literals: Vec<ParsedArrayLiteral>,
+    pub index_expressions: Vec<ParsedIndexExpression>,
     pub if_expressions: Vec<ParsedIfExpression>,
     pub local_declarations: Vec<ParsedLocalDeclaration>,
     pub assignment_statements: Vec<ParsedAssignmentStatement>,
@@ -240,6 +246,30 @@ pub struct ParsedTypeNameReference {
     pub name_span: ByteSpan,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedArrayType {
+    pub array: AstNodeId,
+    pub element_type: AstNodeId,
+    pub length: Option<u64>,
+    pub length_name: Option<String>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedArrayLiteral {
+    pub expression: AstNodeId,
+    pub elements: Vec<AstNodeId>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedIndexExpression {
+    pub expression: AstNodeId,
+    pub array: AstNodeId,
+    pub index: AstNodeId,
+    pub span: ByteSpan,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ParsedLiteralKind {
     BoolTrue,
@@ -376,12 +406,15 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         const_declarations: parser.const_declarations,
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
+        array_types: parser.array_types,
         literal_expressions: parser.literal_expressions,
         integer_literals: parser.integer_literals,
         float_literals: parser.float_literals,
         grouped_expressions: parser.grouped_expressions,
         unary_expressions: parser.unary_expressions,
         binary_expressions: parser.binary_expressions,
+        array_literals: parser.array_literals,
+        index_expressions: parser.index_expressions,
         if_expressions: parser.if_expressions,
         local_declarations: parser.local_declarations,
         assignment_statements: parser.assignment_statements,
@@ -413,12 +446,15 @@ struct Parser<'source> {
     const_declarations: Vec<AstNodeId>,
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
+    array_types: Vec<ParsedArrayType>,
     literal_expressions: Vec<ParsedLiteralExpression>,
     integer_literals: Vec<ParsedIntegerLiteral>,
     float_literals: Vec<ParsedFloatLiteral>,
     grouped_expressions: Vec<ParsedGroupedExpression>,
     unary_expressions: Vec<ParsedUnaryExpression>,
     binary_expressions: Vec<ParsedBinaryExpression>,
+    array_literals: Vec<ParsedArrayLiteral>,
+    index_expressions: Vec<ParsedIndexExpression>,
     if_expressions: Vec<ParsedIfExpression>,
     local_declarations: Vec<ParsedLocalDeclaration>,
     assignment_statements: Vec<ParsedAssignmentStatement>,
@@ -469,12 +505,15 @@ impl<'source> Parser<'source> {
             block_return_indices: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
+            array_types: Vec::new(),
             literal_expressions: Vec::new(),
             integer_literals: Vec::new(),
             float_literals: Vec::new(),
             grouped_expressions: Vec::new(),
             unary_expressions: Vec::new(),
             binary_expressions: Vec::new(),
+            array_literals: Vec::new(),
+            index_expressions: Vec::new(),
             if_expressions: Vec::new(),
             local_declarations: Vec::new(),
             assignment_statements: Vec::new(),
@@ -722,13 +761,14 @@ impl<'source> Parser<'source> {
                 return None;
             }
             self.advance();
-            let annotation_span = self.parse_named_type()?;
+            let annotation_span = self.parse_type()?;
             let annotation = self
                 .type_name_references
                 .iter()
                 .rev()
                 .find(|reference| reference.name_span == annotation_span)
                 .map(|reference| reference.reference);
+            let annotation = annotation.or_else(|| self.latest_type_node_for_span(annotation_span));
             let Some(annotation) = annotation else {
                 self.diagnostic_current_or_span(
                     DiagnosticKind::MalformedDeclarationHeader,
@@ -1563,10 +1603,31 @@ impl<'source> Parser<'source> {
                     }
                 }
                 Some(TokenKind::LeftBracket) => {
-                    self.diagnostic_current(DiagnosticKind::UnsupportedExpressionForm);
+                    let start = span.start();
+                    let array = self.latest_expression_node_for_span(span)?;
                     self.advance();
-                    self.skip_to_expression_boundary();
-                    return Some(span);
+                    let index_span = self
+                        .parse_expression()
+                        .ok_or_else(|| {
+                            self.diagnostic_current(DiagnosticKind::MalformedIndexExpression);
+                        })
+                        .ok()?;
+                    let index = self.latest_expression_node_for_span(index_span)?;
+                    if self.current_kind() != Some(TokenKind::RightBracket) {
+                        self.diagnostic_current(DiagnosticKind::MalformedIndexExpression);
+                        self.skip_to_expression_boundary();
+                        return Some(span);
+                    }
+                    let end = self.current().expect("right bracket exists").span.end();
+                    self.advance();
+                    span = self.span(start, end);
+                    let expression = self.arena.add_index_expression(span);
+                    self.index_expressions.push(ParsedIndexExpression {
+                        expression,
+                        array,
+                        index,
+                        span,
+                    });
                 }
                 _ => return Some(span),
             }
@@ -1625,6 +1686,7 @@ impl<'source> Parser<'source> {
 
     fn parse_primary_expression(&mut self) -> Option<ByteSpan> {
         match self.current_kind() {
+            Some(TokenKind::LeftBracket) => self.parse_array_literal(),
             Some(
                 TokenKind::IntDecimal
                 | TokenKind::IntBinary
@@ -1702,6 +1764,62 @@ impl<'source> Parser<'source> {
                     self.span(self.text.len(), self.text.len()),
                 );
                 None
+            }
+        }
+    }
+
+    fn parse_array_literal(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        let mut elements = Vec::new();
+        if self.current_kind() == Some(TokenKind::RightBracket) {
+            let end = self.current()?.span.end();
+            self.advance();
+            let span = self.span(start, end);
+            let expression = self.arena.add_array_literal_expression(span);
+            self.array_literals.push(ParsedArrayLiteral {
+                expression,
+                elements,
+                span,
+            });
+            return Some(span);
+        }
+        loop {
+            let Some(element_span) = self.parse_expression() else {
+                self.diagnostic_current(DiagnosticKind::MalformedArrayLiteral);
+                self.skip_to_expression_boundary();
+                return None;
+            };
+            let Some(element) = self.latest_expression_node_for_span(element_span) else {
+                self.diagnostic_current(DiagnosticKind::MalformedArrayLiteral);
+                return None;
+            };
+            elements.push(element);
+            match self.current_kind() {
+                Some(TokenKind::Comma) => {
+                    self.advance();
+                    if self.current_kind() == Some(TokenKind::RightBracket) {
+                        self.diagnostic_current(DiagnosticKind::MalformedArrayLiteral);
+                        return None;
+                    }
+                }
+                Some(TokenKind::RightBracket) => {
+                    let end = self.current()?.span.end();
+                    self.advance();
+                    let span = self.span(start, end);
+                    let expression = self.arena.add_array_literal_expression(span);
+                    self.array_literals.push(ParsedArrayLiteral {
+                        expression,
+                        elements,
+                        span,
+                    });
+                    return Some(span);
+                }
+                _ => {
+                    self.diagnostic_current(DiagnosticKind::MalformedArrayLiteral);
+                    self.skip_to_expression_boundary();
+                    return None;
+                }
             }
         }
     }
@@ -2258,6 +2376,7 @@ impl<'source> Parser<'source> {
 
     fn parse_primary_type(&mut self) -> Option<ByteSpan> {
         match self.current_kind() {
+            Some(TokenKind::LeftBracket) => self.parse_array_type(),
             Some(TokenKind::Identifier) => self.parse_named_type(),
             Some(TokenKind::LeftParen) if self.parenthesized_type_is_function_type() => {
                 self.parse_function_type()
@@ -2276,6 +2395,55 @@ impl<'source> Parser<'source> {
                 None
             }
         }
+    }
+
+    fn parse_array_type(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        let element_span = self.parse_type()?;
+        let element_type = self.latest_type_node_for_span(element_span)?;
+        if self.current_kind() != Some(TokenKind::Semicolon) {
+            self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+            return None;
+        }
+        self.advance();
+        let (length, length_name) = match self.current_kind() {
+            Some(TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex) => {
+                let token = self.current()?.clone();
+                let value = parsed_integer_value(
+                    token.kind,
+                    &self.text[token.span.start()..token.span.end()],
+                );
+                self.advance();
+                (value, None)
+            }
+            Some(TokenKind::Identifier) => {
+                let token = self.current()?.clone();
+                let name = self.text[token.span.start()..token.span.end()].to_owned();
+                self.advance();
+                (None, Some(name))
+            }
+            _ => {
+                self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+                return None;
+            }
+        };
+        if self.current_kind() != Some(TokenKind::RightBracket) {
+            self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+            return None;
+        }
+        let end = self.current()?.span.end();
+        self.advance();
+        let span = self.span(start, end);
+        let array = self.arena.add_array_type(span);
+        self.array_types.push(ParsedArrayType {
+            array,
+            element_type,
+            length,
+            length_name,
+            span,
+        });
+        Some(span)
     }
 
     fn parse_named_type(&mut self) -> Option<ByteSpan> {
@@ -2502,7 +2670,7 @@ impl<'source> Parser<'source> {
     fn can_start_type(&self) -> bool {
         matches!(
             self.current_kind(),
-            Some(TokenKind::Identifier | TokenKind::LeftParen)
+            Some(TokenKind::Identifier | TokenKind::LeftParen | TokenKind::LeftBracket)
         )
     }
 
@@ -2925,6 +3093,7 @@ fn type_node_kind(kind: AstNodeKind) -> bool {
             | AstNodeKind::NullableType
             | AstNodeKind::FunctionType
             | AstNodeKind::GroupedType
+            | AstNodeKind::ArrayType
     )
 }
 
@@ -2940,5 +3109,7 @@ fn expression_node_kind(kind: AstNodeKind) -> bool {
             | AstNodeKind::UnaryExpression
             | AstNodeKind::CallExpression
             | AstNodeKind::MemberExpression
+            | AstNodeKind::ArrayLiteralExpression
+            | AstNodeKind::IndexExpression
     )
 }

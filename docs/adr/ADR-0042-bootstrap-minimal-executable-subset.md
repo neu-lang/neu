@@ -60,7 +60,8 @@ runtime, generics, nullable runtime representation, heap allocation,
 destructuring, pattern matching, loops, branches beyond straight-line return
 analysis, coroutines, unsafe, FFI, printing, strings, standard library calls,
 scheduler/runtime work, exceptions/panics as language constructs, closures,
-methods, member access, arrays, and target-pack APIs.
+methods, and member access. Fixed-size inline arrays are accepted only by
+ADR-0063; dynamic arrays, slices, and target-pack APIs remain deferred.
 
 This ADR extends the executable subset beyond ADR-0024 where needed for
 operators not previously parsed. M0028 must add parser and type-checker support

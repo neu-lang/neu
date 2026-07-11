@@ -301,6 +301,7 @@ fn lower_mir_function_with_module(
         };
         let mut clif_blocks = HashMap::new();
         let mut locals = HashMap::new();
+        let mut array_locals = HashMap::new();
         for local in function.locals() {
             if matches!(
                 type_arena.get(local.ty()).map(|record| record.kind()),
@@ -308,9 +309,17 @@ fn lower_mir_function_with_module(
             ) {
                 continue;
             }
-            let local_type = cranelift_type(local.ty(), type_arena)
-                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
-            locals.insert(local.id(), builder.declare_var(local_type));
+            if let Some(local_type) = cranelift_type(local.ty(), type_arena) {
+                locals.insert(local.id(), builder.declare_var(local_type));
+            } else if let Some((element_type, length)) = array_shape(local.ty(), type_arena) {
+                let element_type = cranelift_type(element_type, type_arena)
+                    .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+                for index in 0..length {
+                    array_locals.insert((local.id(), index), builder.declare_var(element_type));
+                }
+            } else {
+                return Err(CraneliftLoweringError::UnsupportedRuntimeType);
+            }
         }
         for mir_block in function.blocks() {
             clif_blocks.insert(mir_block.id(), builder.create_block());
@@ -339,6 +348,7 @@ fn lower_mir_function_with_module(
                     &mut builder,
                     &mut values,
                     &locals,
+                    &array_locals,
                     &mut module,
                     function_ids,
                     &lowering_context,
@@ -416,6 +426,13 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Int)) => Some(types::I64),
         Some(TypeKind::Primitive(PrimitiveType::Float)) => Some(types::F64),
         Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
+        _ => None,
+    }
+}
+
+fn array_shape(ty: TypeId, type_arena: &TypeArena) -> Option<(TypeId, u64)> {
+    match type_arena.get(ty).map(|record| record.kind()) {
+        Some(TypeKind::Array(array)) => Some((array.element(), array.length())),
         _ => None,
     }
 }
@@ -571,11 +588,13 @@ fn normalize_bool_value(
     builder.ins().select(nonzero, one, zero)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_instruction(
     instruction: &MirInstruction,
     builder: &mut FunctionBuilder<'_>,
     values: &mut HashMap<MirValueId, Value>,
     locals: &HashMap<crate::mir::MirLocalId, Variable>,
+    array_locals: &HashMap<(crate::mir::MirLocalId, u64), Variable>,
     module: &mut Option<&mut ObjectModule>,
     function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
     context: &LoweringContext<'_>,
@@ -651,6 +670,112 @@ fn lower_instruction(
                     *output,
                     normalize_bool_value(value, ty, context.type_arena, builder),
                 );
+            }
+            Ok(())
+        }
+        MirInstruction::ArrayInit {
+            local, elements, ..
+        } => {
+            for (index, value) in elements.iter().enumerate() {
+                let variable = array_locals
+                    .get(&(*local, index as u64))
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                let value = values
+                    .get(value)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                builder.def_var(variable, value);
+            }
+            Ok(())
+        }
+        MirInstruction::ArrayLoad {
+            output,
+            local,
+            index,
+            ..
+        } => {
+            let index_value = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let (_, length) = context
+                .function
+                .locals()
+                .iter()
+                .find(|candidate| candidate.id() == *local)
+                .and_then(|candidate| array_shape(candidate.ty(), context.type_arena))
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            let negative = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, index_value, 0);
+            let too_large = builder.ins().icmp_imm(
+                IntCC::UnsignedGreaterThanOrEqual,
+                index_value,
+                length as i64,
+            );
+            builder.ins().trapnz(negative, TrapCode::unwrap_user(3));
+            builder.ins().trapnz(too_large, TrapCode::unwrap_user(3));
+            let mut result = None;
+            for position in (0..length).rev() {
+                let variable = array_locals
+                    .get(&(*local, position))
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                let value = builder.use_var(variable);
+                let matches = builder
+                    .ins()
+                    .icmp_imm(IntCC::Equal, index_value, position as i64);
+                result = Some(match result {
+                    Some(current) => builder.ins().select(matches, value, current),
+                    None => value,
+                });
+            }
+            values.insert(*output, result.ok_or(CraneliftLoweringError::MissingValue)?);
+            Ok(())
+        }
+        MirInstruction::ArrayStore {
+            local,
+            index,
+            value,
+            ..
+        } => {
+            let index_value = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let (_, length) = context
+                .function
+                .locals()
+                .iter()
+                .find(|candidate| candidate.id() == *local)
+                .and_then(|candidate| array_shape(candidate.ty(), context.type_arena))
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            let negative = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, index_value, 0);
+            let too_large = builder.ins().icmp_imm(
+                IntCC::UnsignedGreaterThanOrEqual,
+                index_value,
+                length as i64,
+            );
+            builder.ins().trapnz(negative, TrapCode::unwrap_user(3));
+            builder.ins().trapnz(too_large, TrapCode::unwrap_user(3));
+            let replacement = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            for position in 0..length {
+                let variable = array_locals
+                    .get(&(*local, position))
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                let current = builder.use_var(variable);
+                let matches = builder
+                    .ins()
+                    .icmp_imm(IntCC::Equal, index_value, position as i64);
+                let selected = builder.ins().select(matches, replacement, current);
+                builder.def_var(variable, selected);
             }
             Ok(())
         }

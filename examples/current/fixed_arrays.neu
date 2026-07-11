@@ -1,0 +1,8 @@
+package examples.current
+
+public fun main(): Int {
+    const N: Int = 3;
+    var values: [Int; N] = [1, 2, 3];
+    values[1] = 4;
+    return values[1] + values[2];
+}

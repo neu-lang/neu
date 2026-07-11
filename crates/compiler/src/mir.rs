@@ -168,6 +168,23 @@ pub enum MirInstruction {
         arguments: Vec<MirValueId>,
         span: ByteSpan,
     },
+    ArrayInit {
+        local: MirLocalId,
+        elements: Vec<MirValueId>,
+        span: ByteSpan,
+    },
+    ArrayLoad {
+        output: MirValueId,
+        local: MirLocalId,
+        index: MirValueId,
+        span: ByteSpan,
+    },
+    ArrayStore {
+        local: MirLocalId,
+        index: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
 }
 impl MirInstruction {
     pub fn int_constant(output: MirValueId, value: i64, span: ByteSpan) -> Self {
@@ -229,7 +246,10 @@ impl MirInstruction {
             | Self::Compare { span, .. }
             | Self::LoadLocal { span, .. }
             | Self::StoreLocal { span, .. }
-            | Self::DirectCall { span, .. } => *span,
+            | Self::DirectCall { span, .. }
+            | Self::ArrayInit { span, .. }
+            | Self::ArrayLoad { span, .. }
+            | Self::ArrayStore { span, .. } => *span,
         }
     }
 }
@@ -474,7 +494,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::LocalRead(local) => {
                     if !matches!(
                         types.get(expression.ty()).map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
                     ) {
                         instructions.push(MirInstruction::LoadLocal {
                             output,
@@ -533,12 +553,45 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     })
                 }
+                HirExpressionKind::ArrayLiteral(elements) => {
+                    let local = function
+                        .locals()
+                        .iter()
+                        .find(|local| local.initializer() == Some(expression.id()))
+                        .map(|local| local.id())
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    instructions.push(MirInstruction::ArrayInit {
+                        local: MirLocalId::from_raw(local.index()),
+                        elements: elements
+                            .iter()
+                            .map(|element| MirValueId::from_raw(element.index()))
+                            .collect(),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::Index { array, index } => {
+                    let local = match function
+                        .expressions()
+                        .iter()
+                        .find(|candidate| candidate.id() == *array)
+                        .map(|candidate| candidate.kind())
+                    {
+                        Some(HirExpressionKind::LocalRead(local)) => *local,
+                        _ => return Err(MirLoweringError::UnsupportedExpression),
+                    };
+                    instructions.push(MirInstruction::ArrayLoad {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        index: MirValueId::from_raw(index.index()),
+                        span: expression.span(),
+                    });
+                }
             }
             for local in function.locals() {
                 if local.initializer() == Some(expression.id())
                     && !matches!(
                         types.get(local.ty()).map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
                     )
                 {
                     instructions.push(MirInstruction::StoreLocal {
@@ -559,11 +612,20 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         Some(Some(TypeKind::Primitive(PrimitiveType::Unit)))
                     )
                 {
-                    instructions.push(MirInstruction::StoreLocal {
-                        local: MirLocalId::from_raw(assignment.target().index()),
-                        value: output,
-                        span: assignment.span(),
-                    });
+                    if let Some(index) = assignment.index() {
+                        instructions.push(MirInstruction::ArrayStore {
+                            local: MirLocalId::from_raw(assignment.target().index()),
+                            index: MirValueId::from_raw(index.index()),
+                            value: output,
+                            span: assignment.span(),
+                        });
+                    } else {
+                        instructions.push(MirInstruction::StoreLocal {
+                            local: MirLocalId::from_raw(assignment.target().index()),
+                            value: output,
+                            span: assignment.span(),
+                        });
+                    }
                 }
             }
         }
@@ -896,6 +958,9 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::ArrayLiteral(_) | HirExpressionKind::Index { .. } => {
+                return Err(MirLoweringError::UnsupportedExpression);
+            }
         }
         for local in self.function.locals() {
             if local.initializer() == Some(expression.id())
@@ -1182,6 +1247,9 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::ArrayLiteral(_) | HirExpressionKind::Index { .. } => {
+                return Err(MirLoweringError::UnsupportedExpression);
+            }
         }
         self.lowered.push(id);
         Ok(output)
@@ -1426,18 +1494,17 @@ fn lower_hir_function_with_control_flow(
 }
 
 fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), MirLoweringError> {
-    matches!(
-        types.get(ty).map(|record| record.kind()),
+    match types.get(ty).map(|record| record.kind()) {
         Some(TypeKind::Primitive(
             PrimitiveType::Bool
-                | PrimitiveType::Int
-                | PrimitiveType::Float
-                | PrimitiveType::Byte
-                | PrimitiveType::Unit
-        ))
-    )
-    .then_some(())
-    .ok_or(MirLoweringError::UnsupportedRuntimeType)
+            | PrimitiveType::Int
+            | PrimitiveType::Float
+            | PrimitiveType::Byte
+            | PrimitiveType::Unit,
+        )) => Ok(()),
+        Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
+        _ => Err(MirLoweringError::UnsupportedRuntimeType),
+    }
 }
 
 fn require_hir_expression_type(

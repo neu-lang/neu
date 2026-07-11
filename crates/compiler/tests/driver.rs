@@ -38,7 +38,11 @@ fn compiles_current_example_to_host_executable_with_exit_status_seven() {
 #[test]
 fn compiles_current_control_flow_and_primitive_examples() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for (name, expected_status) in [("control_flow", 7), ("primitive_values", 7)] {
+    for (name, expected_status) in [
+        ("control_flow", 7),
+        ("primitive_values", 7),
+        ("fixed_arrays", 7),
+    ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
         let workspace =

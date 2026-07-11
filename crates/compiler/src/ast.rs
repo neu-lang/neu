@@ -32,6 +32,7 @@ pub enum AstNodeKind {
     CapabilityBound,
     FunctionType,
     GroupedType,
+    ArrayType,
     Block,
     LiteralExpression,
     NameExpression,
@@ -41,6 +42,8 @@ pub enum AstNodeKind {
     BinaryExpression,
     UnaryExpression,
     CallExpression,
+    ArrayLiteralExpression,
+    IndexExpression,
     MemberExpression,
     VariableDeclarationStatement,
     AssignmentStatement,
@@ -142,6 +145,10 @@ impl AstArena {
         self.push(AstNodeKind::GroupedType, span)
     }
 
+    pub fn add_array_type(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ArrayType, span)
+    }
+
     pub fn add_block(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::Block, span)
     }
@@ -176,6 +183,14 @@ impl AstArena {
 
     pub fn add_call_expression(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::CallExpression, span)
+    }
+
+    pub fn add_array_literal_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ArrayLiteralExpression, span)
+    }
+
+    pub fn add_index_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::IndexExpression, span)
     }
 
     pub fn add_member_expression(&mut self, span: ByteSpan) -> AstNodeId {

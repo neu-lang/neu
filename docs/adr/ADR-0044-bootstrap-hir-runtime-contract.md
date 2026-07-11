@@ -43,7 +43,9 @@ the accepted executable subset. It must preserve:
 - ownership/move facts needed to confirm executable-subset values are valid;
 - borrow, lifetime, thread, coroutine, unsafe, and FFI diagnostics already
   produced or proven absent for the executable subset; and
-- unsupported-form markers for parsed constructs excluded by ADR-0042.
+- unsupported-form markers for parsed constructs excluded by ADR-0042;
+- structural array types, ordered array elements, indexed places, bounds
+  facts, and array ownership projections accepted by ADR-0063.
 
 HIR must not invent runtime semantics. It may reject unchecked, unresolved, or
 unsupported AST input rather than represent it as executable HIR.

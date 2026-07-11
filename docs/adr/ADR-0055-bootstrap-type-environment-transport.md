@@ -36,10 +36,11 @@ do not own, duplicate, or reinterpret the arena.
 
 The lowering boundary must resolve a `TypeId` through that supplied arena
 before selecting a bootstrap runtime representation. For the executable subset,
-only `TypeKind::Primitive(PrimitiveType::Int)` is accepted as a runtime value
-and lowers under ADR-0043 and ADR-0046. Missing, foreign, or non-`Int` type
-identities fail as explicit unsupported-lowering conditions; they must not be
-interpreted from raw numeric IDs.
+bootstrap primitives and recursively supported inline arrays from ADR-0063 are
+accepted runtime values and lower under ADR-0043, ADR-0046, and ADR-0063.
+Missing, foreign, or unsupported type identities fail as explicit
+unsupported-lowering conditions; they must not be interpreted from raw numeric
+IDs.
 
 The companion arena must be the same module arena that produced the HIR/MIR
 type facts under ADR-0052. Passing a different arena is invalid lowering input.

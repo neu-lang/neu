@@ -25,6 +25,7 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
         TypeKind::Primitive(PrimitiveType::String) | TypeKind::Nominal(_) => {
             Some(OwnershipCategory::MoveOnly)
         }
+        TypeKind::Array(array) => classify_ownership_category(types, array.element()),
         TypeKind::GenericParameter(_) | TypeKind::Nullable(_) => None,
     }
 }

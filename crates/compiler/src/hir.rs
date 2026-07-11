@@ -241,13 +241,39 @@ pub fn lower_checked_hir_source(
                 .iter()
                 .find(|assignment| assignment.statement == statement.statement)
             {
-                let target = local_binding_id(
-                    &source,
-                    function.declaration,
-                    assignment.target,
-                    &local_bindings,
-                )
-                .ok_or(HirLoweringError::UnsupportedExpression)?;
+                let (target, index) = if let Some(index) = source
+                    .parsed
+                    .index_expressions
+                    .iter()
+                    .find(|index| index.expression == assignment.target)
+                {
+                    let target = local_binding_id(
+                        &source,
+                        function.declaration,
+                        index.array,
+                        &local_bindings,
+                    )
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                    let index_value = lower_expression(
+                        &source,
+                        function.declaration,
+                        index.index,
+                        &local_bindings,
+                        &mut expressions,
+                    )?;
+                    (target, Some(index_value))
+                } else {
+                    (
+                        local_binding_id(
+                            &source,
+                            function.declaration,
+                            assignment.target,
+                            &local_bindings,
+                        )
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                        None,
+                    )
+                };
                 let value = lower_expression(
                     &source,
                     function.declaration,
@@ -255,7 +281,10 @@ pub fn lower_checked_hir_source(
                     &local_bindings,
                     &mut expressions,
                 )?;
-                assignments.push(HirAssignment::new(statement.span, target, value));
+                assignments.push(match index {
+                    Some(index) => HirAssignment::indexed(statement.span, target, index, value),
+                    None => HirAssignment::new(statement.span, target, value),
+                });
                 continue;
             }
             if let Some(returned) = source
@@ -443,6 +472,51 @@ fn lower_expression(
             left,
             right,
         ));
+        return Ok(id);
+    }
+    if let Some(array) = source
+        .parsed
+        .array_literals
+        .iter()
+        .find(|array| array.expression == expression)
+    {
+        let elements = array
+            .elements
+            .iter()
+            .map(|element| {
+                lower_expression(
+                    source,
+                    function_declaration,
+                    *element,
+                    local_bindings,
+                    output,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        output.push(HirExpression::array_literal(id, span, ty, elements));
+        return Ok(id);
+    }
+    if let Some(index) = source
+        .parsed
+        .index_expressions
+        .iter()
+        .find(|index| index.expression == expression)
+    {
+        let array = lower_expression(
+            source,
+            function_declaration,
+            index.array,
+            local_bindings,
+            output,
+        )?;
+        let index_value = lower_expression(
+            source,
+            function_declaration,
+            index.index,
+            local_bindings,
+            output,
+        )?;
+        output.push(HirExpression::index(id, span, ty, array, index_value));
         return Ok(id);
     }
     if let Some(unary) = source
@@ -706,13 +780,35 @@ fn lower_control_flow_block(
             .iter()
             .find(|assignment| assignment.statement == statement.statement)
         {
-            let target = local_binding_id(
-                source,
-                function_declaration,
-                assignment.target,
-                local_bindings,
-            )
-            .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let (target, index) = if let Some(index) = source
+                .parsed
+                .index_expressions
+                .iter()
+                .find(|index| index.expression == assignment.target)
+            {
+                let target =
+                    local_binding_id(source, function_declaration, index.array, local_bindings)
+                        .ok_or(HirLoweringError::UnsupportedExpression)?;
+                let index_value = lower_expression(
+                    source,
+                    function_declaration,
+                    index.index,
+                    local_bindings,
+                    expressions,
+                )?;
+                (target, Some(index_value))
+            } else {
+                (
+                    local_binding_id(
+                        source,
+                        function_declaration,
+                        assignment.target,
+                        local_bindings,
+                    )
+                    .ok_or(HirLoweringError::UnsupportedExpression)?,
+                    None,
+                )
+            };
             let value = lower_expression(
                 source,
                 function_declaration,
@@ -720,11 +816,10 @@ fn lower_control_flow_block(
                 local_bindings,
                 expressions,
             )?;
-            output.push(HirControlFlow::Assignment(HirAssignment::new(
-                statement.span,
-                target,
-                value,
-            )));
+            output.push(HirControlFlow::Assignment(match index {
+                Some(index) => HirAssignment::indexed(statement.span, target, index, value),
+                None => HirAssignment::new(statement.span, target, value),
+            }));
             continue;
         }
         if let Some(returned) = source
@@ -1042,6 +1137,11 @@ pub enum HirExpressionKind {
     Unary(HirUnary),
     Binary(HirBinary),
     DirectCall(HirDirectCall),
+    ArrayLiteral(Vec<HirExpressionId>),
+    Index {
+        array: HirExpressionId,
+        index: HirExpressionId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1159,6 +1259,35 @@ impl HirExpression {
             kind: HirExpressionKind::DirectCall(call),
         }
     }
+
+    pub fn array_literal(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        elements: Vec<HirExpressionId>,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ArrayLiteral(elements),
+        }
+    }
+
+    pub fn index(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        array: HirExpressionId,
+        index: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::Index { array, index },
+        }
+    }
     pub fn id(&self) -> HirExpressionId {
         self.id
     }
@@ -1184,6 +1313,7 @@ pub struct HirAssignment {
     span: ByteSpan,
     target: HirLocalId,
     value: HirExpressionId,
+    index: Option<HirExpressionId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1221,6 +1351,20 @@ impl HirAssignment {
             span,
             target,
             value,
+            index: None,
+        }
+    }
+    pub fn indexed(
+        span: ByteSpan,
+        target: HirLocalId,
+        index: HirExpressionId,
+        value: HirExpressionId,
+    ) -> Self {
+        Self {
+            span,
+            target,
+            value,
+            index: Some(index),
         }
     }
     pub fn span(&self) -> ByteSpan {
@@ -1231,6 +1375,9 @@ impl HirAssignment {
     }
     pub fn value(&self) -> HirExpressionId {
         self.value
+    }
+    pub fn index(&self) -> Option<HirExpressionId> {
+        self.index
     }
 }
 impl HirReturn {

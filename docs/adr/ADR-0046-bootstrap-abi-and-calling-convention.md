@@ -48,6 +48,10 @@ derived from module identity, package namespace, and function name. The exact
 mangling format is a compiler artifact, but it must be stable within one
 object/link invocation and collision-free for the bootstrap subset.
 
+Fixed-size arrays use compiler-internal inline aggregate lowering for
+same-module parameters and returns under ADR-0063. This does not define a
+stable public layout or FFI ABI.
+
 Language `main` from ADR-0040 is not the raw platform entry symbol. The object
 and link pipeline must arrange a bootstrap executable entry path that calls the
 language `main` and maps its `Int` result according to ADR-0047.

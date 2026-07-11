@@ -3,11 +3,11 @@ use crate::{
     module::PackageNamespace,
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
     parser::{
-        ParseOutput, ParsedAssignmentStatement, ParsedBinaryExpression, ParsedBinaryOperator,
-        ParsedFunctionDeclaration, ParsedFunctionParameter, ParsedGenericParameter,
-        ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral, ParsedLiteralExpression,
-        ParsedLiteralKind, ParsedLocalDeclaration, ParsedTypeNameReference, ParsedUnaryExpression,
-        ParsedUnaryOperator,
+        ParseOutput, ParsedArrayType, ParsedAssignmentStatement, ParsedBinaryExpression,
+        ParsedBinaryOperator, ParsedFunctionDeclaration, ParsedFunctionParameter,
+        ParsedGenericParameter, ParsedGroupedExpression, ParsedIfExpression, ParsedIntegerLiteral,
+        ParsedLiteralExpression, ParsedLiteralKind, ParsedLocalDeclaration,
+        ParsedTypeNameReference, ParsedUnaryExpression, ParsedUnaryOperator,
     },
     source::ByteSpan,
     symbol::{SymbolId, SymbolInterner},
@@ -67,6 +67,11 @@ pub enum TypeRuleDiagnostic {
     ConstInitializerRequired,
     ConstInitializerNotConstant,
     ConstDependencyCycle,
+    ArrayLiteralLengthMismatch,
+    ArrayElementTypeMismatch,
+    ArrayIndexTypeMismatch,
+    ArrayIndexOutOfBounds,
+    ImmutableArrayMutation,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -1325,6 +1330,10 @@ impl TypeCheckReport {
         &self.diagnostics
     }
 
+    pub fn retain_diagnostics(&mut self, keep: impl Fn(&TypeCheckDiagnostic) -> bool) {
+        self.diagnostics.retain(keep);
+    }
+
     pub fn record_compile_time_constant(&mut self, constant: CompileTimeConstant) {
         self.compile_time_constants.push(constant);
     }
@@ -1651,6 +1660,16 @@ pub fn type_m0028_function_signatures_in(
     parameters: &[ParsedFunctionParameter],
     type_name_references: &[ParsedTypeNameReference],
 ) -> Vec<FunctionSignature> {
+    type_m0063_function_signatures_in(arena, functions, parameters, type_name_references, &[])
+}
+
+pub fn type_m0063_function_signatures_in(
+    arena: &mut TypeArena,
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+) -> Vec<FunctionSignature> {
     let primitives = PrimitiveTypeIds::module_owned(arena);
     let primitive_annotation = |annotation| {
         let name = type_name_references
@@ -1667,13 +1686,25 @@ pub fn type_m0028_function_signatures_in(
             _ => return None,
         })
     };
+    let annotation_type = |annotation, arena: &mut TypeArena| {
+        if let Some(primitive) = primitive_annotation(annotation) {
+            return Some(primitive);
+        }
+        array_types
+            .iter()
+            .find(|array| array.array == annotation)
+            .and_then(|array| {
+                let element = primitive_annotation(array.element_type)?;
+                Some(arena.array(element, array.length?))
+            })
+    };
     let mut signatures = Vec::new();
 
     for function in functions {
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        let Some(return_type) = primitive_annotation(return_annotation) else {
+        let Some(return_type) = annotation_type(return_annotation, arena) else {
             continue;
         };
         let function_parameters: Vec<_> = parameters
@@ -1682,7 +1713,7 @@ pub fn type_m0028_function_signatures_in(
             .collect();
         let Some(parameter_types) = function_parameters
             .iter()
-            .map(|parameter| primitive_annotation(parameter.annotation))
+            .map(|parameter| annotation_type(parameter.annotation, arena))
             .collect::<Option<Vec<_>>>()
         else {
             continue;
@@ -1695,6 +1726,224 @@ pub fn type_m0028_function_signatures_in(
     }
 
     signatures
+}
+
+pub fn type_m0063_array_expressions(
+    types: &mut TypeArena,
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+) {
+    let primitives = PrimitiveTypeIds::module_owned(types);
+    let const_lengths = report
+        .compile_time_constants()
+        .iter()
+        .filter_map(|constant| match constant.value() {
+            CompileTimeValue::Int(value) => u64::try_from(value)
+                .ok()
+                .map(|value| (constant.declaration(), value)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let resolve_type = |node: AstNodeId, types: &mut TypeArena| -> Option<TypeId> {
+        if let Some(reference) = parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == node)
+        {
+            return primitives.type_for_primitive_name(&reference.name);
+        }
+        let array = parsed
+            .array_types
+            .iter()
+            .find(|array| array.array == node)?;
+        let element = resolve_array_element_type(array.element_type, parsed, types, primitives)?;
+        Some(types.array(
+            element,
+            array.length.or_else(|| {
+                resolve_named_const_length(array.length_name.as_deref(), parsed, &const_lengths)
+            })?,
+        ))
+    };
+
+    for declaration in &parsed.local_declarations {
+        let Some(annotation) = declaration.annotation else {
+            continue;
+        };
+        let Some(ty) = resolve_type(annotation, types) else {
+            continue;
+        };
+        report.record_declaration_signature(DeclarationSignature::new(declaration.declaration, ty));
+        if let (Some(initializer), Some(TypeKind::Array(array))) = (
+            declaration.initializer,
+            types.get(ty).map(|record| record.kind()),
+        ) && let Some(literal) = parsed
+            .array_literals
+            .iter()
+            .find(|literal| literal.expression == initializer)
+        {
+            if literal.elements.len() as u64 != array.length() {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::ArrayLiteralLengthMismatch,
+                    literal.expression,
+                ));
+            }
+            for element in &literal.elements {
+                if let Some(element_type) = report.expression_type(*element)
+                    && element_type != array.element()
+                {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::ArrayElementTypeMismatch,
+                        *element,
+                    ));
+                }
+            }
+        }
+    }
+
+    for reference in &parsed.name_references {
+        let Some(binding) = parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == reference.name)
+        else {
+            continue;
+        };
+        if let Some(ty) = report.declaration_signature(binding.binding) {
+            report.replace_expression_type(ExpressionType::new(reference.reference, ty));
+        }
+    }
+
+    for literal in &parsed.array_literals {
+        let ty = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.initializer == Some(literal.expression))
+            .and_then(|declaration| declaration.annotation)
+            .and_then(|annotation| resolve_type(annotation, types))
+            .or_else(|| {
+                let element = literal
+                    .elements
+                    .first()
+                    .and_then(|element| report.expression_type(*element))?;
+                Some(types.array(element, literal.elements.len() as u64))
+            });
+        if let Some(ty) = ty {
+            report.replace_expression_type(ExpressionType::new(literal.expression, ty));
+        }
+    }
+
+    for index in &parsed.index_expressions {
+        let Some(array_ty) = report.expression_type(index.array) else {
+            continue;
+        };
+        let Some(index_ty) = report.expression_type(index.index) else {
+            continue;
+        };
+        if index_ty != primitives.int_id {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ArrayIndexTypeMismatch,
+                index.index,
+            ));
+            continue;
+        }
+        if let Some(TypeKind::Array(array)) = types.get(array_ty).map(|record| record.kind()) {
+            report.replace_expression_type(ExpressionType::new(index.expression, array.element()));
+            if let Some(value) = parsed
+                .integer_literals
+                .iter()
+                .find(|literal| literal.expression == index.index)
+                .and_then(|literal| literal.value)
+                && value >= array.length()
+            {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::ArrayIndexOutOfBounds,
+                    index.index,
+                ));
+            }
+        }
+    }
+
+    for assignment in &parsed.assignment_statements {
+        let Some(index) = parsed
+            .index_expressions
+            .iter()
+            .find(|index| index.expression == assignment.target)
+        else {
+            continue;
+        };
+        let Some(binding) = parsed.local_binding_names.iter().find(|binding| {
+            binding.name
+                == parsed
+                    .name_references
+                    .iter()
+                    .find(|name| name.reference == index.array)
+                    .map(|name| name.name.as_str())
+                    .unwrap_or_default()
+        }) else {
+            continue;
+        };
+        if binding.kind == LocalBindingKind::Immutable {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ImmutableArrayMutation,
+                assignment.target,
+            ));
+        }
+    }
+}
+
+fn resolve_array_element_type(
+    node: AstNodeId,
+    parsed: &ParseOutput,
+    types: &mut TypeArena,
+    primitives: PrimitiveTypeIds,
+) -> Option<TypeId> {
+    if let Some(reference) = parsed
+        .type_name_references
+        .iter()
+        .find(|reference| reference.reference == node)
+    {
+        return primitives.type_for_primitive_name(&reference.name);
+    }
+    let array = parsed
+        .array_types
+        .iter()
+        .find(|array| array.array == node)?;
+    let element = resolve_array_element_type(array.element_type, parsed, types, primitives)?;
+    Some(
+        types.array(
+            element,
+            array.length.or_else(|| {
+                resolve_named_const_length(array.length_name.as_deref(), parsed, &[])
+            })?,
+        ),
+    )
+}
+
+fn resolve_named_const_length(
+    name: Option<&str>,
+    parsed: &ParseOutput,
+    const_lengths: &[(AstNodeId, u64)],
+) -> Option<u64> {
+    let name = name?;
+    let binding = parsed.local_binding_names.iter().find(|binding| {
+        binding.name == name && parsed.const_declarations.contains(&binding.binding)
+    })?;
+    let declaration = parsed
+        .local_declarations
+        .iter()
+        .find(|declaration| declaration.declaration == binding.binding)?;
+    let initializer = declaration.initializer?;
+    const_lengths
+        .iter()
+        .find(|(declaration, _)| *declaration == binding.binding)
+        .map(|(_, value)| *value)
+        .or_else(|| {
+            parsed
+                .integer_literals
+                .iter()
+                .find(|literal| literal.expression == initializer)
+                .and_then(|literal| literal.value)
+        })
 }
 
 pub fn recognize_m0019_null_tests(
