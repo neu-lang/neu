@@ -713,6 +713,14 @@ fn m0028_call_path_exists(
 }
 
 impl FunctionSignature {
+    pub fn new(declaration: AstNodeId, parameter_types: Vec<TypeId>, return_type: TypeId) -> Self {
+        Self {
+            declaration,
+            parameter_types,
+            return_type,
+        }
+    }
+
     pub fn declaration(&self) -> AstNodeId {
         self.declaration
     }

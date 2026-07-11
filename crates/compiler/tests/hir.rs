@@ -9,8 +9,9 @@ use compiler::{
     parser::parse_source,
     source::{ByteSpan, SourceFileId},
     type_check::{
-        ExecutableSourceTypes, apply_m0028_direct_call_results, check_m0028_direct_calls,
-        type_m0028_executable_core_in, type_m0028_function_signatures_in,
+        ExecutableSourceTypes, FunctionSignature, apply_m0028_direct_call_results,
+        check_m0028_direct_calls, type_m0028_executable_core_in, type_m0028_function_signatures_in,
+        type_parser_literals,
     },
     types::TypeId,
 };
@@ -112,6 +113,59 @@ fn m0035_hir_preserves_non_integer_primitive_literal_payloads() {
     assert_eq!(byte_literal.kind(), &HirExpressionKind::ByteLiteral(255));
     assert_eq!(float_literal.ty(), float_type);
     assert_eq!(byte_literal.span(), span);
+}
+
+#[test]
+fn m0035_checked_source_lowers_bool_unit_and_float_literals_to_hir() {
+    let file = SourceFileId::from_raw(907);
+    let parsed = parse_source(
+        file,
+        "fun flag(): Bool { return true; } fun done(): Unit { return (); } fun ratio(): Float { return 0.0; }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty());
+
+    let (types, report) = type_parser_literals(&parsed.literal_expressions);
+    let signatures = vec![
+        FunctionSignature::new(
+            parsed.function_declarations[0].declaration,
+            vec![],
+            TypeId::from_raw(0),
+        ),
+        FunctionSignature::new(
+            parsed.function_declarations[1].declaration,
+            vec![],
+            TypeId::from_raw(3),
+        ),
+        FunctionSignature::new(
+            parsed.function_declarations[2].declaration,
+            vec![],
+            TypeId::from_raw(5),
+        ),
+    ];
+    let module = lower_checked_hir_source(CheckedHirSource::new(
+        ModuleName::parse("examples").unwrap(),
+        PackageNamespace::parse("current").unwrap(),
+        &parsed,
+        &signatures,
+        report.expression_types(),
+        true,
+    ))
+    .unwrap();
+
+    assert!(matches!(
+        module.functions()[0].expressions()[0].kind(),
+        HirExpressionKind::BoolLiteral(true)
+    ));
+    assert!(matches!(
+        module.functions()[1].expressions()[0].kind(),
+        HirExpressionKind::UnitLiteral
+    ));
+    assert!(matches!(
+        module.functions()[2].expressions()[0].kind(),
+        HirExpressionKind::FloatLiteral(bits) if *bits == 0.0f64.to_bits()
+    ));
+    let _ = types;
 }
 
 #[test]

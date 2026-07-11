@@ -60,6 +60,7 @@ pub struct ParseOutput {
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub integer_literals: Vec<ParsedIntegerLiteral>,
+    pub float_literals: Vec<ParsedFloatLiteral>,
     pub grouped_expressions: Vec<ParsedGroupedExpression>,
     pub unary_expressions: Vec<ParsedUnaryExpression>,
     pub binary_expressions: Vec<ParsedBinaryExpression>,
@@ -224,6 +225,13 @@ pub struct ParsedIntegerLiteral {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedFloatLiteral {
+    pub expression: AstNodeId,
+    pub bits: Option<u64>,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedGroupedExpression {
     pub expression: crate::ast::AstNodeId,
     pub inner: crate::ast::AstNodeId,
@@ -327,6 +335,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         type_name_references: parser.type_name_references,
         literal_expressions: parser.literal_expressions,
         integer_literals: parser.integer_literals,
+        float_literals: parser.float_literals,
         grouped_expressions: parser.grouped_expressions,
         unary_expressions: parser.unary_expressions,
         binary_expressions: parser.binary_expressions,
@@ -359,6 +368,7 @@ struct Parser<'source> {
     type_name_references: Vec<ParsedTypeNameReference>,
     literal_expressions: Vec<ParsedLiteralExpression>,
     integer_literals: Vec<ParsedIntegerLiteral>,
+    float_literals: Vec<ParsedFloatLiteral>,
     grouped_expressions: Vec<ParsedGroupedExpression>,
     unary_expressions: Vec<ParsedUnaryExpression>,
     binary_expressions: Vec<ParsedBinaryExpression>,
@@ -407,6 +417,7 @@ impl<'source> Parser<'source> {
             type_name_references: Vec::new(),
             literal_expressions: Vec::new(),
             integer_literals: Vec::new(),
+            float_literals: Vec::new(),
             grouped_expressions: Vec::new(),
             unary_expressions: Vec::new(),
             binary_expressions: Vec::new(),
@@ -1405,6 +1416,17 @@ impl<'source> Parser<'source> {
                             token.kind,
                             &self.text[span.start()..span.end()],
                         ),
+                        span,
+                    });
+                } else if token.kind == TokenKind::FloatDecimal {
+                    let bits = self.text[span.start()..span.end()]
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|value| value.is_finite())
+                        .map(f64::to_bits);
+                    self.float_literals.push(ParsedFloatLiteral {
+                        expression,
+                        bits,
                         span,
                     });
                 }

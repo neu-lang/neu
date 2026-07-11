@@ -1,6 +1,6 @@
 use crate::{
     module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
-    parser::{ParseOutput, ParsedBinaryOperator},
+    parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
     type_check::{ExpressionType, FunctionSignature},
     types::TypeId,
@@ -157,15 +157,50 @@ fn lower_expression(
     let id = HirExpressionId::from_raw(output.len());
     if let Some(literal) = source
         .parsed
-        .integer_literals
+        .literal_expressions
         .iter()
         .find(|literal| literal.expression == expression)
     {
-        let value = literal
-            .value
-            .and_then(|value| i64::try_from(value).ok())
-            .ok_or(HirLoweringError::UnsupportedExpression)?;
-        output.push(HirExpression::int_literal(id, span, ty, value));
+        match literal.kind {
+            ParsedLiteralKind::BoolTrue | ParsedLiteralKind::BoolFalse => {
+                output.push(HirExpression::bool_literal(
+                    id,
+                    span,
+                    ty,
+                    literal.kind == ParsedLiteralKind::BoolTrue,
+                ));
+            }
+            ParsedLiteralKind::Unit => output.push(HirExpression::unit_literal(id, span, ty)),
+            ParsedLiteralKind::Float => {
+                let bits = source
+                    .parsed
+                    .float_literals
+                    .iter()
+                    .find(|float| float.expression == expression)
+                    .and_then(|float| float.bits)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                output.push(HirExpression::float_literal(
+                    id,
+                    span,
+                    ty,
+                    f64::from_bits(bits),
+                ));
+            }
+            ParsedLiteralKind::AcceptedInteger => {
+                let value = source
+                    .parsed
+                    .integer_literals
+                    .iter()
+                    .find(|integer| integer.expression == expression)
+                    .and_then(|integer| integer.value)
+                    .and_then(|value| i64::try_from(value).ok())
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                output.push(HirExpression::int_literal(id, span, ty, value));
+            }
+            ParsedLiteralKind::AcceptedString | ParsedLiteralKind::Null => {
+                return Err(HirLoweringError::UnsupportedExpression);
+            }
+        }
         return Ok(id);
     }
     if let Some(binary) = source
