@@ -30,6 +30,7 @@ Project context selects Cranelift initially and LLVM optionally later.
 - Target assumptions from ADR-0020.
 - Integer runtime semantics from ADR-0043.
 - ABI assumptions from ADR-0046.
+- Type-environment transport from ADR-0055.
 - Build skeleton from M0002.
 
 ## Outputs
@@ -41,6 +42,7 @@ Project context selects Cranelift initially and LLVM optionally later.
 
 - Minimal Cranelift emission for selected MIR constructs.
 - Backend diagnostics for unsupported MIR.
+- Type resolution only through the owning module `TypeArena`.
 
 ## Out of Scope
 

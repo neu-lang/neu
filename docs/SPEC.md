@@ -582,6 +582,17 @@ are known and incompatible. Recovery records no typed executable return fact;
 an unresolved or deferred expression retains its original diagnostic without a
 second mismatch error.
 
+## ADR-0055: Bootstrap Type Environment Transport
+
+The owning module `TypeArena` accompanies typed lowering boundaries that need
+to interpret `TypeId`, including HIR-to-MIR and MIR-to-backend lowering. HIR
+and MIR preserve type identities without owning, duplicating, or reinterpreting
+the arena. A runtime lowering resolves each identity through that exact arena;
+for the bootstrap executable subset, only primitive `Int` is a supported
+runtime value and lowers according to ADR-0043 and ADR-0046. Missing, foreign,
+or non-`Int` identities are explicit unsupported-lowering conditions and must
+not be inferred from raw ID values.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves

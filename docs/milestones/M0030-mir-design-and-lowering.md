@@ -57,6 +57,8 @@ The expected architecture places MIR before optimization and backend code genera
 ## Acceptance Criteria
 
 - Approved HIR fixtures lower to MIR.
+- HIR-to-MIR lowering receives the owning module type environment when it must
+  validate runtime-facing `TypeId` values under ADR-0055.
 - Executable-subset MIR represents ADR-0043 arithmetic and ADR-0045 runtime
   operations.
 - MIR represents control flow without source-language ambiguity.
@@ -89,3 +91,4 @@ The expected architecture places MIR before optimization and backend code genera
 - [x] MIR model exists.
 - [x] HIR lowers to MIR.
 - [x] MIR is backend-independent.
+- [ ] Type-environment transport is validated at the HIR-to-MIR boundary.
