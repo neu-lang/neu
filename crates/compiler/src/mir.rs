@@ -246,6 +246,10 @@ pub enum MirInstruction {
         value: MirValueId,
         span: ByteSpan,
     },
+    DestroyObject {
+        value: MirValueId,
+        span: ByteSpan,
+    },
 }
 impl MirInstruction {
     pub fn int_constant(output: MirValueId, value: i64, span: ByteSpan) -> Self {
@@ -322,6 +326,7 @@ impl MirInstruction {
             Self::NewObject { span, .. } => *span,
             Self::FieldLoad { span, .. } => *span,
             Self::FieldStore { span, .. } => *span,
+            Self::DestroyObject { span, .. } => *span,
         }
     }
 }
@@ -594,7 +599,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
         let mut instructions = Vec::new();
         for expression in function.expressions() {
             require_hir_expression_type(expression, types)?;
-            let output = MirValueId::from_raw(expression.id().index());
+            let output = mir_expression_value_id(function, expression.id());
             match expression.kind() {
                 HirExpressionKind::IntLiteral(value) => instructions.push(
                     MirInstruction::int_constant(output, *value, expression.span()),
@@ -640,8 +645,8 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     }
                 }
                 HirExpressionKind::Binary(binary) => {
-                    let left = MirValueId::from_raw(binary.left().index());
-                    let right = MirValueId::from_raw(binary.right().index());
+                    let left = mir_expression_value_id(function, binary.left());
+                    let right = mir_expression_value_id(function, binary.right());
                     let left_is_string = function
                         .expressions()
                         .get(binary.left().index())
@@ -689,7 +694,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     }
                 }
                 HirExpressionKind::Unary(unary) => {
-                    let operand = MirValueId::from_raw(unary.operand().index());
+                    let operand = mir_expression_value_id(function, unary.operand());
                     if matches!(unary.operator(), HirUnaryOperator::Not) {
                         instructions.push(MirInstruction::LogicalNot {
                             output,
@@ -712,7 +717,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         arguments: call
                             .arguments()
                             .iter()
-                            .map(|argument| MirValueId::from_raw(argument.index()))
+                            .map(|argument| mir_expression_value_id(function, *argument))
                             .collect(),
                         span: expression.span(),
                     })
@@ -728,7 +733,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         local: MirLocalId::from_raw(local.index()),
                         elements: elements
                             .iter()
-                            .map(|element| MirValueId::from_raw(element.index()))
+                            .map(|element| mir_expression_value_id(function, *element))
                             .collect(),
                         span: expression.span(),
                     });
@@ -748,14 +753,14 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::StringLength(value) => {
                     instructions.push(MirInstruction::StringLength {
                         output,
-                        value: MirValueId::from_raw(value.index()),
+                        value: mir_expression_value_id(function, *value),
                         span: expression.span(),
                     });
                 }
                 HirExpressionKind::StringClone(value) => {
                     instructions.push(MirInstruction::StringClone {
                         output,
-                        value: MirValueId::from_raw(value.index()),
+                        value: mir_expression_value_id(function, *value),
                         span: expression.span(),
                     });
                 }
@@ -770,8 +775,8 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     }) {
                         instructions.push(MirInstruction::StringIndex {
                             output,
-                            value: MirValueId::from_raw(array.index()),
-                            index: MirValueId::from_raw(index.index()),
+                            value: mir_expression_value_id(function, *array),
+                            index: mir_expression_value_id(function, *index),
                             span: expression.span(),
                         });
                     } else {
@@ -782,7 +787,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         instructions.push(MirInstruction::ArrayLoad {
                             output,
                             local: MirLocalId::from_raw(local.index()),
-                            index: MirValueId::from_raw(index.index()),
+                            index: mir_expression_value_id(function, *index),
                             span: expression.span(),
                         });
                     }
@@ -792,7 +797,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 } => {
                     instructions.push(MirInstruction::FieldLoad {
                         output,
-                        receiver: MirValueId::from_raw(receiver.index()),
+                        receiver: mir_expression_value_id(function, *receiver),
                         index: *index,
                         span: expression.span(),
                     });
@@ -802,7 +807,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         output,
                         arguments: arguments
                             .iter()
-                            .map(|argument| MirValueId::from_raw(argument.index()))
+                            .map(|argument| mir_expression_value_id(function, *argument))
                             .collect(),
                         span: expression.span(),
                     });
@@ -836,7 +841,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     && let Some((receiver, index)) = assignment.field()
                 {
                     instructions.push(MirInstruction::FieldStore {
-                        receiver: MirValueId::from_raw(receiver.index()),
+                        receiver: mir_expression_value_id(function, receiver),
                         index,
                         value: output,
                         span: assignment.span(),
@@ -856,7 +861,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     if let Some(index) = assignment.index() {
                         instructions.push(MirInstruction::ArrayStore {
                             local: MirLocalId::from_raw(assignment.target().index()),
-                            index: MirValueId::from_raw(index.index()),
+                            index: mir_expression_value_id(function, index),
                             value: output,
                             span: assignment.span(),
                         });
@@ -868,6 +873,31 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         });
                     }
                 }
+            }
+        }
+        if !matches!(
+            types
+                .get(function.return_type())
+                .map(|record| record.kind()),
+            Some(TypeKind::Nominal(_))
+        ) {
+            let cleanup_value =
+                MirValueId::from_raw(function.parameters().len() + function.expressions().len());
+            for local in function.locals().iter().filter(|local| {
+                matches!(
+                    types.get(local.ty()).map(|record| record.kind()),
+                    Some(TypeKind::Nominal(_))
+                )
+            }) {
+                instructions.push(MirInstruction::LoadLocal {
+                    output: cleanup_value,
+                    local: MirLocalId::from_raw(local.id().index()),
+                    span: local.span(),
+                });
+                instructions.push(MirInstruction::DestroyObject {
+                    value: cleanup_value,
+                    span: local.span(),
+                });
             }
         }
         let returned = function
@@ -883,7 +913,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             MirTerminator::return_unit(returned.span())
         } else {
             MirTerminator::return_value(
-                MirValueId::from_raw(returned.expression().index()),
+                mir_expression_value_id(function, returned.expression()),
                 returned.span(),
             )
         };
@@ -926,6 +956,10 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
     Ok(MirModule::new(hir.name().clone(), functions))
 }
 
+fn mir_expression_value_id(function: &HirFunction, expression: HirExpressionId) -> MirValueId {
+    MirValueId::from_raw(function.parameters().len() + expression.index())
+}
+
 struct LowerBlock {
     id: MirBlockId,
     instructions: Vec<MirInstruction>,
@@ -946,12 +980,13 @@ struct ShortCircuitLowerer<'a> {
 
 impl<'a> ShortCircuitLowerer<'a> {
     fn new(function: &'a HirFunction, types: &'a TypeArena) -> Self {
-        let next_value = function
-            .expressions()
-            .iter()
-            .map(|expression| expression.id().index())
-            .max()
-            .map_or(0, |value| value + 1);
+        let next_value = function.parameters().len()
+            + function
+                .expressions()
+                .iter()
+                .map(|expression| expression.id().index())
+                .max()
+                .map_or(0, |value| value + 1);
         let bool_type = function
             .expressions()
             .iter()
@@ -1031,7 +1066,7 @@ impl<'a> ShortCircuitLowerer<'a> {
             .cloned()
             .ok_or(MirLoweringError::UnsupportedExpression)?;
         require_hir_expression_type(&expression, self.types)?;
-        let output = MirValueId::from_raw(id.index());
+        let output = mir_expression_value_id(self.function, id);
         if self.lowered.contains(&id) {
             return Ok(output);
         }
@@ -1194,7 +1229,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                     arguments: call
                         .arguments()
                         .iter()
-                        .map(|argument| MirValueId::from_raw(argument.index()))
+                        .map(|argument| mir_expression_value_id(self.function, *argument))
                         .collect(),
                     span: expression.span(),
                 });
@@ -1318,12 +1353,13 @@ struct ControlFlowLowerer<'a> {
 
 impl<'a> ControlFlowLowerer<'a> {
     fn new(function: &'a HirFunction, types: &'a TypeArena) -> Self {
-        let next_value = function
-            .expressions()
-            .iter()
-            .map(|expression| expression.id().index())
-            .max()
-            .map_or(0, |value| value + 1);
+        let next_value = function.parameters().len()
+            + function
+                .expressions()
+                .iter()
+                .map(|expression| expression.id().index())
+                .max()
+                .map_or(0, |value| value + 1);
         Self {
             function,
             types,
@@ -1389,7 +1425,7 @@ impl<'a> ControlFlowLowerer<'a> {
             .cloned()
             .ok_or(MirLoweringError::UnsupportedExpression)?;
         require_hir_expression_type(&expression, self.types)?;
-        let output = MirValueId::from_raw(id.index());
+        let output = mir_expression_value_id(self.function, id);
         if self.lowered.contains(&id) {
             return Ok(output);
         }
@@ -1489,7 +1525,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     arguments: call
                         .arguments()
                         .iter()
-                        .map(|argument| MirValueId::from_raw(argument.index()))
+                        .map(|argument| mir_expression_value_id(self.function, *argument))
                         .collect(),
                     span: expression.span(),
                 });

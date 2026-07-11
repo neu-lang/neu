@@ -20,15 +20,17 @@ use crate::{
     source::SourceFileId,
     target_pack::{TargetPackRegistry, TargetPackRegistryError},
     type_check::{
-        DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes,
-        ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
+        ConstructorDiagnostic, DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic,
+        ExecutableSourceTypes, ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
         UnsupportedExecutableFormDiagnostic, apply_m0028_direct_call_results,
         apply_m0060_control_flow_results, apply_m0068_class_type_facts,
-        apply_m0068_field_access_facts, apply_m0070_method_call_facts, check_m0028_direct_calls,
+        apply_m0068_field_access_facts, apply_m0070_method_call_facts,
+        apply_m0070_receiver_name_facts, apply_m0070_receiver_signatures, check_m0028_direct_calls,
         check_m0028_entry_point, check_m0028_return_expression_types,
         check_m0028_straight_line_returns, check_m0028_unsupported_executable_forms,
-        type_m0028_executable_core_in, type_m0060_control_flow, type_m0063_array_expressions,
-        type_m0063_function_signatures_in, type_m0064_string_operations, type_m0068_class_types_in,
+        check_m0069_constructor_calls, type_m0028_executable_core_in, type_m0060_control_flow,
+        type_m0063_array_expressions, type_m0063_function_signatures_in_with_classes,
+        type_m0064_string_operations, type_m0068_class_types_in,
         validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
@@ -101,6 +103,7 @@ pub enum DriverError {
     ReturnTypeDiagnostics(Vec<ReturnTypeDiagnostic>),
     UnsupportedExecutableForms(Vec<UnsupportedExecutableFormDiagnostic>),
     TypeDiagnostics(Vec<TypeCheckDiagnostic>),
+    ConstructorDiagnostics(Vec<ConstructorDiagnostic>),
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
     OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
     Hir(HirLoweringError),
@@ -141,13 +144,24 @@ pub fn compile_source_to_executable(
     let mut types = TypeArena::new();
     let class_types =
         type_m0068_class_types_in(&mut types, &parsed, options.module(), options.package());
-    let signatures = type_m0063_function_signatures_in(
+    if !class_types.diagnostics().is_empty() {
+        return Err(DriverError::TypeDiagnostics(
+            class_types.diagnostics().to_vec(),
+        ));
+    }
+    let constructor_diagnostics = check_m0069_constructor_calls(&parsed, &class_types);
+    if !constructor_diagnostics.is_empty() {
+        return Err(DriverError::ConstructorDiagnostics(constructor_diagnostics));
+    }
+    let mut signatures = type_m0063_function_signatures_in_with_classes(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
         &parsed.array_types,
+        class_types.classes(),
     );
+    apply_m0070_receiver_signatures(&parsed, &class_types, &mut signatures);
     let mut report = type_m0028_executable_core_in(
         &mut types,
         &parsed.arena,
@@ -165,6 +179,7 @@ pub fn compile_source_to_executable(
     apply_m0068_class_type_facts(&parsed, &class_types, &mut report);
     type_m0063_array_expressions(&mut types, &parsed, &mut report);
     type_m0064_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
+    apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_m0068_field_access_facts(&parsed, &class_types, &mut report);
     apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
     let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(

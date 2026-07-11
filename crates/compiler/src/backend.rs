@@ -47,6 +47,7 @@ struct LoweringContext<'a> {
 #[derive(Clone, Copy)]
 struct RuntimeFunctions {
     malloc: FuncId,
+    free: FuncId,
     memcpy: FuncId,
     memcmp: FuncId,
     call_conv: CallConv,
@@ -485,6 +486,9 @@ fn declare_runtime_functions(
     let malloc = module
         .declare_function("malloc", Linkage::Import, &malloc_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let free = module
+        .declare_function("free", Linkage::Import, &malloc_signature)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let memcpy = module
         .declare_function("memcpy", Linkage::Import, &memory_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
@@ -493,6 +497,7 @@ fn declare_runtime_functions(
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     Ok(RuntimeFunctions {
         malloc,
+        free,
         memcpy,
         memcmp,
         call_conv: CallConv::triple_default(target),
@@ -850,14 +855,18 @@ fn lower_instruction(
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
             let word_count = i64::try_from(arguments.len().max(1))
                 .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?;
-            let size = builder.ins().iconst(types::I64, word_count * 8);
+            let size = builder.ins().iconst(types::I64, (word_count + 1) * 8);
             let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
             let allocation = builder.ins().call(malloc_ref, &[size]);
-            let pointer = *builder
+            let allocation = *builder
                 .inst_results(allocation)
                 .first()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            builder.ins().trapz(pointer, TrapCode::unwrap_user(4));
+            builder.ins().trapz(allocation, TrapCode::unwrap_user(4));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), size, allocation, 0);
+            let pointer = builder.ins().iadd_imm(allocation, 8);
             for (index, argument) in arguments.iter().enumerate() {
                 let value = values
                     .get(argument)
@@ -870,6 +879,18 @@ fn lower_instruction(
                     .store(MemFlagsData::new(), value, pointer, offset);
             }
             values.insert(*output, pointer);
+            Ok(())
+        }
+        MirInstruction::DestroyObject { value, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let free_ref = runtime.reference(builder.func, runtime.free, false);
+            builder.ins().call(free_ref, &[pointer]);
             Ok(())
         }
         MirInstruction::FieldLoad {

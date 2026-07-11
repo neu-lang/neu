@@ -99,6 +99,7 @@ pub struct ParsedClassDeclaration {
     pub declaration: AstNodeId,
     pub name: String,
     pub superclass: Option<String>,
+    pub superclass_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
     pub fields: Vec<AstNodeId>,
     pub constructor_parameters: Vec<ParsedConstructorParameter>,
@@ -1009,6 +1010,7 @@ impl<'source> Parser<'source> {
         };
 
         let mut superclass = None;
+        let mut superclass_arguments = Vec::new();
         let mut interfaces = Vec::new();
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
@@ -1032,13 +1034,52 @@ impl<'source> Parser<'source> {
                 let name = self.text[reference.span.start()..reference.span.end()].to_owned();
                 self.advance();
                 let is_superclass = self.current_kind() == Some(TokenKind::LeftParen);
-                if is_superclass && !self.consume_balanced_parentheses() {
-                    self.diagnostic_current_or_span(
-                        DiagnosticKind::MalformedDeclarationHeader,
-                        reference.span,
-                    );
-                    self.skip_to_declaration_boundary(in_body);
-                    return;
+                if is_superclass {
+                    self.advance();
+                    if self.current_kind() != Some(TokenKind::RightParen) {
+                        loop {
+                            let Some(argument_span) = self.parse_expression() else {
+                                self.diagnostic_current_or_span(
+                                    DiagnosticKind::MalformedDeclarationHeader,
+                                    reference.span,
+                                );
+                                self.skip_to_declaration_boundary(in_body);
+                                return;
+                            };
+                            let Some(argument) =
+                                self.latest_expression_node_for_span(argument_span)
+                            else {
+                                self.diagnostic_current_or_span(
+                                    DiagnosticKind::MalformedDeclarationHeader,
+                                    reference.span,
+                                );
+                                self.skip_to_declaration_boundary(in_body);
+                                return;
+                            };
+                            superclass_arguments.push(argument);
+                            match self.current_kind() {
+                                Some(TokenKind::Comma) => self.advance(),
+                                Some(TokenKind::RightParen) => break,
+                                _ => {
+                                    self.diagnostic_current_or_span(
+                                        DiagnosticKind::MalformedDeclarationHeader,
+                                        reference.span,
+                                    );
+                                    self.skip_to_declaration_boundary(in_body);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    if self.current_kind() != Some(TokenKind::RightParen) {
+                        self.diagnostic_current_or_span(
+                            DiagnosticKind::MalformedDeclarationHeader,
+                            reference.span,
+                        );
+                        self.skip_to_declaration_boundary(in_body);
+                        return;
+                    }
+                    self.advance();
                 }
                 if is_superclass && superclass.is_none() {
                     superclass = Some(name);
@@ -1089,6 +1130,7 @@ impl<'source> Parser<'source> {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 superclass,
+                superclass_arguments,
                 interfaces,
                 fields,
                 constructor_parameters,
@@ -1102,6 +1144,7 @@ impl<'source> Parser<'source> {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 superclass,
+                superclass_arguments: Vec::new(),
                 interfaces,
                 fields: Vec::new(),
                 constructor_parameters: Vec::new(),
@@ -3150,6 +3193,8 @@ impl<'source> Parser<'source> {
         matches!(
             kind,
             TokenKind::Identifier
+                | TokenKind::KwThis
+                | TokenKind::KwSuper
                 | TokenKind::IntDecimal
                 | TokenKind::IntBinary
                 | TokenKind::IntHex
@@ -3167,7 +3212,10 @@ impl<'source> Parser<'source> {
     }
 
     fn expression_start_can_be_assignment_target(&self, kind: TokenKind) -> bool {
-        matches!(kind, TokenKind::Identifier | TokenKind::LeftParen)
+        matches!(
+            kind,
+            TokenKind::Identifier | TokenKind::KwThis | TokenKind::KwSuper | TokenKind::LeftParen
+        )
     }
 
     fn binary_operator(&self) -> Option<(u8, BinaryAssociativity, TokenKind)> {

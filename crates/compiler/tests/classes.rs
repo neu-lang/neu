@@ -4,8 +4,9 @@ use compiler::{
     parser::parse_source,
     source::SourceFileId,
     type_check::{
-        ConstructorDiagnosticKind, DispatchDiagnosticKind, check_m0069_constructor_calls,
-        check_m0070_dispatch, class_lifecycle_facts, type_m0068_class_types,
+        ConstructorDiagnosticKind, DispatchDiagnosticKind, TypeRuleDiagnostic,
+        check_m0069_constructor_calls, check_m0070_dispatch, class_lifecycle_facts,
+        type_m0068_class_types,
     },
 };
 use std::{fs, path::PathBuf};
@@ -86,6 +87,82 @@ fn parses_primary_constructor_and_new_expression() {
 }
 
 #[test]
+fn preserves_explicit_superclass_constructor_arguments() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6819),
+        "class Base(val value: Int) {} class Child: Base(7) {}",
+    );
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert_eq!(parsed.class_declarations[1].superclass_arguments.len(), 1);
+
+    let invalid = parse_source(
+        SourceFileId::from_raw(6825),
+        "class Base(val value: Int) {} class Child: Base() {}",
+    );
+    let (_, types) = type_m0068_class_types(
+        &invalid,
+        &ModuleName::parse("classes").unwrap(),
+        &PackageNamespace::root(),
+    );
+    assert_eq!(
+        check_m0069_constructor_calls(&invalid, &types)[0].kind(),
+        ConstructorDiagnosticKind::SuperclassArgumentCountMismatch
+    );
+}
+
+#[test]
+fn constructs_superclass_fields_before_derived_object_use() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-super-constructor-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base(val value: Int) {} class Child: Base(17) {} public fun main(): Int { val child: Child = new Child(); return child.value; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6820),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(17)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn supports_class_typed_function_parameters_and_returns() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-class-signature-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Point(val value: Int) {} fun identity(point: Point): Point { return point; } public fun main(): Int { val point: Point = identity(new Point(19)); return point.value; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6823),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(19)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn associates_method_declarations_with_their_class() {
     let parsed = parse_source(
         SourceFileId::from_raw(6804),
@@ -128,6 +205,32 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
         check_m0070_dispatch(&incomplete)
             .iter()
             .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::MissingInterfaceMethod)
+    );
+
+    let hiding = parse_source(
+        SourceFileId::from_raw(6821),
+        "class Base(val value: Int) {} class Child: Base() { var value: Int; }",
+    );
+    let (_, hiding_types) = type_m0068_class_types(
+        &hiding,
+        &ModuleName::parse("classes").unwrap(),
+        &PackageNamespace::root(),
+    );
+    assert!(
+        hiding_types
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.rule() == TypeRuleDiagnostic::FieldHiding)
+    );
+
+    let incompatible = parse_source(
+        SourceFileId::from_raw(6822),
+        "class Base { open fun value(): Int { return 1; } } class Child: Base() { override fun value(): Bool { return true; } }",
+    );
+    assert!(
+        check_m0070_dispatch(&incompatible)
+            .iter()
+            .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::IncompatibleOverride)
     );
 }
 
@@ -297,4 +400,101 @@ fn accepts_derived_to_base_assignment() {
         Some(13)
     );
     let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn class_method_reads_its_implicit_this_receiver() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-method-this-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Point(val value: Int) { fun read(): Int { return this.value; } } public fun main(): Int { val point: Point = new Point(17); return point.read(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6815),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(17)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn class_method_reads_a_bare_inherited_field() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-bare-field-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base(val value: Int) {} class Child: Base(23) { fun read(): Int { return value; } } public fun main(): Int { val child: Child = new Child(); return child.read(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6824),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(23)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn class_method_can_call_immediate_super_method() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-super-method-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base { open fun value(): Int { return 2; } } class Child: Base() { override fun value(): Int { return super.value() + 1; } } public fun main(): Int { val child: Child = new Child(); return child.value(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6816),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(3)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn lifecycle_orders_constructor_fields_before_body_fields() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6817),
+        "class Record(val first: Int) { var second: Int; }",
+    );
+    let lifecycle = class_lifecycle_facts(&parsed);
+    assert_eq!(lifecycle[0].initialization_order(), ["first", "second"]);
+    assert_eq!(lifecycle[0].destruction_order(), ["second", "first"]);
+}
+
+#[test]
+fn lifecycle_orders_superclass_fields_before_derived_fields() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6818),
+        "class Base(val base: Int) {} class Child: Base() { var child: Int; }",
+    );
+    let lifecycle = class_lifecycle_facts(&parsed);
+    assert_eq!(lifecycle[1].initialization_order(), ["base", "child"]);
+    assert_eq!(lifecycle[1].destruction_order(), ["child", "base"]);
 }

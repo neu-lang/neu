@@ -104,6 +104,17 @@ pub fn lower_checked_hir_source(
             .node(function.declaration)
             .ok_or(HirLoweringError::UnsupportedExpression)?
             .span;
+        let symbol_name = function
+            .owner
+            .and_then(|owner| {
+                source
+                    .parsed
+                    .class_declarations
+                    .iter()
+                    .find(|class| class.declaration == owner)
+                    .map(|class| format!("{}::{}", class.name, function.name))
+            })
+            .unwrap_or_else(|| function.name.clone());
         let symbol_identity = source
             .parsed
             .declaration_names
@@ -113,14 +124,18 @@ pub fn lower_checked_hir_source(
                 FunctionSymbolIdentity::new(
                     source.module.clone(),
                     source.package.clone(),
-                    name.name.clone(),
+                    if function.owner.is_some() {
+                        symbol_name.clone()
+                    } else {
+                        name.name.clone()
+                    },
                 )
             })
             .unwrap_or_else(|| {
                 FunctionSymbolIdentity::new(
                     source.module.clone(),
                     source.package.clone(),
-                    function.name.clone(),
+                    symbol_name.clone(),
                 )
             });
         let id = HirFunctionId::from_raw(functions.len());
@@ -185,30 +200,50 @@ pub fn lower_checked_hir_source(
             locals.push(HirLocal::new(local_id, span, ty, false));
             local_bindings.push((loop_.binding, local_id));
         }
-        let parameters = source
-            .parsed
-            .function_parameters
-            .iter()
-            .filter(|parameter| parameter.function == function.declaration)
-            .enumerate()
-            .map(|(index, parameter)| {
-                let parameter_span = source
-                    .parsed
-                    .arena
-                    .node(parameter.parameter)
-                    .ok_or(HirLoweringError::UnsupportedExpression)?
-                    .span;
-                let ty = *signature
-                    .parameter_types()
-                    .get(index)
-                    .ok_or(HirLoweringError::UnsupportedExpression)?;
-                Ok(HirParameter::new(
-                    HirParameterId::from_raw(index),
-                    parameter_span,
-                    ty,
-                ))
-            })
-            .collect::<Result<Vec<_>, HirLoweringError>>()?;
+        let mut parameters = Vec::new();
+        if function.owner.is_some() {
+            let parameter_span = source
+                .parsed
+                .arena
+                .node(function.declaration)
+                .ok_or(HirLoweringError::UnsupportedExpression)?
+                .span;
+            let ty = *signature
+                .parameter_types()
+                .first()
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            parameters.push(HirParameter::new(
+                HirParameterId::from_raw(0),
+                parameter_span,
+                ty,
+            ));
+        }
+        parameters.extend(
+            source
+                .parsed
+                .function_parameters
+                .iter()
+                .filter(|parameter| parameter.function == function.declaration)
+                .enumerate()
+                .map(|(index, parameter)| {
+                    let parameter_span = source
+                        .parsed
+                        .arena
+                        .node(parameter.parameter)
+                        .ok_or(HirLoweringError::UnsupportedExpression)?
+                        .span;
+                    let ty = *signature
+                        .parameter_types()
+                        .get(index + usize::from(function.owner.is_some()))
+                        .ok_or(HirLoweringError::UnsupportedExpression)?;
+                    Ok(HirParameter::new(
+                        HirParameterId::from_raw(index + usize::from(function.owner.is_some())),
+                        parameter_span,
+                        ty,
+                    ))
+                })
+                .collect::<Result<Vec<_>, HirLoweringError>>()?,
+        );
         let mut assignments = Vec::new();
         for statement in source
             .parsed
@@ -557,8 +592,14 @@ fn lower_expression(
         .iter()
         .find(|new_expression| new_expression.expression == expression)
     {
-        let arguments = new_expression
-            .arguments
+        let mut argument_nodes = Vec::new();
+        append_superclass_argument_nodes(
+            source.parsed,
+            &new_expression.type_name,
+            &mut argument_nodes,
+        );
+        argument_nodes.extend(new_expression.arguments.iter().copied());
+        let arguments = argument_nodes
             .iter()
             .map(|argument| {
                 lower_expression(
@@ -650,6 +691,24 @@ fn lower_expression(
         ));
         return Ok(id);
     }
+    if source
+        .parsed
+        .function_declarations
+        .iter()
+        .find(|function| function.declaration == function_declaration)
+        .is_some_and(|function| function.owner.is_some())
+        && source.parsed.name_references.iter().any(|name| {
+            name.reference == expression && matches!(name.name.as_str(), "this" | "super")
+        })
+    {
+        output.push(HirExpression::parameter_read(
+            id,
+            span,
+            ty,
+            HirParameterId::from_raw(0),
+        ));
+        return Ok(id);
+    }
     if let Some(name) = source
         .parsed
         .name_references
@@ -666,9 +725,45 @@ fn lower_expression(
             id,
             span,
             ty,
-            HirParameterId::from_raw(parameter_index),
+            HirParameterId::from_raw(
+                parameter_index
+                    + usize::from(
+                        source
+                            .parsed
+                            .function_declarations
+                            .iter()
+                            .find(|function| function.declaration == function_declaration)
+                            .is_some_and(|function| function.owner.is_some()),
+                    ),
+            ),
         ));
         return Ok(id);
+    }
+    if let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == expression)
+        && let Some((receiver_type, field_index)) =
+            bare_field_for_method(source, function_declaration, &name.name)
+    {
+        let receiver_id = HirExpressionId::from_raw(output.len());
+        output.push(HirExpression::parameter_read(
+            receiver_id,
+            span,
+            receiver_type,
+            HirParameterId::from_raw(0),
+        ));
+        let field_id = HirExpressionId::from_raw(output.len());
+        output.push(HirExpression::field_access(
+            field_id,
+            span,
+            ty,
+            receiver_id,
+            name.name.clone(),
+            field_index,
+        ));
+        return Ok(field_id);
     }
     if let Some(local) = local_binding_id(source, function_declaration, expression, local_bindings)
     {
@@ -716,22 +811,38 @@ fn lower_expression(
                 .position(|function| function.name == name.name)
                 .ok_or(HirLoweringError::UnsupportedExpression)?
         } else {
-            method_declaration_index(source, call.callee)
+            method_declaration_index(source, call.callee, call.function)
                 .ok_or(HirLoweringError::UnsupportedExpression)?
         };
-        let arguments = call
-            .arguments
+        let mut arguments = Vec::new();
+        if let Some(member) = source
+            .parsed
+            .member_expressions
             .iter()
-            .map(|argument| {
-                lower_expression(
-                    source,
-                    function_declaration,
-                    *argument,
-                    local_bindings,
-                    output,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+            .find(|member| member.expression == call.callee)
+        {
+            arguments.push(lower_expression(
+                source,
+                function_declaration,
+                member.receiver,
+                local_bindings,
+                output,
+            )?);
+        }
+        arguments.extend(
+            call.arguments
+                .iter()
+                .map(|argument| {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        *argument,
+                        local_bindings,
+                        output,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        );
         let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::direct_call(
             id,
@@ -742,6 +853,24 @@ fn lower_expression(
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn append_superclass_argument_nodes(
+    parsed: &ParseOutput,
+    class_name: &str,
+    output: &mut Vec<crate::ast::AstNodeId>,
+) {
+    let Some(class) = parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name)
+    else {
+        return;
+    };
+    if let Some(superclass) = class.superclass.as_deref() {
+        append_superclass_argument_nodes(parsed, superclass, output);
+    }
+    output.extend(class.superclass_arguments.iter().copied());
 }
 
 fn field_index_for_receiver(
@@ -761,6 +890,34 @@ fn field_index_for_receiver(
                 .name_references
                 .iter()
                 .find(|name| name.reference == receiver)?;
+            if matches!(name.name.as_str(), "this" | "super") {
+                let receiver_span = source.parsed.arena.node(receiver)?.span;
+                let function = source
+                    .parsed
+                    .function_declarations
+                    .iter()
+                    .find(|function| {
+                        function
+                            .body
+                            .and_then(|body| source.parsed.arena.node(body))
+                            .is_some_and(|body| {
+                                body.span.file() == receiver_span.file()
+                                    && body.span.start() <= receiver_span.start()
+                                    && receiver_span.end() <= body.span.end()
+                            })
+                    })?;
+                let owner = function.owner?;
+                let class = source
+                    .parsed
+                    .class_declarations
+                    .iter()
+                    .find(|class| class.declaration == owner)?;
+                return if name.name == "super" {
+                    class.superclass.clone()
+                } else {
+                    Some(class.name.clone())
+                };
+            }
             let binding = source
                 .parsed
                 .local_binding_names
@@ -790,6 +947,54 @@ fn field_index_for_receiver(
     else {
         return 0;
     };
+    field_index_for_class(source.parsed, class, field_name)
+}
+
+fn field_index_for_class(
+    parsed: &ParseOutput,
+    class: &crate::parser::ParsedClassDeclaration,
+    field_name: &str,
+) -> usize {
+    let mut index = 0;
+    if let Some(superclass) = class.superclass.as_deref()
+        && let Some(parent) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == superclass)
+    {
+        let parent_field_count = field_count(parsed, parent);
+        if let Some(found) = field_index_for_class_if_present(parsed, parent, field_name) {
+            return found;
+        }
+        index += parent_field_count;
+    }
+    if let Some(found) = field_index_for_class_if_present(parsed, class, field_name) {
+        return index + found;
+    }
+    0
+}
+
+fn field_count(parsed: &ParseOutput, class: &crate::parser::ParsedClassDeclaration) -> usize {
+    class
+        .constructor_parameters
+        .iter()
+        .filter(|parameter| parameter.field)
+        .count()
+        + class.fields.len()
+        + class.superclass.as_deref().map_or(0, |superclass| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == superclass)
+                .map_or(0, |parent| field_count(parsed, parent))
+        })
+}
+
+fn field_index_for_class_if_present(
+    parsed: &ParseOutput,
+    class: &crate::parser::ParsedClassDeclaration,
+    field_name: &str,
+) -> Option<usize> {
     let mut index = 0;
     for parameter in class
         .constructor_parameters
@@ -797,30 +1002,112 @@ fn field_index_for_receiver(
         .filter(|parameter| parameter.field)
     {
         if parameter.name == field_name {
-            return index;
+            return Some(index);
         }
         index += 1;
     }
     for field in &class.fields {
-        let Some(field) = source
-            .parsed
+        let field = parsed
             .field_declarations
             .iter()
-            .find(|candidate| candidate.declaration == *field)
-        else {
-            continue;
-        };
+            .find(|candidate| candidate.declaration == *field)?;
         if field.name == field_name {
-            return index;
+            return Some(index);
         }
         index += 1;
     }
-    0
+    None
+}
+
+fn bare_field_for_method(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    field_name: &str,
+) -> Option<(TypeId, usize)> {
+    if source.parsed.local_binding_names.iter().any(|binding| {
+        binding.name == field_name
+            && source
+                .parsed
+                .executable_body_statements
+                .iter()
+                .any(|statement| {
+                    statement.function == function_declaration
+                        && statement.statement == binding.binding
+                })
+    }) {
+        return None;
+    }
+    let function = source
+        .parsed
+        .function_declarations
+        .iter()
+        .find(|function| function.declaration == function_declaration)?;
+    let owner = function.owner?;
+    let class = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.declaration == owner)?;
+    let signature = source
+        .signatures
+        .iter()
+        .find(|signature| signature.declaration() == function_declaration)?;
+    let receiver_type = *signature.parameter_types().first()?;
+    let field_index = field_index_for_class(source.parsed, class, field_name);
+    let owns_field = class
+        .constructor_parameters
+        .iter()
+        .filter(|parameter| parameter.field)
+        .any(|parameter| parameter.name == field_name)
+        || class.fields.iter().any(|field| {
+            source
+                .parsed
+                .field_declarations
+                .iter()
+                .find(|candidate| candidate.declaration == *field)
+                .is_some_and(|field| field.name == field_name)
+        })
+        || class.superclass.as_deref().is_some_and(|superclass| {
+            source
+                .parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == superclass)
+                .is_some_and(|parent| bare_field_exists(source.parsed, parent, field_name))
+        });
+    owns_field.then_some((receiver_type, field_index))
+}
+
+fn bare_field_exists(
+    parsed: &ParseOutput,
+    class: &crate::parser::ParsedClassDeclaration,
+    field_name: &str,
+) -> bool {
+    class
+        .constructor_parameters
+        .iter()
+        .filter(|parameter| parameter.field)
+        .any(|parameter| parameter.name == field_name)
+        || class.fields.iter().any(|field| {
+            parsed
+                .field_declarations
+                .iter()
+                .find(|candidate| candidate.declaration == *field)
+                .is_some_and(|field| field.name == field_name)
+        })
+        || class.superclass.as_deref().is_some_and(|superclass| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == superclass)
+                .is_some_and(|parent| bare_field_exists(parsed, parent, field_name))
+        })
 }
 
 fn method_declaration_index(
     source: &CheckedHirSource<'_>,
     callee: crate::ast::AstNodeId,
+    function_declaration: crate::ast::AstNodeId,
 ) -> Option<usize> {
     let member = source
         .parsed
@@ -832,6 +1119,36 @@ fn method_declaration_index(
         .name_references
         .iter()
         .find(|name| name.reference == member.receiver)?;
+    if matches!(receiver.name.as_str(), "this" | "super") {
+        let owner = source
+            .parsed
+            .function_declarations
+            .iter()
+            .find(|function| function.declaration == function_declaration)?
+            .owner?;
+        let class = source
+            .parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.declaration == owner)?;
+        let class_name = if receiver.name == "super" {
+            class.superclass.as_deref()?
+        } else {
+            class.name.as_str()
+        };
+        let class = source
+            .parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == class_name)?;
+        return source
+            .parsed
+            .function_declarations
+            .iter()
+            .position(|function| {
+                function.owner == Some(class.declaration) && function.name == member.name
+            });
+    }
     let binding = source
         .parsed
         .local_binding_names

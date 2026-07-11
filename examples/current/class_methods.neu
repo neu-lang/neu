@@ -1,12 +1,13 @@
 package examples.current
 
-class Answer {
-    open fun value(): Int {
-        return 9;
+class Counter(var value: Int) {
+    open fun increment(amount: Int): Int {
+        this.value = this.value + amount;
+        return this.value;
     }
 }
 
 public fun main(): Int {
-    val answer: Answer = new Answer();
-    return answer.value();
+    val counter: Counter = new Counter(4);
+    return counter.increment(5);
 }
