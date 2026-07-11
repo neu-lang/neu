@@ -492,9 +492,6 @@ fn lower_expression(
         .iter()
         .find(|member| member.expression == expression)
     {
-        if member.name != "length" {
-            return Err(HirLoweringError::UnsupportedExpression);
-        }
         let receiver = lower_expression(
             source,
             function_declaration,
@@ -503,7 +500,46 @@ fn lower_expression(
             output,
         )?;
         let id = HirExpressionId::from_raw(output.len());
-        output.push(HirExpression::string_length(id, span, ty, receiver));
+        if member.name == "length" {
+            output.push(HirExpression::string_length(id, span, ty, receiver));
+        } else {
+            output.push(HirExpression::field_access(
+                id,
+                span,
+                ty,
+                receiver,
+                member.name.clone(),
+            ));
+        }
+        return Ok(id);
+    }
+    if let Some(new_expression) = source
+        .parsed
+        .new_expressions
+        .iter()
+        .find(|new_expression| new_expression.expression == expression)
+    {
+        let arguments = new_expression
+            .arguments
+            .iter()
+            .map(|argument| {
+                lower_expression(
+                    source,
+                    function_declaration,
+                    *argument,
+                    local_bindings,
+                    output,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let id = HirExpressionId::from_raw(output.len());
+        output.push(HirExpression::new_object(
+            id,
+            span,
+            ty,
+            new_expression.type_name.clone(),
+            arguments,
+        ));
         return Ok(id);
     }
     if let Some(array) = source
@@ -1203,6 +1239,14 @@ pub enum HirExpressionKind {
     StringLiteral(Vec<u8>),
     StringLength(HirExpressionId),
     StringClone(HirExpressionId),
+    FieldAccess {
+        receiver: HirExpressionId,
+        name: String,
+    },
+    NewObject {
+        type_name: String,
+        arguments: Vec<HirExpressionId>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1370,6 +1414,39 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::StringLength(receiver),
+        }
+    }
+
+    pub fn field_access(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        receiver: HirExpressionId,
+        name: String,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::FieldAccess { receiver, name },
+        }
+    }
+
+    pub fn new_object(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        type_name: String,
+        arguments: Vec<HirExpressionId>,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::NewObject {
+                type_name,
+                arguments,
+            },
         }
     }
 

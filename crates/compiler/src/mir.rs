@@ -749,6 +749,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         });
                     }
                 }
+                HirExpressionKind::FieldAccess { .. } | HirExpressionKind::NewObject { .. } => {
+                    return Err(MirLoweringError::UnsupportedExpression);
+                }
             }
             for local in function.locals() {
                 if local.initializer() == Some(expression.id()) {
@@ -1134,7 +1137,9 @@ impl<'a> ShortCircuitLowerer<'a> {
             | HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
-            | HirExpressionKind::StringClone(_) => {
+            | HirExpressionKind::StringClone(_)
+            | HirExpressionKind::FieldAccess { .. }
+            | HirExpressionKind::NewObject { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -1427,7 +1432,9 @@ impl<'a> ControlFlowLowerer<'a> {
             | HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
-            | HirExpressionKind::StringClone(_) => {
+            | HirExpressionKind::StringClone(_)
+            | HirExpressionKind::FieldAccess { .. }
+            | HirExpressionKind::NewObject { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
