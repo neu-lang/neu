@@ -7,6 +7,7 @@ pub mod borrow;
 pub mod coroutine;
 pub mod hir;
 pub mod lexer;
+pub mod linker;
 pub mod mir;
 pub mod module;
 pub mod name_resolution;
