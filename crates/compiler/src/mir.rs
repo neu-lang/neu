@@ -229,6 +229,7 @@ pub struct MirFunction {
     blocks: Vec<MirBasicBlock>,
     cleanup_boundary: MirCleanupBoundary,
     symbol_identity: Option<FunctionSymbolIdentity>,
+    entry: bool,
 }
 impl MirFunction {
     pub fn new(
@@ -249,6 +250,7 @@ impl MirFunction {
             blocks,
             cleanup_boundary,
             symbol_identity: None,
+            entry: false,
         }
     }
     pub fn id(&self) -> MirFunctionId {
@@ -278,6 +280,13 @@ impl MirFunction {
     }
     pub fn symbol_identity(&self) -> Option<&FunctionSymbolIdentity> {
         self.symbol_identity.as_ref()
+    }
+    pub fn with_entry(mut self, entry: bool) -> Self {
+        self.entry = entry;
+        self
+    }
+    pub fn is_entry(&self) -> bool {
+        self.entry
     }
 }
 
@@ -348,7 +357,8 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 ),
             )],
             MirCleanupBoundary::empty(),
-        );
+        )
+        .with_entry(function.is_entry());
         functions.push(match function.symbol_identity() {
             Some(identity) => mir_function.with_symbol_identity(identity.clone()),
             None => mir_function,

@@ -51,6 +51,12 @@ fn m0032_hir_to_mir_preserves_function_symbol_identity() {
     let mir = lower_hir_to_mir(&hir, &types).unwrap();
 
     assert_eq!(mir.functions()[0].symbol_identity().unwrap().name(), "main");
+    assert!(mir.functions()[0].is_entry());
+}
+
+#[test]
+fn m0032_hir_to_mir_preserves_entry_classification() {
+    m0032_hir_to_mir_preserves_function_symbol_identity();
 }
 
 #[test]
@@ -125,6 +131,7 @@ fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
     assert_eq!(mir.functions()[0].blocks()[0].instructions().len(), 3);
     assert_eq!(mir.functions()[0].return_type(), int);
     assert_eq!(mir.functions()[0].blocks()[0].terminator().span(), span);
+    assert!(!mir.functions()[0].is_entry());
 }
 
 #[test]
