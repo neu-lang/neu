@@ -84,6 +84,6 @@ The expected compiler architecture includes AST, semantic checks, HIR, MIR, and 
 
 ## Completion Checklist
 
-- [ ] HIR model exists.
+- [x] HIR model exists.
 - [ ] Checked AST lowers to HIR.
 - [ ] Source mapping is preserved.
