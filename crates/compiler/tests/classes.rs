@@ -62,6 +62,7 @@ fn parses_primary_constructor_and_new_expression() {
         &PackageNamespace::root(),
     );
     assert_eq!(types.classes()[0].constructor_parameter_count(), 2);
+    assert_eq!(types.fields().len(), 2);
     assert!(check_m0069_constructor_calls(&parsed, &types).is_empty());
     let lifecycle = class_lifecycle_facts(&parsed);
     assert_eq!(lifecycle[0].initialization_order(), ["x", "y"]);

@@ -107,6 +107,7 @@ pub struct ParsedClassDeclaration {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedConstructorParameter {
+    pub parameter: AstNodeId,
     pub name: String,
     pub field: bool,
     pub mutable: bool,
@@ -1280,7 +1281,11 @@ impl<'source> Parser<'source> {
             let Some(annotation) = self.latest_type_node_for_span(annotation_span) else {
                 break;
             };
+            let parameter = self
+                .arena
+                .add_field_declaration(self.span(name.span.start(), annotation_span.end()));
             parameters.push(ParsedConstructorParameter {
+                parameter,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 field,
                 mutable,

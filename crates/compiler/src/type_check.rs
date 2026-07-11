@@ -786,6 +786,42 @@ pub fn type_m0068_class_types(
             mutable: field.mutable,
         });
     }
+    for class in &parsed.class_declarations {
+        for parameter in class
+            .constructor_parameters
+            .iter()
+            .filter(|parameter| parameter.field)
+        {
+            let Some(type_id) = primitive_annotation_type_for_node(
+                parameter.annotation,
+                &parsed.type_name_references,
+                primitives,
+            ) else {
+                continue;
+            };
+            if report
+                .fields
+                .iter()
+                .any(|field| field.owner == class.declaration && field.name == parameter.name)
+            {
+                report
+                    .diagnostics
+                    .push(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::DuplicateField,
+                        parameter.parameter,
+                    ));
+                continue;
+            }
+            report.fields.push(FieldTypeRecord {
+                declaration: parameter.parameter,
+                owner: class.declaration,
+                type_id,
+                name: parameter.name.clone(),
+                visibility: "public".to_owned(),
+                mutable: parameter.mutable,
+            });
+        }
+    }
     let _ = class_ids;
     (types, report)
 }
