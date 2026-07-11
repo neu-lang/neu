@@ -565,6 +565,15 @@ Every source file in one module compilation shares one TypeArena. TypeId is
 meaningful only inside that module arena; same-module direct-call compatibility
 uses those shared identities, while cross-module calls remain deferred.
 
+## ADR-0053: Bootstrap Unsupported Executable-Form Diagnostics
+
+Every parsed form outside ADR-0042 receives `unsupported_executable_form`
+unless a more-specific accepted diagnostic already applies. The diagnostic
+attaches to the source-file-qualified outermost unsupported form; unsupported
+descendants in that form are suppressed. Recovery emits no executable type,
+control-flow, ownership, or lowering fact for the rejected region, and HIR
+must not receive it. Unrelated sibling forms continue checking.
+
 ## ADR-0044: Bootstrap HIR Runtime Contract
 
 Bootstrap HIR is typed, source-mapped, and backend-independent. It preserves
