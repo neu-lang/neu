@@ -217,7 +217,7 @@ fn m0032_loads_target_pack_manifest_from_toml() {
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();
     let manifest = format!(
-        "[target]\ntriple = \"{}\"\nobject_format = \"macho\"\nexecutable_format = \"macho\"\n[linker]\npath = \"bin/linker\"\n[startup_shim]\npath = \"runtime/startup.o\"\n[entry]\nplatform_symbol = \"_start\"\nlanguage_symbol = \"neu_lang_main\"\ntrap_exit_code = 1\n",
+        "[target]\ntriple = \"{}\"\nobject_format = \"macho\"\nexecutable_format = \"macho\"\n[linker]\npath = \"bin/linker\"\n[startup_shim]\npath = \"runtime/startup.o\"\n[entry]\nplatform_symbol = \"_start\"\nlanguage_symbol = \"neu_lang_main\"\ntrap_exit_code = 1\n[capabilities]\nint_width_bits = 64\npointer_width_bits = 64\nendianness = \"little\"\nalignment_model = \"deferred\"\ncalling_convention = \"platform-default\"\natomic_model = \"deferred\"\nplatform_apis = []\n",
         Triple::host()
     );
 

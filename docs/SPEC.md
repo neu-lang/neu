@@ -679,3 +679,19 @@ unsuccessfully for bootstrap traps or unsupported exit values. It is not a
 standard library and provides no printing, allocation, scheduling, CLI
 arguments, or panic formatting. M0032 covers the current host pack; additional
 target-pack distribution remains M0033 work.
+
+## ADR-0058: Bootstrap Target Capability Profile
+
+Every bundled target pack declares a typed `[capabilities]` profile containing
+`int_width_bits`, `pointer_width_bits`, `endianness`, `alignment_model`,
+`calling_convention`, `atomic_model`, and `platform_apis`. The initial host
+profile declares signed 64-bit `Int`, 64-bit pointers, little-endian layout,
+the `platform-default` bootstrap calling convention, deferred alignment and
+atomic models, and an empty platform API list.
+
+Target-pack resolution validates these declarations. The compiler never infers
+capabilities from the host or silently substitutes values from a target triple.
+Deferred capabilities are unavailable to executable forms, and an empty
+platform API list means no platform API or standard library is provided. Future
+target packs must declare their own profile and require accepted ABI, layout,
+atomic, or platform API semantics before using non-deferred values.

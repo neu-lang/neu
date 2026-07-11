@@ -7,7 +7,7 @@
 - Related Milestone: `M0033`
 - Filed By: `main-task architecture review`
 - Date: `2026-07-11`
-- Status: `open`
+- Status: `resolved`
 - Required Owner: `main-task semantic design`
 
 ## Ambiguous Or Missing Authority
@@ -82,3 +82,14 @@ consumes and validates those declarations.
 Do not add a non-host target pack or infer target capabilities from an
 unaccepted source. The explicit target-pack registry may resolve existing packs
 without claiming that cross-target capability semantics are complete.
+
+## Resolution
+
+ADR-0058 accepts an explicit typed bootstrap capability profile in each target
+pack. It defines the bootstrap values, represents unsupported capability
+categories as `deferred`, and requires target-pack validation without host
+inference. `docs/SPEC.md` now records the accepted rule.
+
+- Date resolved: `2026-07-11`
+- Resolved by: delegated main-task Chief Architect decision
+- Implementation task unblocked: `M0033-002`

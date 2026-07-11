@@ -14,6 +14,7 @@ struct SerializedTargetPackManifest {
     linker: SerializedArtifact,
     startup_shim: SerializedArtifact,
     entry: SerializedEntry,
+    capabilities: SerializedTargetCapabilities,
 }
 
 #[derive(Deserialize)]
@@ -38,6 +39,18 @@ struct SerializedEntry {
     trap_exit_code: u8,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SerializedTargetCapabilities {
+    int_width_bits: u16,
+    pointer_width_bits: u16,
+    endianness: String,
+    alignment_model: String,
+    calling_convention: String,
+    atomic_model: String,
+    platform_apis: Vec<String>,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ArtifactKind {
     Linker,
@@ -57,6 +70,7 @@ pub enum TargetPackError {
     StartupShimFormatMismatch,
     MissingStartupEntrySymbol,
     MissingLanguageEntryRelocation,
+    InvalidCapabilities,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,6 +89,53 @@ pub struct TargetPackManifest {
     entry_symbol: String,
     language_entry_symbol: String,
     trap_exit_code: u8,
+    capabilities: TargetCapabilities,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TargetCapabilities {
+    int_width_bits: u16,
+    pointer_width_bits: u16,
+    endianness: String,
+    alignment_model: String,
+    calling_convention: String,
+    atomic_model: String,
+    platform_apis: Vec<String>,
+}
+
+impl TargetCapabilities {
+    pub fn bootstrap_host() -> Self {
+        Self {
+            int_width_bits: 64,
+            pointer_width_bits: 64,
+            endianness: "little".to_owned(),
+            alignment_model: "deferred".to_owned(),
+            calling_convention: "platform-default".to_owned(),
+            atomic_model: "deferred".to_owned(),
+            platform_apis: Vec::new(),
+        }
+    }
+
+    fn from_serialized(serialized: SerializedTargetCapabilities) -> Result<Self, TargetPackError> {
+        let capabilities = Self {
+            int_width_bits: serialized.int_width_bits,
+            pointer_width_bits: serialized.pointer_width_bits,
+            endianness: serialized.endianness,
+            alignment_model: serialized.alignment_model,
+            calling_convention: serialized.calling_convention,
+            atomic_model: serialized.atomic_model,
+            platform_apis: serialized.platform_apis,
+        };
+        capabilities.validate()?;
+        Ok(capabilities)
+    }
+
+    fn validate(&self) -> Result<(), TargetPackError> {
+        if self != &Self::bootstrap_host() {
+            return Err(TargetPackError::InvalidCapabilities);
+        }
+        Ok(())
+    }
 }
 
 impl TargetPackManifest {
@@ -86,7 +147,7 @@ impl TargetPackManifest {
             .triple
             .parse::<Triple>()
             .map_err(|_| TargetPackError::InvalidManifest)?;
-        Self::new(
+        Self::new_with_capabilities(
             target,
             serialized.target.object_format,
             serialized.target.executable_format,
@@ -95,6 +156,7 @@ impl TargetPackManifest {
             serialized.entry.platform_symbol,
             serialized.entry.language_symbol,
             serialized.entry.trap_exit_code,
+            TargetCapabilities::from_serialized(serialized.capabilities)?,
         )
     }
 
@@ -109,6 +171,31 @@ impl TargetPackManifest {
         language_entry_symbol: impl Into<String>,
         trap_exit_code: u8,
     ) -> Result<Self, TargetPackError> {
+        Self::new_with_capabilities(
+            target,
+            object_format,
+            executable_format,
+            linker_path,
+            startup_shim_path,
+            entry_symbol,
+            language_entry_symbol,
+            trap_exit_code,
+            TargetCapabilities::bootstrap_host(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_with_capabilities(
+        target: Triple,
+        object_format: impl Into<String>,
+        executable_format: impl Into<String>,
+        linker_path: impl Into<PathBuf>,
+        startup_shim_path: impl Into<PathBuf>,
+        entry_symbol: impl Into<String>,
+        language_entry_symbol: impl Into<String>,
+        trap_exit_code: u8,
+        capabilities: TargetCapabilities,
+    ) -> Result<Self, TargetPackError> {
         let manifest = Self {
             target,
             object_format: object_format.into(),
@@ -118,6 +205,7 @@ impl TargetPackManifest {
             entry_symbol: entry_symbol.into(),
             language_entry_symbol: language_entry_symbol.into(),
             trap_exit_code,
+            capabilities,
         };
         manifest.validate()?;
         Ok(manifest)
@@ -134,6 +222,7 @@ impl TargetPackManifest {
         {
             return Err(TargetPackError::InvalidManifest);
         }
+        self.capabilities.validate()?;
         Ok(())
     }
 }
@@ -148,6 +237,7 @@ pub struct TargetPack {
     entry_symbol: String,
     language_entry_symbol: String,
     trap_exit_code: u8,
+    capabilities: TargetCapabilities,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -220,6 +310,7 @@ impl TargetPack {
             entry_symbol: manifest.entry_symbol,
             language_entry_symbol: manifest.language_entry_symbol,
             trap_exit_code: manifest.trap_exit_code,
+            capabilities: manifest.capabilities,
         })
     }
 
@@ -253,6 +344,10 @@ impl TargetPack {
 
     pub fn trap_exit_code(&self) -> u8 {
         self.trap_exit_code
+    }
+
+    pub fn capabilities(&self) -> &TargetCapabilities {
+        &self.capabilities
     }
 }
 
