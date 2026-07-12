@@ -38,7 +38,9 @@ use compiler::{
         type_primitive_local_initializer_declarations, type_resolved_name_expressions,
         type_unsupported_m0018_expressions, validate_m0061_compile_time_constants,
     },
-    types::{NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
+    types::{
+        GenericSubstitution, NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord,
+    },
 };
 
 #[test]
@@ -393,6 +395,36 @@ fn m0020_capability_bound_records_preserve_occurrences_without_interpretation() 
     let missing =
         build_m0020_capability_bound_records(&parsed.generic_parameters, &[], &mut symbols);
     assert!(missing.is_empty());
+}
+
+#[test]
+fn m0084_capability_bounds_are_checked_after_substitution() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(502),
+        "struct Box<T: Send & Share> {}",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let parameter_types =
+        build_m0020_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds = build_m0020_capability_bound_records(
+        &parsed.generic_parameters,
+        &parameter_types,
+        &mut symbols,
+    );
+    let string_type = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(parameter_types[0].ty(), string_type);
+
+    let diagnostics = compiler::type_check::validate_m0084_capability_bounds(
+        &bounds,
+        &substitution,
+        &types,
+        &symbols,
+    );
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].bound(), bounds[1].bound());
 }
 
 #[test]

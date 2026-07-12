@@ -12,7 +12,11 @@ use crate::{
     },
     source::ByteSpan,
     symbol::{SymbolId, SymbolInterner},
-    types::{GenericParameterType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord},
+    thread::{ThreadCapability, satisfies_thread_capability},
+    types::{
+        GenericParameterType, GenericSubstitution, PrimitiveType, TypeArena, TypeId, TypeKind,
+        TypeRecord,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2724,6 +2728,32 @@ pub struct CapabilityBoundRecord {
     symbol: SymbolId,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GenericConstraintFailureKind {
+    UnsatisfiedCapability,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenericConstraintDiagnostic {
+    parameter: AstNodeId,
+    bound: AstNodeId,
+    kind: GenericConstraintFailureKind,
+}
+
+impl GenericConstraintDiagnostic {
+    pub fn parameter(&self) -> AstNodeId {
+        self.parameter
+    }
+
+    pub fn bound(&self) -> AstNodeId {
+        self.bound
+    }
+
+    pub fn kind(&self) -> GenericConstraintFailureKind {
+        self.kind
+    }
+}
+
 impl CapabilityBoundRecord {
     pub fn new(parameter: AstNodeId, ty: TypeId, bound: AstNodeId, symbol: SymbolId) -> Self {
         Self {
@@ -2823,6 +2853,33 @@ pub fn build_m0020_capability_bound_records(
     }
 
     records
+}
+
+pub fn validate_m0084_capability_bounds(
+    bounds: &[CapabilityBoundRecord],
+    substitution: &GenericSubstitution,
+    types: &TypeArena,
+    symbols: &SymbolInterner,
+) -> Vec<GenericConstraintDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for bound in bounds {
+        let capability = match symbols.resolve(bound.symbol()) {
+            Some("Send") => ThreadCapability::Send,
+            Some("Share") => ThreadCapability::Share,
+            Some(_) | None => continue,
+        };
+        let Some(argument) = substitution.get(bound.ty()) else {
+            continue;
+        };
+        if !satisfies_thread_capability(types, argument, capability) {
+            diagnostics.push(GenericConstraintDiagnostic {
+                parameter: bound.parameter(),
+                bound: bound.bound(),
+                kind: GenericConstraintFailureKind::UnsatisfiedCapability,
+            });
+        }
+    }
+    diagnostics
 }
 
 pub fn build_m0083_generic_declaration_records(

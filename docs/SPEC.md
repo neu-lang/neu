@@ -1051,6 +1051,19 @@ runtime generic layout. Generic metadata is source-mapped and compiler-private;
 generic declarations, constraints, specialization, and cross-module lookup
 remain governed by later accepted decisions.
 
+## ADR-0084: Generic Constraints And Capabilities
+
+Generic bounds are explicit conjunctions checked in source order after
+substitution and before HIR lowering. `Send` and `Share` use the existing
+thread-capability rules; ownership, nullability, and nominal class/interface
+bounds retain their existing contracts. A concrete argument that fails any
+bound is diagnosed with source mapping, while an uninstantiated parameter
+retains a proof obligation rather than being guessed as valid.
+
+Unknown, unresolved, recursive, and stale bounds are diagnostics. Constraints
+do not change overload identity and do not add inference, conversions,
+variance, wildcards, higher-kinded types, or public ABI behavior.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may
