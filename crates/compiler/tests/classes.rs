@@ -37,12 +37,14 @@ fn parses_class_interface_and_field_surface() {
 }
 
 #[test]
-fn rejects_protected_fields_and_missing_field_types() {
+fn accepts_protected_fields_and_rejects_missing_field_types() {
     let parsed = parse_source(
         SourceFileId::from_raw(6801),
         "class Invalid { protected val secret: Int; private val missing; }",
     );
-    assert!(!parsed.diagnostics.is_empty());
+    assert!(parsed.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == compiler::parser::DiagnosticKind::MissingTypeName
+    }));
 }
 
 #[test]
@@ -241,7 +243,7 @@ fn invalid_class_source_stops_before_backend() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let error = compiler::driver::compile_source_to_executable(
-        "class Point { protected val x: Int; } public func main(): Int { return 0; }",
+        "protected func hidden(); public func main(): Int { return 0; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6808),
             ModuleName::parse("classes").unwrap(),

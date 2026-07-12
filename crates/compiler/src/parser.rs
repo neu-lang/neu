@@ -621,6 +621,7 @@ struct Parser<'source> {
     saw_top_level_declaration: bool,
     current_function: Option<AstNodeId>,
     current_class: Option<AstNodeId>,
+    current_class_is_interface: bool,
     pending_method_visibility: String,
     pending_method_override: bool,
     pending_method_final: bool,
@@ -683,7 +684,8 @@ impl<'source> Parser<'source> {
             saw_top_level_declaration: false,
             current_function: None,
             current_class: None,
-            pending_method_visibility: "internal".to_owned(),
+            current_class_is_interface: false,
+            pending_method_visibility: "public".to_owned(),
             pending_method_override: false,
             pending_method_final: false,
             pending_method_abstract: false,
@@ -795,6 +797,7 @@ impl<'source> Parser<'source> {
         if in_body && self.current_kind() == Some(TokenKind::RightBrace) {
             return;
         }
+        self.pending_method_visibility = "public".to_owned();
 
         let mut saw_visibility = false;
         let mut final_class = false;
@@ -814,6 +817,15 @@ impl<'source> Parser<'source> {
                 if saw_visibility {
                     self.diagnostic(DiagnosticKind::DuplicateVisibilityModifier, token.span);
                 }
+                if self.current_text() == Some("internal") {
+                    self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
+                }
+                if self.current_text() == Some("protected")
+                    && (!in_body || self.current_class_is_interface)
+                {
+                    self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
+                }
+                self.pending_method_visibility = self.current_text().unwrap_or("public").to_owned();
                 saw_visibility = true;
             } else if token.kind == TokenKind::Identifier && self.current_text() == Some("abstract")
             {
@@ -1348,8 +1360,11 @@ impl<'source> Parser<'source> {
             });
         } else if kind == AstNodeKind::InterfaceDeclaration {
             let previous_class = self.current_class.replace(declaration);
+            let previous_interface = self.current_class_is_interface;
+            self.current_class_is_interface = true;
             self.parse_declaration_body();
             self.current_class = previous_class;
+            self.current_class_is_interface = previous_interface;
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
@@ -1394,7 +1409,7 @@ impl<'source> Parser<'source> {
                     && self.current_text() == Some("abstract"))
                 || method_with_visibility
             {
-                self.pending_method_visibility = "internal".to_owned();
+                self.pending_method_visibility = "public".to_owned();
                 self.pending_method_override = false;
                 self.pending_method_final = false;
                 self.pending_method_abstract = false;
@@ -1408,8 +1423,16 @@ impl<'source> Parser<'source> {
                         && matches!(self.current_text(), Some("static" | "abstract")))
                 {
                     if self.is_visibility() {
+                        if self.current_text() == Some("internal") {
+                            self.diagnostic_current(DiagnosticKind::UnsupportedDeclarationModifier);
+                        }
+                        if self.current_text() == Some("protected")
+                            && self.current_class_is_interface
+                        {
+                            self.diagnostic_current(DiagnosticKind::UnsupportedDeclarationModifier);
+                        }
                         self.pending_method_visibility =
-                            self.current_text().unwrap_or("internal").to_owned();
+                            self.current_text().unwrap_or("public").to_owned();
                     } else {
                         match self.current_kind() {
                             Some(TokenKind::KwOverride) => self.pending_method_override = true,
@@ -1452,7 +1475,7 @@ impl<'source> Parser<'source> {
                 self.advance();
                 value
             } else {
-                "internal".to_owned()
+                "public".to_owned()
             };
             let mutable = match self.current_kind() {
                 Some(TokenKind::KwVal) => {
@@ -3997,7 +4020,10 @@ impl<'source> Parser<'source> {
 
     fn is_visibility(&self) -> bool {
         self.current_kind() == Some(TokenKind::Identifier)
-            && matches!(self.current_text(), Some("public" | "private" | "internal"))
+            && matches!(
+                self.current_text(),
+                Some("public" | "private" | "protected" | "internal")
+            )
     }
 
     fn is_unsupported_modifier(&self) -> bool {

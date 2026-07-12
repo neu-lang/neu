@@ -114,6 +114,7 @@ pub enum VisibilityCategory {
     Public,
     Internal,
     Private,
+    Protected,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -151,6 +152,18 @@ impl DeclarationVisibility {
             declaration,
             declaration_kind,
             VisibilityCategory::Internal,
+            VisibilityOrigin::Defaulted,
+        )
+    }
+
+    pub fn default_public(
+        declaration: AstNodeId,
+        declaration_kind: AstNodeKind,
+    ) -> Result<Self, ModuleDiagnostic> {
+        Self::new(
+            declaration,
+            declaration_kind,
+            VisibilityCategory::Public,
             VisibilityOrigin::Defaulted,
         )
     }
@@ -364,6 +377,7 @@ pub enum PackageGraphDiagnosticKind {
     PackageHeaderDisagreement,
     DuplicatePackageIdentity,
     ImportCycle,
+    InaccessibleImport,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -501,6 +515,27 @@ impl VirtualPackageGraph {
                 .unwrap_or_else(|| Path::new(""))
                 .to_path_buf();
             package_dirs.insert(package_dir.clone());
+            let same_package_private: BTreeSet<_> = input
+                .keys()
+                .filter(|path| path.parent() == Some(package_dir.as_path()) && *path != &file_path)
+                .flat_map(|path| {
+                    let parsed = parse_source(file_by_path[path], input[path].source());
+                    parsed
+                        .function_declarations
+                        .into_iter()
+                        .filter(|function| function.top_level && function.visibility == "private")
+                        .map(|function| function.name)
+                })
+                .collect();
+            for reference in &parsed.name_references {
+                if !reference.name.contains('.') && same_package_private.contains(&reference.name) {
+                    diagnostics.push(PackageGraphDiagnostic {
+                        kind: PackageGraphDiagnosticKind::InaccessibleImport,
+                        path: file_path.clone(),
+                        detail: reference.name.clone(),
+                    });
+                }
+            }
             let mut aliases = BTreeSet::new();
             for import in parsed.imports {
                 let alias = import.alias.clone().unwrap_or_else(|| {
@@ -514,13 +549,13 @@ impl VirtualPackageGraph {
                     diagnostics.push(PackageGraphDiagnostic {
                         kind: PackageGraphDiagnosticKind::MalformedAlias,
                         path: file_path.clone(),
-                        detail: alias,
+                        detail: alias.clone(),
                     });
                 } else if !aliases.insert(alias.clone()) {
                     diagnostics.push(PackageGraphDiagnostic {
                         kind: PackageGraphDiagnosticKind::DuplicateAlias,
                         path: file_path.clone(),
-                        detail: alias,
+                        detail: alias.clone(),
                     });
                 }
                 if !import.path.starts_with('.') {
@@ -540,6 +575,40 @@ impl VirtualPackageGraph {
                     });
                     continue;
                 };
+                let imported_names: BTreeSet<_> = input
+                    .keys()
+                    .filter(|path| path.parent() == Some(directory.as_path()))
+                    .flat_map(|path| {
+                        let id = file_by_path[path];
+                        let parsed = parse_source(id, input[path].source());
+                        parsed
+                            .function_declarations
+                            .into_iter()
+                            .filter(|function| {
+                                function.top_level && function.visibility != "public"
+                            })
+                            .map(|function| function.name)
+                    })
+                    .collect();
+                let aliases_to_check = [alias.as_str()];
+                for member in &parsed.member_expressions {
+                    let Some(receiver) = parsed
+                        .name_references
+                        .iter()
+                        .find(|reference| reference.reference == member.receiver)
+                    else {
+                        continue;
+                    };
+                    if aliases_to_check.contains(&receiver.name.as_str())
+                        && imported_names.contains(&member.name)
+                    {
+                        diagnostics.push(PackageGraphDiagnostic {
+                            kind: PackageGraphDiagnosticKind::InaccessibleImport,
+                            path: file_path.clone(),
+                            detail: member.name.clone(),
+                        });
+                    }
+                }
                 let members: Vec<_> = input
                     .keys()
                     .filter(|path| path.parent() == Some(directory.as_path()))

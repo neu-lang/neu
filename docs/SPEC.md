@@ -1223,3 +1223,27 @@ and linking. No manifest, registry, dependency download, wildcard import,
 re-export, precompiled package format, public package ABI, or cyclic package
 semantics is introduced. Visibility remains governed by ADR-0025 and its
 follow-up decision.
+
+## ADR-0096: Public, Private, And Protected Visibility
+
+`internal` is not an accepted source modifier and produces a declaration
+diagnostic. The accepted modifiers are `public`, `private`, and `protected`;
+omitted visibility defaults to `public`.
+
+Top-level private declarations are file-scoped. Top-level protected
+declarations are invalid because there is no enclosing type. Public
+declarations are importable through directory-package aliases. For class
+members, private is declaring-class scoped, protected is available to the
+declaring class and subclasses, and public follows the visible declaring type.
+Interfaces may declare public or private members, but not protected members.
+Constructors, fields, methods, static functions, enum functions, and accepted
+type members use these rules in their declaring context. Overrides retain the
+inherited visibility; private members are not inherited override targets.
+
+Visibility is enforced during lookup and is preserved as compiler-private
+declaration provenance through ownership/effect facts, HIR, MIR, dispatch,
+object emission, and linking. It does not alter symbol naming, slots, layout,
+calling convention, object format, or ABI. Aliases do not bypass access checks,
+and missing or stale separate-compilation visibility metadata is an error.
+Friend packages, re-exports, wildcard imports, reflection, dynamic loading,
+FFI visibility, and package registries remain deferred.

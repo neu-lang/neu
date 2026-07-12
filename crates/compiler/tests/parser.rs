@@ -38,6 +38,35 @@ fn parses_quoted_directory_import_with_alias() {
 }
 
 #[test]
+fn visibility_uses_public_default_and_rejects_internal() {
+    let output = parse_source(
+        SourceFileId::from_raw(10004),
+        "internal func hidden(); protected func member(); func visible();",
+    );
+
+    assert!(
+        output.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == DiagnosticKind::UnsupportedDeclarationModifier
+        })
+    );
+    assert_eq!(output.function_declarations[1].visibility, "protected");
+    assert_eq!(output.function_declarations[2].visibility, "public");
+}
+
+#[test]
+fn protected_interface_members_are_rejected() {
+    let output = parse_source(
+        SourceFileId::from_raw(10005),
+        "interface Readable { protected func read(): Int; }",
+    );
+    assert!(
+        output.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == DiagnosticKind::UnsupportedDeclarationModifier
+        })
+    );
+}
+
+#[test]
 fn parses_newline_terminated_statements_and_return() {
     let output = parse_source(
         SourceFileId::from_raw(900),

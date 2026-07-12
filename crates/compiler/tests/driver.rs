@@ -119,6 +119,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("abstract_classes", 7),
         ("move_only_captures", 7),
         ("function_values", 7),
+        ("visibility_public", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

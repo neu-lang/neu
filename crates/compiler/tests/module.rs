@@ -212,6 +212,29 @@ fn virtual_package_graph_rejects_file_imports_and_cycles() {
 }
 
 #[test]
+fn virtual_package_graph_rejects_private_imported_declarations() {
+    let diagnostics = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import \"./math\" as arithmetic\nfunc main(): Int { return arithmetic.secret() }",
+            ),
+            VirtualSource::new(
+                "src/math/math.neu",
+                "package math\nprivate func secret(): Int { return 1 }",
+            ),
+        ],
+    )
+    .unwrap_err();
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == PackageGraphDiagnosticKind::InaccessibleImport
+        })
+    );
+}
+
+#[test]
 fn visibility_metadata_represents_explicit_categories() {
     let public = DeclarationVisibility::explicit(
         AstNodeId::from_raw(10),
@@ -239,15 +262,34 @@ fn visibility_metadata_represents_explicit_categories() {
 }
 
 #[test]
-fn default_visibility_is_internal_and_defaulted() {
-    let visibility = DeclarationVisibility::default_internal(
+fn default_visibility_is_public_and_defaulted() {
+    let visibility = DeclarationVisibility::default_public(
         AstNodeId::from_raw(13),
         AstNodeKind::EnumDeclaration,
     )
     .unwrap();
 
-    assert_eq!(visibility.category(), VisibilityCategory::Internal);
+    assert_eq!(visibility.category(), VisibilityCategory::Public);
     assert_eq!(visibility.origin(), VisibilityOrigin::Defaulted);
+}
+
+#[test]
+fn visibility_metadata_supports_protected_and_public_default() {
+    let protected = DeclarationVisibility::explicit(
+        AstNodeId::from_raw(14),
+        AstNodeKind::FunctionDeclaration,
+        VisibilityCategory::Protected,
+    )
+    .unwrap();
+    let defaulted = DeclarationVisibility::default_public(
+        AstNodeId::from_raw(15),
+        AstNodeKind::FunctionDeclaration,
+    )
+    .unwrap();
+
+    assert_eq!(protected.category(), VisibilityCategory::Protected);
+    assert_eq!(defaulted.category(), VisibilityCategory::Public);
+    assert_eq!(defaulted.origin(), VisibilityOrigin::Defaulted);
 }
 
 #[test]
