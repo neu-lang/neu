@@ -1,0 +1,11 @@
+package examples.current
+
+func apply(operation: (Int) -> Int, value: Int): Int {
+    return operation(value);
+}
+
+public func main(): Int {
+    val suffix: String = "abc";
+    val length: (Int) -> Int = { value: Int -> value + suffix.length };
+    return apply(length, 4);
+}

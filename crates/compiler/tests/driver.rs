@@ -62,6 +62,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("array_iteration", 7),
         ("static_class_functions", 7),
         ("abstract_classes", 7),
+        ("move_only_captures", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -188,6 +189,71 @@ fn compiles_and_runs_a_copy_capturing_lambda() {
     )
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_a_move_only_string_capturing_lambda() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-move-capture-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        func apply(operation: (Int) -> Int, value: Int): Int {
+            return operation(value);
+        }
+        public func main(): Int {
+            val suffix: String = "abc";
+            val length: (Int) -> Int = { value: Int -> value + suffix.length };
+            return apply(length, 4);
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9402),
+            ModuleName::parse("move_capture").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn move_only_lambda_capture_consumes_source_binding() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-move-capture-invalid-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public func main(): Int {
+            val suffix: String = "abc";
+            val length: (Int) -> Int = { value: Int -> value + suffix.length };
+            return suffix.length;
+        }
+    "#;
+    let error = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9403),
+            ModuleName::parse("move_capture_invalid").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("UseAfterMove"));
     let _ = fs::remove_dir_all(workspace);
 }
 

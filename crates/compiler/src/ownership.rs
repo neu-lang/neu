@@ -37,6 +37,7 @@ pub enum OwnershipTransferKind {
     LocalInitializer,
     Assignment,
     ConsumingCallArgument,
+    ClosureCapture,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -171,6 +172,52 @@ pub fn collect_ownership_call_transfers(
                 OwnershipTransferKind::ConsumingCallArgument,
                 call.expression,
                 *argument,
+                resolved.binding().clone(),
+            ));
+        }
+    }
+    transfers
+}
+
+pub fn collect_ownership_capture_transfers(
+    parsed: &ParseOutput,
+    resolved_local_bindings: &[ResolvedLocalBinding],
+    declaration_signatures: &[DeclarationSignature],
+    types: &TypeArena,
+) -> Vec<OwnershipTransfer> {
+    let mut transfers = Vec::new();
+    for lambda in &parsed.lambda_expressions {
+        for reference in parsed.name_references.iter().filter(|reference| {
+            parsed.arena.node(lambda.body).is_some_and(|body| {
+                body.span.file() == reference.name_span.file()
+                    && body.span.start() <= reference.name_span.start()
+                    && reference.name_span.end() <= body.span.end()
+            }) && !lambda
+                .parameters
+                .iter()
+                .any(|parameter| parameter.name == reference.name)
+        }) {
+            let Some(resolved) = resolved_local_bindings
+                .iter()
+                .find(|resolved| resolved.reference() == reference.reference)
+            else {
+                continue;
+            };
+            let Some(signature) = declaration_signatures
+                .iter()
+                .find(|signature| signature.declaration() == resolved.binding().binding())
+            else {
+                continue;
+            };
+            if classify_ownership_category(types, signature.ty())
+                != Some(OwnershipCategory::MoveOnly)
+            {
+                continue;
+            }
+            transfers.push(OwnershipTransfer::new(
+                OwnershipTransferKind::ClosureCapture,
+                lambda.expression,
+                reference.reference,
                 resolved.binding().clone(),
             ));
         }

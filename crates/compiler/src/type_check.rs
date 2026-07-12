@@ -3771,10 +3771,11 @@ pub fn type_m0088_lambda_expressions(
                     .iter()
                     .any(|parameter| parameter.name == reference.name)
         }) {
-            let capture_is_literal = parsed
+            let binding = parsed
                 .local_binding_names
                 .iter()
-                .find(|binding| binding.name == reference.name)
+                .find(|binding| binding.name == reference.name);
+            let capture_is_literal = binding
                 .and_then(|binding| {
                     parsed
                         .local_declarations
@@ -3792,7 +3793,13 @@ pub fn type_m0088_lambda_expressions(
                 .expression_type(reference.reference)
                 .and_then(|typed| classify_ownership_category(types, typed))
                 == Some(OwnershipCategory::Copyable);
-            if !capture_is_literal || !copyable {
+            let move_only = report
+                .expression_type(reference.reference)
+                .and_then(|typed| classify_ownership_category(types, typed))
+                == Some(OwnershipCategory::MoveOnly);
+            let immutable =
+                binding.is_some_and(|binding| binding.kind == LocalBindingKind::Immutable);
+            if !capture_is_literal || !(copyable || move_only && immutable) {
                 report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                     TypeRuleDiagnostic::LambdaCaptureUnsupported,
                     reference.reference,

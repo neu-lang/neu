@@ -14,7 +14,10 @@ use crate::{
     name_resolution::{
         bind_local_name_references, build_local_scope_tree, build_scoped_local_binding_index,
     },
-    ownership::{analyze_ownership_with_extra_transfers, collect_ownership_call_transfers},
+    ownership::{
+        analyze_ownership_with_extra_transfers, collect_ownership_call_transfers,
+        collect_ownership_capture_transfers,
+    },
     ownership_effects::infer_source_parameter_effects,
     parser,
     source::SourceFileId,
@@ -429,13 +432,21 @@ pub fn compile_source_to_executable(
         &signatures,
         &types,
     );
+    let capture_transfers = collect_ownership_capture_transfers(
+        &parsed,
+        resolved_locals.resolved_local_bindings(),
+        &local_signatures,
+        &types,
+    );
+    let mut ownership_transfers = call_transfers;
+    ownership_transfers.extend(capture_transfers);
     let ownership = analyze_ownership_with_extra_transfers(
         &parsed.local_declarations,
         &parsed.assignment_statements,
         resolved_locals.resolved_local_bindings(),
         &local_signatures,
         &types,
-        &call_transfers,
+        &ownership_transfers,
     );
     if !ownership.diagnostics().is_empty() {
         return Err(DriverError::OwnershipDiagnostics(

@@ -1,7 +1,8 @@
 use crate::{
-    ast::AstNodeKind,
+    ast::{AstNodeId, AstNodeKind},
     module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
     name_resolution::LocalBindingKind,
+    ownership::{OwnershipCategory, classify_ownership_category},
     ownership_effects::OwnershipEffectContract,
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
@@ -589,6 +590,52 @@ fn lower_lambda_function(
         &[],
         &mut expressions,
     )?;
+    let mut captures = Vec::new();
+    for reference in source.parsed.name_references.iter().filter(|reference| {
+        source
+            .parsed
+            .arena
+            .node(lambda.body)
+            .is_some_and(|body| span_contains(body.span, reference.name_span))
+            && !lambda
+                .parameters
+                .iter()
+                .any(|parameter| parameter.name == reference.name)
+    }) {
+        let Some(binding) = source
+            .parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == reference.name)
+        else {
+            continue;
+        };
+        if captures
+            .iter()
+            .any(|capture: &HirCapture| capture.binding == binding.binding)
+        {
+            continue;
+        }
+        let mode = match source
+            .expression_types
+            .iter()
+            .find(|typed| typed.expression() == reference.reference)
+            .and_then(|typed| {
+                source
+                    .type_arena
+                    .and_then(|arena| classify_ownership_category(arena, typed.ty()))
+            }) {
+            Some(OwnershipCategory::Copyable) => HirCaptureMode::Copy,
+            Some(OwnershipCategory::MoveOnly) => HirCaptureMode::Move,
+            None => HirCaptureMode::Borrow,
+        };
+        captures.push(HirCapture {
+            source: reference.reference,
+            binding: binding.binding,
+            mode,
+            span: reference.name_span,
+        });
+    }
     let span = lambda.span;
     Ok(HirFunction::new(
         id,
@@ -604,6 +651,7 @@ fn lower_lambda_function(
         HirSafetyFacts::executable_subset_checked(),
         Vec::new(),
     )
+    .with_captures(captures)
     .with_symbol_identity(FunctionSymbolIdentity::new(
         source.module.clone(),
         source.package.clone(),
@@ -3709,6 +3757,37 @@ impl HirSafetyFacts {
 pub struct HirUnsupportedForm {
     span: ByteSpan,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HirCaptureMode {
+    Copy,
+    Move,
+    Borrow,
+    Mutable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HirCapture {
+    source: AstNodeId,
+    binding: AstNodeId,
+    mode: HirCaptureMode,
+    span: ByteSpan,
+}
+
+impl HirCapture {
+    pub fn source(&self) -> AstNodeId {
+        self.source
+    }
+    pub fn binding(&self) -> AstNodeId {
+        self.binding
+    }
+    pub fn mode(&self) -> HirCaptureMode {
+        self.mode
+    }
+    pub fn span(&self) -> ByteSpan {
+        self.span
+    }
+}
 impl HirUnsupportedForm {
     pub fn new(span: ByteSpan) -> Self {
         Self { span }
@@ -3737,6 +3816,7 @@ pub struct HirFunction {
     symbol_identity: Option<FunctionSymbolIdentity>,
     effect_contract: Option<OwnershipEffectContract>,
     specialization_identity: Option<GenericSpecializationIdentity>,
+    captures: Vec<HirCapture>,
 }
 impl HirFunction {
     #[allow(clippy::too_many_arguments)]
@@ -3772,6 +3852,7 @@ impl HirFunction {
             symbol_identity: None,
             effect_contract: None,
             specialization_identity: None,
+            captures: Vec::new(),
         }
     }
     pub fn id(&self) -> HirFunctionId {
@@ -3844,6 +3925,13 @@ impl HirFunction {
     }
     pub fn specialization_identity(&self) -> Option<&GenericSpecializationIdentity> {
         self.specialization_identity.as_ref()
+    }
+    pub fn with_captures(mut self, captures: Vec<HirCapture>) -> Self {
+        self.captures = captures;
+        self
+    }
+    pub fn captures(&self) -> &[HirCapture] {
+        &self.captures
     }
     pub fn direct_call(&self, id: HirExpressionId) -> Option<&HirDirectCall> {
         self.expressions
