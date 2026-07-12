@@ -1672,6 +1672,15 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
             {
                 continue;
             }
+            if member.is_some_and(|member| {
+                source
+                    .parsed
+                    .index_expressions
+                    .iter()
+                    .any(|index| index.expression == member.receiver)
+            }) {
+                continue;
+            }
             let targets: Vec<_> = sources
                 .iter()
                 .enumerate()
@@ -3015,6 +3024,15 @@ pub fn type_m0063_array_expressions(
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
 ) {
+    type_m0063_array_expressions_with_classes(types, parsed, report, &[]);
+}
+
+pub fn type_m0063_array_expressions_with_classes(
+    types: &mut TypeArena,
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+    classes: &[ClassTypeRecord],
+) {
     let primitives = PrimitiveTypeIds::module_owned(types);
     let const_lengths = report
         .compile_time_constants()
@@ -3043,7 +3061,8 @@ pub fn type_m0063_array_expressions(
             .array_types
             .iter()
             .find(|array| array.array == node)?;
-        let element = resolve_array_element_type(array.element_type, parsed, types, primitives)?;
+        let element =
+            resolve_array_element_type(array.element_type, parsed, types, primitives, classes)?;
         Some(types.array(
             element,
             array.length.or_else(|| {
@@ -3076,7 +3095,7 @@ pub fn type_m0063_array_expressions(
             }
             for element in &literal.elements {
                 if let Some(element_type) = report.expression_type(*element)
-                    && element_type != array.element()
+                    && !array_element_assignable(element_type, array.element(), classes)
                 {
                     report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                         TypeRuleDiagnostic::ArrayElementTypeMismatch,
@@ -3191,6 +3210,37 @@ pub fn type_m0063_array_expressions(
             ));
         }
     }
+}
+
+fn array_element_assignable(actual: TypeId, expected: TypeId, classes: &[ClassTypeRecord]) -> bool {
+    if actual == expected {
+        return true;
+    }
+    let Some(actual) = classes.iter().find(|class| class.type_id == actual) else {
+        return false;
+    };
+    let Some(expected) = classes.iter().find(|class| class.type_id == expected) else {
+        return false;
+    };
+    if expected.interface {
+        return actual.interfaces.iter().any(|name| name == &expected.name)
+            || actual.superclass.as_deref().is_some_and(|parent| {
+                classes
+                    .iter()
+                    .find(|class| class.name == parent)
+                    .is_some_and(|parent| {
+                        array_element_assignable(parent.type_id, expected.type_id, classes)
+                    })
+            });
+    }
+    actual.superclass.as_deref().is_some_and(|parent| {
+        classes
+            .iter()
+            .find(|class| class.name == parent)
+            .is_some_and(|parent| {
+                array_element_assignable(parent.type_id, expected.type_id, classes)
+            })
+    })
 }
 
 pub fn type_m0064_string_operations(
@@ -3533,19 +3583,28 @@ fn resolve_array_element_type(
     parsed: &ParseOutput,
     types: &mut TypeArena,
     primitives: PrimitiveTypeIds,
+    classes: &[ClassTypeRecord],
 ) -> Option<TypeId> {
     if let Some(reference) = parsed
         .type_name_references
         .iter()
         .find(|reference| reference.reference == node)
     {
-        return primitives.type_for_primitive_name(&reference.name);
+        return primitives
+            .type_for_primitive_name(&reference.name)
+            .or_else(|| {
+                classes
+                    .iter()
+                    .find(|class| class.name == reference.name)
+                    .map(|class| class.type_id)
+            });
     }
     let array = parsed
         .array_types
         .iter()
         .find(|array| array.array == node)?;
-    let element = resolve_array_element_type(array.element_type, parsed, types, primitives)?;
+    let element =
+        resolve_array_element_type(array.element_type, parsed, types, primitives, classes)?;
     Some(
         types.array(
             element,

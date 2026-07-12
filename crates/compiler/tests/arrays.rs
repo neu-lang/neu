@@ -195,3 +195,52 @@ fn appends_and_removes_dynamic_array_elements() {
     assert_eq!(Command::new(output).status().unwrap().code(), Some(1));
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn compiles_fixed_arrays_with_nominal_elements_and_field_access() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-nominal-array-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "class Counter(var value: Int) {} public func main(): Int { val values: Counter[2] = [new Counter(3), new Counter(4)]; return values[1].value; }";
+    let output = compiler::driver::compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6312),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(4));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_fixed_arrays_with_interface_elements() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-array-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "interface Answerable { func value(): Int; } class Answer: Answerable { func value(): Int { return 11; } } public func main(): Int { val values: Answerable[1] = [new Answer()]; return values[0].value(); }";
+    let output = compiler::driver::compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6313),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(11));
+    let _ = fs::remove_dir_all(workspace);
+}

@@ -1235,6 +1235,75 @@ fn method_declaration_index(
         .member_expressions
         .iter()
         .find(|member| member.expression == callee)?;
+    if let Some(index) = source
+        .parsed
+        .index_expressions
+        .iter()
+        .find(|index| index.expression == member.receiver)
+    {
+        let name = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == index.array)?;
+        let binding = source
+            .parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == name.name)?;
+        let declaration = source
+            .parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == binding.binding)?;
+        let annotation = declaration.annotation?;
+        let array = source
+            .parsed
+            .array_types
+            .iter()
+            .find(|array| array.array == annotation)?;
+        let element_reference = source
+            .parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == array.element_type)?;
+        let class = source
+            .parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == element_reference.name)?;
+        let declaration = if class.interface {
+            source
+                .class_types?
+                .classes()
+                .iter()
+                .find(|candidate| {
+                    !candidate.is_interface()
+                        && candidate
+                            .interfaces()
+                            .iter()
+                            .any(|name| name == &class.name)
+                })
+                .and_then(|candidate| {
+                    method_owner_declaration(source, candidate.name(), &member.name)
+                })?
+        } else {
+            source
+                .parsed
+                .function_declarations
+                .iter()
+                .find(|function| {
+                    function.owner == Some(class.declaration) && function.name == member.name
+                })?
+                .declaration
+        };
+        let index = source
+            .parsed
+            .function_declarations
+            .iter()
+            .position(|function| function.declaration == declaration)?;
+        return hir_function_index(source.parsed, index);
+    }
     let receiver = source
         .parsed
         .name_references
@@ -1457,6 +1526,40 @@ fn receiver_class_name<'a>(
         .iter()
         .find(|new_expression| new_expression.expression == receiver)
         .map(|new_expression| new_expression.type_name.as_str())
+        .or_else(|| {
+            let index = source
+                .parsed
+                .index_expressions
+                .iter()
+                .find(|index| index.expression == receiver)?;
+            let name = source
+                .parsed
+                .name_references
+                .iter()
+                .find(|name| name.reference == index.array)?;
+            let binding = source
+                .parsed
+                .local_binding_names
+                .iter()
+                .find(|binding| binding.name == name.name)?;
+            let declaration = source
+                .parsed
+                .local_declarations
+                .iter()
+                .find(|declaration| declaration.declaration == binding.binding)?;
+            let annotation = declaration.annotation?;
+            let array = source
+                .parsed
+                .array_types
+                .iter()
+                .find(|array| array.array == annotation)?;
+            source
+                .parsed
+                .type_name_references
+                .iter()
+                .find(|reference| reference.reference == array.element_type)
+                .map(|reference| reference.name.as_str())
+        })
 }
 
 fn dispatch_targets_for_classes(

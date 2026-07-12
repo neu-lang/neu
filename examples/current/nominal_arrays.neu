@@ -1,0 +1,8 @@
+package examples.current
+
+class Counter(var value: Int) {}
+
+public func main(): Int {
+    val values: Counter[2] = [new Counter(3), new Counter(4)];
+    return values[1].value;
+}

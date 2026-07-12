@@ -931,3 +931,12 @@ rejects mutation. Dynamic arrays are move-only, opaque, compiler-managed
 values with target-pack allocation and deterministic traps. Strings, nominal
 elements, nested dynamic arrays, indexing, slices, iterators, public layout,
 FFI, and user allocation APIs remain deferred.
+
+## ADR-0074: Nominal Fixed-Array Elements
+
+Fixed inline arrays may contain accepted class and interface values, including
+nested fixed arrays. They are structural, move-only aggregates with left-to-
+right initialization, reverse destruction, existing indexed ownership rules,
+and existing class/interface dispatch. Their compiler-private inline ABI is not
+public or available to FFI. Nullable nominal elements, dynamic-array nominal
+elements, slices, and generic variance remain deferred.
