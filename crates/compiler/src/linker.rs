@@ -5,6 +5,8 @@ use std::{
     process::Command,
 };
 
+use object::{Object, ObjectSymbol};
+
 use crate::bootstrap::{BootstrapOutcome, map_main_result};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -12,6 +14,7 @@ pub enum LinkInvocationError {
     MissingObject,
     LinkerUnavailable,
     LinkerFailed(Option<i32>),
+    MissingRuntimeSymbol(String),
     MissingOutput,
 }
 
@@ -78,6 +81,7 @@ impl SystemLinkInvocation {
     }
 
     pub fn execute(&self) -> Result<(), LinkInvocationError> {
+        self.validate_runtime_symbols()?;
         let status = Command::new(&self.program)
             .args(&self.arguments)
             .status()
@@ -90,6 +94,25 @@ impl SystemLinkInvocation {
         } else {
             Err(LinkInvocationError::LinkerFailed(status.code()))
         }
+    }
+
+    fn validate_runtime_symbols(&self) -> Result<(), LinkInvocationError> {
+        let object = self
+            .arguments
+            .last()
+            .expect("link plan always contains the object path");
+        let bytes = fs::read(object).map_err(|_| LinkInvocationError::MissingObject)?;
+        let file = object::File::parse(bytes.as_slice())
+            .map_err(|_| LinkInvocationError::LinkerFailed(None))?;
+        if let Some(symbol) = file.symbols().find_map(|symbol| {
+            let name = symbol.name().ok()?;
+            let normalized = name.strip_prefix('_').unwrap_or(name);
+            (symbol.is_undefined() && normalized.starts_with("neu_runtime_"))
+                .then_some(normalized.to_owned())
+        }) {
+            return Err(LinkInvocationError::MissingRuntimeSymbol(symbol));
+        }
+        Ok(())
     }
 
     pub fn run(&self) -> Result<ExecutableRunOutcome, ExecutableRunError> {

@@ -93,3 +93,40 @@ fn host_linker_can_execute_a_compiled_program() {
     );
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn host_link_rejects_missing_private_runtime_symbols_before_invoking_linker() {
+    let root =
+        std::env::temp_dir().join(format!("neu-link-missing-runtime-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let source = root.join("main.c");
+    let object = root.join("main.o");
+    let output = root.join("program");
+    fs::write(
+        &source,
+        b"extern void neu_runtime_missing(void); int main(void) { neu_runtime_missing(); return 0; }\n",
+    )
+    .unwrap();
+    assert!(
+        Command::new("cc")
+            .args([
+                "-c",
+                source.to_str().unwrap(),
+                "-o",
+                object.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let plan = SystemLinkInvocation::new(&object, &output).unwrap();
+    assert_eq!(
+        plan.execute(),
+        Err(LinkInvocationError::MissingRuntimeSymbol(
+            "neu_runtime_missing".to_owned()
+        ))
+    );
+    assert!(!output.exists());
+    let _ = fs::remove_dir_all(root);
+}

@@ -1,0 +1,9 @@
+public func main(): Int {
+    val queue = channel<Int>(1);
+    send(queue, 21);
+    val result = receive(queue);
+    return when (result) {
+        ChannelResult.Message(value) -> value;
+        ChannelResult.Closed -> 0;
+    };
+}

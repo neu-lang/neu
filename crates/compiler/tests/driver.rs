@@ -311,6 +311,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("channel_receive", 9),
         ("producer_consumer", 8),
         ("concurrency_interfaces", 12),
+        ("concurrency_binary", 21),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

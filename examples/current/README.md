@@ -20,6 +20,8 @@ payload extraction.
 an opaque channel handle.
 `concurrency_interfaces.neu` exercises public interface dispatch over a private
 channel-backed implementation.
+`concurrency_binary.neu` exercises the host linker path for a compiler-owned
+channel runtime operation.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by
