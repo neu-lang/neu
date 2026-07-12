@@ -235,6 +235,43 @@ fn virtual_package_graph_rejects_private_imported_declarations() {
 }
 
 #[test]
+fn virtual_package_graph_rejects_distinct_packages_with_same_default_qualifier() {
+    let diagnostics = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import \"./one/math\"\nimport \"./two/math\"\nfunc main();",
+            ),
+            VirtualSource::new("src/one/math/add.neu", "func add();"),
+            VirtualSource::new("src/two/math/sub.neu", "func sub();"),
+        ],
+    )
+    .unwrap_err();
+
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == PackageGraphDiagnosticKind::ImportQualifierCollision
+    }));
+}
+
+#[test]
+fn explicit_alias_resolves_default_qualifier_collision() {
+    let graph = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import \"./one/math\"\nimport \"./two/math\" as otherMath\nfunc main();",
+            ),
+            VirtualSource::new("src/one/math/add.neu", "func add();"),
+            VirtualSource::new("src/two/math/sub.neu", "func sub();"),
+        ],
+    )
+    .unwrap();
+    assert_eq!(graph.packages().len(), 3);
+}
+
+#[test]
 fn visibility_metadata_represents_explicit_categories() {
     let public = DeclarationVisibility::explicit(
         AstNodeId::from_raw(10),

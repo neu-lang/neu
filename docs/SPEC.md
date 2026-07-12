@@ -1267,3 +1267,14 @@ Dependency descriptors default to Git and contain a URL and non-empty tag;
 other dependency types are rejected. Manifest validation does not fetch Git or
 create lockfiles; recursive cache and lockfile behavior is reserved for the
 dependency-resolution decision. Raw-source driver APIs remain available.
+
+## ADR-0098: Import Qualifier Collisions
+
+After path normalization and package-header resolution, an explicit `as` alias
+is the local qualifier; otherwise the resolved package identity is used.
+Distinct packages may not receive the same qualifier in one source file.
+Equivalent paths to one package are deduplicated. Explicit aliases must be
+unique and cannot shadow another import, the current package qualifier, or a
+local declaration. Such failures are `import_qualifier_collision` diagnostics
+with both import origins and an alias suggestion, before qualified lookup or
+later compiler stages.

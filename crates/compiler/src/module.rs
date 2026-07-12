@@ -378,6 +378,7 @@ pub enum PackageGraphDiagnosticKind {
     DuplicatePackageIdentity,
     ImportCycle,
     InaccessibleImport,
+    ImportQualifierCollision,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -537,20 +538,20 @@ impl VirtualPackageGraph {
                 }
             }
             let mut aliases = BTreeSet::new();
+            let mut qualifiers = BTreeMap::<String, PathBuf>::new();
+            let current_qualifier =
+                package_identity_for_directory(&package_dir, &input, &file_by_path);
             for import in parsed.imports {
-                let alias = import.alias.clone().unwrap_or_else(|| {
-                    Path::new(&import.path)
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or_default()
-                        .to_owned()
-                });
+                let explicit_alias = import.alias.clone();
+                let alias = explicit_alias.clone().unwrap_or_default();
                 if alias.is_empty() || !is_identifier_segment(&alias) {
-                    diagnostics.push(PackageGraphDiagnostic {
-                        kind: PackageGraphDiagnosticKind::MalformedAlias,
-                        path: file_path.clone(),
-                        detail: alias.clone(),
-                    });
+                    if explicit_alias.is_some() {
+                        diagnostics.push(PackageGraphDiagnostic {
+                            kind: PackageGraphDiagnosticKind::MalformedAlias,
+                            path: file_path.clone(),
+                            detail: alias.clone(),
+                        });
+                    }
                 } else if !aliases.insert(alias.clone()) {
                     diagnostics.push(PackageGraphDiagnostic {
                         kind: PackageGraphDiagnosticKind::DuplicateAlias,
@@ -575,6 +576,39 @@ impl VirtualPackageGraph {
                     });
                     continue;
                 };
+                let qualifier = explicit_alias.unwrap_or_else(|| {
+                    package_qualifier_for_directory(&directory, &input, &file_by_path)
+                });
+                if aliases.contains(&qualifier) && qualifier != alias {
+                    diagnostics.push(PackageGraphDiagnostic {
+                        kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                        path: file_path.clone(),
+                        detail: format!("add an explicit alias for {qualifier}"),
+                    });
+                }
+                if qualifier == current_qualifier
+                    || parsed
+                        .declaration_names
+                        .iter()
+                        .any(|declaration| declaration.name == qualifier)
+                {
+                    diagnostics.push(PackageGraphDiagnostic {
+                        kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                        path: file_path.clone(),
+                        detail: format!("qualifier {qualifier} conflicts with a local name"),
+                    });
+                }
+                if let Some(previous) = qualifiers.insert(qualifier.clone(), directory.clone())
+                    && previous != directory
+                {
+                    diagnostics.push(PackageGraphDiagnostic {
+                        kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                        path: file_path.clone(),
+                        detail: format!(
+                            "qualifier {qualifier} names multiple packages; add an explicit alias"
+                        ),
+                    });
+                }
                 let imported_names: BTreeSet<_> = input
                     .keys()
                     .filter(|path| path.parent() == Some(directory.as_path()))
@@ -673,10 +707,10 @@ impl VirtualPackageGraph {
             }
             let identity = headers.into_iter().next().unwrap_or_else(|| {
                 directory
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("root")
-                    .to_owned()
+                    .components()
+                    .filter_map(|component| component.as_os_str().to_str())
+                    .collect::<Vec<_>>()
+                    .join(".")
             });
             if identities
                 .insert(identity.clone(), directory.clone())
@@ -830,6 +864,50 @@ fn normalize_relative_path(path: &Path) -> Result<PathBuf, PackageGraphDiagnosti
         }
     }
     Ok(normalized)
+}
+
+fn package_identity_for_directory(
+    directory: &Path,
+    input: &BTreeMap<PathBuf, VirtualSource>,
+    file_by_path: &BTreeMap<PathBuf, SourceFileId>,
+) -> String {
+    let mut header = None;
+    for path in input.keys().filter(|path| path.parent() == Some(directory)) {
+        let parsed = parse_source(file_by_path[path], input[path].source());
+        if let Some(package) = parsed.package_name {
+            header = Some(package);
+            break;
+        }
+    }
+    header.unwrap_or_else(|| {
+        directory
+            .components()
+            .filter_map(|component| component.as_os_str().to_str())
+            .collect::<Vec<_>>()
+            .join(".")
+    })
+}
+
+fn package_qualifier_for_directory(
+    directory: &Path,
+    input: &BTreeMap<PathBuf, VirtualSource>,
+    file_by_path: &BTreeMap<PathBuf, SourceFileId>,
+) -> String {
+    let mut header = None;
+    for path in input.keys().filter(|path| path.parent() == Some(directory)) {
+        let parsed = parse_source(file_by_path[path], input[path].source());
+        if let Some(package) = parsed.package_name {
+            header = Some(package);
+            break;
+        }
+    }
+    header.unwrap_or_else(|| {
+        directory
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("root")
+            .to_owned()
+    })
 }
 
 fn resolve_import_directory(file: &Path, import: &str, root: &Path) -> Option<PathBuf> {
