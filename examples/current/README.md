@@ -11,3 +11,7 @@ reassignment.
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by
 the full backend and executable pipeline.
+
+The `packages/` directory is a virtual project example: `main.neu` imports the
+sibling `math` directory with an explicit alias, and every direct `.neu` file
+in that directory belongs to the package.

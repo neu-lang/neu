@@ -1,0 +1,5 @@
+import "./math" as arithmetic
+
+public func main(): Int {
+    return arithmetic.add()
+}

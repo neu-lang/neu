@@ -1,6 +1,7 @@
 use compiler::ast::{AstNodeId, AstNodeKind};
 use compiler::module::{
-    DeclarationVisibility, ModuleDiagnosticKind, ModuleMetadata, ModuleName, PackageNamespace,
+    DeclarationVisibility, ModuleDiagnosticKind, ModuleMetadata, ModuleName,
+    PackageGraphDiagnosticKind, PackageNamespace, VirtualPackageGraph, VirtualSource,
     VisibilityCategory, VisibilityOrigin,
 };
 use compiler::source::{SourceDatabase, SourceFileId};
@@ -142,6 +143,71 @@ fn package_namespace_does_not_change_module_identity() {
     assert_ne!(
         root_metadata.packages()[0].namespace(),
         nested_metadata.packages()[0].namespace()
+    );
+}
+
+#[test]
+fn virtual_package_graph_loads_direct_directory_members_and_aliases() {
+    let graph = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import \"./math\" as arithmetic\nfunc main();",
+            ),
+            VirtualSource::new("src/math/add.neu", "package math\nfunc add();"),
+            VirtualSource::new("src/math/sub.neu", "package math\nfunc sub();"),
+            VirtualSource::new("src/math/nested/ignored.neu", "func ignored();"),
+        ],
+    )
+    .unwrap();
+
+    let math = graph
+        .packages()
+        .iter()
+        .find(|package| package.directory == std::path::Path::new("src/math"))
+        .unwrap();
+    assert_eq!(math.identity, "math");
+    assert_eq!(math.files.len(), 2);
+    assert_eq!(
+        graph
+            .files()
+            .iter()
+            .map(|file| file.id.index())
+            .collect::<Vec<_>>(),
+        vec![0, 1, 3]
+    );
+}
+
+#[test]
+fn virtual_package_graph_rejects_file_imports_and_cycles() {
+    let file_import = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new("src/main.neu", "import \"./math/add.neu\"\nfunc main();"),
+            VirtualSource::new("src/math/add.neu", "func add();"),
+        ],
+    )
+    .unwrap_err();
+    assert!(
+        file_import
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == PackageGraphDiagnosticKind::FileImport })
+    );
+
+    let cycle = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new("src/main.neu", "import \"./a\"\nfunc main();"),
+            VirtualSource::new("src/a/a.neu", "import \"../b\"\nfunc a();"),
+            VirtualSource::new("src/b/b.neu", "import \"../a\"\nfunc b();"),
+        ],
+    )
+    .unwrap_err();
+    assert!(
+        cycle
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == PackageGraphDiagnosticKind::ImportCycle })
     );
 }
 

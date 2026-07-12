@@ -1,11 +1,66 @@
 use std::{fs, path::PathBuf, process::Command};
 
 use compiler::{
-    driver::{SourceDriverOptions, compile_source_to_executable},
-    module::{ModuleName, PackageNamespace},
+    driver::{
+        SourceDriverOptions, compile_source_to_executable, compile_virtual_project_to_executable,
+        validate_virtual_project,
+    },
+    module::{ModuleName, PackageNamespace, VirtualSource},
     source::SourceFileId,
 };
 use target_lexicon::Triple;
+
+#[test]
+fn driver_validates_virtual_directory_project_before_compilation() {
+    let graph = validate_virtual_project(
+        "src/main.neu",
+        [
+            VirtualSource::new("src/main.neu", "import \"./math\"\nfunc main();"),
+            VirtualSource::new("src/math/add.neu", "package math\nfunc add();"),
+        ],
+    )
+    .expect("virtual package graph should validate");
+
+    assert_eq!(graph.entry(), std::path::Path::new("src/main.neu"));
+    assert_eq!(graph.packages().len(), 2);
+}
+
+#[test]
+fn compiles_virtual_directory_package_to_host_executable() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-package-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let graph = validate_virtual_project(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import \"./math\" as arithmetic\npublic func main(): Int { return arithmetic.add() }",
+            ),
+            VirtualSource::new(
+                "src/math/add.neu",
+                "package math\npublic func add(): Int { return 7 }",
+            ),
+        ],
+    )
+    .unwrap();
+    compile_virtual_project_to_executable(
+        &graph,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(3000),
+            ModuleName::parse("packages").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    let status = std::process::Command::new(&executable).status().unwrap();
+    assert_eq!(status.code(), Some(7));
+}
 
 #[test]
 fn compiles_current_example_to_host_executable_with_exit_status_seven() {

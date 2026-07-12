@@ -25,6 +25,19 @@ fn parses_package_import_and_function_declaration() {
 }
 
 #[test]
+fn parses_quoted_directory_import_with_alias() {
+    let output = parse_source(
+        SourceFileId::from_raw(10003),
+        "package app import \"./math\" as arithmetic public func main();",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.imports[0].path, "./math");
+    assert_eq!(output.imports[0].alias.as_deref(), Some("arithmetic"));
+}
+
+#[test]
 fn parses_newline_terminated_statements_and_return() {
     let output = parse_source(
         SourceFileId::from_raw(900),

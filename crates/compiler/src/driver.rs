@@ -10,7 +10,9 @@ use crate::{
     hir::{CheckedHirSource, HirLoweringError, lower_checked_hir_source},
     linker::{LinkInvocation, LinkInvocationError},
     mir::{MirLoweringError, lower_hir_to_mir},
-    module::{ModuleName, PackageNamespace},
+    module::{
+        ModuleName, PackageGraphDiagnostic, PackageNamespace, VirtualPackageGraph, VirtualSource,
+    },
     name_resolution::{
         bind_local_name_references, build_local_scope_tree, build_scoped_local_binding_index,
     },
@@ -121,6 +123,21 @@ pub enum DriverError {
     Backend(CraneliftLoweringError),
     TargetPack(TargetPackRegistryError),
     Link(LinkInvocationError),
+    PackageGraph(Vec<PackageGraphDiagnostic>),
+}
+
+pub fn validate_virtual_project(
+    entry: impl Into<PathBuf>,
+    sources: impl IntoIterator<Item = VirtualSource>,
+) -> Result<VirtualPackageGraph, DriverError> {
+    VirtualPackageGraph::build(entry, sources).map_err(DriverError::PackageGraph)
+}
+
+pub fn compile_virtual_project_to_executable(
+    project: &VirtualPackageGraph,
+    options: SourceDriverOptions,
+) -> Result<PathBuf, DriverError> {
+    compile_source_to_executable(&project.bootstrap_source(), options)
 }
 
 pub fn compile_source_to_executable(

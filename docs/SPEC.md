@@ -1199,3 +1199,27 @@ inheritance and interface implementation use exact invariant substituted
 arguments. No inference, default arguments, variance, implicit conversion,
 cross-module lookup, or executable lowering of unspecialized declarations is
 added; specialization is a later accepted decision.
+
+## ADR-0095: Directory Packages And Import Aliases
+
+Imports resolve normalized directories, never individual `.neu` files. The
+canonical syntax is `import "./relative/directory"`, optionally followed by
+`as alias`. Every `.neu` file directly in that directory belongs to the package;
+subdirectories are separate packages. Files in the current package share an
+unqualified namespace, while imported declarations are reached through the
+alias or deterministic package qualifier.
+
+Package headers are optional for bootstrap. Present headers must agree across
+all direct files; omitted headers use deterministic normalized-directory
+identity. Relative imports resolve from the importing file within a virtual
+project source root and may not escape it. Missing or empty packages, file
+imports, malformed or duplicate aliases, header disagreement, duplicate
+package identity, ambiguous qualified names, and cycles are diagnostics.
+
+The driver accepts normalized virtual paths paired with raw source strings and
+assigns deterministic file IDs. Paths, package identities, and source mappings
+remain attached through name resolution, ownership, HIR, MIR, object emission,
+and linking. No manifest, registry, dependency download, wildcard import,
+re-export, precompiled package format, public package ABI, or cyclic package
+semantics is introduced. Visibility remains governed by ADR-0025 and its
+follow-up decision.

@@ -46,6 +46,7 @@ pub enum DiagnosticKind {
     MalformedArrayType,
     MalformedArrayLiteral,
     MalformedIndexExpression,
+    MalformedImportPath,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -97,6 +98,16 @@ pub struct ParseOutput {
     pub pattern_bindings: Vec<ParsedPatternBinding>,
     pub class_declarations: Vec<ParsedClassDeclaration>,
     pub field_declarations: Vec<ParsedFieldDeclaration>,
+    pub imports: Vec<ParsedImport>,
+    pub package_name: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedImport {
+    pub declaration: AstNodeId,
+    pub path: String,
+    pub alias: Option<String>,
+    pub span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -553,6 +564,8 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         qualified_case_patterns: parser.qualified_case_patterns,
         class_declarations: parser.class_declarations,
         field_declarations: parser.field_declarations,
+        imports: parser.imports,
+        package_name: parser.package_name,
     }
 }
 
@@ -601,6 +614,8 @@ struct Parser<'source> {
     pattern_bindings: Vec<ParsedPatternBinding>,
     class_declarations: Vec<ParsedClassDeclaration>,
     field_declarations: Vec<ParsedFieldDeclaration>,
+    imports: Vec<ParsedImport>,
+    package_name: Option<String>,
     block_return_indices: Vec<Vec<usize>>,
     saw_package_or_import: bool,
     saw_top_level_declaration: bool,
@@ -643,6 +658,8 @@ impl<'source> Parser<'source> {
             pattern_bindings: Vec::new(),
             class_declarations: Vec::new(),
             field_declarations: Vec::new(),
+            imports: Vec::new(),
+            package_name: None,
             block_return_indices: Vec::new(),
             name_references: Vec::new(),
             type_name_references: Vec::new(),
@@ -703,27 +720,75 @@ impl<'source> Parser<'source> {
         }
         self.saw_package_or_import = true;
         self.advance();
-        self.parse_qualified_name();
+        self.package_name = self.parse_qualified_name();
     }
 
     fn parse_import(&mut self) {
         let import = self.current().expect("import token exists").clone();
         if self.saw_top_level_declaration {
             self.diagnostic(DiagnosticKind::MisplacedImportDeclaration, import.span);
-        } else {
-            self.arena.add_import_declaration(import.span);
         }
+        let declaration = self.arena.add_import_declaration(import.span);
         self.saw_package_or_import = true;
         self.advance();
-        self.parse_qualified_name();
-        if self.current_kind() == Some(TokenKind::KwAs) {
+        let path_start = self.current().map(|token| token.span.start());
+        let path = match self.current_kind() {
+            Some(TokenKind::String) => {
+                let token = self.current().expect("string import token exists").clone();
+                let path = decode_string_literal(&self.text[token.span.start()..token.span.end()])
+                    .and_then(|bytes| String::from_utf8(bytes).ok());
+                self.advance();
+                if path.is_none() {
+                    self.diagnostic(DiagnosticKind::MalformedImportPath, token.span);
+                }
+                path
+            }
+            Some(TokenKind::Identifier) => self.parse_import_qualified_name(),
+            _ => {
+                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedImportPath);
+                None
+            }
+        };
+        let alias = if self.current_kind() == Some(TokenKind::KwAs) {
+            self.advance();
+            if self.current_kind() == Some(TokenKind::Identifier) {
+                let alias = self.current_text().map(str::to_owned);
+                self.advance();
+                alias
+            } else {
+                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedDeclarationHeader);
+                None
+            }
+        } else {
+            None
+        };
+        if let (Some(path), Some(start)) = (path, path_start) {
+            let end = self
+                .previous_span()
+                .map_or(import.span.end(), ByteSpan::end);
+            self.imports.push(ParsedImport {
+                declaration,
+                path,
+                alias,
+                span: self.span(start, end),
+            });
+        }
+    }
+
+    fn parse_import_qualified_name(&mut self) -> Option<String> {
+        let start = self.current()?.span.start();
+        self.advance();
+        while self.current_kind() == Some(TokenKind::Dot) {
             self.advance();
             if self.current_kind() == Some(TokenKind::Identifier) {
                 self.advance();
             } else {
-                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedDeclarationHeader);
+                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedImportPath);
+                return None;
             }
         }
+        let end = self.previous_span()?.end();
+        Some(self.text[start..end].to_owned())
     }
 
     fn parse_declaration(&mut self, in_body: bool) {
@@ -3157,11 +3222,12 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn parse_qualified_name(&mut self) {
+    fn parse_qualified_name(&mut self) -> Option<String> {
         if self.current_kind() != Some(TokenKind::Identifier) {
             self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedDeclarationHeader);
-            return;
+            return None;
         }
+        let start = self.current()?.span.start();
         self.advance();
         while self.current_kind() == Some(TokenKind::Dot) {
             self.advance();
@@ -3169,9 +3235,11 @@ impl<'source> Parser<'source> {
                 self.advance();
             } else {
                 self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedDeclarationHeader);
-                return;
+                return None;
             }
         }
+        let end = self.previous_span()?.end();
+        Some(self.text[start..end].to_owned())
     }
 
     fn parse_generic_parameters(&mut self) {
