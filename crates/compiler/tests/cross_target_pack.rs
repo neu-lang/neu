@@ -96,7 +96,7 @@ fn links_string_object_through_the_x86_target_pack_without_execution() {
     fs::create_dir_all(&root).unwrap();
     let output = root.join("program");
     let source = r#"
-        public fun main(): Int {
+        public func main(): Int {
             val text: String = "é" + "";
             return text.length;
         }
@@ -127,7 +127,7 @@ fn links_class_object_through_the_x86_target_pack_without_execution() {
     fs::create_dir_all(&root).unwrap();
     let output = root.join("program");
     let executable = compile_source_to_executable(
-        "class Point(var value: Int) {} public fun main(): Int { val point: Point = new Point(7); return point.value; }",
+        "class Point(var value: Int) {} public func main(): Int { val point: Point = new Point(7); return point.value; }",
         SourceDriverOptions::new(
             SourceFileId::from_raw(802),
             ModuleName::parse("classes").unwrap(),

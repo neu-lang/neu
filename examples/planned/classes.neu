@@ -1,21 +1,21 @@
 // Planned Neu class surface. Constructors and object lowering are not yet in
 // the runnable current-example set.
 class Point(val x: Int, var y: Int) {
-    fun value(): Int {
+    func value(): Int {
         return x;
     }
 }
 
 interface Describable {
-    fun describe(): Int;
+    func describe(): Int;
 }
 
 class ColoredPoint: Point(), Describable {
-    override fun value(): Int {
+    override func value(): Int {
         return x;
     }
 
-    fun describe(): Int {
+    func describe(): Int {
         return value();
     }
 }

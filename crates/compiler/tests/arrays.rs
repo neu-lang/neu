@@ -11,7 +11,7 @@ use target_lexicon::Triple;
 fn parses_fixed_array_types_literals_and_indexing() {
     let parsed = parse_source(
         SourceFileId::from_raw(6300),
-        "fun read(): Int { val values: [Int; 3] = [1, 2, 3]; return values[1]; }",
+        "func read(): Int { val values: [Int; 3] = [1, 2, 3]; return values[1]; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
@@ -21,7 +21,7 @@ fn parses_fixed_array_types_literals_and_indexing() {
 fn accepts_named_const_array_length_and_nested_arrays() {
     let parsed = parse_source(
         SourceFileId::from_raw(6301),
-        "fun read(): Int { const N: Int = 2; val values: [[Int; N]; 2] = [[1, 2], [3, 4]]; return values[1][0]; }",
+        "func read(): Int { const N: Int = 2; val values: [[Int; N]; 2] = [[1, 2], [3, 4]]; return values[1][0]; }",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
 }
@@ -33,7 +33,7 @@ fn compiles_and_runs_fixed_array_program() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "public fun main(): Int { var values: [Int; 3] = [1, 2, 3]; values[1] = 4; return values[1] + values[2]; }";
+    let source = "public func main(): Int { var values: [Int; 3] = [1, 2, 3]; values[1] = 4; return values[1] + values[2]; }";
     let output = compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -58,7 +58,7 @@ fn rejects_array_length_and_immutable_index_mutation() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source =
-        "public fun main(): Int { val values: [Int; 2] = [1, 2, 3]; values[0] = 4; return 0; }";
+        "public func main(): Int { val values: [Int; 2] = [1, 2, 3]; values[0] = 4; return 0; }";
     let error = compiler::driver::compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -84,7 +84,7 @@ fn dynamic_out_of_bounds_index_traps() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "public fun main(): Int { val values: [Int; 2] = [1, 2]; var index: Int = 2; return values[index]; }";
+    let source = "public func main(): Int { val values: [Int; 2] = [1, 2]; var index: Int = 2; return values[index]; }";
     let output = compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -109,10 +109,10 @@ fn compiles_fixed_array_parameters_and_returns() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun identity(values: [Int; 2]): [Int; 2] {
+        public func identity(values: [Int; 2]): [Int; 2] {
             return values;
         }
-        public fun main(): Int {
+        public func main(): Int {
             val values: [Int; 2] = [3, 4];
             val returned: [Int; 2] = identity(values);
             return returned[0] + returned[1];

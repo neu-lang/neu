@@ -120,7 +120,7 @@ fn m0035_checked_source_lowers_bool_unit_and_float_literals_to_hir() {
     let file = SourceFileId::from_raw(907);
     let parsed = parse_source(
         file,
-        "fun flag(): Bool { return true; } fun done(): Unit { return (); } fun ratio(): Float { return 0.0; }",
+        "func flag(): Bool { return true; } func done(): Unit { return (); } func ratio(): Float { return 0.0; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -203,7 +203,7 @@ fn m0035_hir_preserves_primitive_operator_kinds_and_operand_order() {
 fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
     let parsed = parse_source(
         SourceFileId::from_raw(918),
-        "fun main(): Byte { return 255; }",
+        "func main(): Byte { return 255; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -257,7 +257,7 @@ fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
 fn m0035_checked_source_lowers_float_local_and_read_to_hir() {
     let parsed = parse_source(
         SourceFileId::from_raw(919),
-        "fun ratio(): Float { const value: Float = 1.5; return value; }",
+        "func ratio(): Float { const value: Float = 1.5; return value; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -399,7 +399,7 @@ fn m0035_hir_models_primitive_parameter_reads() {
 #[test]
 fn m0035_checked_source_lowers_primitive_parameter_reads() {
     let file = SourceFileId::from_raw(926);
-    let parsed = parse_source(file, "fun echo(value: Float): Float { return value; }");
+    let parsed = parse_source(file, "func echo(value: Float): Float { return value; }");
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
     let return_expression = parsed.return_statements[0].value.unwrap();
@@ -432,7 +432,7 @@ fn m0035_checked_source_lowers_primitive_parameter_reads() {
 fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
     let parsed = parse_source(
         SourceFileId::from_raw(203),
-        "fun helper(): Int { return 1 + 2; } fun main(): Int { return helper(); }",
+        "func helper(): Int { return 1 + 2; } func main(): Int { return helper(); }",
     );
     let mut types = compiler::types::TypeArena::new();
     let signatures = type_m0028_function_signatures_in(

@@ -23,7 +23,7 @@ fn options(output: &std::path::Path) -> SourceDriverOptions {
 fn parses_valid_string_literal_and_rejects_invalid_escape() {
     let valid = parse_source(
         SourceFileId::from_raw(6401),
-        r#"fun read(): String { return "hi\n"; }"#,
+        r#"func read(): String { return "hi\n"; }"#,
     );
     assert!(valid.lex_diagnostics.is_empty());
     assert!(valid.diagnostics.is_empty(), "{:?}", valid.diagnostics);
@@ -31,7 +31,7 @@ fn parses_valid_string_literal_and_rejects_invalid_escape() {
 
     let utf8 = parse_source(
         SourceFileId::from_raw(6403),
-        r#"fun read(): String { return "café"; }"#,
+        r#"func read(): String { return "café"; }"#,
     );
     assert!(utf8.lex_diagnostics.is_empty());
     assert!(utf8.diagnostics.is_empty(), "{:?}", utf8.diagnostics);
@@ -53,7 +53,7 @@ fn compiles_string_length_index_equality_concat_and_clone() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun main(): Int {
+        public func main(): Int {
             val left: String = "ab";
             val right: String = clone(left) + "c";
             return right.length;
@@ -71,7 +71,7 @@ fn compiles_string_byte_index_and_utf8_byte_length() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun main(): Int {
+        public func main(): Int {
             val text: String = "é";
             val first: Byte = text[0];
             return text.length;
@@ -90,7 +90,7 @@ fn compiles_string_equality_inequality_and_empty_concat() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun main(): Int {
+        public func main(): Int {
             val equal: Bool = "a" == "a";
             val unequal: Bool = "a" != "ab";
             val empty: String = "" + "";
@@ -112,11 +112,11 @@ fn string_equality_results_cover_unequal_lengths_and_empty_values() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun score(value: Bool): Int {
+        public func score(value: Bool): Int {
             if (value) { return 1; }
             return 0;
         }
-        public fun main(): Int {
+        public func main(): Int {
             return score("a" == "a")
                 + score("a" != "ab")
                 + score("ab" != "a")
@@ -137,10 +137,10 @@ fn string_parameter_return_and_clone_preserve_ownership() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun identity(value: String): String {
+        public func identity(value: String): String {
             return value;
         }
-        public fun main(): Int {
+        public func main(): Int {
             val original: String = "ab";
             val copied: String = clone(original);
             val returned: String = identity(copied);
@@ -160,7 +160,7 @@ fn dynamic_string_index_traps() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun main(): Int {
+        public func main(): Int {
             val text: String = "a";
             val index: Int = 1;
             val byte: Byte = text[index];
@@ -179,10 +179,10 @@ fn string_read_only_use_preserves_source_and_move_is_diagnosed() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun consume(value: String): String {
+        public func consume(value: String): String {
             return value;
         }
-        public fun main(): Int {
+        public func main(): Int {
             var text: String = "value";
             val consumed: String = consume(text);
             return text.length;
@@ -200,7 +200,7 @@ fn statically_invalid_string_index_is_rejected() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun main(): Int {
+        public func main(): Int {
             val text: String = "a";
             val byte: Byte = text[2];
             return 0;

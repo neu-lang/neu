@@ -1,18 +1,18 @@
 package examples.current
 
 class Base {
-    fun value(): Int {
+    func value(): Int {
         return 1;
     }
 }
 
 class Derived: Base() {
-    override fun value(): Int {
+    override func value(): Int {
         return 13;
     }
 }
 
-public fun main(): Int {
+public func main(): Int {
     val base: Base = new Derived();
     return base.value();
 }

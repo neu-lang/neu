@@ -1,6 +1,6 @@
 package examples.current
 
-public fun main(): Int {
+public func main(): Int {
     for (index in 0..3) {
         if (index == 0) {
             continue;

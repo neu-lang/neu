@@ -3,7 +3,7 @@ package examples.current
 class Counter(var value: Int) {
 }
 
-public fun main(): Int {
+public func main(): Int {
     val counter: Counter = new Counter(4);
     counter.value = 7;
     return counter.value;

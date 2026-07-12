@@ -1,13 +1,13 @@
 package examples.current
 
 class Counter(var value: Int) {
-    fun increment(amount: Int): Int {
+    func increment(amount: Int): Int {
         this.value = this.value + amount;
         return this.value;
     }
 }
 
-public fun main(): Int {
+public func main(): Int {
     val counter: Counter = new Counter(4);
     return counter.increment(5);
 }

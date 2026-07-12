@@ -45,7 +45,7 @@ use compiler::{
 fn m0061_const_expression_produces_a_typed_compile_time_fact() {
     let parsed = parse_source(
         SourceFileId::from_raw(1004),
-        "fun run() { const answer: Int = 1 + 2; }",
+        "func run() { const answer: Int = 1 + 2; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -399,7 +399,7 @@ fn m0020_capability_bound_records_preserve_occurrences_without_interpretation() 
 fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
     let parsed = parse_source(
         SourceFileId::from_raw(190),
-        "fun check() { if (maybe != null) { const definite = maybe; }; if (null != other) { const also = other; } }",
+        "func check() { if (maybe != null) { const definite = maybe; }; if (null != other) { const also = other; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -436,7 +436,7 @@ fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
 fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() {
     let parsed = parse_source(
         SourceFileId::from_raw(191),
-        "fun check() { if (maybe == null) { const fallback = \"missing\"; } else { const definite = maybe; }; if (null == other) { const fallback2 = \"missing\"; } else { const also = other; } }",
+        "func check() { if (maybe == null) { const fallback = \"missing\"; } else { const definite = maybe; }; if (null == other) { const fallback2 = \"missing\"; } else { const also = other; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -464,7 +464,7 @@ fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() 
 fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
     let parsed = parse_source(
         SourceFileId::from_raw(192),
-        "fun check() { if (left == right) { const a = left; }; if (null == null) { const b = null; }; if (maybe < null) { const c = maybe; }; if (maybe == 1) { const d = maybe; } }",
+        "func check() { if (left == right) { const a = left; }; if (null == null) { const b = null; }; if (maybe < null) { const c = maybe; }; if (maybe == 1) { const d = maybe; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -813,7 +813,7 @@ fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
 #[test]
 fn m0019_refined_expression_type_records_active_exact_binding_uses() {
     let source =
-        "fun check() { const maybe: String? = null; if (maybe != null) { maybe; }; maybe; }";
+        "func check() { const maybe: String? = null; if (maybe != null) { maybe; }; maybe; }";
     let file = SourceFileId::from_raw(330);
     let parsed = parse_source(file, source);
     assert!(parsed.diagnostics.is_empty());
@@ -878,7 +878,7 @@ fn m0019_refined_expression_type_records_active_exact_binding_uses() {
 
 #[test]
 fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bounds() {
-    let source = "fun check() { const maybe: String? = null; if (maybe != null) { maybe; if (ready) { maybe; const maybe: String? = null; maybe; }; }; maybe; }";
+    let source = "func check() { const maybe: String? = null; if (maybe != null) { maybe; if (ready) { maybe; const maybe: String? = null; maybe; }; }; maybe; }";
     let file = SourceFileId::from_raw(331);
     let parsed = parse_source(file, source);
     assert!(
@@ -1245,7 +1245,7 @@ fn type_rule_diagnostic_identifiers_cover_adr0027_examples() {
 fn unsupported_expression_diagnostics_report_adr0027_deferred_forms() {
     let parsed = parse_source(
         SourceFileId::from_raw(85),
-        "fun run() { const answer: Int = compute(); next = next + 1; logger.info(next); if (ready) { const inner = next; } else { const other = answer; } }",
+        "func run() { const answer: Int = compute(); next = next + 1; logger.info(next); if (ready) { const inner = next; } else { const other = answer; } }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -1298,7 +1298,7 @@ fn unsupported_expression_diagnostics_report_adr0027_deferred_forms() {
 fn unsupported_expression_diagnostics_ignore_accepted_and_non_expression_nodes() {
     let parsed = parse_source(
         SourceFileId::from_raw(86),
-        "fun run() { const source: Int = 1; const copy: Int = (source); copy = source; return; }",
+        "func run() { const source: Int = 1; const copy: Int = (source); copy = source; return; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -1474,7 +1474,7 @@ fn literal_expression_typing_does_not_synthesize_missing_expression_types() {
 fn parser_literal_metadata_types_to_adr0027_primitives() {
     let parsed = parse_source(
         SourceFileId::from_raw(60),
-        "fun run() { const a = true; const b = 7; const c = \"text\"; const d = null; }",
+        "func run() { const a = true; const b = 7; const c = \"text\"; const d = null; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1514,7 +1514,7 @@ fn parser_literal_metadata_types_to_adr0027_primitives() {
 fn primitive_local_declaration_annotations_record_declaration_signatures() {
     let parsed = parse_source(
         SourceFileId::from_raw(61),
-        "fun run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const done: Unit; const absent: Null = null; const ratio: Float = value; const octet: Byte = value; }",
+        "func run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const done: Unit; const absent: Null = null; const ratio: Float = value; const octet: Byte = value; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1567,7 +1567,7 @@ fn primitive_local_declaration_annotations_record_declaration_signatures() {
 fn primitive_local_declaration_annotations_do_not_synthesize_unknown_signatures() {
     let parsed = parse_source(
         SourceFileId::from_raw(62),
-        "fun run() { const inferred = true; const custom: UserId = value; const count: Int = 1; }",
+        "func run() { const inferred = true; const custom: UserId = value; const count: Int = 1; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1613,7 +1613,7 @@ fn primitive_local_declaration_annotations_do_not_synthesize_unknown_signatures(
 fn primitive_local_initializer_checks_record_matching_assignments() {
     let parsed = parse_source(
         SourceFileId::from_raw(63),
-        "fun run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; }",
+        "func run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1650,7 +1650,7 @@ fn primitive_local_initializer_checks_record_matching_assignments() {
 fn primitive_local_initializers_type_float_and_in_range_byte_literals() {
     let parsed = parse_source(
         SourceFileId::from_raw(63),
-        "fun run() { const ratio: Float = 1.5; const first: Byte = 0; const last: Byte = 255; }",
+        "func run() { const ratio: Float = 1.5; const first: Byte = 0; const last: Byte = 255; }",
     );
 
     let (_arena, report) = type_primitive_local_initializer_declarations(
@@ -1668,7 +1668,7 @@ fn primitive_local_initializers_type_float_and_in_range_byte_literals() {
 fn primitive_local_initializer_rejects_byte_literal_out_of_range() {
     let parsed = parse_source(
         SourceFileId::from_raw(64),
-        "fun run() { const value: Byte = 256; }",
+        "func run() { const value: Byte = 256; }",
     );
 
     let (_arena, report) = type_primitive_local_initializer_declarations(
@@ -1765,7 +1765,7 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
 fn m0035_executable_core_types_primitive_operator_source() {
     let parsed = parse_source(
         SourceFileId::from_raw(914),
-        "fun run() { const ready: Bool = !true; const ratio: Float = 1.5 + 2.0; const ordered: Bool = 1.5 < 2.0; }",
+        "func run() { const ready: Bool = !true; const ratio: Float = 1.5 + 2.0; const ordered: Bool = 1.5 < 2.0; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -1807,7 +1807,7 @@ fn m0035_executable_core_types_primitive_operator_source() {
 fn m0035_executable_core_contextualizes_byte_literal_initializers() {
     let parsed = parse_source(
         SourceFileId::from_raw(915),
-        "fun run(): Int { const value: Byte = 255; return 0; }",
+        "func run(): Int { const value: Byte = 255; return 0; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -1844,7 +1844,7 @@ fn m0035_executable_core_contextualizes_byte_literal_initializers() {
 fn primitive_local_initializer_checks_diagnose_mismatched_literals() {
     let parsed = parse_source(
         SourceFileId::from_raw(64),
-        "fun run() { const ready: Bool = 1; const count: Int = 2; const custom: UserId = 3; const later: String = compute(); }",
+        "func run() { const ready: Bool = 1; const count: Int = 2; const custom: UserId = 3; const later: String = compute(); }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -3432,7 +3432,7 @@ fn accepted_expression_composition_reports_unknown_resolved_name_types() {
 fn accepted_local_initializer_checks_names_and_grouped_names() {
     let parsed = parse_source(
         SourceFileId::from_raw(83),
-        "fun run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (source); }",
+        "func run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (source); }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3474,7 +3474,7 @@ fn accepted_local_initializer_checks_names_and_grouped_names() {
 fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers() {
     let parsed = parse_source(
         SourceFileId::from_raw(84),
-        "fun run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const skipped: Int = missing; }",
+        "func run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const skipped: Int = missing; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3532,7 +3532,7 @@ fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers()
 fn m0018_core_types_well_typed_accepted_fixture() {
     let parsed = parse_source(
         SourceFileId::from_raw(88),
-        "fun run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (copy); var next: Int = grouped; next = source; }",
+        "func run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (copy); var next: Int = grouped; next = source; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3607,7 +3607,7 @@ fn m0018_core_types_well_typed_accepted_fixture() {
 fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
     let parsed = parse_source(
         SourceFileId::from_raw(89),
-        "fun run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const missingKnown: Int = external; logger.info(source); }",
+        "func run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const missingKnown: Int = external; logger.info(source); }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3704,7 +3704,7 @@ fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
 fn m0028_executable_int_operators_type_every_supported_operator() {
     let parsed = parse_source(
         SourceFileId::from_raw(90),
-        "fun run() { const plus = +1; const minus = -1; const not = ~1; const add = 1 + 2; const subtract = 1 - 2; const multiply = 1 * 2; const divide = 1 / 2; const modulo = 1 % 2; const exponent = 1 ** 2; const and = 1 & 2; const or = 1 | 2; const xor = 1 ^ 2; const left = 1 << 2; const right = 1 >> 2; const nested = (1 + 2) * 3; }",
+        "func run() { const plus = +1; const minus = -1; const not = ~1; const add = 1 + 2; const subtract = 1 - 2; const multiply = 1 * 2; const divide = 1 / 2; const modulo = 1 % 2; const exponent = 1 ** 2; const and = 1 & 2; const or = 1 | 2; const xor = 1 ^ 2; const left = 1 << 2; const right = 1 >> 2; const nested = (1 + 2) * 3; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3740,7 +3740,7 @@ fn m0028_executable_int_operators_type_every_supported_operator() {
 
 #[test]
 fn m0028_executable_int_operators_reject_known_non_int_operands() {
-    let parsed = parse_source(SourceFileId::from_raw(91), "fun run() { true + 1; }");
+    let parsed = parse_source(SourceFileId::from_raw(91), "func run() { true + 1; }");
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
@@ -3778,7 +3778,7 @@ fn m0028_executable_int_operators_reject_known_non_int_operands() {
 
 #[test]
 fn m0028_executable_int_operators_do_not_type_unknown_operands() {
-    let parsed = parse_source(SourceFileId::from_raw(92), "fun run() { unknown + 1; }");
+    let parsed = parse_source(SourceFileId::from_raw(92), "func run() { unknown + 1; }");
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
@@ -3807,7 +3807,7 @@ fn m0028_executable_int_operators_do_not_type_unknown_operands() {
 fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
     let parsed = parse_source(
         SourceFileId::from_raw(93),
-        "fun run() { const value: Int = (1 + 2) * 3; var next: Int = value; next = next << 1; }",
+        "func run() { const value: Int = (1 + 2) * 3; var next: Int = value; next = next << 1; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3864,7 +3864,7 @@ fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
 fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
     let parsed = parse_source(
         SourceFileId::from_raw(94),
-        "fun run() { const bad: Int = true + 1; }",
+        "func run() { const bad: Int = true + 1; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3899,7 +3899,7 @@ fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
 fn m0035_core_accepts_boolean_and_equality_operators() {
     let parsed = parse_source(
         SourceFileId::from_raw(95),
-        "fun run() { const logical = !true; const comparison = 1 == 2; }",
+        "func run() { const logical = !true; const comparison = 1 == 2; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3931,7 +3931,7 @@ fn m0035_core_accepts_boolean_and_equality_operators() {
 fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
     let parsed = parse_source(
         SourceFileId::from_raw(915),
-        "fun run() { const bad_bool: Bool = !1; const bad_float: Float = 1.5 + 1; }",
+        "func run() { const bad_bool: Bool = !1; const bad_float: Float = 1.5 + 1; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -3969,7 +3969,7 @@ fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
 fn m0035_executable_core_types_byte_literal_in_context() {
     let parsed = parse_source(
         SourceFileId::from_raw(916),
-        "fun run() { const first: Byte = 0; const last: Byte = 255; }",
+        "func run() { const first: Byte = 0; const last: Byte = 255; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -4000,7 +4000,7 @@ fn m0035_executable_core_types_byte_literal_in_context() {
 fn m0035_executable_core_rejects_byte_literal_out_of_range() {
     let parsed = parse_source(
         SourceFileId::from_raw(917),
-        "fun run() { const invalid: Byte = 256; }",
+        "func run() { const invalid: Byte = 256; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -4031,7 +4031,7 @@ fn m0035_executable_core_rejects_byte_literal_out_of_range() {
 fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
     let parsed = parse_source(
         SourceFileId::from_raw(97),
-        "fun run() { const range = 9223372036854775808; const overflow = 9223372036854775807 + 1; const zero = 1 / 0; const exponent = 2 ** -1; const shift = 1 << 64; }",
+        "func run() { const range = 9223372036854775808; const overflow = 9223372036854775807 + 1; const zero = 1 / 0; const exponent = 2 ** -1; const shift = 1 << 64; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -4057,7 +4057,7 @@ fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
 fn m0028_static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees() {
     let parsed = parse_source(
         SourceFileId::from_raw(98),
-        "fun run() { const min = -9223372036854775808; const value: Int = 1; const deferred = value + 9223372036854775808; }",
+        "func run() { const min = -9223372036854775808; const value: Int = 1; const deferred = value + 9223372036854775808; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -4087,7 +4087,7 @@ fn m0028_static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees(
 fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
     let parsed = parse_source(
         SourceFileId::from_raw(99),
-        "fun run() { const plus = 1 + 2; const minus = 3 - 2; const product = 2 * 3; const quotient = 8 / 2; const remainder = 7 % 3; const power = 2 ** 8; const left = 1 << 4; const right = -8 >> 2; const and = 6 & 3; const or = 6 | 3; const xor = 6 ^ 3; const unaryPlus = +1; const unaryMinus = -1; const inverted = ~1; const min = -(9223372036854775808); }",
+        "func run() { const plus = 1 + 2; const minus = 3 - 2; const product = 2 * 3; const quotient = 8 / 2; const remainder = 7 % 3; const power = 2 ** 8; const left = 1 << 4; const right = -8 >> 2; const and = 6 & 3; const or = 6 | 3; const xor = 6 ^ 3; const unaryPlus = +1; const unaryMinus = -1; const inverted = ~1; const min = -(9223372036854775808); }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -4103,8 +4103,14 @@ fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
 
 #[test]
 fn m0028_entry_point_selects_one_valid_main_in_the_explicit_package() {
-    let entry_file = parse_source(SourceFileId::from_raw(102), "fun main(): Int { return 0; }");
-    let other_file = parse_source(SourceFileId::from_raw(103), "fun main(): Int { return 1; }");
+    let entry_file = parse_source(
+        SourceFileId::from_raw(102),
+        "func main(): Int { return 0; }",
+    );
+    let other_file = parse_source(
+        SourceFileId::from_raw(103),
+        "func main(): Int { return 1; }",
+    );
     let entry_package = PackageNamespace::parse("app").unwrap();
     let other_package = PackageNamespace::parse("other").unwrap();
     let files = [
@@ -4126,15 +4132,19 @@ fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
     let package = PackageNamespace::parse("app").unwrap();
     let missing = parse_source(
         SourceFileId::from_raw(104),
-        "fun helper(): Int { return 0; }",
+        "func helper(): Int { return 0; }",
     );
-    let duplicate_first =
-        parse_source(SourceFileId::from_raw(105), "fun main(): Int { return 0; }");
-    let duplicate_second =
-        parse_source(SourceFileId::from_raw(106), "fun main(): Int { return 1; }");
+    let duplicate_first = parse_source(
+        SourceFileId::from_raw(105),
+        "func main(): Int { return 0; }",
+    );
+    let duplicate_second = parse_source(
+        SourceFileId::from_raw(106),
+        "func main(): Int { return 1; }",
+    );
     let invalid = parse_source(
         SourceFileId::from_raw(107),
-        "fun main(value: Int): String { return \"bad\"; }",
+        "func main(value: Int): String { return \"bad\"; }",
     );
 
     let missing_report =
@@ -4184,9 +4194,9 @@ fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
 fn m0028_entry_point_rejects_every_non_entry_main_shape() {
     let package = PackageNamespace::parse("app").unwrap();
     for (file, source) in [
-        (108, "fun main() { return 0; }"),
-        (109, "fun main(): Int;"),
-        (110, "struct Container { fun main(): Int { return 0; } }"),
+        (108, "func main() { return 0; }"),
+        (109, "func main(): Int;"),
+        (110, "struct Container { func main(): Int { return 0; } }"),
     ] {
         let parsed = parse_source(SourceFileId::from_raw(file), source);
         assert!(parsed.diagnostics.is_empty());
@@ -4209,7 +4219,7 @@ fn m0028_entry_point_rejects_every_non_entry_main_shape() {
 fn m0028_straight_line_return_validation_reports_missing_and_unreachable_returns() {
     let parsed = parse_source(
         SourceFileId::from_raw(112),
-        "fun valid(): Int { return 1; } fun missing(): Int { const value: Int = 1; } fun duplicate(): Int { return 1; return 2; } fun nested(): Int { if (true) { return 1; }; }",
+        "func valid(): Int { return 1; } func missing(): Int { const value: Int = 1; } func duplicate(): Int { return 1; return 2; } func nested(): Int { if (true) { return 1; }; }",
     );
     assert!(parsed.diagnostics.is_empty());
 
@@ -4248,7 +4258,7 @@ fn m0028_straight_line_return_validation_reports_missing_and_unreachable_returns
 fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
     let parsed = parse_source(
         SourceFileId::from_raw(113),
-        "fun add(left: Int, right: Int): Int { return left + right; }",
+        "func add(left: Int, right: Int): Int { return left + right; }",
     );
     assert!(parsed.diagnostics.is_empty());
 
@@ -4267,7 +4277,7 @@ fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
 fn m0035_function_signatures_type_all_bootstrap_primitives() {
     let parsed = parse_source(
         SourceFileId::from_raw(919),
-        "fun bool_value(value: Bool): Bool { return value; } fun unit_value(): Unit { return (); } fun float_value(value: Float): Float { return value; } fun byte_value(value: Byte): Byte { return value; }",
+        "func bool_value(value: Bool): Bool { return value; } func unit_value(): Unit { return (); } func float_value(value: Float): Float { return value; } func byte_value(value: Byte): Byte { return value; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -4294,11 +4304,11 @@ fn m0035_function_signatures_type_all_bootstrap_primitives() {
 fn m0028_function_signatures_share_the_caller_owned_module_arena() {
     let first = parse_source(
         SourceFileId::from_raw(114),
-        "fun first(value: Int): Int { return value; }",
+        "func first(value: Int): Int { return value; }",
     );
     let second = parse_source(
         SourceFileId::from_raw(115),
-        "fun second(): Int { return 1; }",
+        "func second(): Int { return 1; }",
     );
     let mut types = TypeArena::new();
 
@@ -4326,11 +4336,11 @@ fn m0028_function_signatures_share_the_caller_owned_module_arena() {
 fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
     let first = parse_source(
         SourceFileId::from_raw(116),
-        "fun first() { const value: Int = 1; }",
+        "func first() { const value: Int = 1; }",
     );
     let second = parse_source(
         SourceFileId::from_raw(117),
-        "fun second() { const value: Int = 2; }",
+        "func second() { const value: Int = 2; }",
     );
     let mut types = TypeArena::new();
     let first_report = type_m0028_executable_core_in(
@@ -4373,11 +4383,11 @@ fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
 fn m0028_direct_calls_type_same_package_helper_arguments() {
     let helper = parse_source(
         SourceFileId::from_raw(118),
-        "fun helper(value: Int): Int { return value; }",
+        "func helper(value: Int): Int { return value; }",
     );
     let caller = parse_source(
         SourceFileId::from_raw(119),
-        "fun main(): Int { return helper(1); }",
+        "func main(): Int { return helper(1); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
@@ -4444,11 +4454,11 @@ fn m0028_direct_calls_type_same_package_helper_arguments() {
 fn m0028_direct_calls_report_invalid_target_and_arity() {
     let target = parse_source(
         SourceFileId::from_raw(120),
-        "fun helper(value: Int): Int { return value; }",
+        "func helper(value: Int): Int { return value; }",
     );
     let caller = parse_source(
         SourceFileId::from_raw(121),
-        "fun main(): Int { return missing(); } fun other(): Int { return helper(); }",
+        "func main(): Int { return missing(); } func other(): Int { return helper(); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
@@ -4519,7 +4529,7 @@ fn m0028_direct_calls_report_invalid_target_and_arity() {
 fn m0028_direct_calls_reject_every_edge_in_a_recursive_cycle() {
     let parsed = parse_source(
         SourceFileId::from_raw(122),
-        "fun first(): Int { return second(); } fun second(): Int { return third(); } fun third(): Int { return first(); }",
+        "func first(): Int { return second(); } func second(): Int { return third(); } func third(): Int { return first(); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
@@ -4566,11 +4576,11 @@ fn m0028_direct_calls_reject_every_edge_in_a_recursive_cycle() {
 fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodies() {
     let target = parse_source(
         SourceFileId::from_raw(123),
-        "fun helper(value: Int): Int { return value; } fun declared(): Int;",
+        "func helper(value: Int): Int { return value; } func declared(): Int;",
     );
     let caller = parse_source(
         SourceFileId::from_raw(124),
-        "fun main(): Int { return helper(true); } fun other(): Int { return declared(); }",
+        "func main(): Int { return helper(true); } func other(): Int { return declared(); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
@@ -4650,11 +4660,11 @@ fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodie
 fn m0028_executable_core_accepts_checked_direct_calls() {
     let helper = parse_source(
         SourceFileId::from_raw(125),
-        "fun increment(value: Int): Int { return value + 1; }",
+        "func increment(value: Int): Int { return value + 1; }",
     );
     let caller = parse_source(
         SourceFileId::from_raw(126),
-        "fun main(): Int { return increment(41); }",
+        "func main(): Int { return increment(41); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
@@ -4731,7 +4741,7 @@ fn m0028_executable_core_accepts_checked_direct_calls() {
 fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
     let parsed = parse_source(
         SourceFileId::from_raw(127),
-        "fun main(): Int { return missing(); }",
+        "func main(): Int { return missing(); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
@@ -4777,7 +4787,7 @@ fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
 fn m0028_return_expression_types_report_known_mismatches_only() {
     let parsed = parse_source(
         SourceFileId::from_raw(128),
-        "fun bad(): Int { return true; } fun unresolved(): Int { return missing; } fun valid(): Int { return 1; }",
+        "func bad(): Int { return true; } func unresolved(): Int { return missing; } func valid(): Int { return 1; }",
     );
     let mut types = TypeArena::new();
     let signatures = type_m0028_function_signatures_in(
@@ -4820,7 +4830,7 @@ fn m0028_return_expression_types_report_known_mismatches_only() {
 fn m0028_unsupported_executable_forms_report_outermost_source_spans() {
     let parsed = parse_source(
         SourceFileId::from_raw(129),
-        "struct Box<T> {} fun main(): Int { return \"not executable\"; }",
+        "struct Box<T> {} func main(): Int { return \"not executable\"; }",
     );
     assert!(parsed.diagnostics.is_empty());
 

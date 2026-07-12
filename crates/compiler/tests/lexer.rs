@@ -25,9 +25,9 @@ fn diagnostic_texts(source: &str) -> Vec<(DiagnosticKind, &str)> {
 #[test]
 fn lexes_keywords_and_identifiers() {
     assert_eq!(
-        kinds("fun main() { return true }"),
+        kinds("func main() { return true }"),
         vec![
-            TokenKind::KwFun,
+            TokenKind::KwFunc,
             TokenKind::Identifier,
             TokenKind::LeftParen,
             TokenKind::RightParen,
@@ -55,6 +55,11 @@ fn val_and_const_are_reserved_keywords() {
         format!("{:?}", kinds("val const var")),
         "[KwVal, KwConst, KwVar]"
     );
+}
+
+#[test]
+fn func_is_reserved_and_fun_remains_lexically_distinct_for_migration_diagnostics() {
+    assert_eq!(kinds("func fun"), vec![TokenKind::KwFunc, TokenKind::KwFun]);
 }
 
 #[test]

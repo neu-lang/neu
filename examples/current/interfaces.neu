@@ -1,16 +1,16 @@
 package examples.current
 
 interface Answerable {
-    fun value(): Int;
+    func value(): Int;
 }
 
 class Answer: Answerable {
-    fun value(): Int {
+    func value(): Int {
         return 11;
     }
 }
 
-public fun main(): Int {
+public func main(): Int {
     val answer: Answerable = new Answer();
     return answer.value();
 }

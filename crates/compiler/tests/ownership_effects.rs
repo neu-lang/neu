@@ -118,7 +118,7 @@ fn parameter_effects_record_the_strongest_inferred_effect() {
 fn source_parameter_effects_preserve_mutation_and_return_facts() {
     let parsed = parse_source(
         SourceFileId::from_raw(1005),
-        "fun rebuild(value: Int): Int { value = 1; return value; }",
+        "func rebuild(value: Int): Int { value = 1; return value; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());

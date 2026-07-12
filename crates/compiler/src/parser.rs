@@ -9,6 +9,7 @@ pub enum DiagnosticKind {
     MisplacedImportDeclaration,
     DuplicateVisibilityModifier,
     UnsupportedDeclarationModifier,
+    ObsoleteFunctionKeyword,
     MissingDeclarationName,
     MalformedDeclarationHeader,
     InvalidMemberDeclarationPosition,
@@ -695,7 +696,11 @@ impl<'source> Parser<'source> {
         }
 
         match self.current_kind() {
-            Some(TokenKind::KwFun) => self.parse_function(in_body),
+            Some(TokenKind::KwFunc) => self.parse_function(in_body),
+            Some(TokenKind::KwFun) => {
+                self.diagnostic_current(DiagnosticKind::ObsoleteFunctionKeyword);
+                self.parse_function(in_body);
+            }
             Some(TokenKind::KwClass) => self.parse_named_body_declaration(
                 AstNodeKind::ClassDeclaration,
                 in_body,
@@ -1177,13 +1182,15 @@ impl<'source> Parser<'source> {
                 && matches!(
                     self.peek_kind(),
                     Some(
-                        TokenKind::KwFun
+                        TokenKind::KwFunc
+                            | TokenKind::KwFun
                             | TokenKind::KwOverride
                             | TokenKind::KwOpen
                             | TokenKind::KwFinal
                     )
                 );
-            if self.current_kind() == Some(TokenKind::KwFun)
+            if self.current_kind() == Some(TokenKind::KwFunc)
+                || self.current_kind() == Some(TokenKind::KwFun)
                 || self.current_kind() == Some(TokenKind::KwOverride)
                 || self.current_kind() == Some(TokenKind::KwOpen)
                 || self.current_kind() == Some(TokenKind::KwFinal)
@@ -1215,10 +1222,15 @@ impl<'source> Parser<'source> {
                     }
                     self.advance();
                 }
-                if self.current_kind() != Some(TokenKind::KwFun) {
+                if self.current_kind() != Some(TokenKind::KwFunc)
+                    && self.current_kind() != Some(TokenKind::KwFun)
+                {
                     self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
                     self.skip_to_declaration_boundary(true);
                     continue;
+                }
+                if self.current_kind() == Some(TokenKind::KwFun) {
+                    self.diagnostic_current(DiagnosticKind::ObsoleteFunctionKeyword);
                 }
                 self.parse_function(true);
                 continue;
@@ -3436,7 +3448,11 @@ impl<'source> Parser<'source> {
         matches!(
             self.current_kind(),
             Some(
-                TokenKind::KwFun | TokenKind::KwStruct | TokenKind::KwEnum | TokenKind::KwInterface
+                TokenKind::KwFunc
+                    | TokenKind::KwFun
+                    | TokenKind::KwStruct
+                    | TokenKind::KwEnum
+                    | TokenKind::KwInterface
             )
         ) || self.is_visibility()
             || self.is_unsupported_modifier()

@@ -48,7 +48,7 @@ fn rejects_protected_fields_and_missing_field_types() {
 fn parses_primary_constructor_and_new_expression() {
     let parsed = parse_source(
         SourceFileId::from_raw(6802),
-        "class Point(val x: Int, var y: Int) {} fun make(): Point { return new Point(1, 2); }",
+        "class Point(val x: Int, var y: Int) {} func make(): Point { return new Point(1, 2); }",
     );
     assert!(
         parsed.lex_diagnostics.is_empty(),
@@ -73,7 +73,7 @@ fn parses_primary_constructor_and_new_expression() {
 
     let invalid = parse_source(
         SourceFileId::from_raw(6803),
-        "class Point(val x: Int) {} fun make(): Point { return new Missing(1); }",
+        "class Point(val x: Int) {} func make(): Point { return new Missing(1); }",
     );
     let (_, invalid_types) = type_m0068_class_types(
         &invalid,
@@ -118,7 +118,7 @@ fn constructs_superclass_fields_before_derived_object_use() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base(val value: Int) {} class Child: Base(17) {} public fun main(): Int { val child: Child = new Child(); return child.value; }",
+        "class Base(val value: Int) {} class Child: Base(17) {} public func main(): Int { val child: Child = new Child(); return child.value; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6820),
             ModuleName::parse("classes").unwrap(),
@@ -144,7 +144,7 @@ fn supports_class_typed_function_parameters_and_returns() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Point(val value: Int) {} fun identity(point: Point): Point { return point; } public fun main(): Int { val point: Point = identity(new Point(19)); return point.value; }",
+        "class Point(val value: Int) {} func identity(point: Point): Point { return point; } public func main(): Int { val point: Point = identity(new Point(19)); return point.value; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6823),
             ModuleName::parse("classes").unwrap(),
@@ -166,7 +166,7 @@ fn supports_class_typed_function_parameters_and_returns() {
 fn associates_method_declarations_with_their_class() {
     let parsed = parse_source(
         SourceFileId::from_raw(6804),
-        "class Point(val x: Int) { fun value(): Int { return x; } }",
+        "class Point(val x: Int) { func value(): Int { return x; } }",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert_eq!(parsed.function_declarations.len(), 1);
@@ -180,7 +180,7 @@ fn associates_method_declarations_with_their_class() {
 fn preserves_method_dispatch_modifiers_and_visibility() {
     let parsed = parse_source(
         SourceFileId::from_raw(6805),
-        "class Base { fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert_eq!(parsed.function_declarations.len(), 2);
@@ -189,7 +189,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 
     let invalid = parse_source(
         SourceFileId::from_raw(6806),
-        "class Base { fun value(): Int { return 1; } } class Child: Base() { fun value(): Int { return 2; } }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } }",
     );
     assert_eq!(
         check_m0070_dispatch(&invalid)[0].kind(),
@@ -198,7 +198,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 
     let incomplete = parse_source(
         SourceFileId::from_raw(6807),
-        "interface Readable { fun read(): Int; } class Item: Readable {}",
+        "interface Readable { func read(): Int; } class Item: Readable {}",
     );
     assert!(
         check_m0070_dispatch(&incomplete)
@@ -224,7 +224,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 
     let incompatible = parse_source(
         SourceFileId::from_raw(6822),
-        "class Base { fun value(): Int { return 1; } } class Child: Base() { override fun value(): Bool { return true; } }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Bool { return true; } }",
     );
     assert!(
         check_m0070_dispatch(&incompatible)
@@ -240,7 +240,7 @@ fn invalid_class_source_stops_before_backend() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let error = compiler::driver::compile_source_to_executable(
-        "class Point { protected val x: Int; } public fun main(): Int { return 0; }",
+        "class Point { protected val x: Int; } public func main(): Int { return 0; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6808),
             ModuleName::parse("classes").unwrap(),
@@ -262,7 +262,7 @@ fn constructs_a_minimal_owned_class_through_the_target_pack() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Point(val value: Int) {} public fun main(): Int { val point: Point = new Point(7); return point.value; }",
+        "class Point(val value: Int) {} public func main(): Int { val point: Point = new Point(7); return point.value; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6809),
             ModuleName::parse("classes").unwrap(),
@@ -287,7 +287,7 @@ fn dispatches_a_same_module_class_method() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Point(val value: Int) { fun answer(): Int { return 9; } } public fun main(): Int { val point: Point = new Point(7); return point.answer(); }",
+        "class Point(val value: Int) { func answer(): Int { return 9; } } public func main(): Int { val point: Point = new Point(7); return point.answer(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6810),
             ModuleName::parse("classes").unwrap(),
@@ -313,7 +313,7 @@ fn mutates_a_var_field_and_rejects_val_field_writes() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Point(var value: Int) {} public fun main(): Int { val point: Point = new Point(7); point.value = 8; return point.value; }",
+        "class Point(var value: Int) {} public func main(): Int { val point: Point = new Point(7); point.value = 8; return point.value; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6811),
             ModuleName::parse("classes").unwrap(),
@@ -335,7 +335,7 @@ fn mutates_a_var_field_and_rejects_val_field_writes() {
     let _ = fs::remove_dir_all(&readonly);
     fs::create_dir_all(&readonly).unwrap();
     let error = compiler::driver::compile_source_to_executable(
-        "class Point(val value: Int) {} public fun main(): Int { val point: Point = new Point(7); point.value = 8; return 0; }",
+        "class Point(val value: Int) {} public func main(): Int { val point: Point = new Point(7); point.value = 8; return 0; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6812),
             ModuleName::parse("classes").unwrap(),
@@ -358,7 +358,7 @@ fn dispatches_a_class_through_an_interface_type() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "interface Answer { fun answer(): Int; } class Point: Answer { fun answer(): Int { return 11; } } public fun main(): Int { val value: Answer = new Point(); return value.answer(); }",
+        "interface Answer { func answer(): Int; } class Point: Answer { func answer(): Int { return 11; } } public func main(): Int { val value: Answer = new Point(); return value.answer(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6813),
             ModuleName::parse("classes").unwrap(),
@@ -383,7 +383,7 @@ fn accepts_derived_to_base_assignment() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base() {} class Child: Base() {} public fun main(): Int { val base: Base = new Child(); return 13; }",
+        "class Base() {} class Child: Base() {} public func main(): Int { val base: Base = new Child(); return 13; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6814),
             ModuleName::parse("classes").unwrap(),
@@ -408,7 +408,7 @@ fn class_method_reads_its_implicit_this_receiver() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Point(val value: Int) { fun read(): Int { return this.value; } } public fun main(): Int { val point: Point = new Point(17); return point.read(); }",
+        "class Point(val value: Int) { func read(): Int { return this.value; } } public func main(): Int { val point: Point = new Point(17); return point.read(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6815),
             ModuleName::parse("classes").unwrap(),
@@ -433,7 +433,7 @@ fn class_method_reads_a_bare_inherited_field() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base(val value: Int) {} class Child: Base(23) { fun read(): Int { return value; } } public fun main(): Int { val child: Child = new Child(); return child.read(); }",
+        "class Base(val value: Int) {} class Child: Base(23) { func read(): Int { return value; } } public func main(): Int { val child: Child = new Child(); return child.read(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6824),
             ModuleName::parse("classes").unwrap(),
@@ -455,7 +455,7 @@ fn class_method_reads_a_bare_inherited_field() {
 fn open_method_declaration_is_rejected() {
     let parsed = parse_source(
         SourceFileId::from_raw(6830),
-        "class Base { open fun value(): Int { return 1; } }",
+        "class Base { open func value(): Int { return 1; } }",
     );
     assert!(!parsed.diagnostics.is_empty());
 }
@@ -468,7 +468,7 @@ fn default_overridable_method_dispatches_through_a_base_type() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base { fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } } public fun main(): Int { val base: Base = new Child(); return base.value(); }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } } public func main(): Int { val base: Base = new Child(); return base.value(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6831),
             ModuleName::parse("classes").unwrap(),
@@ -490,13 +490,13 @@ fn default_overridable_method_dispatches_through_a_base_type() {
 fn final_class_is_accepted_and_final_method_cannot_be_overridden() {
     let parsed = parse_source(
         SourceFileId::from_raw(6832),
-        "final class Sealed { final fun value(): Int { return 7; } }",
+        "final class Sealed { final func value(): Int { return 7; } }",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
 
     let invalid = parse_source(
         SourceFileId::from_raw(6833),
-        "class Base { final fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } }",
+        "class Base { final func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
     );
     assert!(!check_m0070_dispatch(&invalid).is_empty());
 }
@@ -508,7 +508,7 @@ fn class_method_can_call_immediate_super_method() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base { fun value(): Int { return 2; } } class Child: Base() { override fun value(): Int { return super.value() + 1; } } public fun main(): Int { val child: Child = new Child(); return child.value(); }",
+        "class Base { func value(): Int { return 2; } } class Child: Base() { override func value(): Int { return super.value() + 1; } } public func main(): Int { val child: Child = new Child(); return child.value(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6816),
             ModuleName::parse("classes").unwrap(),

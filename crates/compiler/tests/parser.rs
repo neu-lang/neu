@@ -8,7 +8,7 @@ use compiler::source::{ByteSpan, SourceFileId};
 fn parses_package_import_and_function_declaration() {
     let output = parse_source(
         SourceFileId::from_raw(1),
-        "package demo.core import demo.io as io public fun main();",
+        "package demo.core import demo.io as io public func main();",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -25,10 +25,37 @@ fn parses_package_import_and_function_declaration() {
 }
 
 #[test]
+fn func_is_the_accepted_function_declaration_keyword() {
+    let output = parse_source(SourceFileId::from_raw(10001), "public func main();");
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.function_declarations.len(), 1);
+}
+
+#[test]
+fn fun_is_rejected_in_top_level_class_and_interface_declarations() {
+    for source in [
+        "fun main();",
+        "class Box { fun value(); }",
+        "interface Readable { fun value(); }",
+    ] {
+        let output = parse_source(SourceFileId::from_raw(10002), source);
+        assert!(
+            output
+                .diagnostics
+                .iter()
+                .any(|diagnostic| { diagnostic.kind == DiagnosticKind::ObsoleteFunctionKeyword }),
+            "source: {source:?}, diagnostics: {:?}",
+            output.diagnostics
+        );
+    }
+}
+
+#[test]
 fn parses_nested_declaration_body_shells() {
     let output = parse_source(
         SourceFileId::from_raw(2),
-        "struct Module { fun build(); interface Service { fun run(); } enum State {} }",
+        "struct Module { func build(); interface Service { func run(); } enum State {} }",
     );
 
     assert!(output.diagnostics.is_empty());
@@ -52,7 +79,7 @@ fn parses_nested_declaration_body_shells() {
 fn reports_misplaced_package_and_import() {
     let output = parse_source(
         SourceFileId::from_raw(3),
-        "fun main(); package misplaced import too.late",
+        "func main(); package misplaced import too.late",
     );
 
     let kinds: Vec<_> = output
@@ -72,7 +99,7 @@ fn reports_misplaced_package_and_import() {
 
 #[test]
 fn reports_duplicate_visibility_and_missing_name() {
-    let output = parse_source(SourceFileId::from_raw(4), "public private fun ();");
+    let output = parse_source(SourceFileId::from_raw(4), "public private func ();");
 
     let kinds: Vec<_> = output
         .diagnostics
@@ -92,7 +119,7 @@ fn reports_duplicate_visibility_and_missing_name() {
 fn rejects_deferred_expression_and_field_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(5),
-        "struct Box { val size: Int } fun answer() = 42",
+        "struct Box { val size: Int } func answer() = 42",
     );
 
     let kinds: Vec<_> = output
@@ -108,7 +135,7 @@ fn rejects_deferred_expression_and_field_syntax() {
 fn parses_type_and_generic_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(6),
-        "struct Box<T: Send & Share, U> {} fun wrap<T>(value): ((Box<T?>) -> U)?;",
+        "struct Box<T: Send & Share, U> {} func wrap<T>(value): ((Box<T?>) -> U)?;",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -128,7 +155,7 @@ fn parses_type_and_generic_syntax() {
 
 #[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
-    let source = "struct Box<T: capability.Send & Share, U> {} fun wrap<V: Send>() {}";
+    let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);
     let output = parse_source(file, source);
 
@@ -171,7 +198,7 @@ fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds()
 fn m0020_generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
     let output = parse_source(
         SourceFileId::from_raw(201),
-        "struct Bad<T: > {} fun use(): Box<Send> {};",
+        "struct Bad<T: > {} func use(): Box<Send> {};",
     );
 
     assert!(
@@ -226,7 +253,7 @@ fn m0021_when_expression_records_subject_and_ordered_arms() {
     let file = SourceFileId::from_raw(205);
     let output = parse_source(
         file,
-        "fun code() { when (signal) { Signal.Red -> 0; _ -> 1 } }",
+        "func code() { when (signal) { Signal.Red -> 0; _ -> 1 } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -251,7 +278,7 @@ fn m0021_when_expression_records_subject_and_ordered_arms() {
     );
     assert_eq!(
         output.arena.node(output.match_arms[0].body).unwrap().span,
-        ByteSpan::new(file, 43, 44).unwrap()
+        ByteSpan::new(file, 44, 45).unwrap()
     );
 }
 
@@ -259,14 +286,14 @@ fn m0021_when_expression_records_subject_and_ordered_arms() {
 fn m0021_when_expression_rejects_incomplete_or_unsupported_arms() {
     let missing_body = parse_source(
         SourceFileId::from_raw(206),
-        "fun bad() { when (x) { A.B -> } }",
+        "func bad() { when (x) { A.B -> } }",
     );
     assert!(!missing_body.diagnostics.is_empty());
     assert!(missing_body.match_arms.is_empty());
 
     let binding = parse_source(
         SourceFileId::from_raw(207),
-        "fun bad() { when (x) { value -> 1 } }",
+        "func bad() { when (x) { value -> 1 } }",
     );
     assert!(!binding.diagnostics.is_empty());
     assert!(binding.match_arms.is_empty());
@@ -275,21 +302,21 @@ fn m0021_when_expression_rejects_incomplete_or_unsupported_arms() {
 #[test]
 fn m0021_qualified_case_pattern_records_exact_identifier_metadata() {
     let file = SourceFileId::from_raw(208);
-    let output = parse_source(file, "fun code() { when (signal) { Signal.Red -> 0 } }");
+    let output = parse_source(file, "func code() { when (signal) { Signal.Red -> 0 } }");
 
     assert_eq!(output.qualified_case_patterns.len(), 1);
     let pattern = &output.qualified_case_patterns[0];
     assert_eq!(pattern.enum_name, "Signal");
     assert_eq!(pattern.variant_name, "Red");
-    assert_eq!(pattern.enum_name_span, ByteSpan::new(file, 29, 35).unwrap());
+    assert_eq!(pattern.enum_name_span, ByteSpan::new(file, 30, 36).unwrap());
     assert_eq!(
         pattern.variant_name_span,
-        ByteSpan::new(file, 36, 39).unwrap()
+        ByteSpan::new(file, 37, 40).unwrap()
     );
 
     let unsupported = parse_source(
         SourceFileId::from_raw(209),
-        "fun code() { when (signal) { Signal.Red.Blue -> 0; Signal.Red(_) -> 1 } }",
+        "func code() { when (signal) { Signal.Red.Blue -> 0; Signal.Red(_) -> 1 } }",
     );
     assert!(unsupported.qualified_case_patterns.is_empty());
 }
@@ -299,7 +326,7 @@ fn m0021_typed_function_parameter_records_function_and_named_type() {
     let file = SourceFileId::from_raw(210);
     let output = parse_source(
         file,
-        "fun code(signal: Signal) { when (signal) { _ -> 0 } }",
+        "func code(signal: Signal) { when (signal) { _ -> 0 } }",
     );
 
     assert!(output.diagnostics.is_empty());
@@ -318,7 +345,7 @@ fn m0021_typed_function_parameter_records_function_and_named_type() {
 
     let malformed = parse_source(
         SourceFileId::from_raw(211),
-        "fun bad(signal Signal) { when (signal) { _ -> 0 } }",
+        "func bad(signal Signal) { when (signal) { _ -> 0 } }",
     );
     assert!(!malformed.diagnostics.is_empty());
     assert!(malformed.function_parameters.is_empty());
@@ -328,7 +355,7 @@ fn m0021_typed_function_parameter_records_function_and_named_type() {
 fn reports_malformed_type_and_generic_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(7),
-        "struct Bad<> {} fun wrong<T: Send, Share>(): T??; fun broken(): (T) ->;",
+        "struct Bad<> {} func wrong<T: Send, Share>(): T??; func broken(): (T) ->;",
     );
 
     let kinds: Vec<_> = output
@@ -348,7 +375,7 @@ fn reports_malformed_type_and_generic_syntax() {
 fn parses_adr0024_body_statements_and_expressions() {
     let output = parse_source(
         SourceFileId::from_raw(8),
-        "fun run(): Int { const answer: Int = compute(); var next = answer; next = next + 1; logger.info(next); return next; }",
+        "func run(): Int { const answer: Int = compute(); var next = answer; next = next + 1; logger.info(next); return next; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -370,7 +397,7 @@ fn parses_adr0024_body_statements_and_expressions() {
 fn m0028_records_executable_binary_operator_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(66),
-        "fun run() { a + b - c * d / e % f ** g << h >> i & j ^ k | l; }",
+        "func run() { a + b - c * d / e % f ** g << h >> i & j ^ k | l; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -398,7 +425,7 @@ fn m0028_records_executable_binary_operator_metadata() {
 fn m0028_parses_executable_unary_operators() {
     let output = parse_source(
         SourceFileId::from_raw(67),
-        "fun run() { const a = +value; const b = -value; const c = ~value; }",
+        "func run() { const a = +value; const b = -value; const c = ~value; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -417,7 +444,7 @@ fn m0028_parses_executable_unary_operators() {
 fn m0028_records_executable_unary_operator_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(69),
-        "fun run() { const a = +value; const b = -value; const c = ~value; }",
+        "func run() { const a = +value; const b = -value; const c = ~value; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -445,7 +472,7 @@ fn m0028_records_executable_unary_operator_metadata() {
 
 #[test]
 fn m0028_parses_exponentiation_right_associatively() {
-    let output = parse_source(SourceFileId::from_raw(68), "fun run() { a ** b ** c; }");
+    let output = parse_source(SourceFileId::from_raw(68), "func run() { a ** b ** c; }");
 
     assert!(output.lex_diagnostics.is_empty());
     assert!(output.diagnostics.is_empty());
@@ -454,7 +481,7 @@ fn m0028_parses_exponentiation_right_associatively() {
     let outer = output
         .binary_expressions
         .iter()
-        .find(|expression| expression.span.start() == 12)
+        .find(|expression| expression.span.start() == 13)
         .expect("outer exponent expression recorded");
     let inner = output
         .binary_expressions
@@ -469,7 +496,7 @@ fn m0028_parses_exponentiation_right_associatively() {
 #[test]
 fn records_simple_identifier_expression_name_references() {
     let file = SourceFileId::from_raw(20);
-    let source = "fun run() { const answer = compute(); answer; next + answer; }";
+    let source = "func run() { const answer = compute(); answer; next + answer; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -496,7 +523,7 @@ fn records_simple_identifier_expression_name_references() {
 #[test]
 fn records_literal_expression_metadata_for_type_checking() {
     let file = SourceFileId::from_raw(27);
-    let source = "fun run() { const a = true; const b = false; const c = 42; const d = \"ok\"; const e = null; }";
+    let source = "func run() { const a = true; const b = false; const c = 42; const d = \"ok\"; const e = null; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -535,7 +562,7 @@ fn records_literal_expression_metadata_for_type_checking() {
 
 #[test]
 fn records_float_and_unit_literal_metadata() {
-    let parsed = parse_source(SourceFileId::from_raw(93), "fun run() { 1.5; (); }");
+    let parsed = parse_source(SourceFileId::from_raw(93), "func run() { 1.5; (); }");
 
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -548,7 +575,7 @@ fn records_float_and_unit_literal_metadata() {
 fn m0028_records_integer_literal_values_without_truncation() {
     let output = parse_source(
         SourceFileId::from_raw(96),
-        "fun run() { const decimal = 1_000; const binary = 0b10_10; const hexadecimal = 0x7f; const minimumMagnitude = 9223372036854775808; const tooLarge = 18446744073709551616; }",
+        "func run() { const decimal = 1_000; const binary = 0b10_10; const hexadecimal = 0x7f; const minimumMagnitude = 9223372036854775808; const tooLarge = 18446744073709551616; }",
     );
     assert!(output.lex_diagnostics.is_empty());
     assert!(output.diagnostics.is_empty());
@@ -574,7 +601,7 @@ fn m0028_records_integer_literal_values_without_truncation() {
 fn literal_expression_metadata_excludes_non_literal_expressions() {
     let output = parse_source(
         SourceFileId::from_raw(28),
-        "fun run() { const item = compute(); const other = item; }",
+        "func run() { const item = compute(); const other = item; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -586,7 +613,7 @@ fn literal_expression_metadata_excludes_non_literal_expressions() {
 fn records_grouped_expression_metadata_for_type_checking() {
     let output = parse_source(
         SourceFileId::from_raw(31),
-        "fun run() { const answer = (42); const nested = ((answer)); }",
+        "func run() { const answer = (42); const nested = ((answer)); }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -620,7 +647,7 @@ fn records_grouped_expression_metadata_for_type_checking() {
 fn grouped_expression_metadata_excludes_malformed_groups() {
     let output = parse_source(
         SourceFileId::from_raw(32),
-        "fun run() { const broken = (42; const ok = (true); }",
+        "func run() { const broken = (42; const ok = (true); }",
     );
 
     assert!(
@@ -644,7 +671,7 @@ fn grouped_expression_metadata_excludes_malformed_groups() {
 fn name_reference_metadata_excludes_member_import_and_package_names() {
     let output = parse_source(
         SourceFileId::from_raw(21),
-        "package demo.core import demo.io fun run() { logger.info(value); }",
+        "package demo.core import demo.io func run() { logger.info(value); }",
     );
 
     assert!(output.diagnostics.is_empty());
@@ -660,7 +687,7 @@ fn name_reference_metadata_excludes_member_import_and_package_names() {
 #[test]
 fn records_named_type_reference_metadata() {
     let file = SourceFileId::from_raw(22);
-    let source = "fun run(): demo.Result<Box<Int?>> { const item: Box<Int> = make(); }";
+    let source = "func run(): demo.Result<Box<Int?>> { const item: Box<Int> = make(); }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -687,7 +714,7 @@ fn records_named_type_reference_metadata() {
 #[test]
 fn type_name_reference_metadata_records_grouped_and_function_types_in_order() {
     let file = SourceFileId::from_raw(23);
-    let output = parse_source(file, "fun run(): ((Input) -> Output)?;");
+    let output = parse_source(file, "func run(): ((Input) -> Output)?;");
 
     assert!(output.lex_diagnostics.is_empty());
     assert!(output.diagnostics.is_empty());
@@ -704,9 +731,9 @@ fn type_name_reference_metadata_records_grouped_and_function_types_in_order() {
 fn type_name_reference_metadata_excludes_package_import_expression_and_missing_types() {
     let output = parse_source(
         SourceFileId::from_raw(24),
-        "package demo.core import demo.io fun run() { value; }",
+        "package demo.core import demo.io func run() { value; }",
     );
-    let malformed = parse_source(SourceFileId::from_raw(25), "fun broken(): ;");
+    let malformed = parse_source(SourceFileId::from_raw(25), "func broken(): ;");
 
     let type_names: Vec<_> = output
         .type_name_references
@@ -727,7 +754,7 @@ fn type_name_reference_metadata_excludes_package_import_expression_and_missing_t
 #[test]
 fn records_local_immutable_and_var_binding_name_metadata() {
     let file = SourceFileId::from_raw(18);
-    let source = "fun run() { const answer: Int = compute(); var next = answer; }";
+    let source = "func run() { const answer: Int = compute(); var next = answer; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -756,7 +783,7 @@ fn records_local_immutable_and_var_binding_name_metadata() {
 fn parses_const_declarations_and_val_binding_names() {
     let output = parse_source(
         SourceFileId::from_raw(93),
-        "fun run() { val answer: Int = 1; const count: Int = 2; }",
+        "func run() { val answer: Int = 1; const count: Int = 2; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -776,7 +803,7 @@ fn parses_const_declarations_and_val_binding_names() {
 
 #[test]
 fn const_requires_a_compile_time_initializer() {
-    let source = "fun run() { const value = compute(); }";
+    let source = "func run() { const value = compute(); }";
     let output = parse_source(SourceFileId::from_raw(94), source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -786,7 +813,7 @@ fn const_requires_a_compile_time_initializer() {
 
 #[test]
 fn const_is_rejected_in_prior_identifier_positions_by_ordinary_parser_diagnostics() {
-    let source = "fun const();";
+    let source = "func const();";
     let output = parse_source(SourceFileId::from_raw(95), source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -800,14 +827,14 @@ fn const_is_rejected_in_prior_identifier_positions_by_ordinary_parser_diagnostic
     );
     assert_eq!(
         &source[output.diagnostics[0].span.start()..output.diagnostics[0].span.end()],
-        "fun"
+        "func"
     );
 }
 
 #[test]
 fn records_local_declaration_type_and_initializer_metadata() {
     let file = SourceFileId::from_raw(29);
-    let source = "fun run() { const answer: Int = 42; var next = answer; const pending: String; }";
+    let source = "func run() { const answer: Int = 42; var next = answer; const pending: String; }";
     let output = parse_source(file, source);
 
     assert!(output.lex_diagnostics.is_empty());
@@ -870,7 +897,7 @@ fn records_local_declaration_type_and_initializer_metadata() {
 fn local_declaration_metadata_excludes_malformed_and_other_statements() {
     let output = parse_source(
         SourceFileId::from_raw(30),
-        "fun run() { const : Int = value; value; return value; var ok: Int = 1; }",
+        "func run() { const : Int = value; value; return value; var ok: Int = 1; }",
     );
 
     assert_eq!(output.local_declarations.len(), 1);
@@ -890,7 +917,7 @@ fn local_declaration_metadata_excludes_malformed_and_other_statements() {
 fn local_binding_name_metadata_excludes_malformed_declarations() {
     let output = parse_source(
         SourceFileId::from_raw(19),
-        "fun broken() { const : Int = compute(); var ok = value; }",
+        "func broken() { const : Int = compute(); var ok = value; }",
     );
 
     assert_eq!(output.local_binding_names.len(), 1);
@@ -902,7 +929,7 @@ fn local_binding_name_metadata_excludes_malformed_declarations() {
 fn records_assignment_statement_metadata_for_type_checking() {
     let output = parse_source(
         SourceFileId::from_raw(33),
-        "fun run() { target = value; object.field = 1; }",
+        "func run() { target = value; object.field = 1; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -943,7 +970,7 @@ fn records_assignment_statement_metadata_for_type_checking() {
 fn assignment_statement_metadata_excludes_malformed_and_non_assignment_statements() {
     let output = parse_source(
         SourceFileId::from_raw(34),
-        "fun run() { broken = ; value; const local = 1; ok = true; }",
+        "func run() { broken = ; value; const local = 1; ok = true; }",
     );
 
     assert!(
@@ -972,7 +999,7 @@ fn assignment_statement_metadata_excludes_malformed_and_non_assignment_statement
 fn parses_trailing_expression_and_if_expression_body() {
     let output = parse_source(
         SourceFileId::from_raw(9),
-        "fun choose(): Int { const ready = check(); if (ready) { service.run(arg, 2); } else { fallback(); } }",
+        "func choose(): Int { const ready = check(); if (ready) { service.run(arg, 2); } else { fallback(); } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -990,7 +1017,7 @@ fn parses_trailing_expression_and_if_expression_body() {
 fn m0019_records_binary_expression_metadata_for_flow_inputs() {
     let output = parse_source(
         SourceFileId::from_raw(90),
-        "fun check() { const maybe: String? = null; if (maybe != null) { const definite = maybe; } }",
+        "func check() { const maybe: String? = null; if (maybe != null) { const definite = maybe; } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -1018,7 +1045,7 @@ fn m0019_records_binary_expression_metadata_for_flow_inputs() {
 fn m0019_records_if_expression_condition_and_branch_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(91),
-        "fun check() { if (null == maybe) { const fallback = \"missing\"; } else { const definite = maybe; } }",
+        "func check() { if (null == maybe) { const fallback = \"missing\"; } else { const definite = maybe; } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -1052,7 +1079,7 @@ fn m0019_records_if_expression_condition_and_branch_metadata() {
 fn m0019_records_if_expression_without_else_as_none() {
     let output = parse_source(
         SourceFileId::from_raw(92),
-        "fun check() { if (maybe != null) { const definite = maybe; } }",
+        "func check() { if (maybe != null) { const definite = maybe; } }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -1065,7 +1092,7 @@ fn m0019_records_if_expression_without_else_as_none() {
 fn reports_adr0024_body_diagnostics() {
     let output = parse_source(
         SourceFileId::from_raw(10),
-        "fun broken() { const : Int = compute(); target = ; return + ; service.(arg,); if ready { nope(); } }",
+        "func broken() { const : Int = compute(); target = ; return + ; service.(arg,); if ready { nope(); } }",
     );
 
     let kinds: Vec<_> = output
@@ -1092,7 +1119,7 @@ fn reports_adr0024_body_diagnostics() {
 fn rejects_deferred_body_forms() {
     let output = parse_source(
         SourceFileId::from_raw(11),
-        "fun deferred() { while (ready) { run(); } unsafe { run(); } when (value) { } items[0]; }",
+        "func deferred() { while (ready) { run(); } unsafe { run(); } when (value) { } items[0]; }",
     );
 
     let kinds: Vec<_> = output
@@ -1109,7 +1136,7 @@ fn rejects_deferred_body_forms() {
 fn m0024_unspecified_concurrency_forms_remain_blocked() {
     let output = parse_source(
         SourceFileId::from_raw(83),
-        "fun concurrent() { async { run(); } while (ready) { run(); } }",
+        "func concurrent() { async { run(); } while (ready) { run(); } }",
     );
 
     let kinds: Vec<_> = output
@@ -1125,7 +1152,7 @@ fn m0024_unspecified_concurrency_forms_remain_blocked() {
 
 #[test]
 fn records_top_level_function_declaration_name_metadata() {
-    let output = parse_source(SourceFileId::from_raw(12), "public fun main(): Int;");
+    let output = parse_source(SourceFileId::from_raw(12), "public func main(): Int;");
 
     assert!(output.diagnostics.is_empty());
     assert_eq!(output.declaration_names.len(), 1);
@@ -1133,8 +1160,8 @@ fn records_top_level_function_declaration_name_metadata() {
     let declaration = &output.declaration_names[0];
     assert_eq!(declaration.kind, DeclarationKind::Function);
     assert_eq!(declaration.name, "main");
-    assert_eq!(declaration.name_span.start(), 11);
-    assert_eq!(declaration.name_span.end(), 15);
+    assert_eq!(declaration.name_span.start(), 12);
+    assert_eq!(declaration.name_span.end(), 16);
     assert_eq!(
         output.arena.node(declaration.declaration).unwrap().kind,
         AstNodeKind::FunctionDeclaration
@@ -1169,7 +1196,7 @@ fn records_top_level_type_declaration_name_metadata() {
 fn declaration_name_metadata_excludes_nested_declarations_and_missing_names() {
     let nested = parse_source(
         SourceFileId::from_raw(14),
-        "struct Module { fun build(); enum State {} } fun ();",
+        "struct Module { func build(); enum State {} } func ();",
     );
 
     let names: Vec<_> = nested
@@ -1191,7 +1218,7 @@ fn declaration_name_metadata_excludes_nested_declarations_and_missing_names() {
 fn m0028_records_executable_function_return_and_call_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(100),
-        "fun helper(value: Int): Int { return value + 1; } fun main(): Int { return helper(1, 2 + 3); } fun external(): Int;",
+        "func helper(value: Int): Int { return value + 1; } func main(): Int { return helper(1, 2 + 3); } func external(): Int;",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -1247,7 +1274,7 @@ fn m0028_records_executable_function_return_and_call_metadata() {
 fn m0028_executable_metadata_excludes_malformed_function_and_call_records() {
     let output = parse_source(
         SourceFileId::from_raw(101),
-        "fun broken(: Int) { return; } fun run(): Int { return helper(,); }",
+        "func broken(: Int) { return; } func run(): Int { return helper(,); }",
     );
 
     assert!(output.diagnostics.iter().any(|diagnostic| {
@@ -1262,7 +1289,7 @@ fn m0028_executable_metadata_excludes_malformed_function_and_call_records() {
 fn m0028_records_return_statement_enclosing_blocks_in_source_order() {
     let output = parse_source(
         SourceFileId::from_raw(111),
-        "fun main(): Int { return 1; if (true) { return 2; }; return 3; }",
+        "func main(): Int { return 1; if (true) { return 2; }; return 3; }",
     );
 
     assert!(output.lex_diagnostics.is_empty());
@@ -1281,7 +1308,7 @@ fn m0028_records_return_statement_enclosing_blocks_in_source_order() {
 fn m0029_records_executable_body_statements_in_function_source_order() {
     let parsed = parse_source(
         SourceFileId::from_raw(202),
-        "fun run(): Int { const value: Int = 1; var next: Int = value; next = next + 1; return next; }",
+        "func run(): Int { const value: Int = 1; var next: Int = value; next = next + 1; return next; }",
     );
     assert!(parsed.diagnostics.is_empty());
 
@@ -1319,7 +1346,7 @@ fn m0029_records_executable_body_statements_in_function_source_order() {
 fn m0060_records_for_range_and_loop_controls() {
     let parsed = parse_source(
         SourceFileId::from_raw(203),
-        "fun run(): Int { for (index in 0..3) { continue; break; } return 0; }",
+        "func run(): Int { for (index in 0..3) { continue; break; } return 0; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1333,7 +1360,7 @@ fn m0060_records_for_range_and_loop_controls() {
 fn m0060_keeps_while_unsupported() {
     let parsed = parse_source(
         SourceFileId::from_raw(204),
-        "fun run(): Int { while (true) { return 1; } return 0; }",
+        "func run(): Int { while (true) { return 1; } return 0; }",
     );
 
     assert!(

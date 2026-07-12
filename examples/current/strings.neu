@@ -1,6 +1,6 @@
 package examples.current
 
-public fun main(): Int {
+public func main(): Int {
     val prefix: String = "Neu";
     val text: String = clone(prefix) + "!";
     val first: Byte = text[0];

@@ -756,7 +756,7 @@ extend interfaces. Structural conformance, multiple class inheritance, traits,
 mixins, nested classes, companion objects, and generic classes/interfaces are
 deferred.
 
-Classes may declare typed `val` or `var` fields and `fun` methods. Visibility is
+Classes may declare typed `val` or `var` fields and `func` methods. Visibility is
 `public`, `internal`, or `private` under ADR-0025; `protected` is deferred.
 Interfaces declare required methods. Default methods, interface state,
 extension methods, and operator overloading are deferred. Implementations must
@@ -880,7 +880,7 @@ allocation, initialization, and runtime object access are deferred to task-009.
 ## ADR-0070: Final-Only Runtime Dispatch
 
 Classes and methods are overridable by default. `final class` prevents
-subclassing, `final fun` prevents overriding, and `override fun` remains
+subclassing, `final func` prevents overriding, and `override func` remains
 required for inherited replacements. `open` is not accepted in declaration
 positions and is diagnosed rather than silently migrated. Interface methods and
 constructors cannot be `final` or `override`; private methods are non-virtual.
@@ -900,3 +900,14 @@ receivers must be flow-refined before dispatch under existing rules. Multiple
 class inheritance, default interface methods, reflection, dynamic loading,
 runtime type tests and downcasts, FFI tables, and new reference/move/lifetime
 syntax remain deferred.
+
+## ADR-0071: `func` Function Keyword
+
+`func` is the only accepted source keyword for top-level functions, class
+methods, and interface methods. It is reserved in identifier positions. The
+historical `fun` spelling is lexically recognized only to produce the
+source-mapped `ObsoleteFunctionKeyword` diagnostic; it is not a compatibility
+alias and never declares a function. This spelling change does not alter
+function typing, ownership, dispatch, constructors, ABI, symbols, or runtime
+behavior. Active examples and fixtures use `func`; historical ADR text retains
+its original wording as evidence.

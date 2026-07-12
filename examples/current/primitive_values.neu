@@ -1,6 +1,6 @@
 package examples.current
 
-public fun main(): Int {
+public func main(): Int {
     val ready: Bool = true;
     val ratio: Float = 3.75;
     val mask: Byte = 0xff;

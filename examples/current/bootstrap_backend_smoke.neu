@@ -1,5 +1,5 @@
 package examples.current
 
-public fun main(): Int {
+public func main(): Int {
     return 1 + 2 * 3;
 }

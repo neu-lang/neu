@@ -900,7 +900,7 @@ fn m0035_lowers_unit_direct_call_without_abi_result() {
 fn m0035_source_float_helper_call_reaches_object_emission() {
     let parsed = compiler::parser::parse_source(
         SourceFileId::from_raw(929),
-        "fun helper(): Float { return 1.5; } fun caller(): Float { return helper(); }",
+        "func helper(): Float { return 1.5; } func caller(): Float { return helper(); }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -955,7 +955,7 @@ fn m0035_source_float_helper_call_reaches_object_emission() {
 fn m0035_source_bool_unit_and_byte_helpers_reach_object_emission() {
     let parsed = compiler::parser::parse_source(
         SourceFileId::from_raw(930),
-        "fun flag(): Bool { return !false; } fun done(): Unit { return (); } fun locallyDone(): Unit { const value: Unit = (); return value; } fun octet(): Byte { return 255; }",
+        "func flag(): Bool { return !false; } func done(): Unit { return (); } func locallyDone(): Unit { const value: Unit = (); return value; } func octet(): Byte { return 255; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());

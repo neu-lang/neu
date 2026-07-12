@@ -82,11 +82,11 @@ fn compiles_primitive_parameter_and_return_matrix() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let source = r#"
-        public fun bool_identity(value: Bool): Bool { return value; }
-        public fun float_identity(value: Float): Float { return value; }
-        public fun byte_identity(value: Byte): Byte { return value; }
-        public fun unit_identity(value: Unit): Unit { return (); }
-        public fun main(): Int {
+        public func bool_identity(value: Bool): Bool { return value; }
+        public func float_identity(value: Float): Float { return value; }
+        public func byte_identity(value: Byte): Byte { return value; }
+        public func unit_identity(value: Unit): Unit { return (); }
+        public func main(): Int {
             bool_identity(true);
             float_identity(2.5);
             val byte: Byte = 7;
@@ -119,7 +119,7 @@ fn rejects_runtime_calls_in_const_initializers() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let error = compiler::driver::compile_source_to_executable(
-        "fun compute(): Int { return 1; } public fun main(): Int { const value = compute(); return 7; }",
+        "func compute(): Int { return 1; } public func main(): Int { const value = compute(); return 7; }",
         SourceDriverOptions::new(
             SourceFileId::from_raw(1003),
             ModuleName::parse("consts").unwrap(),
@@ -142,7 +142,7 @@ fn compiles_if_for_break_and_continue_to_host_executable() {
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
     let output = compile_source_to_executable(
-        "public fun main(): Int { for (index in 0..3) { if (index == 0) { continue; } else { if (index == 2) { break; } } } return 7; }",
+        "public func main(): Int { for (index in 0..3) { if (index == 0) { continue; } else { if (index == 2) { break; } } } return 7; }",
         SourceDriverOptions::new(
             SourceFileId::from_raw(1001),
             ModuleName::parse("control").unwrap(),
