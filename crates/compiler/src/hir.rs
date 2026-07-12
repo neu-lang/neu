@@ -200,10 +200,11 @@ pub fn lower_checked_hir_source(
                 .ok_or(HirLoweringError::MissingType)?;
             let span = source
                 .parsed
-                .arena
-                .node(loop_.statement)
-                .ok_or(HirLoweringError::UnsupportedExpression)?
-                .span;
+                .for_statements
+                .iter()
+                .find(|candidate| candidate.statement == loop_.statement)
+                .map(|candidate| candidate.span)
+                .unwrap_or(loop_.span);
             let local_id = HirLocalId::from_raw(locals.len());
             locals.push(HirLocal::new(local_id, span, ty, false));
             local_bindings.push((loop_.binding, local_id));
@@ -399,7 +400,7 @@ pub fn lower_checked_hir_source(
                     )
                 })
             {
-                let expression = source
+                let Some(expression) = source
                     .parsed
                     .call_expressions
                     .iter()
@@ -419,7 +420,9 @@ pub fn lower_checked_hir_source(
                             .find(|member| member.span.start() == statement.span.start())
                             .map(|member| member.expression)
                     })
-                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                else {
+                    continue;
+                };
                 lower_expression(
                     &source,
                     function.declaration,
@@ -497,12 +500,14 @@ fn lower_expression(
     local_bindings: &[(crate::ast::AstNodeId, HirLocalId)],
     output: &mut Vec<HirExpression>,
 ) -> Result<HirExpressionId, HirLoweringError> {
-    let ty = source
+    let Some(ty) = source
         .expression_types
         .iter()
         .find(|typed| typed.expression() == expression)
         .map(|typed| typed.ty())
-        .ok_or(HirLoweringError::MissingType)?;
+    else {
+        return Err(HirLoweringError::MissingType);
+    };
     let span = source
         .parsed
         .arena
@@ -1340,11 +1345,78 @@ fn method_declaration_index(
             })
             .and_then(|index| hir_function_index(source.parsed, index));
     }
-    let binding = source
+    if let Some(parameter) = source.parsed.function_parameters.iter().find(|parameter| {
+        parameter.function == function_declaration && parameter.name == receiver.name
+    }) {
+        let class_name = source
+            .parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == parameter.annotation)?
+            .name
+            .clone();
+        let class = source
+            .parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == class_name)?;
+        let declaration = if class.interface {
+            source
+                .class_types?
+                .classes()
+                .iter()
+                .find(|candidate| {
+                    !candidate.is_interface()
+                        && candidate
+                            .interfaces()
+                            .iter()
+                            .any(|name| name == &class.name)
+                })
+                .and_then(|candidate| {
+                    method_owner_declaration(source, candidate.name(), &member.name)
+                })?
+        } else {
+            source
+                .parsed
+                .function_declarations
+                .iter()
+                .find(|function| {
+                    function.owner == Some(class.declaration) && function.name == member.name
+                })?
+                .declaration
+        };
+        return source
+            .parsed
+            .function_declarations
+            .iter()
+            .position(|function| function.declaration == declaration)
+            .and_then(|index| hir_function_index(source.parsed, index));
+    }
+    let Some(binding) = source
         .parsed
         .local_binding_names
         .iter()
-        .find(|binding| binding.name == receiver.name)?;
+        .find(|binding| binding.name == receiver.name)
+    else {
+        let receiver_type = source
+            .expression_types
+            .iter()
+            .find(|typed| typed.expression() == member.receiver)
+            .map(|typed| typed.ty())?;
+        let class = source
+            .class_types?
+            .classes()
+            .iter()
+            .find(|class| class.type_id() == receiver_type)?;
+        return source
+            .parsed
+            .function_declarations
+            .iter()
+            .position(|function| {
+                function.owner == Some(class.declaration()) && function.name == member.name
+            })
+            .and_then(|index| hir_function_index(source.parsed, index));
+    };
     let declaration = source
         .parsed
         .local_declarations
@@ -1502,6 +1574,16 @@ fn receiver_class_name<'a>(
                 .find(|class| class.declaration == owner)?;
             return class.superclass.as_deref();
         }
+        if let Some(parameter) = source.parsed.function_parameters.iter().find(|parameter| {
+            parameter.function == function_declaration && parameter.name == name.name
+        }) {
+            return source
+                .parsed
+                .type_name_references
+                .iter()
+                .find(|reference| reference.reference == parameter.annotation)
+                .map(|reference| reference.name.as_str());
+        }
         let binding = source
             .parsed
             .local_binding_names
@@ -1520,46 +1602,61 @@ fn receiver_class_name<'a>(
             .find(|reference| reference.reference == annotation)
             .map(|reference| reference.name.as_str());
     }
-    source
-        .parsed
-        .new_expressions
+    let inferred = source
+        .expression_types
         .iter()
-        .find(|new_expression| new_expression.expression == receiver)
-        .map(|new_expression| new_expression.type_name.as_str())
-        .or_else(|| {
-            let index = source
-                .parsed
-                .index_expressions
-                .iter()
-                .find(|index| index.expression == receiver)?;
-            let name = source
-                .parsed
-                .name_references
-                .iter()
-                .find(|name| name.reference == index.array)?;
-            let binding = source
-                .parsed
-                .local_binding_names
-                .iter()
-                .find(|binding| binding.name == name.name)?;
-            let declaration = source
-                .parsed
-                .local_declarations
-                .iter()
-                .find(|declaration| declaration.declaration == binding.binding)?;
-            let annotation = declaration.annotation?;
-            let array = source
-                .parsed
-                .array_types
-                .iter()
-                .find(|array| array.array == annotation)?;
+        .find(|typed| typed.expression() == receiver)
+        .map(|typed| typed.ty())
+        .and_then(|receiver_type| {
             source
-                .parsed
-                .type_name_references
+                .class_types?
+                .classes()
                 .iter()
-                .find(|reference| reference.reference == array.element_type)
-                .map(|reference| reference.name.as_str())
+                .find(|class| class.type_id() == receiver_type)
         })
+        .map(|class| class.name());
+    inferred.or_else(|| {
+        source
+            .parsed
+            .new_expressions
+            .iter()
+            .find(|new_expression| new_expression.expression == receiver)
+            .map(|new_expression| new_expression.type_name.as_str())
+            .or_else(|| {
+                let index = source
+                    .parsed
+                    .index_expressions
+                    .iter()
+                    .find(|index| index.expression == receiver)?;
+                let name = source
+                    .parsed
+                    .name_references
+                    .iter()
+                    .find(|name| name.reference == index.array)?;
+                let binding = source
+                    .parsed
+                    .local_binding_names
+                    .iter()
+                    .find(|binding| binding.name == name.name)?;
+                let declaration = source
+                    .parsed
+                    .local_declarations
+                    .iter()
+                    .find(|declaration| declaration.declaration == binding.binding)?;
+                let annotation = declaration.annotation?;
+                let array = source
+                    .parsed
+                    .array_types
+                    .iter()
+                    .find(|array| array.array == annotation)?;
+                source
+                    .parsed
+                    .type_name_references
+                    .iter()
+                    .find(|reference| reference.reference == array.element_type)
+                    .map(|reference| reference.name.as_str())
+            })
+    })
 }
 
 fn dispatch_targets_for_classes(
@@ -1673,12 +1770,9 @@ fn lower_control_flow_block(
     local_bindings: &[(crate::ast::AstNodeId, HirLocalId)],
     expressions: &mut Vec<HirExpression>,
 ) -> Result<Vec<HirControlFlow>, HirLoweringError> {
-    let block_span = source
-        .parsed
-        .arena
-        .node(block)
-        .ok_or(HirLoweringError::UnsupportedExpression)?
-        .span;
+    let Some(block_span) = source.parsed.arena.node(block).map(|node| node.span) else {
+        return Err(HirLoweringError::UnsupportedExpression);
+    };
     let nested_bodies: Vec<_> = source
         .parsed
         .if_statements

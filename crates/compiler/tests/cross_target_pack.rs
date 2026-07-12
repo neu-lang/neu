@@ -143,3 +143,28 @@ fn links_class_object_through_the_x86_target_pack_without_execution() {
     assert_eq!(executable.format(), object::BinaryFormat::Elf);
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn links_virtual_dispatch_object_through_the_x86_target_pack_without_execution() {
+    let target = "x86_64-unknown-linux-gnu".parse::<Triple>().unwrap();
+    let root = std::env::temp_dir().join(format!("neu-cross-dispatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let output = root.join("program");
+    let executable = compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { val base: Base = new Child(); return invoke(base); }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(803),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            target,
+            target_pack_root(),
+            &output,
+        ),
+    )
+    .unwrap();
+    let executable_bytes = fs::read(executable).unwrap();
+    let executable = object::File::parse(executable_bytes.as_slice()).unwrap();
+    assert_eq!(executable.format(), object::BinaryFormat::Elf);
+    let _ = fs::remove_dir_all(root);
+}

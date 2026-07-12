@@ -1532,6 +1532,7 @@ pub struct ExecutableSourceTypes<'a> {
     parsed: &'a ParseOutput,
     signatures: &'a [FunctionSignature],
     expression_types: &'a [ExpressionType],
+    class_types: Option<&'a ClassTypeReport>,
 }
 
 impl<'a> ExecutableSourceTypes<'a> {
@@ -1546,7 +1547,13 @@ impl<'a> ExecutableSourceTypes<'a> {
             parsed,
             signatures,
             expression_types,
+            class_types: None,
         }
+    }
+
+    pub fn with_class_types(mut self, class_types: &'a ClassTypeReport) -> Self {
+        self.class_types = Some(class_types);
+        self
     }
 
     pub fn package(&self) -> &PackageNamespace {
@@ -1738,7 +1745,18 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 .any(|function| {
                     function.declaration == target.declaration && function.body.is_some()
                 });
-            if !has_body {
+            let interface_contract = member.is_some_and(|member| {
+                member_receiver_class_name(source, member.receiver, call.function)
+                    .and_then(|name| {
+                        source
+                            .class_types?
+                            .classes
+                            .iter()
+                            .find(|class| class.name == name)
+                    })
+                    .is_some_and(|class| class.interface)
+            });
+            if !has_body && !interface_contract {
                 report.diagnostics.push(DirectCallDiagnostic::new(
                     DirectCallDiagnosticKind::InvalidCallTarget,
                     diagnostic_span,
@@ -1912,24 +1930,65 @@ fn member_receiver_class_name(
         .name_references
         .iter()
         .find(|name| name.reference == receiver)?;
-    let binding = source
+    if let Some(parameter) =
+        source.parsed.function_parameters.iter().find(|parameter| {
+            parameter.function == function_declaration && parameter.name == name.name
+        })
+    {
+        return source
+            .parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == parameter.annotation)
+            .map(|reference| reference.name.clone());
+    }
+    let Some(binding) = source
         .parsed
         .local_binding_names
         .iter()
-        .find(|binding| binding.name == name.name)?;
+        .find(|binding| binding.name == name.name)
+    else {
+        return source
+            .expression_types
+            .iter()
+            .find(|typed| typed.expression == receiver)
+            .and_then(|typed| {
+                source
+                    .class_types?
+                    .classes
+                    .iter()
+                    .find(|class| class.type_id == typed.ty)
+            })
+            .map(|class| class.name.clone());
+    };
     let declaration = source
         .parsed
         .local_declarations
         .iter()
         .find(|declaration| declaration.declaration == binding.binding)?;
-    declaration.initializer.and_then(|initializer| {
+    let local_name = declaration.initializer.and_then(|initializer| {
         source
             .parsed
             .new_expressions
             .iter()
             .find(|expression| expression.expression == initializer)
             .map(|expression| expression.type_name.clone())
-    })
+    });
+    if local_name.is_some() {
+        return local_name;
+    }
+    source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression == receiver)
+        .and_then(|typed| {
+            source
+                .class_types?
+                .classes
+                .iter()
+                .find(|class| class.type_id == typed.ty)
+        })
+        .map(|class| class.name.clone())
 }
 
 pub fn apply_m0028_direct_call_results(

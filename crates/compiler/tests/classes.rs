@@ -487,6 +487,76 @@ fn default_overridable_method_dispatches_through_a_base_type() {
 }
 
 #[test]
+fn base_parameter_dispatches_to_the_most_derived_override() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-virtual-parameter-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 4; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { val child: Base = new Child(); return invoke(child); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6834),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(4)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn interface_parameter_dispatches_to_the_implementing_class() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-parameter-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "interface Answer { func answer(): Int; } class Point: Answer { func answer(): Int { return 6; } } func invoke(value: Answer): Int { return value.answer(); } public func main(): Int { val point: Answer = new Point(); return invoke(point); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6835),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(6)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn final_class_rejects_subclassing_and_open_is_a_diagnostic() {
+    let final_class = parse_source(
+        SourceFileId::from_raw(6836),
+        "final class Base {} class Child: Base() {}",
+    );
+    assert_eq!(
+        check_m0070_dispatch(&final_class)[0].kind(),
+        DispatchDiagnosticKind::FinalClassInheritance
+    );
+
+    let open_method = parse_source(
+        SourceFileId::from_raw(6837),
+        "class Base { open func value(): Int { return 1; } }",
+    );
+    assert!(!open_method.diagnostics.is_empty());
+}
+
+#[test]
 fn final_class_is_accepted_and_final_method_cannot_be_overridden() {
     let parsed = parse_source(
         SourceFileId::from_raw(6832),

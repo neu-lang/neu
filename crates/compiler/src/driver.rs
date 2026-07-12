@@ -193,7 +193,8 @@ pub fn compile_source_to_executable(
         &parsed,
         &signatures,
         report.expression_types(),
-    )]);
+    )
+    .with_class_types(&class_types)]);
     if !calls.diagnostics().is_empty() {
         return Err(DriverError::DirectCallDiagnostics(
             calls.diagnostics().to_vec(),

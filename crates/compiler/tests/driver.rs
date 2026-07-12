@@ -47,6 +47,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("class_methods", 9),
         ("interfaces", 11),
         ("virtual_dispatch", 13),
+        ("dispatch_parameters", 10),
         ("dynamic_arrays", 1),
         ("nominal_arrays", 4),
     ] {

@@ -1,0 +1,35 @@
+package examples.current
+
+interface Answer {
+    func answer(): Int;
+}
+
+class Base {
+    func value(): Int {
+        return 1;
+    }
+}
+
+class Derived: Base(), Answer {
+    override func value(): Int {
+        return 4;
+    }
+
+    func answer(): Int {
+        return 6;
+    }
+}
+
+func invoke(base: Base): Int {
+    return base.value();
+}
+
+func invoke_interface(value: Answer): Int {
+    return value.answer();
+}
+
+public func main(): Int {
+    val base: Base = new Derived();
+    val answer: Answer = new Derived();
+    return invoke(base) + invoke_interface(answer);
+}
