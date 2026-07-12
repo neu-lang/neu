@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted; payload-related deferrals are superseded by ADR-0081.
 
 ## Decision
 
@@ -43,3 +43,9 @@ layout is introduced.
 ## Dependencies
 
 ADR-0021, ADR-0027, ADR-0035, ADR-0055, ADR-0075, ADR-0078.
+
+## Supersession
+
+ADR-0081 supersedes the payload, payload-pattern, enum-function, and
+payload-ownership deferrals in this ADR. Its zero-payload identity and typed
+transport decisions remain in force.

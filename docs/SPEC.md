@@ -990,6 +990,22 @@ functions, inheritance, generic enums, reflection, serialization, and FFI are
 deferred. HIR, MIR, Cranelift, object emission, and linking preserve nominal
 enum and variant identity and source mappings without exposing layout.
 
+## ADR-0081: Payload-Bearing Enums And Enum Functions
+
+Enums may declare immutable payload fields in the header and variants must
+provide exact, left-to-right constructor arguments. Payload patterns bind one
+name per field, are scoped to their arm, and require exact arity. Existing
+ownership and reverse destruction rules apply. Instance `func` declarations
+inside an enum use an implicit non-consuming `this`; `static func` declarations
+are associated functions without a receiver. Enum functions are final and use
+the existing overload, effect, capability, and ABI rules.
+
+Payload and enum-function representations remain compiler-private tagged
+aggregates with semantic HIR/MIR/source mappings and no public layout or FFI
+contract. Generic enum behavior waits for the generic declaration and
+constraint decisions. Inheritance, reflection, serialization, dynamic
+loading, FFI, implicit conversions, and user allocation remain deferred.
+
 ## ADR-0080: Zero-Payload Enum `when` Patterns
 
 `when` supports qualified zero-payload enum variant patterns and `_`. The
