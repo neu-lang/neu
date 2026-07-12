@@ -5,6 +5,10 @@ The language is designed around Kotlin-like syntax and ergonomics, compile-time
 memory and thread safety, inferred ownership effects, structured concurrency,
 and a compiler implemented in Rust.
 
+> **Weekend-project disclaimer:** This project is largely vibe coded and began
+> as an attempt to make a boring weekend substantially less boring. Treat the
+> specification, compiler, and roadmap accordingly.
+
 The compiler currently uses a Cranelift backend and supports host-only system
 linking. It emits a host object and links it with `cc`; `NEU_LINKER` can override
 the linker command. Non-host targets are rejected explicitly. The repository
