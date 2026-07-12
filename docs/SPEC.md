@@ -1127,6 +1127,15 @@ assignment, ownership, nullability, capability, dispatch, cleanup, HIR, MIR,
 and ABI rules. Parameters, returns, fields, constructors, and public
 signatures remain explicitly typed.
 
+## ADR-0091: Optional Control-Header Parentheses
+
+`if`, `for`, and `when` headers may omit their surrounding parentheses while
+retaining the parenthesized forms. The opening body or arm brace terminates an
+unparenthesized header. Existing range and array iteration, `when` matching,
+grouping, multiline, optional-semicolon, ownership, cleanup, HIR, MIR, and
+backend behavior are unchanged; ambiguous or malformed headers remain
+diagnostics.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

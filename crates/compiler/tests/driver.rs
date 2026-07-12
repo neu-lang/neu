@@ -58,6 +58,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("enum_functions", 40),
         ("lambdas", 7),
         ("inferred_locals", 7),
+        ("optional_headers", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -278,6 +279,30 @@ fn inferred_var_keeps_its_type_for_reassignment() {
         SourceDriverOptions::new(
             SourceFileId::from_raw(9503),
             ModuleName::parse("inferred_var").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_unparenthesized_if_header() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-if-header-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "public func main(): Int { if true { val branch = 7; } else { val branch = 0; } return 7; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9600),
+            ModuleName::parse("optional_if").unwrap(),
             PackageNamespace::root(),
             Triple::host(),
             repo_root.join("target-packs"),

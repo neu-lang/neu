@@ -299,6 +299,25 @@ fn lambda_metadata_preserves_parameters_and_body() {
 }
 
 #[test]
+fn optional_control_header_parentheses_preserve_metadata() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(9100),
+        "enum Signal { Red, Blue } func run(): Int { return when Signal.Red { Signal.Red -> 1; _ -> 0; } }",
+    );
+    assert!(parsed.lex_diagnostics.is_empty());
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert_eq!(parsed.when_expressions.len(), 1);
+
+    let range = parse_source(
+        SourceFileId::from_raw(9101),
+        "func run(): Int { for index in 0..2 { continue; } return 0; }",
+    );
+    assert!(range.lex_diagnostics.is_empty());
+    assert!(range.diagnostics.is_empty(), "{:?}", range.diagnostics);
+    assert_eq!(range.for_statements.len(), 1);
+}
+
+#[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);
@@ -1239,7 +1258,7 @@ fn m0019_records_if_expression_without_else_as_none() {
 fn reports_adr0024_body_diagnostics() {
     let output = parse_source(
         SourceFileId::from_raw(10),
-        "func broken() { const : Int = compute(); target = ; return + ; service.(arg,); if ready { nope(); } }",
+        "func broken() { const : Int = compute(); target = ; return + ; service.(arg,); if { nope(); } }",
     );
 
     let kinds: Vec<_> = output

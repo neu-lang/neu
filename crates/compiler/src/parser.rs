@@ -1775,15 +1775,10 @@ impl<'source> Parser<'source> {
     fn parse_for_statement(&mut self) {
         let start = self.current().expect("for token exists").span.start();
         self.advance();
-        if self.current_kind() != Some(TokenKind::LeftParen) {
-            self.diagnostic_current_or_span(
-                DiagnosticKind::MalformedConditional,
-                self.span_at(start),
-            );
-            self.skip_to_statement_boundary();
-            return;
+        let parenthesized = self.current_kind() == Some(TokenKind::LeftParen);
+        if parenthesized {
+            self.advance();
         }
-        self.advance();
         let Some(binding_token) = self.current().cloned() else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
@@ -1836,7 +1831,7 @@ impl<'source> Parser<'source> {
             self.skip_to_statement_boundary();
             return;
         };
-        if self.current_kind() != Some(TokenKind::RightParen) {
+        if parenthesized && self.current_kind() != Some(TokenKind::RightParen) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
                 self.span_at(start),
@@ -1844,7 +1839,9 @@ impl<'source> Parser<'source> {
             self.skip_to_statement_boundary();
             return;
         }
-        self.advance();
+        if parenthesized {
+            self.advance();
+        }
         let Some(body_span) = self.parse_body_block() else {
             return;
         };
@@ -2765,7 +2762,11 @@ impl<'source> Parser<'source> {
     fn parse_if_expression(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
         self.advance();
-        if self.current_kind() != Some(TokenKind::LeftParen) {
+        let parenthesized = self.current_kind() == Some(TokenKind::LeftParen);
+        if parenthesized {
+            self.advance();
+        }
+        if self.current_kind() == Some(TokenKind::LeftBrace) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
                 self.span_at(start),
@@ -2773,7 +2774,6 @@ impl<'source> Parser<'source> {
             self.skip_to_expression_boundary();
             return None;
         }
-        self.advance();
         let Some(condition_span) = self.parse_expression() else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
@@ -2783,7 +2783,7 @@ impl<'source> Parser<'source> {
             return None;
         };
         let condition = self.latest_expression_node_for_span(condition_span);
-        if self.current_kind() != Some(TokenKind::RightParen) {
+        if parenthesized && self.current_kind() != Some(TokenKind::RightParen) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
                 self.span_at(start),
@@ -2791,7 +2791,17 @@ impl<'source> Parser<'source> {
             self.skip_to_expression_boundary();
             return None;
         }
-        self.advance();
+        if parenthesized {
+            self.advance();
+        }
+        if self.current_kind() != Some(TokenKind::LeftBrace) {
+            self.diagnostic_current_or_span(
+                DiagnosticKind::MalformedConditional,
+                self.span_at(start),
+            );
+            self.skip_to_expression_boundary();
+            return None;
+        }
         let then_block = self.parse_body_block()?;
         let then_block_node = self.latest_node_for_span(then_block, AstNodeKind::Block);
         let mut end = then_block.end();
@@ -2825,24 +2835,22 @@ impl<'source> Parser<'source> {
     fn parse_when_expression(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
         self.advance();
-        if self.current_kind() != Some(TokenKind::LeftParen) {
-            self.diagnostic_current_or_span(
-                DiagnosticKind::MalformedConditional,
-                self.span_at(start),
-            );
-            return None;
+        let parenthesized = self.current_kind() == Some(TokenKind::LeftParen);
+        if parenthesized {
+            self.advance();
         }
-        self.advance();
         let subject_span = self.parse_expression()?;
         let subject = self.latest_expression_node_for_span(subject_span)?;
-        if self.current_kind() != Some(TokenKind::RightParen) {
+        if parenthesized && self.current_kind() != Some(TokenKind::RightParen) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
                 self.span_at(start),
             );
             return None;
         }
-        self.advance();
+        if parenthesized {
+            self.advance();
+        }
         if self.current_kind() != Some(TokenKind::LeftBrace) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedConditional,
