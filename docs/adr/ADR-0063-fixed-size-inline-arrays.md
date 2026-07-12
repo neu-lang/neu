@@ -49,7 +49,7 @@ element places, bounds facts, source spans, and ownership-effect projections.
 MIR preserves aggregate construction, ordered initialization, local aggregate
 storage, indexed loads and stores, bounds checks, trap terminators, and source
 mapping. The backend lowers supported arrays as compiler-internal inline
-aggregates through the existing target-pack pipeline.
+aggregates through the existing host-linking pipeline.
 
 ## Deferrals
 
@@ -61,6 +61,6 @@ destructor execution, and coroutine-array interactions remain deferred.
 
 This ADR supersedes the array and indexing deferrals in ADR-0024 and ADR-0042
 for the accepted fixed-size subset. It refines the runtime-type boundary in
-ADR-0055 and the HIR, MIR, ABI, primitive, and target-pack contracts in
-ADR-0044 through ADR-0046 and ADR-0058. It uses named compile-time constants
+ADR-0055 and the HIR, MIR, ABI, primitive, and host-linking contracts in
+ADR-0044 through ADR-0046 and ADR-0100. It uses named compile-time constants
 from ADR-0061 and ownership projection facts from ADR-0062.

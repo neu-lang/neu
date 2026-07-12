@@ -9,8 +9,7 @@ use compiler::{
         check_constructor_calls, check_dispatch, class_lifecycle_facts, type_class_types,
     },
 };
-use std::{fs, path::PathBuf, process::Command};
-use target_lexicon::Triple;
+use std::{fs, process::Command};
 
 #[test]
 fn parses_class_interface_and_field_surface() {
@@ -114,7 +113,6 @@ fn preserves_explicit_superclass_constructor_arguments() {
 
 #[test]
 fn constructs_superclass_fields_before_derived_object_use() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-super-constructor-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -125,8 +123,6 @@ fn constructs_superclass_fields_before_derived_object_use() {
             SourceFileId::from_raw(6820),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -140,7 +136,6 @@ fn constructs_superclass_fields_before_derived_object_use() {
 
 #[test]
 fn supports_class_typed_function_parameters_and_returns() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-class-signature-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -151,8 +146,6 @@ fn supports_class_typed_function_parameters_and_returns() {
             SourceFileId::from_raw(6823),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -237,7 +230,6 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 
 #[test]
 fn invalid_class_source_stops_before_backend() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-class-boundary-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -247,8 +239,6 @@ fn invalid_class_source_stops_before_backend() {
             SourceFileId::from_raw(6808),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -258,8 +248,7 @@ fn invalid_class_source_stops_before_backend() {
 }
 
 #[test]
-fn constructs_a_minimal_owned_class_through_the_target_pack() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+fn constructs_a_minimal_owned_class_through_host_linking() {
     let workspace = std::env::temp_dir().join(format!("neu-class-smoke-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -269,8 +258,6 @@ fn constructs_a_minimal_owned_class_through_the_target_pack() {
             SourceFileId::from_raw(6809),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -284,7 +271,6 @@ fn constructs_a_minimal_owned_class_through_the_target_pack() {
 
 #[test]
 fn class_static_function_is_callable_through_class_name() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-static-class-function-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -297,8 +283,6 @@ fn class_static_function_is_callable_through_class_name() {
             SourceFileId::from_raw(6720),
             compiler::module::ModuleName::parse("classes").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -309,7 +293,6 @@ fn class_static_function_is_callable_through_class_name() {
 
 #[test]
 fn static_class_function_rejects_instance_receiver_access() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-static-class-invalid-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -322,8 +305,6 @@ fn static_class_function_rejects_instance_receiver_access() {
             SourceFileId::from_raw(6721),
             compiler::module::ModuleName::parse("classes").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -334,7 +315,6 @@ fn static_class_function_rejects_instance_receiver_access() {
 
 #[test]
 fn abstract_class_requires_concrete_completion_before_construction() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-abstract-class-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -346,8 +326,6 @@ fn abstract_class_requires_concrete_completion_before_construction() {
             SourceFileId::from_raw(6722),
             compiler::module::ModuleName::parse("classes").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -362,7 +340,6 @@ fn abstract_class_requires_concrete_completion_before_construction() {
 
 #[test]
 fn concrete_class_completes_abstract_function() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-abstract-class-valid-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -375,8 +352,6 @@ fn concrete_class_completes_abstract_function() {
             SourceFileId::from_raw(6723),
             compiler::module::ModuleName::parse("classes").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -387,7 +362,6 @@ fn concrete_class_completes_abstract_function() {
 
 #[test]
 fn dispatches_a_same_module_class_method() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-class-method-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -397,8 +371,6 @@ fn dispatches_a_same_module_class_method() {
             SourceFileId::from_raw(6810),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -412,7 +384,6 @@ fn dispatches_a_same_module_class_method() {
 
 #[test]
 fn mutates_a_var_field_and_rejects_val_field_writes() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-class-field-write-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -423,8 +394,6 @@ fn mutates_a_var_field_and_rejects_val_field_writes() {
             SourceFileId::from_raw(6811),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -445,8 +414,6 @@ fn mutates_a_var_field_and_rejects_val_field_writes() {
             SourceFileId::from_raw(6812),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             readonly.join("program"),
         ),
     )
@@ -457,7 +424,6 @@ fn mutates_a_var_field_and_rejects_val_field_writes() {
 
 #[test]
 fn dispatches_a_class_through_an_interface_type() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-interface-smoke-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -468,8 +434,6 @@ fn dispatches_a_class_through_an_interface_type() {
             SourceFileId::from_raw(6813),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -483,7 +447,6 @@ fn dispatches_a_class_through_an_interface_type() {
 
 #[test]
 fn accepts_derived_to_base_assignment() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-derived-base-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -493,8 +456,6 @@ fn accepts_derived_to_base_assignment() {
             SourceFileId::from_raw(6814),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -508,7 +469,6 @@ fn accepts_derived_to_base_assignment() {
 
 #[test]
 fn class_method_reads_its_implicit_this_receiver() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-method-this-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -518,8 +478,6 @@ fn class_method_reads_its_implicit_this_receiver() {
             SourceFileId::from_raw(6815),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -533,7 +491,6 @@ fn class_method_reads_its_implicit_this_receiver() {
 
 #[test]
 fn class_method_reads_a_bare_inherited_field() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-bare-field-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -543,8 +500,6 @@ fn class_method_reads_a_bare_inherited_field() {
             SourceFileId::from_raw(6824),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -567,7 +522,6 @@ fn open_method_declaration_is_rejected() {
 
 #[test]
 fn default_overridable_method_dispatches_through_a_base_type() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-virtual-dispatch-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -578,8 +532,6 @@ fn default_overridable_method_dispatches_through_a_base_type() {
             SourceFileId::from_raw(6831),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -593,7 +545,6 @@ fn default_overridable_method_dispatches_through_a_base_type() {
 
 #[test]
 fn base_parameter_dispatches_to_the_most_derived_override() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-virtual-parameter-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -604,8 +555,6 @@ fn base_parameter_dispatches_to_the_most_derived_override() {
             SourceFileId::from_raw(6834),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -619,7 +568,6 @@ fn base_parameter_dispatches_to_the_most_derived_override() {
 
 #[test]
 fn interface_parameter_dispatches_to_the_implementing_class() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-interface-parameter-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -630,8 +578,6 @@ fn interface_parameter_dispatches_to_the_implementing_class() {
             SourceFileId::from_raw(6835),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -645,7 +591,6 @@ fn interface_parameter_dispatches_to_the_implementing_class() {
 
 #[test]
 fn resolves_overloaded_methods_before_virtual_dispatch() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-method-overload-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -656,8 +601,6 @@ fn resolves_overloaded_methods_before_virtual_dispatch() {
             SourceFileId::from_raw(6838),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -671,7 +614,6 @@ fn resolves_overloaded_methods_before_virtual_dispatch() {
 
 #[test]
 fn resolves_overloaded_interface_methods_through_interface_dispatch() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-interface-overload-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -682,8 +624,6 @@ fn resolves_overloaded_interface_methods_through_interface_dispatch() {
             SourceFileId::from_raw(6839),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -730,7 +670,6 @@ fn final_class_is_accepted_and_final_method_cannot_be_overridden() {
 
 #[test]
 fn class_method_can_call_immediate_super_method() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-super-method-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -740,8 +679,6 @@ fn class_method_can_call_immediate_super_method() {
             SourceFileId::from_raw(6816),
             ModuleName::parse("classes").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            root.join("target-packs"),
             workspace.join("program"),
         ),
     )

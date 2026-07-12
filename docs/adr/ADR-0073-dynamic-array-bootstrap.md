@@ -24,7 +24,7 @@ trap at runtime; statically known invalid indices diagnose before lowering.
 
 Dynamic arrays are move-only compiler-managed values. The compiler owns their
 storage and exposes no capacity, pointer, allocator, deallocator, layout, FFI,
-or standard-library API. The initial target-pack representation is an opaque
+or standard-library API. The initial host-linking representation is an opaque
 pointer to a private length/capacity/data header. Initial capacity is private
 and growth is compiler-managed; reaching an unsupported target capability or
 allocation failure traps deterministically. Element destruction and full
@@ -40,10 +40,10 @@ ADR-0063 and ADR-0072.
 - `Array<T>` is a distinct structural runtime type keyed by its element type.
 - Dynamic array calls are compiler-recognized operations and do not use general
   method dispatch.
-- Primitive dynamic-array operations can reach host and target-pack lowering;
+- Primitive dynamic-array operations can reach host and host-linking lowering;
   richer element and ownership behavior is explicitly deferred.
 
 ## Dependencies
 
 ADR-0063, ADR-0072, ADR-0041, ADR-0055, ADR-0059, ADR-0062, ADR-0064, and the
-target-pack runtime contracts.
+host-linking runtime contracts.

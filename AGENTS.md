@@ -75,4 +75,4 @@ A task is complete only when its tests were created first, scope remains
 bounded, the brief source-of-truth review passes, and CI passes. Minimum CI for
 implementation changes is formatting, Clippy with warnings denied, workspace
 tests, relevant negative/diagnostic tests, compiler smoke tests, and
-cross-target smoke tests when target behavior changes.
+host-linking and explicit non-host rejection tests when target behavior changes.

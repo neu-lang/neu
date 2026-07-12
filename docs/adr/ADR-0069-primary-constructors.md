@@ -31,7 +31,7 @@ superclass state and previously initialized fields but may not publish `this`
 or read a later field.
 
 The first implementation supports primitive and already-supported owned values
-as fields only where the target-pack runtime contract can represent them. Class
+as fields only where the host-linking runtime contract can represent them. Class
 instances are move-only. Field reads borrow implicitly, field writes require
 exclusive ownership, and construction transfers argument ownership into owned
 fields. No user-visible allocation, deallocation, pointer, or layout API is
@@ -49,7 +49,7 @@ Parser and type checking must distinguish constructor declarations from normal
 functions and preserve parameter-to-field identity. HIR and MIR must preserve
 argument evaluation order, field initialization order, ownership transfers,
 and cleanup boundaries. Backend object storage remains compiler-private and
-target-pack supplied. Secondary constructors, default values, exceptions,
+host-linking supplied. Secondary constructors, default values, exceptions,
 reflection, and FFI remain deferred.
 
 ## Dependencies

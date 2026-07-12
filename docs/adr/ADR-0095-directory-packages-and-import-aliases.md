@@ -53,7 +53,7 @@ and source paths remain attached to diagnostics and intermediate source facts.
 The compiler constructs the complete package graph before name resolution,
 ownership analysis, HIR, MIR, object emission, or linking.
 
-Cross-package calls use the existing compiler-private symbol and target-pack
+Cross-package calls use the existing compiler-private symbol and host-linking
 contracts. No manifest, dependency download, package registry, precompiled
 artifact format, dynamic loading, re-export, wildcard import, or public ABI is
 introduced. Cyclic package dependencies are rejected rather than assigned

@@ -40,7 +40,7 @@ calls use `Color.method(...)`.
 
 Enum payloads and enum-function parameters/returns use the accepted internal
 ABI type set. HIR and MIR preserve enum, variant, field, receiver, payload,
-ownership, cleanup, and source-span facts. Cranelift and target packs may use a
+ownership, cleanup, and source-span facts. Cranelift and host linking may use a
 compiler-private tagged aggregate representation; tag width, field offsets,
 symbols, tables, and layout are not public ABI or FFI contracts. Separate
 compilation exchanges semantic metadata, not raw layout.

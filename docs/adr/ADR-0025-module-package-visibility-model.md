@@ -27,7 +27,7 @@ Source-root inferred modules are convenient for tools, but risk unstable identit
 
 The bootstrap frontend uses a small explicit module model. A module is identified by an explicit module name supplied by the compiler invocation or test harness. Packages are namespaces inside a module. Visibility categories are `public`, `internal`, and `private`, with omitted visibility defaulting to `internal`.
 
-This decision defines only the metadata required before name resolution. It does not define package manager behavior, manifest syntax, module dependencies, target-pack artifact compatibility, or name resolution.
+This decision defines only the metadata required before name resolution. It does not define package manager behavior, manifest syntax, module dependencies, host-linking artifact compatibility, or name resolution.
 
 ## Module Identity
 
@@ -157,7 +157,7 @@ This ADR does not define:
 - M0015 symbol interning depends on stable module and package identity.
 - M0016 name resolution depends on visibility category semantics.
 - M0021 sealed or algebraic data behavior may depend on module scope.
-- M0031 target packs need module artifact compatibility rules later.
+- M0031 needs module artifact compatibility rules later.
 
 ## Dependencies
 

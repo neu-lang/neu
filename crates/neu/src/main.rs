@@ -1,7 +1,8 @@
 use std::{path::PathBuf, process::ExitCode};
 
 use clap::{Args, Parser, Subcommand};
-use compiler::driver::compile_manifest_to_executable;
+use compiler::driver::compile_manifest_to_executable_for_target;
+use target_lexicon::Triple;
 
 #[derive(Debug, Parser)]
 #[command(name = "neu", version, about = "Neu compiler tooling")]
@@ -22,6 +23,8 @@ struct BuildArgs {
     project: Option<PathBuf>,
     #[arg(long, value_name = "PATH")]
     output: Option<PathBuf>,
+    #[arg(long, value_name = "TARGET")]
+    target: Option<String>,
 }
 
 fn main() -> ExitCode {
@@ -64,7 +67,13 @@ fn build(args: BuildArgs) -> Result<PathBuf, String> {
     if let Some(parent) = output.parent() {
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-    compile_manifest_to_executable(&manifest_path, &output).map_err(|error| format!("{error:?}"))
+    let target = args
+        .target
+        .map(|value| value.parse::<Triple>().map_err(|error| error.to_string()))
+        .transpose()?
+        .unwrap_or_else(Triple::host);
+    compile_manifest_to_executable_for_target(&manifest_path, target, &output)
+        .map_err(|error| format!("{error:?}"))
 }
 
 fn safe_executable_name(name: &str) -> String {

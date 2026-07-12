@@ -77,7 +77,7 @@ syntax, and public ABI changes remain deferred.
 
 This ADR supersedes only the value-producing conditional deferrals in
 ADR-0024, ADR-0045, ADR-0053, and ADR-0060. It preserves the existing statement
-conditional, flow-typing, ownership, loop, diagnostics, and target-pack rules.
+conditional, flow-typing, ownership, loop, diagnostics, and host-linking rules.
 
 ## Dependencies
 

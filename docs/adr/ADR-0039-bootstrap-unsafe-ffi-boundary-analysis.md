@@ -5,16 +5,16 @@ Status: Accepted
 ## Question
 
 What bootstrap unsafe and FFI boundary semantics are sufficient for M0026
-without defining unsafe source syntax, FFI declaration syntax, target packs,
+without defining unsafe source syntax, FFI declaration syntax, host linking,
 foreign binding generation, or ABI lowering?
 
 ## Competing Designs
 
 1. Define concrete unsafe and FFI source syntax now.
-2. Implement target-pack and ABI validation before unsafe/FFI checks.
+2. Implement host-linking and ABI validation before unsafe/FFI checks.
 3. Use metadata-only unsafe-context, unsafe-operation, and FFI-declaration
    records for M0026.
-4. Defer M0026 entirely until unsafe syntax and target packs exist.
+4. Defer M0026 entirely until unsafe syntax and host linking exist.
 
 ## Trade-offs
 
@@ -22,11 +22,11 @@ Concrete source syntax would make unsafe and FFI user-facing, but ADR-0024
 explicitly defers unsafe block syntax and the current grammar does not accept
 FFI declarations.
 
-Target-pack-first validation would improve ABI precision, but it would push
+Host-linking-first validation would improve ABI precision, but it would push
 backend and packaging milestones ahead of core safe-code boundary checks.
 
 Metadata-only records let M0026 validate the trust-boundary rules selected by
-ADR-0018 while keeping syntax, target packs, linking, and ABI lowering out of
+ADR-0018 while keeping syntax, host linking, linking, and ABI lowering out of
 scope.
 
 Full deferral avoids premature decisions, but leaves safe-code guarantees
@@ -103,7 +103,7 @@ ordinary safe code.
   syntax.
 - Later unsafe syntax must map into the same context and operation categories
   or supersede this ADR.
-- Later target-pack milestones must replace metadata-presence checks with
+- Later host-linking milestones must replace metadata-presence checks with
   target-specific validation.
 - Diagnostics can rely on stable identifiers
   `unsafe_operation_outside_context` and `missing_ffi_safety_metadata`.

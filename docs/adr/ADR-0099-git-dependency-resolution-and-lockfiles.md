@@ -27,7 +27,7 @@ change a locked build. Regeneration is an explicit resolver operation, and
 lockfiles are written atomically only after the complete graph succeeds.
 
 Offline resolution uses only cached repositories and locked commits; missing
-objects are errors. Cache identity is independent of target packs because
+objects are errors. Cache identity is independent of host linking because
 source resolution is target-neutral.
 
 No registry, archive, binary artifact, submodule, branch dependency, feature
@@ -37,4 +37,4 @@ solver, package manager, or automatic update command is introduced.
 
 This ADR depends on ADR-0097 and ADR-0095 and supplies the resolver boundary
 used by the project driver. It preserves manifest module identity, package
-qualifiers, visibility, target-pack, and raw-source contracts.
+qualifiers, visibility, host-linking, and raw-source contracts.

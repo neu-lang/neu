@@ -21,7 +21,7 @@ Indexed writes during iteration remain subject to existing `var`, ownership,
 and projection-overlap rules. Structural dynamic-array mutation during the
 iteration is rejected, so no iterator invalidation semantics are introduced.
 Nested arrays, accepted element types, parameters, returns, cleanup, source
-spans, and target-pack behavior retain their existing contracts. HIR and MIR
+spans, and host-linking behavior retain their existing contracts. HIR and MIR
 preserve the array target, fixed/dynamic identity, element projection, loop
 binding, cleanup, and back-edge facts rather than treating the operation as a
 plain integer range.

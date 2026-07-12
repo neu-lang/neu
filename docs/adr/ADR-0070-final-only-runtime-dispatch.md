@@ -19,7 +19,7 @@ dispatch for class and interface calls without exposing object or table ABI?
 
 The second design conflicts with the accepted Kotlin-like default hierarchy
 direction requested for Neu. Static-only resolution is unsound for virtual
-overrides and interface values. Public layouts would constrain target packs,
+overrides and interface values. Public layouts would constrain host linking,
 separate compilation, and future ownership representation. The first design
 preserves source ergonomics while keeping ABI details private.
 
@@ -86,12 +86,12 @@ stale, or incompatible metadata is a diagnostic rather than a linker guess.
 Nullable receivers must be flow-refined by the existing accepted rules before
 dispatch. No safe-call, force-unwrap, cast, downcast, or runtime type-test
 syntax is added by this ADR. A dispatch failure or invalid non-null receiver
-state traps according to the existing target-pack trap contract; ordinary valid
+state traps according to the existing host-linking trap contract; ordinary valid
 dispatch does not require a standard library or scheduler runtime.
 
-Target packs need no public dispatch API. They must support the existing
+Host linking needs no public dispatch API. They must support the existing
 compiler-private pointer/value ABI, executable object emission, and trap path.
-The compiler rejects a target pack that cannot represent the selected internal
+The compiler rejects a host runtime that cannot represent the selected internal
 dispatch operations before linking.
 
 Multiple class inheritance, default interface methods, reflection, dynamic

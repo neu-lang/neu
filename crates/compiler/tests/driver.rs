@@ -1,5 +1,7 @@
 use std::{fs, path::PathBuf, process::Command};
 
+use target_lexicon::Triple;
+
 use compiler::{
     driver::{
         SourceDriverOptions, compile_manifest_to_executable, compile_source_to_executable,
@@ -8,7 +10,6 @@ use compiler::{
     module::{ModuleName, PackageNamespace, VirtualSource},
     source::SourceFileId,
 };
-use target_lexicon::Triple;
 
 #[test]
 fn driver_validates_virtual_directory_project_before_compilation() {
@@ -27,7 +28,6 @@ fn driver_validates_virtual_directory_project_before_compilation() {
 
 #[test]
 fn compiles_virtual_directory_package_to_host_executable() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-package-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -52,8 +52,6 @@ fn compiles_virtual_directory_package_to_host_executable() {
             SourceFileId::from_raw(3000),
             ModuleName::parse("packages").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -90,6 +88,31 @@ fn compiles_a_neu_json_project_to_a_host_executable() {
 }
 
 #[test]
+fn rejects_non_host_targets_before_compilation() {
+    let non_host = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+        .into_iter()
+        .map(|target| target.parse::<Triple>().unwrap())
+        .find(|target| *target != Triple::host())
+        .expect("the test matrix must include a non-host target");
+    let output = std::env::temp_dir().join(format!("neu-non-host-{}", std::process::id()));
+    let error = compiler::driver::compile_source_to_executable(
+        "public func main(): Int { return 7; }",
+        SourceDriverOptions::for_target(
+            SourceFileId::from_raw(1004),
+            ModuleName::parse("non_host").unwrap(),
+            PackageNamespace::root(),
+            non_host.clone(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        compiler::driver::DriverError::HostOnlyTarget(non_host)
+    );
+}
+
+#[test]
 fn compiles_current_example_to_host_executable_with_exit_status_seven() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let source_path = repo_root.join("examples/current/bootstrap_backend_smoke.neu");
@@ -105,8 +128,6 @@ fn compiles_current_example_to_host_executable_with_exit_status_seven() {
             SourceFileId::from_raw(1000),
             ModuleName::parse("examples.current").unwrap(),
             PackageNamespace::parse("examples.current").unwrap(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -161,8 +182,6 @@ fn compiles_current_control_flow_and_primitive_examples() {
                 SourceFileId::from_raw(1002),
                 ModuleName::parse("examples.current").unwrap(),
                 PackageNamespace::parse("examples.current").unwrap(),
-                Triple::host(),
-                repo_root.join("target-packs"),
                 &executable,
             ),
         )
@@ -175,7 +194,6 @@ fn compiles_current_control_flow_and_primitive_examples() {
 
 #[test]
 fn compiles_primitive_parameter_and_return_matrix() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-primitive-matrix-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -201,8 +219,6 @@ fn compiles_primitive_parameter_and_return_matrix() {
             SourceFileId::from_raw(9300),
             compiler::module::ModuleName::parse("matrix").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -213,7 +229,6 @@ fn compiles_primitive_parameter_and_return_matrix() {
 
 #[test]
 fn compiles_and_runs_a_no_capture_lambda() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-lambda-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -233,8 +248,6 @@ fn compiles_and_runs_a_no_capture_lambda() {
             SourceFileId::from_raw(9400),
             ModuleName::parse("lambda").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -245,7 +258,6 @@ fn compiles_and_runs_a_no_capture_lambda() {
 
 #[test]
 fn compiles_and_runs_a_copy_capturing_lambda() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-capture-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -266,8 +278,6 @@ fn compiles_and_runs_a_copy_capturing_lambda() {
             SourceFileId::from_raw(9401),
             ModuleName::parse("capture").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -278,7 +288,6 @@ fn compiles_and_runs_a_copy_capturing_lambda() {
 
 #[test]
 fn compiles_and_runs_a_move_only_string_capturing_lambda() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-move-capture-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -300,8 +309,6 @@ fn compiles_and_runs_a_move_only_string_capturing_lambda() {
             SourceFileId::from_raw(9402),
             ModuleName::parse("move_capture").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -312,7 +319,6 @@ fn compiles_and_runs_a_move_only_string_capturing_lambda() {
 
 #[test]
 fn move_only_lambda_capture_consumes_source_binding() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-move-capture-invalid-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -331,8 +337,6 @@ fn move_only_lambda_capture_consumes_source_binding() {
             SourceFileId::from_raw(9403),
             ModuleName::parse("move_capture_invalid").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -343,7 +347,6 @@ fn move_only_lambda_capture_consumes_source_binding() {
 
 #[test]
 fn stores_returns_and_applies_named_function_value() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-function-value-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -363,8 +366,6 @@ fn stores_returns_and_applies_named_function_value() {
             SourceFileId::from_raw(9404),
             ModuleName::parse("function_values").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -375,7 +376,6 @@ fn stores_returns_and_applies_named_function_value() {
 
 #[test]
 fn compiles_and_runs_an_inferred_primitive_local() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-inferred-local-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -392,8 +392,6 @@ fn compiles_and_runs_an_inferred_primitive_local() {
             SourceFileId::from_raw(9500),
             ModuleName::parse("inferred").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -404,7 +402,6 @@ fn compiles_and_runs_an_inferred_primitive_local() {
 
 #[test]
 fn inferred_class_local_keeps_concrete_dispatch_type() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-inferred-class-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -424,8 +421,6 @@ fn inferred_class_local_keeps_concrete_dispatch_type() {
             SourceFileId::from_raw(9501),
             ModuleName::parse("inferred_class").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -443,8 +438,6 @@ fn bare_null_local_inference_is_rejected() {
             SourceFileId::from_raw(9502),
             ModuleName::parse("inferred_null").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target-packs"),
             std::env::temp_dir().join("neu-inferred-null-program"),
         ),
     );
@@ -453,7 +446,6 @@ fn bare_null_local_inference_is_rejected() {
 
 #[test]
 fn inferred_var_keeps_its_type_for_reassignment() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-inferred-var-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -465,8 +457,6 @@ fn inferred_var_keeps_its_type_for_reassignment() {
             SourceFileId::from_raw(9503),
             ModuleName::parse("inferred_var").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -477,7 +467,6 @@ fn inferred_var_keeps_its_type_for_reassignment() {
 
 #[test]
 fn compiles_unparenthesized_if_header() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-if-header-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -489,8 +478,6 @@ fn compiles_unparenthesized_if_header() {
             SourceFileId::from_raw(9600),
             ModuleName::parse("optional_if").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -501,7 +488,6 @@ fn compiles_unparenthesized_if_header() {
 
 #[test]
 fn compiles_zero_payload_enum_values_through_typed_parameters_and_returns() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-enum-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -521,8 +507,6 @@ fn compiles_zero_payload_enum_values_through_typed_parameters_and_returns() {
             SourceFileId::from_raw(7900),
             ModuleName::parse("enum_values").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -533,7 +517,6 @@ fn compiles_zero_payload_enum_values_through_typed_parameters_and_returns() {
 
 #[test]
 fn compiles_enum_when_statement_and_expression_forms() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-enum-when-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -566,8 +549,6 @@ fn compiles_enum_when_statement_and_expression_forms() {
             SourceFileId::from_raw(8000),
             ModuleName::parse("enum_when").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -578,7 +559,6 @@ fn compiles_enum_when_statement_and_expression_forms() {
 
 #[test]
 fn compiles_payload_enum_construction_and_when_extraction() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-enum-payload-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -604,8 +584,6 @@ fn compiles_payload_enum_construction_and_when_extraction() {
             SourceFileId::from_raw(8100),
             ModuleName::parse("enum_payload").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -616,7 +594,6 @@ fn compiles_payload_enum_construction_and_when_extraction() {
 
 #[test]
 fn compiles_enum_instance_and_associated_functions() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-enum-functions-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -638,8 +615,6 @@ fn compiles_enum_instance_and_associated_functions() {
             SourceFileId::from_raw(8110),
             ModuleName::parse("enum_functions").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -650,7 +625,6 @@ fn compiles_enum_instance_and_associated_functions() {
 
 #[test]
 fn resolves_exact_top_level_overloads_end_to_end() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-overload-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -667,8 +641,6 @@ fn resolves_exact_top_level_overloads_end_to_end() {
             SourceFileId::from_raw(7600),
             ModuleName::parse("overloads").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -679,7 +651,6 @@ fn resolves_exact_top_level_overloads_end_to_end() {
 
 #[test]
 fn rejects_ambiguous_and_missing_overloads_before_lowering() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (source, expected) in [
         (
             "func select(value: Int): Int { return 1; } public func main(): Int { return select(true); }",
@@ -704,8 +675,6 @@ fn rejects_ambiguous_and_missing_overloads_before_lowering() {
                 SourceFileId::from_raw(7601),
                 ModuleName::parse("overloads").unwrap(),
                 PackageNamespace::root(),
-                Triple::host(),
-                repo_root.join("target-packs"),
                 workspace.join("program"),
             ),
         )
@@ -717,7 +686,6 @@ fn rejects_ambiguous_and_missing_overloads_before_lowering() {
 
 #[test]
 fn compiles_value_producing_conditional_expression() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-if-value-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -728,8 +696,6 @@ fn compiles_value_producing_conditional_expression() {
             SourceFileId::from_raw(7700),
             ModuleName::parse("conditionals").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -740,7 +706,6 @@ fn compiles_value_producing_conditional_expression() {
 
 #[test]
 fn value_conditionals_short_circuit_and_nest() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-if-value-nested-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -752,8 +717,6 @@ fn value_conditionals_short_circuit_and_nest() {
             SourceFileId::from_raw(7701),
             ModuleName::parse("conditionals").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             workspace.join("program"),
         ),
     )
@@ -764,7 +727,6 @@ fn value_conditionals_short_circuit_and_nest() {
 
 #[test]
 fn rejects_invalid_value_conditional_forms() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     for (source, expected) in [
         (
             "public func main(): Int { val result: Int = if (1) { 1; } else { 2; }; return result; }",
@@ -789,8 +751,6 @@ fn rejects_invalid_value_conditional_forms() {
                 SourceFileId::from_raw(7702),
                 ModuleName::parse("conditionals").unwrap(),
                 PackageNamespace::root(),
-                Triple::host(),
-                repo_root.join("target-packs"),
                 workspace.join("program"),
             ),
         )
@@ -802,7 +762,6 @@ fn rejects_invalid_value_conditional_forms() {
 
 #[test]
 fn rejects_runtime_calls_in_const_initializers() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-const-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -813,8 +772,6 @@ fn rejects_runtime_calls_in_const_initializers() {
             SourceFileId::from_raw(1003),
             ModuleName::parse("consts").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -825,7 +782,6 @@ fn rejects_runtime_calls_in_const_initializers() {
 
 #[test]
 fn compiles_if_for_break_and_continue_to_host_executable() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-control-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -836,8 +792,6 @@ fn compiles_if_for_break_and_continue_to_host_executable() {
             SourceFileId::from_raw(1001),
             ModuleName::parse("control").unwrap(),
             PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )

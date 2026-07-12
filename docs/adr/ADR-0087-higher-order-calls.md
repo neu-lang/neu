@@ -17,7 +17,7 @@ MIR, and Cranelift. Their inferred ownership/effect contract applies at the
 indirect call site. Function values are copyable, `Send`, and `Share` under
 ADR-0086. Return ownership is the referenced function's declared contract.
 
-Indirect calls use compiler-private target-pack signatures and function
+Indirect calls use compiler-private host-linking signatures and function
 addresses. No public pointer, stable function layout, FFI representation,
 reflection, closure capture, or callback crossing an unapproved boundary is
 introduced. Generic function values require explicit specialization arguments

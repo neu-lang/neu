@@ -11,7 +11,7 @@ layout promise?
 ## Competing Designs
 
 1. Compiler-managed move-only objects with required primary construction,
-   opaque target-pack layout, and deterministic destruction.
+   opaque host-linking layout, and deterministic destruction.
 2. Inline value objects with copying and no allocation.
 3. Traced heap objects with automatic reclamation.
 4. Public C-compatible object layout and allocator ABI.
@@ -32,9 +32,9 @@ constructor contract; construction order and superclass chaining must be
 explicit in source once constructor syntax is implemented.
 
 An object is a compiler-managed owned value. The compiler may place an object
-in a local or target-pack-managed heap storage according to escape and ABI
+in a local or host-linking-managed heap storage according to escape and ABI
 needs, but source code cannot observe or request placement. The first runtime
-implementation uses target-pack allocation artifacts for escaping or required
+implementation uses host-linking allocation artifacts for escaping or required
 heap objects. No `free`, allocator primitive, stable pointer, or user-visible
 deallocation API exists.
 
@@ -59,7 +59,7 @@ reference syntax is introduced; non-owning cycle support is deferred.
 
 Object and interface layout, field offsets, alignment, padding, vtable and
 interface-table representation, and allocation headers are compiler-private
-target-pack contracts. They may vary by target, compiler version, and module
+host-linking contracts. They may vary by target, compiler version, and module
 boundary. Separate compilation exchanges nominal identities, field types,
 visibility, lifecycle requirements, capabilities, and ownership-effect
 metadata, never raw offsets or stable layout. FFI and public object ABI are
@@ -82,7 +82,7 @@ construction and cleanup diagnostics preserve field or constructor spans.
 ## Consequences
 
 HIR and MIR must preserve field declaration order, initialization state,
-ownership transitions, cleanup boundaries, and source mappings. Target packs
+ownership transitions, cleanup boundaries, and source mappings. Host linking
 must provide compiler-only allocation/deallocation artifacts for executable
 class programs. No standard library, public allocator, stable layout, or FFI
 support is implied.

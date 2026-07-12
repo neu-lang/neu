@@ -6,7 +6,7 @@ use std::{
 use target_lexicon::Triple;
 
 use crate::{
-    backend::{CraneliftLoweringError, emit_mir_module_to_object_for_target},
+    backend::{CraneliftLoweringError, emit_mir_module_to_object},
     hir::{CheckedHirSource, HirLoweringError, lower_checked_hir_source},
     linker::{LinkInvocationError, SystemLinkInvocation},
     mir::{MirLoweringError, lower_hir_to_mir},
@@ -23,7 +23,6 @@ use crate::{
     ownership_effects::infer_source_parameter_effects,
     parser,
     source::SourceFileId,
-    target_pack::TargetPackRegistryError,
     type_check::{
         ConstructorDiagnostic, DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic,
         ExecutableSourceTypes, ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
@@ -50,7 +49,6 @@ pub struct SourceDriverOptions {
     module: ModuleName,
     package: PackageNamespace,
     target: Triple,
-    target_packs: PathBuf,
     output: PathBuf,
 }
 
@@ -59,8 +57,16 @@ impl SourceDriverOptions {
         source_file: SourceFileId,
         module: ModuleName,
         package: PackageNamespace,
+        output: impl Into<PathBuf>,
+    ) -> Self {
+        Self::for_target(source_file, module, package, Triple::host(), output)
+    }
+
+    pub fn for_target(
+        source_file: SourceFileId,
+        module: ModuleName,
+        package: PackageNamespace,
         target: Triple,
-        target_packs: impl Into<PathBuf>,
         output: impl Into<PathBuf>,
     ) -> Self {
         Self {
@@ -68,7 +74,6 @@ impl SourceDriverOptions {
             module,
             package,
             target,
-            target_packs: target_packs.into(),
             output: output.into(),
         }
     }
@@ -87,10 +92,6 @@ impl SourceDriverOptions {
 
     pub fn target(&self) -> Triple {
         self.target.clone()
-    }
-
-    pub fn target_packs(&self) -> &Path {
-        &self.target_packs
     }
 
     pub fn output(&self) -> &Path {
@@ -117,7 +118,6 @@ pub enum DriverError {
     Hir(HirLoweringError),
     Mir(MirLoweringError),
     Backend(CraneliftLoweringError),
-    TargetPack(TargetPackRegistryError),
     HostOnlyTarget(Triple),
     Link(LinkInvocationError),
     PackageGraph(Vec<PackageGraphDiagnostic>),
@@ -143,6 +143,14 @@ pub fn compile_manifest_to_executable(
     manifest_path: impl AsRef<std::path::Path>,
     output: impl Into<PathBuf>,
 ) -> Result<PathBuf, DriverError> {
+    compile_manifest_to_executable_for_target(manifest_path, Triple::host(), output)
+}
+
+pub fn compile_manifest_to_executable_for_target(
+    manifest_path: impl AsRef<std::path::Path>,
+    target: Triple,
+    output: impl Into<PathBuf>,
+) -> Result<PathBuf, DriverError> {
     let manifest_path = manifest_path.as_ref();
     let resolver = crate::dependency::GitDependencyResolver::from_environment()
         .map_err(DriverError::Dependency)?;
@@ -165,12 +173,11 @@ pub fn compile_manifest_to_executable(
         ModuleName::parse(manifest.name()).expect("manifest name was validated while loading");
     compile_virtual_project_to_executable(
         &graph,
-        SourceDriverOptions::new(
+        SourceDriverOptions::for_target(
             entry_file.id,
             module,
             PackageNamespace::root(),
-            Triple::host(),
-            PathBuf::new(),
+            target,
             output,
         ),
     )
@@ -526,8 +533,7 @@ pub fn compile_source_to_executable(
     )
     .map_err(DriverError::Hir)?;
     let mir = lower_hir_to_mir(&hir, &types).map_err(DriverError::Mir)?;
-    let object = emit_mir_module_to_object_for_target(&mir, &types, "main", target)
-        .map_err(DriverError::Backend)?;
+    let object = emit_mir_module_to_object(&mir, &types, "main").map_err(DriverError::Backend)?;
 
     let object_path = PathBuf::from(format!("{}.o", options.output().display()));
     fs::write(&object_path, object).map_err(|_| DriverError::Io {

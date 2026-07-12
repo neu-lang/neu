@@ -19,7 +19,7 @@ suffixes.
 
 This ADR changes source spelling and parser recovery only. Fixed-array literal,
 indexing, mutation, ownership, cleanup, inline representation, same-module
-parameter/return, backend, target-pack, and deferred dynamic-array contracts
+parameter/return, backend, host-linking, and deferred dynamic-array contracts
 remain those accepted by ADR-0063. Dynamic arrays remain distinct and are not
 introduced by `T[]` in this decision.
 

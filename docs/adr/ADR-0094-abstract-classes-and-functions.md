@@ -29,7 +29,7 @@ static functions under ADR-0093, but abstract static functions are not allowed.
 
 HIR and MIR retain abstract method identity, completion targets, receiver
 effects, source spans, and dispatch metadata for validation; only concrete
-implementations are emitted. The private value/object ABI, target packs,
+implementations are emitted. The private value/object ABI, host linking,
 object format, linking, and runtime ownership model are unchanged. No public
 abstract-object, vtable, reflection, dynamic-loading, or FFI ABI is defined.
 

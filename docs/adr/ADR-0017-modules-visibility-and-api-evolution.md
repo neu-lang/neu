@@ -29,7 +29,7 @@ Modules as explicit compilation and visibility units, containing packages/namesp
 
 - Public/private/internal visibility must be specified.
 - Sealed types, extension methods, and protocol conformance need module-scoped rules.
-- Cross-compilation target packs must define module artifact compatibility.
+- Cross-compilation host linking must define module artifact compatibility.
 
 ## Dependencies
 

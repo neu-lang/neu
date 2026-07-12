@@ -1,11 +1,10 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, process::Command};
 
 use compiler::{
     driver::{SourceDriverOptions, compile_source_to_executable},
     parser::parse_source,
     source::SourceFileId,
 };
-use target_lexicon::Triple;
 
 #[test]
 fn parses_fixed_array_types_literals_and_indexing() {
@@ -40,7 +39,6 @@ fn accepts_named_const_array_length_and_nested_arrays() {
 
 #[test]
 fn compiles_and_runs_fixed_array_program() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-array-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -52,8 +50,6 @@ fn compiles_and_runs_fixed_array_program() {
             SourceFileId::from_raw(6302),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -64,7 +60,6 @@ fn compiles_and_runs_fixed_array_program() {
 
 #[test]
 fn iterates_fixed_array_elements_in_order() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-array-iteration-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -77,8 +72,6 @@ fn iterates_fixed_array_elements_in_order() {
             SourceFileId::from_raw(6315),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -89,7 +82,6 @@ fn iterates_fixed_array_elements_in_order() {
 
 #[test]
 fn iterates_dynamic_array_elements() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!(
         "neu-dynamic-array-iteration-{}",
         std::process::id()
@@ -104,8 +96,6 @@ fn iterates_dynamic_array_elements() {
             SourceFileId::from_raw(6316),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -116,7 +106,6 @@ fn iterates_dynamic_array_elements() {
 
 #[test]
 fn rejects_dynamic_array_structural_mutation_during_iteration() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!(
         "neu-array-iteration-negative-{}",
         std::process::id()
@@ -131,8 +120,6 @@ fn rejects_dynamic_array_structural_mutation_during_iteration() {
             SourceFileId::from_raw(6317),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -143,7 +130,6 @@ fn rejects_dynamic_array_structural_mutation_during_iteration() {
 
 #[test]
 fn rejects_array_length_and_immutable_index_mutation() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-array-negative-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -156,8 +142,6 @@ fn rejects_array_length_and_immutable_index_mutation() {
             SourceFileId::from_raw(6303),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -170,7 +154,6 @@ fn rejects_array_length_and_immutable_index_mutation() {
 
 #[test]
 fn dynamic_out_of_bounds_index_traps() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-array-trap-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -182,8 +165,6 @@ fn dynamic_out_of_bounds_index_traps() {
             SourceFileId::from_raw(6304),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -194,7 +175,6 @@ fn dynamic_out_of_bounds_index_traps() {
 
 #[test]
 fn compiles_fixed_array_parameters_and_returns() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-array-abi-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -215,8 +195,6 @@ fn compiles_fixed_array_parameters_and_returns() {
             SourceFileId::from_raw(6305),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -227,7 +205,6 @@ fn compiles_fixed_array_parameters_and_returns() {
 
 #[test]
 fn compiles_empty_dynamic_array_and_reads_size() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-dynamic-array-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -240,8 +217,6 @@ fn compiles_empty_dynamic_array_and_reads_size() {
             SourceFileId::from_raw(6307),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -252,7 +227,6 @@ fn compiles_empty_dynamic_array_and_reads_size() {
 
 #[test]
 fn appends_and_removes_dynamic_array_elements() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-dynamic-array-mutate-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -265,8 +239,6 @@ fn appends_and_removes_dynamic_array_elements() {
             SourceFileId::from_raw(6310),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -277,7 +249,6 @@ fn appends_and_removes_dynamic_array_elements() {
 
 #[test]
 fn compiles_fixed_arrays_with_nominal_elements_and_field_access() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-nominal-array-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -289,8 +260,6 @@ fn compiles_fixed_arrays_with_nominal_elements_and_field_access() {
             SourceFileId::from_raw(6312),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -301,7 +270,6 @@ fn compiles_fixed_arrays_with_nominal_elements_and_field_access() {
 
 #[test]
 fn compiles_fixed_arrays_with_interface_elements() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-interface-array-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -314,8 +282,6 @@ fn compiles_fixed_arrays_with_interface_elements() {
             SourceFileId::from_raw(6313),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )
@@ -326,7 +292,6 @@ fn compiles_fixed_arrays_with_interface_elements() {
 
 #[test]
 fn passes_dynamic_arrays_through_parameters_and_returns() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace =
         std::env::temp_dir().join(format!("neu-dynamic-array-abi-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
@@ -339,8 +304,6 @@ fn passes_dynamic_arrays_through_parameters_and_returns() {
             SourceFileId::from_raw(6314),
             compiler::module::ModuleName::parse("arrays").unwrap(),
             compiler::module::PackageNamespace::root(),
-            Triple::host(),
-            repo_root.join("target-packs"),
             &executable,
         ),
     )

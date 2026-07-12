@@ -108,9 +108,10 @@ deferred until the core language proves insufficient.
 
 ## ADR-0020: Portability, Targets, And Platform Semantics
 
-The language provides Go-like bundled target packs with explicit target triples,
-standard layout rules, platform capability declarations, and no hidden host
-dependency for ordinary builds.
+The initial implementation is host-only. It emits a Cranelift object for the
+host triple and links it with the host system linker. Non-host targets are
+explicitly rejected. Cross compilation, bundled linkers, and target-specific
+startup artifacts require a future accepted portability and ABI decision.
 
 ## ADR-0021: Lexical Grammar
 
@@ -493,7 +494,7 @@ library calls, scheduler/runtime work, exceptions or panics as language
 constructs, closures, methods, and general member access remain deferred.
 Fixed-size inline arrays are accepted only as defined by ADR-0063. Owned UTF-8
 strings are accepted only as defined by ADR-0064. Dynamic arrays, slices, and
-target-pack APIs remain deferred. Unsupported parsed forms must fail before
+cross-target APIs remain deferred. Unsupported parsed forms must fail before
 backend lowering with
 `unsupported_executable_form` or a more specific existing diagnostic. M0028
 must add parser and type-checker support for executable operators not already
@@ -620,7 +621,7 @@ a later cleanup insertion boundary without inventing cleanup semantics.
 ## ADR-0046: Bootstrap ABI And Calling Convention
 
 The bootstrap backend assumes the current host target for the initial smoke.
-Cross-target behavior is deferred to M0033. `Int` lowers to a signed 64-bit
+Non-host targets are rejected before lowering. `Int` lowers to a signed 64-bit
 integer value. Unsupported runtime types must not reach ABI lowering.
 
 Bootstrap language functions use an internal Neu calling convention that may be
@@ -635,21 +636,13 @@ must arrange a bootstrap executable entry path that calls language `main`.
 ## ADR-0047: Bootstrap Object Link Runtime Model
 
 The first object/link pipeline targets the current host object's native format
-only. Cross-object formats and target packs are deferred to M0033.
+only. Non-host object formats and cross compilation are deferred.
 
-The first runnable program requires no Neu standard library. It may use a tiny
-bootstrap runtime shim whose only responsibilities are participating in the
-entry path, calling compiled language `main`, mapping a non-negative `Int` in
-`0..255` to the process exit status, and trapping on bootstrap runtime traps
-such as checked integer overflow, division/modulo by zero, negative exponent,
-or invalid shift count. The shim is not a language standard library and must
-not provide printing, allocation, CLI arguments, scheduling, panics as a
-language feature, exceptions, FFI helpers, or platform APIs.
-
-M0032 must use the planned bundled linker path for the initial host target. Any
-temporary host-tool dependency must be documented as a blocker or explicit
-limitation and must not be presented as satisfying Go-like target-pack
-semantics.
+The first runnable program requires no Neu standard library. Host `cc` links the
+Cranelift object, and `NEU_LINKER` may override that command. The compiler-owned
+runtime boundary handles the accepted entry and trap contracts without exposing
+printing, allocation, CLI arguments, scheduling, panics as a language feature,
+exceptions, FFI helpers, or platform APIs. There is no bundled startup object.
 
 ## ADR-0056: Bootstrap Function Symbol Identity
 
@@ -661,39 +654,6 @@ MIR function ID is not a substitute. The backend derives a deterministic,
 collision-free internal object symbol from those components. Exact escaping
 and encoding are compiler implementation details and do not define a public
 ABI or new language semantics.
-
-## ADR-0057: Bootstrap Target-Pack Linker Contract
-
-The initial host target pack owns a pinned executable `lld` linker artifact and
-a target-specific startup-shim object. Its manifest identifies the exact target
-triple, native object and executable formats, linker path, startup-shim path,
-platform entry symbol, canonical language-entry symbol, and test-visible
-non-success trap status. Paths are pack-relative; absolute paths, traversal,
-missing artifacts, and target mismatches are rejected.
-
-The compiler receives an explicit target-pack root and never searches `PATH` or
-falls back to a host linker. The startup shim calls the selected language
-`main`, maps an `Int` in `0..255` to process exit status, and exits
-unsuccessfully for bootstrap traps or unsupported exit values. It is not a
-standard library and provides no printing, allocation, scheduling, CLI
-arguments, or panic formatting. M0032 covers the current host pack; additional
-target-pack distribution remains M0033 work.
-
-## ADR-0058: Bootstrap Target Capability Profile
-
-Every bundled target pack declares a typed `[capabilities]` profile containing
-`int_width_bits`, `pointer_width_bits`, `endianness`, `alignment_model`,
-`calling_convention`, `atomic_model`, and `platform_apis`. The initial host
-profile declares signed 64-bit `Int`, 64-bit pointers, little-endian layout,
-the `platform-default` bootstrap calling convention, deferred alignment and
-atomic models, and an empty platform API list.
-
-Target-pack resolution validates these declarations. The compiler never infers
-capabilities from the host or silently substitutes values from a target triple.
-Deferred capabilities are unavailable to executable forms, and an empty
-platform API list means no platform API or standard library is provided. Future
-target packs must declare their own profile and require accepted ABI, layout,
-atomic, or platform API semantics before using non-deferred values.
 
 ## ADR-0059: Bootstrap Primitive Runtime Support
 
@@ -830,7 +790,7 @@ superclass construction order. `this` cannot escape or be used as a fully
 initialized receiver before construction completes.
 
 Instances are compiler-managed owned values. The compiler may use local or
-target-pack-managed heap storage, but source code cannot request or observe
+host-linking-managed heap storage, but source code cannot request or observe
 placement. There is no `free`, allocator primitive, stable pointer, tracing
 collector, or user-visible deallocation API. Objects move by default and are
 not copied unless a later accepted copyability decision proves all owned state
@@ -845,7 +805,7 @@ are deferred. Fields have no implicit null or zero state, and reads before
 initialization are diagnostics. Cyclic owning graphs are rejected or deferred.
 
 Object fields, offsets, alignment, padding, allocation headers, vtables, and
-interface tables are compiler-private target-pack contracts. Separate
+interface tables are compiler-private host-linking contracts. Separate
 compilation carries nominal identity, field types, visibility, lifecycle,
 capability, and ownership metadata, never raw offsets. Public object layout,
 stable object ABI, FFI, and standard-library allocation remain deferred.
@@ -944,7 +904,7 @@ unchanged. The old spelling is retained only in historical ADR text.
 The bootstrap scalar element set is `Bool`, `Int`, `Float`, and `Byte`.
 Mutable `var` bindings support `add`, indexed `add`, `remove`, and `size`; `val`
 rejects mutation. Dynamic arrays are move-only, opaque, compiler-managed
-values with target-pack allocation and deterministic traps. Strings, nominal
+values with host-linking allocation and deterministic traps. Strings, nominal
 elements, nested dynamic arrays, indexing, slices, iterators, public layout,
 FFI, and user allocation APIs remain deferred.
 
@@ -1122,7 +1082,7 @@ and specialization occurs after constraint validation before MIR lowering.
 
 Substituted HIR/MIR preserves ownership, cleanup, aggregate, dispatch, and
 source facts. Generated symbols and layouts are compiler-private; unsupported
-bootstrap or target-pack representations are diagnosed before object emission.
+bootstrap or host-linking representations are diagnosed before object emission.
 Erasure, inference, reflection, public generic ABI, and separate-compilation
 caches remain deferred.
 
@@ -1142,7 +1102,7 @@ Indirect calls require an exact non-null function type. The callee evaluates
 before left-to-right arguments, and the referenced function's parameter,
 return, ownership, and effect contract is preserved. HIR/MIR distinguish
 function references and indirect calls from direct calls; Cranelift uses a
-compiler-private target-pack signature and address. No implicit conversions,
+compiler-private host-linking signature and address. No implicit conversions,
 nullable function values, callback boundary, public pointer layout, or FFI
 representation is added.
 
@@ -1296,14 +1256,25 @@ resolution; entries are sorted and record module, URL, type, requested tag, and
 resolved commit. Locked builds reject moved tags and offline misses. Registries,
 archives, binaries, branches, features, and automatic updates remain deferred.
 
+## ADR-0100: Host-Only System Linking
+
+The initial compiler emits Cranelift object code for the host triple and links
+it with the host system C linker, `cc`. `NEU_LINKER` may override the linker
+command. Non-host target requests are rejected explicitly before frontend or
+backend compilation. No bundled linker, startup object, target registry, or
+foreign-target executable contract is provided. Compiler-owned runtime support
+remains private and does not define a public allocation, object-layout, or FFI
+ABI. `main(): Int` remains the executable entry contract.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers
 `neu.json` from the current directory or an explicit project/manifest path,
 defaults the target to the host, and writes to
 `<manifest-root>/target/<safe-manifest-name>` unless `--output` is supplied.
-`--target` selects a bundled target pack. The command creates output
+`--target` accepts an explicit target triple. Only the host triple is supported;
+other values are rejected before compilation. The command creates output
 directories, never executes the produced binary, and reports compiler,
-manifest, dependency, target-pack, linker, and I/O failures with a non-zero
+manifest, dependency, target, linker, and I/O failures with a non-zero
 exit status. Raw-source APIs remain library interfaces; `run`, `check`, `test`,
 package-manager, registry, and dependency-update commands are deferred.

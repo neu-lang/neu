@@ -22,5 +22,5 @@ CI runs the same gates:
 
 ## Current Scope
 
-The workspace may contain placeholder crates needed to validate build and CI plumbing. It must not contain lexer, parser, AST, semantic analysis, backend, target-pack, or language-runtime behavior until later milestones authorize those areas.
+The workspace may contain placeholder crates needed to validate build and CI plumbing. It must not contain lexer, parser, AST, semantic analysis, backend, host-linking, or language-runtime behavior until later milestones authorize those areas.
 

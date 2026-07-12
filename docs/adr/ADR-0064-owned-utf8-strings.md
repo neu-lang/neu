@@ -33,7 +33,7 @@ API is introduced.
 
 String literals use compiler-managed immutable storage. Clones and
 concatenations use compiler-inserted allocation and destruction supplied by the
-selected target pack. Allocation failure traps. The opaque internal value
+host compiler runtime. Allocation failure traps. The opaque internal value
 contains sufficient pointer and byte-length information for the compiler but
 has no stable public or FFI layout.
 
@@ -48,12 +48,11 @@ HIR preserves decoded bytes, literal source spans, exact String types, built-in
 operations, ownership facts, and source mappings. MIR preserves owned string
 values, byte loads, length reads, equality, concatenation, clone operations,
 allocation-failure traps, and cleanup boundaries. Backend lowering may use an
-internal target-specific representation only through the selected target pack;
+internal target-specific representation only through the host compiler runtime;
 it must not expose that representation through FFI or public symbols.
 
-Target packs must declare or provide compiler-only allocation and deallocation
-artifacts. Packs without the required capability reject executable String
-forms. The allocator is not a standard-library API and is not directly
+The host compiler runtime provides compiler-only allocation and deallocation
+artifacts. The allocator is not a standard-library API and is not directly
 callable by Neu source.
 
 ## Diagnostics And Deferrals
@@ -80,6 +79,6 @@ standard-library modules, and alternate string encodings remain deferred.
 - ADR-0046
 - ADR-0047
 - ADR-0055
-- ADR-0058
+- ADR-0100
 - ADR-0061
 - ADR-0062

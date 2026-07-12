@@ -17,7 +17,7 @@ How do accepted classes override methods, implement interfaces, resolve
 
 Multiple class inheritance adds ambiguous fields and constructor order.
 All-static dispatch cannot express virtual overrides. Public layouts constrain
-future target packs and conflict with the opaque ABI direction. The first
+future host linking and conflict with the opaque ABI direction. The first
 design supports Kotlin-like ergonomics while keeping ABI details internal.
 
 ## Decision

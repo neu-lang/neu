@@ -63,7 +63,7 @@ standard library calls,
 scheduler/runtime work, exceptions/panics as language constructs, closures,
 methods, and member access. Fixed-size inline arrays are accepted only by
 ADR-0063. Owned UTF-8 strings are accepted only by ADR-0064; dynamic arrays,
-slices, and target-pack APIs remain deferred.
+slices, and host-linking APIs remain deferred.
 
 This ADR extends the executable subset beyond ADR-0024 where needed for
 operators not previously parsed. M0028 must add parser and type-checker support

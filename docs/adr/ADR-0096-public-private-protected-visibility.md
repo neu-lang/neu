@@ -84,4 +84,4 @@ unsupported declaration forms remain deferred.
 This ADR supersedes the visibility categories and default in ADR-0025. It
 depends on ADR-0017, ADR-0022, ADR-0025, ADR-0070, ADR-0095, and the accepted
 class, interface, inheritance, generic, ownership, effect, HIR, MIR, and
-target-pack contracts.
+host-linking contracts.

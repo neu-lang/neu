@@ -92,7 +92,7 @@ behavior is not diagnosed as an arithmetic failure.
 - Type checking must represent all four primitive identities and exact
   operation rules.
 - HIR, MIR, and Cranelift must carry and lower non-`Int` primitive values.
-- Target packs must validate that the selected target supports the required
+- Host linking must validate that the selected target supports the required
   `i8` and `f64` bootstrap representations.
 - Examples and executable smoke tests continue to use `Int`-returning `main`
   while exercising additional primitive helper functions.
@@ -105,4 +105,4 @@ behavior is not diagnosed as an arithmetic failure.
 - ADR-0044
 - ADR-0045
 - ADR-0046
-- ADR-0058
+- ADR-0100

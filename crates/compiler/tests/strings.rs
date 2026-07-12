@@ -1,20 +1,16 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, process::Command};
 
 use compiler::{
     driver::{SourceDriverOptions, compile_source_to_executable},
     parser::parse_source,
     source::SourceFileId,
 };
-use target_lexicon::Triple;
 
 fn options(output: &std::path::Path) -> SourceDriverOptions {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     SourceDriverOptions::new(
         SourceFileId::from_raw(6400),
         compiler::module::ModuleName::parse("strings").unwrap(),
         compiler::module::PackageNamespace::root(),
-        Triple::host(),
-        repo_root.join("target-packs"),
         output,
     )
 }

@@ -39,7 +39,7 @@ Thread and coroutine metadata can validate closure captures without exposing
 Rust-style reference syntax or changing the ordinary value ABI. HIR/MIR
 consumers must retain capture mode, capability, scope, and cleanup facts when
 closure construction and invocation are lowered. Closure transfer lowering
-remains compiler-private and target-pack-specific.
+remains compiler-private and host-linking-specific.
 
 ## Dependencies
 

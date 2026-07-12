@@ -19,7 +19,7 @@ function identity plus the ordered specialization type identities; they are
 not source-visible, stable across compiler versions, or usable through FFI.
 
 The initial backend accepts only type arguments with an already accepted
-bootstrap ABI representation. Unsupported aggregate or target-pack
+bootstrap ABI representation. Unsupported aggregate or host-linking
 capabilities are diagnostics before object emission. Specializations are
 deduplicated within a compilation and recursive expansion is rejected. No
 runtime erasure, reflection, public layout, separate-compilation cache, or

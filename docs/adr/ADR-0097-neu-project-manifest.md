@@ -39,8 +39,8 @@ resolution, recursive manifests, `NEU_PATH`, and `neu.lock.json` belong to the
 task-032 resolver boundary. A dependency repository must expose its own root
 manifest and uses that manifest's `name` as module identity.
 
-The project driver selects bundled target packs and the existing output/linker
-pipeline. Raw-source compilation remains available as a library API. No
+The project driver selects the host-only output and system-linker pipeline.
+Non-host targets are rejected before compilation. Raw-source compilation remains available as a library API. No
 registry, archive, binary artifact, workspace manifest, build script, or
 conditional compilation semantics is introduced.
 
@@ -54,5 +54,5 @@ Git cache/lockfile resolution and from language semantics.
 
 This ADR supersedes the project-discovery and source-set portions of ADR-0025
 and ADR-0095 and depends on ADR-0020, ADR-0025, ADR-0095, and the accepted
-target-pack and entrypoint contracts. ADR-0098 will define qualifier collision
+host-linking and entrypoint contracts. ADR-0098 will define qualifier collision
 diagnostics; task 032 will define Git resolution and lockfiles.
