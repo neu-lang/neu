@@ -1278,3 +1278,20 @@ unique and cannot shadow another import, the current package qualifier, or a
 local declaration. Such failures are `import_qualifier_collision` diagnostics
 with both import origins and an alias suggestion, before qualified lookup or
 later compiler stages.
+
+## ADR-0099: Git Dependency Resolution And Lockfiles
+
+Neu accepts only `https://` Git dependencies with non-empty tags. The cache is
+`NEU_PATH` or `$HOME/.neu`, under `pkg/<host>/<owner>/<repository>`; the cache
+path never becomes module identity. A repository must contain root `neu.json`,
+whose `name` supplies the dependency module identity. Tags resolve to full
+commit hashes and builds use detached cached checkouts without executing hooks
+or build scripts.
+
+Dependencies resolve recursively and deterministically. Cycles, duplicate
+module identities, conflicting URLs/tags, unsupported schemes/types, missing
+manifests, submodules, and symlink escapes are diagnostics. Projects with Git
+dependencies create or update `neu.lock.json` atomically after complete
+resolution; entries are sorted and record module, URL, type, requested tag, and
+resolved commit. Locked builds reject moved tags and offline misses. Registries,
+archives, binaries, branches, features, and automatic updates remain deferred.

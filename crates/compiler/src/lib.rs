@@ -6,6 +6,7 @@ pub mod backend;
 pub mod bootstrap;
 pub mod borrow;
 pub mod coroutine;
+pub mod dependency;
 pub mod driver;
 pub mod hir;
 pub mod lexer;

@@ -125,6 +125,7 @@ pub enum DriverError {
     Link(LinkInvocationError),
     PackageGraph(Vec<PackageGraphDiagnostic>),
     Manifest(crate::manifest::ManifestDiagnostic),
+    Dependency(crate::dependency::DependencyDiagnostic),
 }
 
 pub fn validate_virtual_project(
@@ -147,6 +148,12 @@ pub fn compile_manifest_to_executable(
     target: Triple,
     output: impl Into<PathBuf>,
 ) -> Result<PathBuf, DriverError> {
+    let manifest_path = manifest_path.as_ref();
+    let resolver = crate::dependency::GitDependencyResolver::from_environment()
+        .map_err(DriverError::Dependency)?;
+    resolver
+        .resolve_project(manifest_path)
+        .map_err(DriverError::Dependency)?;
     let (manifest, root) =
         crate::manifest::ProjectManifest::load(manifest_path).map_err(DriverError::Manifest)?;
     let sources = manifest
