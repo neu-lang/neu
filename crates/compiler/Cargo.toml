@@ -16,5 +16,6 @@ cranelift-module = "0.133.1"
 cranelift-object = "0.133.1"
 object = "0.39"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 target-lexicon = "0.13.3"
 toml = "0.8"

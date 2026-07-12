@@ -1247,3 +1247,23 @@ calling convention, object format, or ABI. Aliases do not bypass access checks,
 and missing or stale separate-compilation visibility metadata is an error.
 Friend packages, re-exports, wildcard imports, reflection, dynamic loading,
 FFI visibility, and package registries remain deferred.
+
+## ADR-0097: Neu Project Manifest
+
+`neu.json` is rooted at the project directory and contains required `name`,
+`entrypoint`, and `srcs` fields plus optional `description` and `dependencies`.
+The name is the module identity under existing dotted-identifier rules;
+description is metadata only. Unknown fields, duplicate keys, malformed JSON,
+wrong types, and invalid paths are diagnostics.
+
+The entrypoint is a normalized relative `.neu` path and must be included in the
+authoritative `srcs` allowlist. Source patterns support `*`, `**`, and `?`, use
+slash separators, match `.neu` files, exclude hidden components, reject
+absolute paths and `..` escapes, reject symlink escapes, sort normalized paths,
+deduplicate matches, and diagnose empty matches. The selected files feed the
+directory-package graph from ADR-0095.
+
+Dependency descriptors default to Git and contain a URL and non-empty tag;
+other dependency types are rejected. Manifest validation does not fetch Git or
+create lockfiles; recursive cache and lockfile behavior is reserved for the
+dependency-resolution decision. Raw-source driver APIs remain available.

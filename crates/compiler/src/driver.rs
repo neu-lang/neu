@@ -124,6 +124,7 @@ pub enum DriverError {
     TargetPack(TargetPackRegistryError),
     Link(LinkInvocationError),
     PackageGraph(Vec<PackageGraphDiagnostic>),
+    Manifest(crate::manifest::ManifestDiagnostic),
 }
 
 pub fn validate_virtual_project(
@@ -138,6 +139,39 @@ pub fn compile_virtual_project_to_executable(
     options: SourceDriverOptions,
 ) -> Result<PathBuf, DriverError> {
     compile_source_to_executable(&project.bootstrap_source(), options)
+}
+
+pub fn compile_manifest_to_executable(
+    manifest_path: impl AsRef<std::path::Path>,
+    target_packs: impl Into<PathBuf>,
+    target: Triple,
+    output: impl Into<PathBuf>,
+) -> Result<PathBuf, DriverError> {
+    let (manifest, root) =
+        crate::manifest::ProjectManifest::load(manifest_path).map_err(DriverError::Manifest)?;
+    let sources = manifest
+        .load_sources(&root)
+        .map_err(DriverError::Manifest)?;
+    let entry = manifest.entrypoint().to_path_buf();
+    let graph = validate_virtual_project(entry.clone(), sources)?;
+    let entry_file = graph
+        .files()
+        .iter()
+        .find(|file| file.path == entry)
+        .expect("manifest entrypoint is in the source graph");
+    let module =
+        ModuleName::parse(manifest.name()).expect("manifest name was validated while loading");
+    compile_virtual_project_to_executable(
+        &graph,
+        SourceDriverOptions::new(
+            entry_file.id,
+            module,
+            PackageNamespace::root(),
+            target,
+            target_packs,
+            output,
+        ),
+    )
 }
 
 pub fn compile_source_to_executable(

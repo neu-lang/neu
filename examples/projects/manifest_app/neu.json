@@ -1,0 +1,7 @@
+{
+  "name": "manifest.app",
+  "description": "A minimal Neu project manifest",
+  "entrypoint": "src/main.neu",
+  "srcs": ["src/**/*.neu"],
+  "dependencies": []
+}
