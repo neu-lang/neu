@@ -9,7 +9,7 @@ configuration.
 2. `docs/SPEC.md`.
 3. Accepted ADRs in `docs/adr/`.
 4. This file.
-5. The current task note.
+5. The current task prompt.
 6. Existing implementation behavior.
 
 Existing behavior never overrides the specification or accepted ADRs. Do not
@@ -20,39 +20,29 @@ file an ambiguity report and stop the affected implementation.
 
 For ordinary implementation work:
 
-1. Write one concise task note in the main task, referencing exactly one
-   milestone.
-2. Read only the note's cited specification, ADRs, source paths, and tests.
-3. Write focused tests first and verify the expected failure.
-4. Implement the smallest complete change justified by accepted authority.
-5. Run focused tests, Clippy, and relevant full CI gates.
-6. Perform a brief scope and source-of-truth review in the main task note.
-7. Update examples only when the runnable language surface changes.
-8. Stage scoped files and commit locally.
-9. Do not push.
+1. Read the task prompt's cited specification, ADRs, source paths, and tests.
+2. Write focused tests first and verify the expected failure.
+3. Implement the smallest complete change justified by accepted authority.
+4. Run focused tests, Clippy, and relevant full CI gates.
+5. Perform a brief scope and source-of-truth review in the main task.
+6. Update examples only when the runnable language surface changes.
+7. Stage scoped files and commit locally.
+8. Do not push.
 
 Create or revise an ADR or lengthy review document only when the
 change introduces new language semantics, ownership/thread-safety rules, ABI
 behavior, or another irreversible architectural decision. Accepted ADRs and
 `docs/SPEC.md` must be updated before implementation relies on such a decision.
 
-## Required Task Contents
+## Task And Review Records
 
-The concise task note must state:
-
-- authority read and bounded context;
-- goal, scope, and out of scope;
-- tests and objectively testable acceptance criteria;
-- the expected pre-implementation test failure;
-- files changed;
-- validation commands and results;
-- a brief scope/spec review;
-- open questions, remaining risk, and next action.
-
-Keep the note concise. Do not create separate task, review, soundness, or
-validator files under `docs/` for ordinary work. Persist a separate ambiguity
-report only when an ambiguity blocks safe implementation, or a soundness report
-when an explicit soundness finding requires durable tracking.
+Task prompts define authority, scope, tests, acceptance criteria, and validation
+requirements. No separate task note is required. Record implementation results,
+scope/spec review, open questions, and remaining risk in the main task. Do not
+create separate task, review, soundness, or validator files under `docs/` for
+ordinary work. Persist a separate ambiguity report only when an ambiguity
+blocks safe implementation, or a soundness report when an explicit soundness
+finding requires durable tracking.
 
 ## Non-Negotiable Rules
 
@@ -68,7 +58,7 @@ when an explicit soundness finding requires durable tracking.
 
 ## Ambiguity And Escalation
 
-Record an ambiguity in the main task note when a semantic rule, required
+Record an ambiguity in the main task when a semantic rule, required
 diagnostic, recovery behavior, source span, or architectural boundary is
 missing or contradictory. Quote the ambiguity, list competing interpretations,
 explain why guessing is unsafe, and identify affected source-of-truth files.
