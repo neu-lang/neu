@@ -937,6 +937,86 @@ fn lower_instruction(
             }
             Ok(())
         }
+        MirInstruction::FunctionReference { output, callee, .. } => {
+            let function_id = function_ids
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let module = module
+                .as_deref_mut()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let function_ref = module.declare_func_in_func(function_id, builder.func);
+            values.insert(*output, builder.ins().func_addr(types::I64, function_ref));
+            Ok(())
+        }
+        MirInstruction::IndirectCall {
+            output,
+            callee,
+            function_type,
+            arguments,
+            ..
+        } => {
+            let function = context
+                .type_arena
+                .get(*function_type)
+                .and_then(|record| match record.kind() {
+                    TypeKind::Function(function) => Some(function),
+                    _ => None,
+                })
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let mut signature = Signature::new(context.call_conv);
+            for parameter_type in function.parameters() {
+                let mut parameter_types = Vec::new();
+                flattened_cranelift_types(
+                    *parameter_type,
+                    context.type_arena,
+                    &mut parameter_types,
+                )?;
+                signature
+                    .params
+                    .extend(parameter_types.into_iter().map(AbiParam::new));
+            }
+            let mut return_types = Vec::new();
+            flattened_cranelift_types(
+                function.return_type(),
+                context.type_arena,
+                &mut return_types,
+            )?;
+            signature
+                .returns
+                .extend(return_types.into_iter().map(AbiParam::new));
+            let signature_ref = builder.import_signature(signature);
+            let callee = values
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let mut call_arguments = Vec::new();
+            for argument in arguments {
+                if let Some(aggregate) = aggregate_values.get(argument) {
+                    call_arguments.extend(aggregate.iter().copied());
+                } else if let Some(value) = values.get(argument).copied() {
+                    call_arguments.push(value);
+                }
+            }
+            let call = builder
+                .ins()
+                .call_indirect(signature_ref, callee, &call_arguments);
+            let results = builder.inst_results(call).to_vec();
+            if array_shape(function.return_type(), context.type_arena).is_some() {
+                aggregate_values.insert(*output, results);
+            } else if let Some(value) = results.first().copied() {
+                values.insert(
+                    *output,
+                    normalize_bool_value(
+                        value,
+                        function.return_type(),
+                        context.type_arena,
+                        builder,
+                    ),
+                );
+            }
+            Ok(())
+        }
         MirInstruction::VirtualCall {
             output,
             arguments,

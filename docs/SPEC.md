@@ -1087,6 +1087,16 @@ applied through compiler-private indirect-call facts. Overload ambiguity,
 closures, captures, bound methods, nullable function values, equality, public
 function-pointer layout, and FFI remain deferred.
 
+## ADR-0087: Higher-Order Calls
+
+Indirect calls require an exact non-null function type. The callee evaluates
+before left-to-right arguments, and the referenced function's parameter,
+return, ownership, and effect contract is preserved. HIR/MIR distinguish
+function references and indirect calls from direct calls; Cranelift uses a
+compiler-private target-pack signature and address. No implicit conversions,
+nullable function values, callback boundary, public pointer layout, or FFI
+representation is added.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

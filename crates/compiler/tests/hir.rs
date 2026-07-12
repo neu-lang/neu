@@ -114,6 +114,35 @@ fn m0085_hir_preserves_specialization_identity() {
 }
 
 #[test]
+fn m0087_hir_preserves_function_reference_and_indirect_call_kinds() {
+    let file = SourceFileId::from_raw(1087);
+    let span = ByteSpan::new(file, 0, 1).unwrap();
+    let int = TypeId::from_raw(1);
+    let function_type = TypeId::from_raw(2);
+    let reference = HirExpression::function_reference(
+        HirExpressionId::from_raw(0),
+        span,
+        function_type,
+        HirFunctionId::from_raw(3),
+    );
+    let call = HirExpression::indirect_call(
+        HirExpressionId::from_raw(1),
+        span,
+        int,
+        reference.id(),
+        Vec::new(),
+    );
+    assert!(matches!(
+        reference.kind(),
+        HirExpressionKind::FunctionReference(_)
+    ));
+    assert!(matches!(
+        call.kind(),
+        HirExpressionKind::IndirectCall { .. }
+    ));
+}
+
+#[test]
 fn m0035_hir_preserves_non_integer_primitive_literal_payloads() {
     let file = SourceFileId::from_raw(904);
     let span = ByteSpan::new(file, 0, 4).unwrap();

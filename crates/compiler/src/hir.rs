@@ -1024,6 +1024,26 @@ fn lower_expression(
         ));
         return Ok(field_id);
     }
+    if let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == expression)
+        && let Some(function_index) = source
+            .parsed
+            .function_declarations
+            .iter()
+            .position(|function| function.top_level && function.name == name.name)
+        && let Some(function_id) = hir_function_index(source.parsed, function_index)
+    {
+        output.push(HirExpression::function_reference(
+            id,
+            span,
+            ty,
+            HirFunctionId::from_raw(function_id),
+        ));
+        return Ok(id);
+    }
     if let Some(local) = local_binding_id(source, function_declaration, expression, local_bindings)
     {
         output.push(HirExpression::local_read(id, span, ty, local));
@@ -2829,7 +2849,12 @@ pub enum HirExpressionKind {
         subject: HirExpressionId,
         index: usize,
     },
+    FunctionReference(HirFunctionId),
     DirectCall(HirDirectCall),
+    IndirectCall {
+        callee: HirExpressionId,
+        arguments: Vec<HirExpressionId>,
+    },
     ArrayLiteral(Vec<HirExpressionId>),
     Index {
         array: HirExpressionId,
@@ -3047,6 +3072,35 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::EnumPayload { subject, index },
+        }
+    }
+
+    pub fn function_reference(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        function: HirFunctionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::FunctionReference(function),
+        }
+    }
+
+    pub fn indirect_call(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        callee: HirExpressionId,
+        arguments: Vec<HirExpressionId>,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::IndirectCall { callee, arguments },
         }
     }
 

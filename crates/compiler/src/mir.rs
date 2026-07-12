@@ -258,6 +258,18 @@ pub enum MirInstruction {
         arguments: Vec<MirValueId>,
         span: ByteSpan,
     },
+    FunctionReference {
+        output: MirValueId,
+        callee: MirFunctionId,
+        span: ByteSpan,
+    },
+    IndirectCall {
+        output: MirValueId,
+        callee: MirValueId,
+        function_type: TypeId,
+        arguments: Vec<MirValueId>,
+        span: ByteSpan,
+    },
     VirtualCall {
         output: MirValueId,
         arguments: Vec<MirValueId>,
@@ -451,6 +463,8 @@ impl MirInstruction {
             | Self::LoadLocal { span, .. }
             | Self::StoreLocal { span, .. }
             | Self::DirectCall { span, .. }
+            | Self::FunctionReference { span, .. }
+            | Self::IndirectCall { span, .. }
             | Self::VirtualCall { span, .. }
             | Self::InterfaceCall { span, .. }
             | Self::StaticSuperCall { span, .. }
@@ -927,6 +941,30 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             .collect(),
                         expression.span(),
                     ));
+                }
+                HirExpressionKind::FunctionReference(callee) => {
+                    instructions.push(MirInstruction::FunctionReference {
+                        output,
+                        callee: MirFunctionId::from_raw(callee.index()),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::IndirectCall { callee, arguments } => {
+                    instructions.push(MirInstruction::IndirectCall {
+                        output,
+                        callee: mir_expression_value_id(function, *callee),
+                        function_type: function
+                            .expressions()
+                            .iter()
+                            .find(|candidate| candidate.id() == *callee)
+                            .map(|candidate| candidate.ty())
+                            .ok_or(MirLoweringError::UnsupportedExpression)?,
+                        arguments: arguments
+                            .iter()
+                            .map(|argument| mir_expression_value_id(function, *argument))
+                            .collect(),
+                        span: expression.span(),
+                    });
                 }
                 HirExpressionKind::ArrayLiteral(elements) => {
                     let local = function
@@ -1562,6 +1600,34 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::FunctionReference(callee) => {
+                self.push(MirInstruction::FunctionReference {
+                    output,
+                    callee: MirFunctionId::from_raw(callee.index()),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::IndirectCall { callee, arguments } => {
+                let callee_expression = *callee;
+                let callee = self.lower_expression(callee_expression)?;
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.push(MirInstruction::IndirectCall {
+                    output,
+                    callee,
+                    function_type: self
+                        .function
+                        .expressions()
+                        .iter()
+                        .find(|candidate| candidate.id() == callee_expression)
+                        .map(|candidate| candidate.ty())
+                        .ok_or(MirLoweringError::UnsupportedExpression)?,
+                    arguments,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::Conditional { .. } | HirExpressionKind::When { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
@@ -1901,6 +1967,34 @@ impl<'a> ControlFlowLowerer<'a> {
                         .collect(),
                     expression.span(),
                 ));
+            }
+            HirExpressionKind::FunctionReference(callee) => {
+                self.push(MirInstruction::FunctionReference {
+                    output,
+                    callee: MirFunctionId::from_raw(callee.index()),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::IndirectCall { callee, arguments } => {
+                let callee_expression = *callee;
+                let callee = self.lower_expression(callee_expression)?;
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.push(MirInstruction::IndirectCall {
+                    output,
+                    callee,
+                    function_type: self
+                        .function
+                        .expressions()
+                        .iter()
+                        .find(|candidate| candidate.id() == callee_expression)
+                        .map(|candidate| candidate.ty())
+                        .ok_or(MirLoweringError::UnsupportedExpression)?,
+                    arguments,
+                    span: expression.span(),
+                });
             }
             HirExpressionKind::Conditional {
                 condition,
