@@ -33,6 +33,7 @@ pub enum AstNodeKind {
     GenericArgument,
     CapabilityBound,
     FunctionType,
+    LambdaExpression,
     GroupedType,
     ArrayType,
     Block,
@@ -150,6 +151,10 @@ impl AstArena {
 
     pub fn add_function_type(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::FunctionType, span)
+    }
+
+    pub fn add_lambda_expression(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::LambdaExpression, span)
     }
 
     pub fn add_grouped_type(&mut self, span: ByteSpan) -> AstNodeId {

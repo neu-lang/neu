@@ -274,6 +274,31 @@ fn function_type_metadata_preserves_parameter_and_return_types() {
 }
 
 #[test]
+fn lambda_metadata_preserves_parameters_and_body() {
+    let output = parse_source(
+        SourceFileId::from_raw(216),
+        "func use() { val add = { x: Int -> x + 1 }; }",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.lambda_expressions.len(), 1);
+    assert_eq!(output.lambda_expressions[0].parameters.len(), 1);
+    assert!(
+        output.lambda_expressions[0].parameters[0]
+            .annotation
+            .is_some()
+    );
+    assert_eq!(
+        output
+            .arena
+            .node(output.lambda_expressions[0].body)
+            .unwrap()
+            .kind,
+        AstNodeKind::BinaryExpression
+    );
+}
+
+#[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);

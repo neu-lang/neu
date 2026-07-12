@@ -1097,6 +1097,17 @@ compiler-private target-pack signature and address. No implicit conversions,
 nullable function values, callback boundary, public pointer layout, or FFI
 representation is added.
 
+## ADR-0088: Owned Lambdas And Closures
+
+Lambda expressions use Kotlin-like `{ parameter: Type -> expression }` syntax.
+Captures are inferred; copyable values copy, move-only values transfer, and
+mutable captures require an exclusive inferred effect. Borrowed captures may
+not outlive their source or cross a transfer/suspension boundary. Closure
+identity and environment layout are compiler-private, values are immutable and
+non-comparable, and cleanup/capture facts remain source-mapped through HIR and
+MIR. Public closure ABI, FFI, reflection, detached execution, and coroutine
+suspension remain deferred.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

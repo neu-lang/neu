@@ -66,6 +66,7 @@ pub struct ParseOutput {
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub array_types: Vec<ParsedArrayType>,
     pub function_types: Vec<ParsedFunctionType>,
+    pub lambda_expressions: Vec<ParsedLambdaExpression>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub integer_literals: Vec<ParsedIntegerLiteral>,
     pub float_literals: Vec<ParsedFloatLiteral>,
@@ -336,6 +337,21 @@ pub struct ParsedFunctionType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedLambdaParameter {
+    pub name: String,
+    pub name_span: ByteSpan,
+    pub annotation: Option<AstNodeId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedLambdaExpression {
+    pub expression: AstNodeId,
+    pub parameters: Vec<ParsedLambdaParameter>,
+    pub body: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedArrayLiteral {
     pub expression: AstNodeId,
     pub elements: Vec<AstNodeId>,
@@ -503,6 +519,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         type_name_references: parser.type_name_references,
         array_types: parser.array_types,
         function_types: parser.function_types,
+        lambda_expressions: parser.lambda_expressions,
         literal_expressions: parser.literal_expressions,
         integer_literals: parser.integer_literals,
         float_literals: parser.float_literals,
@@ -550,6 +567,7 @@ struct Parser<'source> {
     type_name_references: Vec<ParsedTypeNameReference>,
     array_types: Vec<ParsedArrayType>,
     function_types: Vec<ParsedFunctionType>,
+    lambda_expressions: Vec<ParsedLambdaExpression>,
     literal_expressions: Vec<ParsedLiteralExpression>,
     integer_literals: Vec<ParsedIntegerLiteral>,
     float_literals: Vec<ParsedFloatLiteral>,
@@ -626,6 +644,7 @@ impl<'source> Parser<'source> {
             type_name_references: Vec::new(),
             array_types: Vec::new(),
             function_types: Vec::new(),
+            lambda_expressions: Vec::new(),
             literal_expressions: Vec::new(),
             integer_literals: Vec::new(),
             float_literals: Vec::new(),
@@ -2354,6 +2373,7 @@ impl<'source> Parser<'source> {
         match self.current_kind() {
             Some(TokenKind::KwNew) => self.parse_new_expression(),
             Some(TokenKind::LeftBracket) => self.parse_array_literal(),
+            Some(TokenKind::LeftBrace) => self.parse_lambda_expression(),
             Some(
                 TokenKind::IntDecimal
                 | TokenKind::IntBinary
@@ -2444,6 +2464,64 @@ impl<'source> Parser<'source> {
                 None
             }
         }
+    }
+
+    fn parse_lambda_expression(&mut self) -> Option<ByteSpan> {
+        let start = self.current()?.span.start();
+        self.advance();
+        let mut parameters = Vec::new();
+        while self.current_kind() != Some(TokenKind::Arrow) {
+            let name = self.current()?.clone();
+            if name.kind != TokenKind::Identifier {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedFunctionType,
+                    self.span_at(start),
+                );
+                self.skip_to_expression_boundary();
+                return None;
+            }
+            self.advance();
+            let annotation = if self.current_kind() == Some(TokenKind::Colon) {
+                self.advance();
+                let annotation_span = self.parse_type()?;
+                self.latest_type_node_for_span(annotation_span)
+            } else {
+                None
+            };
+            parameters.push(ParsedLambdaParameter {
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                name_span: name.span,
+                annotation,
+            });
+            if self.current_kind() == Some(TokenKind::Comma) {
+                self.advance();
+            } else if self.current_kind() != Some(TokenKind::Arrow) {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedFunctionType,
+                    self.span_at(start),
+                );
+                self.skip_to_expression_boundary();
+                return None;
+            }
+        }
+        self.advance();
+        let body_span = self.parse_expression()?;
+        let body = self.latest_expression_node_for_span(body_span)?;
+        if self.current_kind() != Some(TokenKind::RightBrace) {
+            self.diagnostic_current_or_span(DiagnosticKind::MalformedBlock, self.span_at(start));
+            return None;
+        }
+        let end = self.current()?.span.end();
+        self.advance();
+        let span = self.span(start, end);
+        let expression = self.arena.add_lambda_expression(span);
+        self.lambda_expressions.push(ParsedLambdaExpression {
+            expression,
+            parameters,
+            body,
+            span,
+        });
+        Some(span)
     }
 
     fn parse_new_expression(&mut self) -> Option<ByteSpan> {
