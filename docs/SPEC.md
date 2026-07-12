@@ -940,3 +940,12 @@ right initialization, reverse destruction, existing indexed ownership rules,
 and existing class/interface dispatch. Their compiler-private inline ABI is not
 public or available to FFI. Nullable nominal elements, dynamic-array nominal
 elements, slices, and generic variance remain deferred.
+
+## ADR-0075: Bootstrap Value ABI Extension
+
+The internal same-module ABI transports accepted primitive, string, fixed-array,
+class, interface, and scalar dynamic-array values with typed signatures.
+Dynamic scalar arrays use opaque compiler-managed pointers; move-only ownership
+and return cleanup remain enforced. Dynamic arrays containing strings, nominal
+values, fixed arrays, nested dynamic arrays, or nullable values are rejected
+before lowering until their element ABI and destruction contracts are accepted.

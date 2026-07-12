@@ -1083,7 +1083,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             types
                 .get(function.return_type())
                 .map(|record| record.kind()),
-            Some(TypeKind::Nominal(_))
+            Some(TypeKind::Nominal(_) | TypeKind::DynamicArray(_))
         ) {
             let cleanup_value =
                 MirValueId::from_raw(function.parameters().len() + function.expressions().len());

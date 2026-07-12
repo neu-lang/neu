@@ -244,3 +244,28 @@ fn compiles_fixed_arrays_with_interface_elements() {
     assert_eq!(Command::new(output).status().unwrap().code(), Some(11));
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn passes_dynamic_arrays_through_parameters_and_returns() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-dynamic-array-abi-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "func identity(values: Array<Int>): Array<Int> { return values; } public func main(): Int { var values: Array<Int> = new Int[]; values.add(7); val returned: Array<Int> = identity(values); return returned.size(); }";
+    let output = compiler::driver::compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6314),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(1));
+    let _ = fs::remove_dir_all(workspace);
+}
