@@ -202,7 +202,7 @@ fn lexes_operators_and_delimiters_with_longest_match() {
 }
 
 #[test]
-fn m0028_lexes_executable_operator_tokens() {
+fn lexes_executable_operator_tokens() {
     assert_eq!(
         kinds("** << >> ~ ^ & | + - * / %"),
         vec![

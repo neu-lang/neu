@@ -108,7 +108,7 @@ fn startup_shim_call_fixture() -> Vec<u8> {
 }
 
 #[test]
-fn m0032_resolves_valid_target_pack() {
+fn resolves_valid_target_pack() {
     let root = fixture_root("valid");
     let linker = root.join("bin/linker");
     let shim = root.join("runtime/startup.o");
@@ -131,7 +131,7 @@ fn m0032_resolves_valid_target_pack() {
 }
 
 #[test]
-fn m0032_rejects_target_mismatch() {
+fn rejects_target_mismatch() {
     let root = fixture_root("target-mismatch");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();
@@ -149,7 +149,7 @@ fn m0032_rejects_target_mismatch() {
 }
 
 #[test]
-fn m0032_rejects_unsafe_and_missing_artifacts() {
+fn rejects_unsafe_and_missing_artifacts() {
     let root = fixture_root("unsafe");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();
@@ -182,7 +182,7 @@ fn m0032_rejects_unsafe_and_missing_artifacts() {
 }
 
 #[test]
-fn m0032_rejects_invalid_manifest() {
+fn rejects_invalid_manifest() {
     assert_eq!(
         TargetPackManifest::new(
             Triple::host(),
@@ -212,7 +212,7 @@ fn m0032_rejects_invalid_manifest() {
 }
 
 #[test]
-fn m0032_loads_target_pack_manifest_from_toml() {
+fn loads_target_pack_manifest_from_toml() {
     let root = fixture_root("toml");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();
@@ -229,7 +229,7 @@ fn m0032_loads_target_pack_manifest_from_toml() {
 }
 
 #[test]
-fn m0032_rejects_malformed_target_pack_toml() {
+fn rejects_malformed_target_pack_toml() {
     assert_eq!(
         TargetPackManifest::from_toml("[target]\ntriple = \"not a triple\"\n"),
         Err(TargetPackError::InvalidManifest)
@@ -243,7 +243,7 @@ fn m0032_rejects_malformed_target_pack_toml() {
 }
 
 #[test]
-fn m0032_rejects_malformed_startup_shim_object() {
+fn rejects_malformed_startup_shim_object() {
     let root = fixture_root("malformed-startup");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), b"not an object").unwrap();
@@ -260,7 +260,7 @@ fn m0032_rejects_malformed_startup_shim_object() {
 }
 
 #[test]
-fn m0032_rejects_startup_shim_format_mismatch() {
+fn rejects_startup_shim_format_mismatch() {
     let root = fixture_root("startup-format-mismatch");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();
@@ -284,7 +284,7 @@ fn m0032_rejects_startup_shim_format_mismatch() {
 }
 
 #[test]
-fn m0032_rejects_startup_shim_without_platform_entry() {
+fn rejects_startup_shim_without_platform_entry() {
     let root = fixture_root("startup-entry-missing");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(
@@ -305,7 +305,7 @@ fn m0032_rejects_startup_shim_without_platform_entry() {
 }
 
 #[test]
-fn m0032_accepts_startup_shim_language_entry_relocation() {
+fn accepts_startup_shim_language_entry_relocation() {
     let root = fixture_root("startup-language-entry");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();
@@ -322,7 +322,7 @@ fn m0032_accepts_startup_shim_language_entry_relocation() {
 }
 
 #[test]
-fn m0032_rejects_startup_shim_without_language_entry_relocation() {
+fn rejects_startup_shim_without_language_entry_relocation() {
     let root = fixture_root("startup-language-missing");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(
@@ -343,7 +343,7 @@ fn m0032_rejects_startup_shim_without_language_entry_relocation() {
 }
 
 #[test]
-fn m0032_rejects_startup_shim_language_entry_mismatch() {
+fn rejects_startup_shim_language_entry_mismatch() {
     let root = fixture_root("startup-language-mismatch");
     fs::write(root.join("bin/linker"), b"linker").unwrap();
     fs::write(root.join("runtime/startup.o"), startup_shim_call_fixture()).unwrap();

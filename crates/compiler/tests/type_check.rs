@@ -21,23 +21,21 @@ use compiler::{
         LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
         RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
         ReturnTypeDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
-        TypeRuleDiagnostic, apply_m0028_direct_call_results, build_m0020_capability_bound_records,
-        build_m0020_generic_parameter_types, check_m0028_direct_calls, check_m0028_entry_point,
-        check_m0028_return_expression_types, check_m0028_straight_line_returns,
-        check_m0028_unsupported_executable_forms, known_local_symbol_types,
-        recognize_m0019_null_tests, record_m0019_branch_refinements,
-        record_m0019_refined_expression_types, select_m0019_eligible_null_tests,
-        type_assignment_statements, type_grouped_expressions, type_literal_expressions,
-        type_m0018_accepted_expressions, type_m0018_core,
-        type_m0018_local_declaration_initializers, type_m0019_assignment_statements,
-        type_m0019_local_declaration_initializers, type_m0019_region_exit_refinement_invalidations,
-        type_m0028_executable_core, type_m0028_executable_core_in,
-        type_m0028_executable_int_operators, type_m0028_function_signatures,
-        type_m0028_function_signatures_in, type_m0028_static_integer_diagnostics,
-        type_m0035_primitive_operators, type_m0086_function_types, type_parser_literals,
-        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
-        type_resolved_name_expressions, type_unsupported_m0018_expressions,
-        validate_m0061_compile_time_constants,
+        TypeRuleDiagnostic, apply_direct_call_results, build_capability_bound_records,
+        build_generic_parameter_types, check_direct_calls, check_entry_point,
+        check_return_expression_types, check_straight_line_returns,
+        check_unsupported_executable_forms, known_local_symbol_types, recognize_null_tests,
+        record_branch_refinements, record_refined_expression_types, select_eligible_null_tests,
+        type_accepted_expressions, type_assignment_statements,
+        type_assignment_statements_with_flow, type_core, type_executable_core,
+        type_executable_core_in, type_executable_int_operators, type_function_signatures,
+        type_function_signatures_in, type_function_types, type_grouped_expressions,
+        type_literal_expressions, type_local_declaration_initializers, type_parser_literals,
+        type_primitive_local_declaration_initializers, type_primitive_local_declarations,
+        type_primitive_local_initializer_declarations, type_primitive_operators,
+        type_region_exit_refinement_invalidations, type_resolved_name_expressions,
+        type_static_integer_diagnostics, type_unsupported_expressions,
+        validate_compile_time_constants,
     },
     types::{
         GenericSubstitution, NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord,
@@ -45,7 +43,7 @@ use compiler::{
 };
 
 #[test]
-fn m0061_const_expression_produces_a_typed_compile_time_fact() {
+fn const_expression_produces_a_typed_compile_time_fact() {
     let parsed = parse_source(
         SourceFileId::from_raw(1004),
         "func run() { const answer: Int = 1 + 2; }",
@@ -53,7 +51,7 @@ fn m0061_const_expression_produces_a_typed_compile_time_fact() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
     let mut types = TypeArena::new();
-    let mut report = type_m0028_executable_core_in(
+    let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -68,7 +66,7 @@ fn m0061_const_expression_produces_a_typed_compile_time_fact() {
         &[],
     );
     let expression_types = report.expression_types().to_vec();
-    validate_m0061_compile_time_constants(&parsed, &expression_types, &types, &mut report);
+    validate_compile_time_constants(&parsed, &expression_types, &types, &mut report);
     assert!(
         report.diagnostics().is_empty(),
         "{:?}",
@@ -82,7 +80,7 @@ fn m0061_const_expression_produces_a_typed_compile_time_fact() {
 }
 
 #[test]
-fn m0019_mutation_invalidation_classifies_only_exact_post_region_bare_name_initializer() {
+fn mutation_invalidation_classifies_only_exact_post_region_bare_name_initializer() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
@@ -229,7 +227,7 @@ fn m0019_mutation_invalidation_classifies_only_exact_post_region_bare_name_initi
         },
     ];
 
-    let report = type_m0019_region_exit_refinement_invalidations(
+    let report = type_region_exit_refinement_invalidations(
         &declarations,
         &signatures,
         &expression_types,
@@ -307,7 +305,7 @@ fn m0019_mutation_invalidation_classifies_only_exact_post_region_bare_name_initi
 }
 
 #[test]
-fn m0020_generic_parameter_types_preserve_parameter_identity_and_source_order() {
+fn generic_parameter_types_preserve_parameter_identity_and_source_order() {
     let parsed = parse_source(
         SourceFileId::from_raw(500),
         "struct Pair<T: Send & Share, U> {} struct Other<T> {}",
@@ -318,7 +316,7 @@ fn m0020_generic_parameter_types_preserve_parameter_identity_and_source_order() 
     let mut symbols = SymbolInterner::new();
     let mut types = TypeArena::new();
     let records =
-        build_m0020_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
 
     assert_eq!(records.len(), 3);
     assert_eq!(types.records().len(), 3);
@@ -350,14 +348,14 @@ fn m0020_generic_parameter_types_preserve_parameter_identity_and_source_order() 
     assert_eq!(symbols.resolve(first.symbol()), Some("T"));
     assert_eq!(symbols.resolve(SymbolId::from_raw(1)), Some("U"));
 
-    let empty = build_m0020_generic_parameter_types(&[], &mut symbols, &mut types);
+    let empty = build_generic_parameter_types(&[], &mut symbols, &mut types);
     assert!(empty.is_empty());
     assert_eq!(types.records().len(), 3);
     assert_eq!(symbols.symbols(), &["T".to_owned(), "U".to_owned()]);
 }
 
 #[test]
-fn m0020_capability_bound_records_preserve_occurrences_without_interpretation() {
+fn capability_bound_records_preserve_occurrences_without_interpretation() {
     let parsed = parse_source(
         SourceFileId::from_raw(501),
         "struct Pair<T: Send & Share, U: Send> {}",
@@ -367,12 +365,9 @@ fn m0020_capability_bound_records_preserve_occurrences_without_interpretation() 
     let mut symbols = SymbolInterner::new();
     let mut types = TypeArena::new();
     let parameter_types =
-        build_m0020_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
-    let bounds = build_m0020_capability_bound_records(
-        &parsed.generic_parameters,
-        &parameter_types,
-        &mut symbols,
-    );
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds =
+        build_capability_bound_records(&parsed.generic_parameters, &parameter_types, &mut symbols);
 
     assert_eq!(bounds.len(), 3);
     assert_eq!(
@@ -393,13 +388,12 @@ fn m0020_capability_bound_records_preserve_occurrences_without_interpretation() 
     assert_eq!(bounds[2].ty(), parameter_types[1].ty());
     assert_eq!(bounds[2].symbol(), bounds[0].symbol());
 
-    let missing =
-        build_m0020_capability_bound_records(&parsed.generic_parameters, &[], &mut symbols);
+    let missing = build_capability_bound_records(&parsed.generic_parameters, &[], &mut symbols);
     assert!(missing.is_empty());
 }
 
 #[test]
-fn m0084_capability_bounds_are_checked_after_substitution() {
+fn capability_bounds_are_checked_after_substitution() {
     let parsed = parse_source(
         SourceFileId::from_raw(502),
         "struct Box<T: Send & Share> {}",
@@ -408,35 +402,28 @@ fn m0084_capability_bounds_are_checked_after_substitution() {
     let mut symbols = SymbolInterner::new();
     let mut types = TypeArena::new();
     let parameter_types =
-        build_m0020_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
-    let bounds = build_m0020_capability_bound_records(
-        &parsed.generic_parameters,
-        &parameter_types,
-        &mut symbols,
-    );
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds =
+        build_capability_bound_records(&parsed.generic_parameters, &parameter_types, &mut symbols);
     let string_type = types.insert(TypeRecord::primitive(PrimitiveType::String));
     let mut substitution = GenericSubstitution::new();
     substitution.insert(parameter_types[0].ty(), string_type);
 
-    let diagnostics = compiler::type_check::validate_m0084_capability_bounds(
-        &bounds,
-        &substitution,
-        &types,
-        &symbols,
-    );
+    let diagnostics =
+        compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].bound(), bounds[1].bound());
 }
 
 #[test]
-fn m0086_function_type_metadata_resolves_to_structural_type_identity() {
+fn function_type_metadata_resolves_to_structural_type_identity() {
     let parsed = parse_source(
         SourceFileId::from_raw(503),
         "func apply(operation: (Int, Byte) -> Int): Int;",
     );
     assert!(parsed.diagnostics.is_empty());
     let mut types = TypeArena::new();
-    let resolved = type_m0086_function_types(&parsed, &mut types);
+    let resolved = type_function_types(&parsed, &mut types);
     assert_eq!(resolved.len(), 1);
     let TypeKind::Function(function) = types.get(resolved[0].1).unwrap().kind() else {
         panic!("expected function type");
@@ -445,7 +432,7 @@ fn m0086_function_type_metadata_resolves_to_structural_type_identity() {
 }
 
 #[test]
-fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
+fn null_test_recognition_accepts_direct_not_equal_forms() {
     let parsed = parse_source(
         SourceFileId::from_raw(190),
         "func check() { if (maybe != null) { const definite = maybe; }; if (null != other) { const also = other; } }",
@@ -453,7 +440,7 @@ fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let recognized = recognize_m0019_null_tests(
+    let recognized = recognize_null_tests(
         &parsed.binary_expressions,
         &parsed.literal_expressions,
         &parsed.arena,
@@ -482,7 +469,7 @@ fn m0019_null_test_recognition_accepts_direct_not_equal_forms() {
 }
 
 #[test]
-fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() {
+fn null_test_recognition_accepts_direct_equal_forms_as_else_refinements() {
     let parsed = parse_source(
         SourceFileId::from_raw(191),
         "func check() { if (maybe == null) { const fallback = \"missing\"; } else { const definite = maybe; }; if (null == other) { const fallback2 = \"missing\"; } else { const also = other; } }",
@@ -490,7 +477,7 @@ fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() 
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let recognized = recognize_m0019_null_tests(
+    let recognized = recognize_null_tests(
         &parsed.binary_expressions,
         &parsed.literal_expressions,
         &parsed.arena,
@@ -510,7 +497,7 @@ fn m0019_null_test_recognition_accepts_direct_equal_forms_as_else_refinements() 
 }
 
 #[test]
-fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
+fn null_test_recognition_ignores_unsupported_condition_shapes() {
     let parsed = parse_source(
         SourceFileId::from_raw(192),
         "func check() { if (left == right) { const a = left; }; if (null == null) { const b = null; }; if (maybe < null) { const c = maybe; }; if (maybe == 1) { const d = maybe; } }",
@@ -518,7 +505,7 @@ fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let recognized = recognize_m0019_null_tests(
+    let recognized = recognize_null_tests(
         &parsed.binary_expressions,
         &parsed.literal_expressions,
         &parsed.arena,
@@ -528,7 +515,7 @@ fn m0019_null_test_recognition_ignores_unsupported_condition_shapes() {
 }
 
 #[test]
-fn m0019_null_test_eligibility_accepts_immutable_nullable_local() {
+fn null_test_eligibility_accepts_immutable_nullable_local() {
     let null_test = RecognizedNullTest::new(
         AstNodeId::from_raw(200),
         AstNodeId::from_raw(201),
@@ -552,7 +539,7 @@ fn m0019_null_test_eligibility_accepts_immutable_nullable_local() {
         nullable_string,
     )];
 
-    let (eligible, report) = select_m0019_eligible_null_tests(
+    let (eligible, report) = select_eligible_null_tests(
         &[null_test],
         &resolutions,
         std::slice::from_ref(&binding),
@@ -576,7 +563,7 @@ fn m0019_null_test_eligibility_accepts_immutable_nullable_local() {
 }
 
 #[test]
-fn m0019_null_test_eligibility_rejects_mutable_local_with_flow_diagnostic() {
+fn null_test_eligibility_rejects_mutable_local_with_flow_diagnostic() {
     let null_test = RecognizedNullTest::new(
         AstNodeId::from_raw(210),
         AstNodeId::from_raw(211),
@@ -600,13 +587,8 @@ fn m0019_null_test_eligibility_rejects_mutable_local_with_flow_diagnostic() {
         nullable_string,
     )];
 
-    let (eligible, report) = select_m0019_eligible_null_tests(
-        &[null_test],
-        &resolutions,
-        &[binding],
-        &signatures,
-        &types,
-    );
+    let (eligible, report) =
+        select_eligible_null_tests(&[null_test], &resolutions, &[binding], &signatures, &types);
 
     assert!(eligible.is_empty());
     assert_eq!(report.diagnostics().len(), 1);
@@ -622,7 +604,7 @@ fn m0019_null_test_eligibility_rejects_mutable_local_with_flow_diagnostic() {
 }
 
 #[test]
-fn m0019_null_test_eligibility_ignores_non_nullable_and_incomplete_inputs() {
+fn null_test_eligibility_ignores_non_nullable_and_incomplete_inputs() {
     let non_nullable_test = RecognizedNullTest::new(
         AstNodeId::from_raw(220),
         AstNodeId::from_raw(221),
@@ -672,7 +654,7 @@ fn m0019_null_test_eligibility_ignores_non_nullable_and_incomplete_inputs() {
         string,
     )];
 
-    let (eligible, report) = select_m0019_eligible_null_tests(
+    let (eligible, report) = select_eligible_null_tests(
         &[non_nullable_test, unresolved_test, missing_signature_test],
         &resolutions,
         &[non_nullable_binding, missing_signature_binding],
@@ -685,7 +667,7 @@ fn m0019_null_test_eligibility_ignores_non_nullable_and_incomplete_inputs() {
 }
 
 #[test]
-fn m0019_null_test_eligibility_reports_ambiguous_local_binding_match() {
+fn null_test_eligibility_reports_ambiguous_local_binding_match() {
     let null_test = RecognizedNullTest::new(
         AstNodeId::from_raw(240),
         AstNodeId::from_raw(241),
@@ -709,7 +691,7 @@ fn m0019_null_test_eligibility_reports_ambiguous_local_binding_match() {
     let types = TypeArena::new();
 
     let (eligible, report) =
-        select_m0019_eligible_null_tests(&[null_test], &resolutions, &[first, second], &[], &types);
+        select_eligible_null_tests(&[null_test], &resolutions, &[first, second], &[], &types);
 
     assert!(eligible.is_empty());
     assert_eq!(report.diagnostics().len(), 1);
@@ -725,7 +707,7 @@ fn m0019_null_test_eligibility_reports_ambiguous_local_binding_match() {
 }
 
 #[test]
-fn m0019_branch_refinement_records_then_branch_for_not_equal_tests() {
+fn branch_refinement_records_then_branch_for_not_equal_tests() {
     let null_test = RecognizedNullTest::new(
         AstNodeId::from_raw(300),
         AstNodeId::from_raw(301),
@@ -753,7 +735,7 @@ fn m0019_branch_refinement_records_then_branch_for_not_equal_tests() {
     };
     let then_block = if_expression.then_block;
 
-    let report = record_m0019_branch_refinements(&[eligible], &[if_expression]);
+    let report = record_branch_refinements(&[eligible], &[if_expression]);
 
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.refinements().len(), 1);
@@ -768,7 +750,7 @@ fn m0019_branch_refinement_records_then_branch_for_not_equal_tests() {
 }
 
 #[test]
-fn m0019_branch_refinement_records_else_branch_for_equal_tests() {
+fn branch_refinement_records_else_branch_for_equal_tests() {
     let null_test = RecognizedNullTest::new(
         AstNodeId::from_raw(310),
         AstNodeId::from_raw(311),
@@ -796,7 +778,7 @@ fn m0019_branch_refinement_records_else_branch_for_equal_tests() {
     };
     let else_block = if_expression.else_block.unwrap();
 
-    let report = record_m0019_branch_refinements(&[eligible], &[if_expression]);
+    let report = record_branch_refinements(&[eligible], &[if_expression]);
 
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.refinements().len(), 1);
@@ -810,7 +792,7 @@ fn m0019_branch_refinement_records_else_branch_for_equal_tests() {
 }
 
 #[test]
-fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
+fn branch_refinement_skips_missing_else_and_non_condition_tests() {
     let equal_without_else = RecognizedNullTest::new(
         AstNodeId::from_raw(320),
         AstNodeId::from_raw(321),
@@ -852,7 +834,7 @@ fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
         span: ByteSpan::new(SourceFileId::from_raw(320), 0, 10).unwrap(),
     };
 
-    let report = record_m0019_branch_refinements(&eligible, &[if_expression]);
+    let report = record_branch_refinements(&eligible, &[if_expression]);
 
     assert_eq!(report.diagnostics(), &[]);
     assert!(report.refinements().is_empty());
@@ -860,7 +842,7 @@ fn m0019_branch_refinement_skips_missing_else_and_non_condition_tests() {
 }
 
 #[test]
-fn m0019_refined_expression_type_records_active_exact_binding_uses() {
+fn refined_expression_type_records_active_exact_binding_uses() {
     let source =
         "func check() { const maybe: String? = null; if (maybe != null) { maybe; }; maybe; }";
     let file = SourceFileId::from_raw(330);
@@ -902,7 +884,7 @@ fn m0019_refined_expression_type_records_active_exact_binding_uses() {
         non_null,
     ));
 
-    record_m0019_refined_expression_types(
+    record_refined_expression_types(
         &mut report,
         &parsed.arena,
         resolved.resolved_local_bindings(),
@@ -926,7 +908,7 @@ fn m0019_refined_expression_type_records_active_exact_binding_uses() {
 }
 
 #[test]
-fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bounds() {
+fn refined_expression_type_records_honor_nested_shadowing_and_region_bounds() {
     let source = "func check() { const maybe: String? = null; if (maybe != null) { maybe; if (ready) { maybe; const maybe: String? = null; maybe; }; }; maybe; }";
     let file = SourceFileId::from_raw(331);
     let parsed = parse_source(file, source);
@@ -970,7 +952,7 @@ fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bound
         TypeId::from_raw(43),
     ));
 
-    record_m0019_refined_expression_types(
+    record_refined_expression_types(
         &mut report,
         &parsed.arena,
         resolved.resolved_local_bindings(),
@@ -996,7 +978,7 @@ fn m0019_refined_expression_type_records_honor_nested_shadowing_and_region_bound
 }
 
 #[test]
-fn m0019_refined_expression_type_records_report_overlapping_regions() {
+fn refined_expression_type_records_report_overlapping_regions() {
     let file = SourceFileId::from_raw(332);
     let mut arena = AstArena::new();
     arena.add_source_file(ByteSpan::new(file, 0, 100).unwrap());
@@ -1027,7 +1009,7 @@ fn m0019_refined_expression_type_records_report_overlapping_regions() {
         TypeId::from_raw(45),
     ));
 
-    record_m0019_refined_expression_types(&mut report, &arena, &[resolved]);
+    record_refined_expression_types(&mut report, &arena, &[resolved]);
 
     assert!(report.refined_expression_types().is_empty());
     assert_eq!(report.diagnostics().len(), 1);
@@ -1043,7 +1025,7 @@ fn m0019_refined_expression_type_records_report_overlapping_regions() {
 }
 
 #[test]
-fn m0019_refined_expression_type_records_reject_non_name_and_cross_file_uses() {
+fn refined_expression_type_records_reject_non_name_and_cross_file_uses() {
     let branch_file = SourceFileId::from_raw(338);
     let other_file = SourceFileId::from_raw(339);
     let mut arena = AstArena::new();
@@ -1071,14 +1053,14 @@ fn m0019_refined_expression_type_records_reject_non_name_and_cross_file_uses() {
         TypeId::from_raw(47),
     ));
 
-    record_m0019_refined_expression_types(&mut report, &arena, &resolved);
+    record_refined_expression_types(&mut report, &arena, &resolved);
 
     assert!(report.refined_expression_types().is_empty());
     assert!(report.diagnostics().is_empty());
 }
 
 #[test]
-fn m0019_flow_diagnostic_constructors_preserve_rule_node_and_types() {
+fn flow_diagnostic_constructors_preserve_rule_node_and_types() {
     let node = AstNodeId::from_raw(190);
     let expected = TypeId::from_raw(1);
     let actual = TypeId::from_raw(2);
@@ -1131,7 +1113,7 @@ fn m0019_flow_diagnostic_constructors_preserve_rule_node_and_types() {
 }
 
 #[test]
-fn m0019_flow_rule_diagnostic_identifiers_cover_adr0028_examples() {
+fn flow_rule_diagnostic_identifiers_cover_adr0028_examples() {
     let rules = [
         TypeRuleDiagnostic::NullableValueWithoutRefinement,
         TypeRuleDiagnostic::NullableAssignmentWithoutRefinement,
@@ -1150,7 +1132,7 @@ fn m0019_flow_rule_diagnostic_identifiers_cover_adr0028_examples() {
 }
 
 #[test]
-fn m0019_type_check_report_records_flow_refinements_in_insertion_order() {
+fn type_check_report_records_flow_refinements_in_insertion_order() {
     let binding = LocalBinding::new(
         LocalBindingKey::new(LocalScopeId::from_raw(1), SymbolId::from_raw(2)),
         AstNodeId::from_raw(191),
@@ -1185,7 +1167,7 @@ fn m0019_type_check_report_records_flow_refinements_in_insertion_order() {
 }
 
 #[test]
-fn m0019_type_check_report_records_refined_expression_types_as_per_use_views() {
+fn type_check_report_records_refined_expression_types_as_per_use_views() {
     let first = RefinedExpressionType::new(
         AstNodeId::from_raw(200),
         AstNodeId::from_raw(201),
@@ -1228,7 +1210,7 @@ fn ambiguous_type_rule_diagnostic_preserves_rule_and_node() {
 }
 
 #[test]
-fn ambiguous_type_rules_cover_m0018_blockers() {
+fn ambiguous_type_rules_cover_blockers() {
     let blockers = [
         AmbiguousTypeRule::LiteralTyping,
         AmbiguousTypeRule::PrimitiveScalarCatalog,
@@ -1299,7 +1281,7 @@ fn unsupported_expression_diagnostics_report_adr0027_deferred_forms() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let report = type_unsupported_m0018_expressions(&parsed.arena);
+    let report = type_unsupported_expressions(&parsed.arena);
 
     assert_eq!(report.expression_types(), &[]);
     assert_eq!(report.declaration_signatures(), &[]);
@@ -1359,7 +1341,7 @@ fn unsupported_expression_diagnostics_ignore_accepted_and_non_expression_nodes()
             .any(|node| node.kind == AstNodeKind::ReturnStatement)
     );
 
-    let report = type_unsupported_m0018_expressions(&parsed.arena);
+    let report = type_unsupported_expressions(&parsed.arena);
 
     assert_eq!(report.diagnostics(), &[]);
     assert_eq!(report.expression_types(), &[]);
@@ -1374,7 +1356,7 @@ fn unsupported_expression_diagnostics_report_unary_expression_nodes() {
     arena.add_source_file(ByteSpan::new(file, 0, 1).unwrap());
     let unary = arena.add_unary_expression(ByteSpan::new(file, 2, 6).unwrap());
 
-    let report = type_unsupported_m0018_expressions(&arena);
+    let report = type_unsupported_expressions(&arena);
 
     assert_eq!(report.diagnostics().len(), 1);
     assert_eq!(
@@ -1735,7 +1717,7 @@ fn primitive_local_initializer_rejects_byte_literal_out_of_range() {
 }
 
 #[test]
-fn m0035_primitive_operators_type_bool_float_and_byte_families() {
+fn primitive_operators_type_bool_float_and_byte_families() {
     let bool_type = TypeId::from_raw(0);
     let float_type = TypeId::from_raw(5);
     let byte_type = TypeId::from_raw(6);
@@ -1798,7 +1780,7 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
         },
     ];
 
-    let report = type_m0035_primitive_operators(
+    let report = type_primitive_operators(
         &unary, &binary, &known, bool_type, float_type, byte_type, unit_type,
     );
 
@@ -1811,7 +1793,7 @@ fn m0035_primitive_operators_type_bool_float_and_byte_families() {
 }
 
 #[test]
-fn m0035_executable_core_types_primitive_operator_source() {
+fn executable_core_types_primitive_operator_source() {
     let parsed = parse_source(
         SourceFileId::from_raw(914),
         "func run() { const ready: Bool = !true; const ratio: Float = 1.5 + 2.0; const ordered: Bool = 1.5 < 2.0; }",
@@ -1819,7 +1801,7 @@ fn m0035_executable_core_types_primitive_operator_source() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -1853,7 +1835,7 @@ fn m0035_executable_core_types_primitive_operator_source() {
 }
 
 #[test]
-fn m0035_executable_core_contextualizes_byte_literal_initializers() {
+fn executable_core_contextualizes_byte_literal_initializers() {
     let parsed = parse_source(
         SourceFileId::from_raw(915),
         "func run(): Int { const value: Byte = 255; return 0; }",
@@ -1862,7 +1844,7 @@ fn m0035_executable_core_contextualizes_byte_literal_initializers() {
     assert!(parsed.diagnostics.is_empty());
 
     let mut types = TypeArena::new();
-    let report = type_m0028_executable_core_in(
+    let report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -2329,7 +2311,7 @@ fn assignment_statement_type_checking_rejects_null_for_non_nullable_targets() {
 }
 
 #[test]
-fn assignment_statement_type_checking_keeps_nullable_to_base_as_m0018_type_mismatch() {
+fn assignment_statement_type_checking_keeps_nullable_to_base_as_type_mismatch() {
     let mut arena = TypeArena::new();
     let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int_id = arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
@@ -2356,7 +2338,7 @@ fn assignment_statement_type_checking_keeps_nullable_to_base_as_m0018_type_misma
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_accepts_valid_refined_value() {
+fn refinement_aware_assignment_accepts_valid_refined_value() {
     let mut type_arena = TypeArena::new();
     let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
@@ -2384,7 +2366,7 @@ fn m0019_refinement_aware_assignment_accepts_valid_refined_value() {
         nullable_int_id,
         int_id,
     ));
-    record_m0019_refined_expression_types(&mut flow_report, &ast_arena, &resolved);
+    record_refined_expression_types(&mut flow_report, &ast_arena, &resolved);
     let inside_statement = AstNodeId::from_raw(347);
     let outside_statement = AstNodeId::from_raw(348);
     let inside_target = AstNodeId::from_raw(349);
@@ -2408,7 +2390,7 @@ fn m0019_refinement_aware_assignment_accepts_valid_refined_value() {
         ExpressionType::new(outside_value, nullable_int_id),
     ];
 
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2430,7 +2412,7 @@ fn m0019_refinement_aware_assignment_accepts_valid_refined_value() {
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_reports_unrefined_nullable_to_base() {
+fn refinement_aware_assignment_reports_unrefined_nullable_to_base() {
     let mut arena = TypeArena::new();
     let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int_id = arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
@@ -2449,7 +2431,7 @@ fn m0019_refinement_aware_assignment_reports_unrefined_nullable_to_base() {
 
     let flow_report = TypeCheckReport::new();
     let ast_arena = AstArena::new();
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2475,7 +2457,7 @@ fn m0019_refinement_aware_assignment_reports_unrefined_nullable_to_base() {
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_preserves_m0018_compatibility() {
+fn refinement_aware_assignment_preserves_compatibility() {
     let mut arena = TypeArena::new();
     let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let null_id = arena.insert(TypeRecord::primitive(PrimitiveType::Null));
@@ -2508,7 +2490,7 @@ fn m0019_refinement_aware_assignment_preserves_m0018_compatibility() {
 
     let flow_report = TypeCheckReport::new();
     let ast_arena = AstArena::new();
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2525,7 +2507,7 @@ fn m0019_refinement_aware_assignment_preserves_m0018_compatibility() {
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_keeps_other_mismatches() {
+fn refinement_aware_assignment_keeps_other_mismatches() {
     let mut arena = TypeArena::new();
     let int_id = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let string_id = arena.insert(TypeRecord::primitive(PrimitiveType::String));
@@ -2552,7 +2534,7 @@ fn m0019_refinement_aware_assignment_keeps_other_mismatches() {
 
     let flow_report = TypeCheckReport::new();
     let ast_arena = AstArena::new();
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2577,7 +2559,7 @@ fn m0019_refinement_aware_assignment_keeps_other_mismatches() {
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_ignores_inconsistent_refined_views() {
+fn refinement_aware_assignment_ignores_inconsistent_refined_views() {
     let mut type_arena = TypeArena::new();
     let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let string_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::String));
@@ -2638,7 +2620,7 @@ fn m0019_refinement_aware_assignment_ignores_inconsistent_refined_views() {
         string_id,
     ));
 
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2656,7 +2638,7 @@ fn m0019_refinement_aware_assignment_ignores_inconsistent_refined_views() {
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_rejects_duplicate_refined_views() {
+fn refinement_aware_assignment_rejects_duplicate_refined_views() {
     let mut type_arena = TypeArena::new();
     let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
@@ -2704,7 +2686,7 @@ fn m0019_refinement_aware_assignment_rejects_duplicate_refined_views() {
         int_id,
     ));
 
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2726,7 +2708,7 @@ fn m0019_refinement_aware_assignment_rejects_duplicate_refined_views() {
 }
 
 #[test]
-fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
+fn refinement_aware_assignment_rejects_forged_out_of_region_view() {
     let mut type_arena = TypeArena::new();
     let int_id = type_arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int_id = type_arena.insert(TypeRecord::nullable(NullableType::new(int_id)));
@@ -2767,7 +2749,7 @@ fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
         int_id,
     ));
 
-    let report = type_m0019_assignment_statements(
+    let report = type_assignment_statements_with_flow(
         &assignments,
         &expression_types,
         &flow_report,
@@ -2785,8 +2767,7 @@ fn m0019_refinement_aware_assignment_rejects_forged_out_of_region_view() {
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_accepts_exact_active_view_and_preserves_original_records()
- {
+fn refinement_aware_local_initializer_accepts_exact_active_view_and_preserves_original_records() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
@@ -2826,7 +2807,7 @@ fn m0019_refinement_aware_local_initializer_accepts_exact_active_view_and_preser
         int,
     ));
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -2851,7 +2832,7 @@ fn m0019_refinement_aware_local_initializer_accepts_exact_active_view_and_preser
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_diagnoses_exact_unrefined_name_only() {
+fn refinement_aware_local_initializer_diagnoses_exact_unrefined_name_only() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
@@ -2902,7 +2883,7 @@ fn m0019_refinement_aware_local_initializer_diagnoses_exact_unrefined_name_only(
         ResolvedLocalBinding::new(unrelated_name, binding),
     ];
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -2932,7 +2913,7 @@ fn m0019_refinement_aware_local_initializer_diagnoses_exact_unrefined_name_only(
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_preserves_nullable_compatibility() {
+fn refinement_aware_local_initializer_preserves_nullable_compatibility() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let null = types.insert(TypeRecord::primitive(PrimitiveType::Null));
@@ -2964,7 +2945,7 @@ fn m0019_refinement_aware_local_initializer_preserves_nullable_compatibility() {
         ExpressionType::new(base_initializer, int),
     ];
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -2985,7 +2966,7 @@ fn m0019_refinement_aware_local_initializer_preserves_nullable_compatibility() {
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_rejects_invalid_or_cross_use_views() {
+fn refinement_aware_local_initializer_rejects_invalid_or_cross_use_views() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
@@ -3079,7 +3060,7 @@ fn m0019_refinement_aware_local_initializer_rejects_invalid_or_cross_use_views()
         ),
     ];
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -3106,8 +3087,7 @@ fn m0019_refinement_aware_local_initializer_rejects_invalid_or_cross_use_views()
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_rejects_after_sibling_shadowed_and_inconsistent_views()
-{
+fn refinement_aware_local_initializer_rejects_after_sibling_shadowed_and_inconsistent_views() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let string = types.insert(TypeRecord::primitive(PrimitiveType::String));
@@ -3204,7 +3184,7 @@ fn m0019_refinement_aware_local_initializer_rejects_after_sibling_shadowed_and_i
         ResolvedLocalBinding::new(inconsistent, outer_binding),
     ];
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -3231,7 +3211,7 @@ fn m0019_refinement_aware_local_initializer_rejects_after_sibling_shadowed_and_i
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_rejects_forged_mutable_binding_view() {
+fn refinement_aware_local_initializer_rejects_forged_mutable_binding_view() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
@@ -3271,7 +3251,7 @@ fn m0019_refinement_aware_local_initializer_rejects_forged_mutable_binding_view(
     ));
     let resolved = [ResolvedLocalBinding::new(initializer, binding)];
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -3294,7 +3274,7 @@ fn m0019_refinement_aware_local_initializer_rejects_forged_mutable_binding_view(
 }
 
 #[test]
-fn m0019_refinement_aware_local_initializer_does_not_consume_another_use_view() {
+fn refinement_aware_local_initializer_does_not_consume_another_use_view() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
     let nullable_int = types.insert(TypeRecord::nullable(NullableType::new(int)));
@@ -3350,7 +3330,7 @@ fn m0019_refinement_aware_local_initializer_does_not_consume_another_use_view() 
         ResolvedLocalBinding::new(other_use, binding),
     ];
 
-    let report = type_m0019_local_declaration_initializers(
+    let report = type_local_declaration_initializers(
         &declarations,
         &signatures,
         &expression_types,
@@ -3398,8 +3378,7 @@ fn accepted_expression_composition_records_literals_names_and_groups() {
         TypeId::from_raw(0),
     )];
 
-    let (arena, report) =
-        type_m0018_accepted_expressions(&literals, &grouped, &resolutions, &known);
+    let (arena, report) = type_accepted_expressions(&literals, &grouped, &resolutions, &known);
 
     assert_eq!(arena.records().len(), 7);
     assert_eq!(report.diagnostics(), &[]);
@@ -3434,7 +3413,7 @@ fn accepted_expression_composition_types_nested_groups_when_inner_becomes_known(
     ];
     let resolutions = ResolutionTable::new();
 
-    let (_arena, report) = type_m0018_accepted_expressions(&literals, &grouped, &resolutions, &[]);
+    let (_arena, report) = type_accepted_expressions(&literals, &grouped, &resolutions, &[]);
 
     assert_eq!(report.expression_type(literal), Some(TypeId::from_raw(2)));
     assert_eq!(
@@ -3459,7 +3438,7 @@ fn accepted_expression_composition_reports_unknown_resolved_name_types() {
     let mut resolutions = ResolutionTable::new();
     resolutions.insert(ResolvedName::new(unknown_name, SymbolId::from_raw(41)));
 
-    let (_arena, report) = type_m0018_accepted_expressions(&[], &grouped, &resolutions, &[]);
+    let (_arena, report) = type_accepted_expressions(&[], &grouped, &resolutions, &[]);
 
     assert_eq!(report.expression_type(unknown_name), None);
     assert_eq!(report.expression_type(unknown_group), None);
@@ -3493,7 +3472,7 @@ fn accepted_local_initializer_checks_names_and_grouped_names() {
     }
     let known = [KnownSymbolType::new(source_symbol, TypeId::from_raw(1))];
 
-    let (_arena, report) = type_m0018_local_declaration_initializers(
+    let (_arena, report) = type_primitive_local_declaration_initializers(
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
@@ -3537,7 +3516,7 @@ fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers()
     }
     let known = [KnownSymbolType::new(source_symbol, TypeId::from_raw(1))];
 
-    let (_arena, report) = type_m0018_local_declaration_initializers(
+    let (_arena, report) = type_primitive_local_declaration_initializers(
         &parsed.local_declarations,
         &parsed.type_name_references,
         &parsed.literal_expressions,
@@ -3578,7 +3557,7 @@ fn accepted_local_initializer_checks_diagnose_mismatched_accepted_initializers()
 }
 
 #[test]
-fn m0018_core_types_well_typed_accepted_fixture() {
+fn core_types_well_typed_accepted_fixture() {
     let parsed = parse_source(
         SourceFileId::from_raw(88),
         "func run() { const source: Int = 1; const copy: Int = source; const grouped: Int = (copy); var next: Int = grouped; next = source; }",
@@ -3624,7 +3603,7 @@ fn m0018_core_types_well_typed_accepted_fixture() {
         ),
     ];
 
-    let (_arena, report) = type_m0018_core(
+    let (_arena, report) = type_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -3653,7 +3632,7 @@ fn m0018_core_types_well_typed_accepted_fixture() {
 }
 
 #[test]
-fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
+fn core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
     let parsed = parse_source(
         SourceFileId::from_raw(89),
         "func run() { const source: Int = 1; const bad: String = source; const unknown: UserId = source; const missingKnown: Int = external; logger.info(source); }",
@@ -3680,7 +3659,7 @@ fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
         LocalBindingKind::Immutable,
     )];
 
-    let (_arena, report) = type_m0018_core(
+    let (_arena, report) = type_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -3750,7 +3729,7 @@ fn m0018_core_reports_mismatch_unresolved_and_unsupported_diagnostics() {
 }
 
 #[test]
-fn m0028_executable_int_operators_type_every_supported_operator() {
+fn executable_int_operators_type_every_supported_operator() {
     let parsed = parse_source(
         SourceFileId::from_raw(90),
         "func run() { const plus = +1; const minus = -1; const not = ~1; const add = 1 + 2; const subtract = 1 - 2; const multiply = 1 * 2; const divide = 1 / 2; const modulo = 1 % 2; const exponent = 1 ** 2; const and = 1 & 2; const or = 1 | 2; const xor = 1 ^ 2; const left = 1 << 2; const right = 1 >> 2; const nested = (1 + 2) * 3; }",
@@ -3758,13 +3737,13 @@ fn m0028_executable_int_operators_type_every_supported_operator() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, base_report) = type_m0018_accepted_expressions(
+    let (_arena, base_report) = type_accepted_expressions(
         &parsed.literal_expressions,
         &parsed.grouped_expressions,
         &ResolutionTable::new(),
         &[],
     );
-    let report = type_m0028_executable_int_operators(
+    let report = type_executable_int_operators(
         &parsed.unary_expressions,
         &parsed.binary_expressions,
         &parsed.grouped_expressions,
@@ -3788,18 +3767,18 @@ fn m0028_executable_int_operators_type_every_supported_operator() {
 }
 
 #[test]
-fn m0028_executable_int_operators_reject_known_non_int_operands() {
+fn executable_int_operators_reject_known_non_int_operands() {
     let parsed = parse_source(SourceFileId::from_raw(91), "func run() { true + 1; }");
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, base_report) = type_m0018_accepted_expressions(
+    let (_arena, base_report) = type_accepted_expressions(
         &parsed.literal_expressions,
         &parsed.grouped_expressions,
         &ResolutionTable::new(),
         &[],
     );
-    let report = type_m0028_executable_int_operators(
+    let report = type_executable_int_operators(
         &parsed.unary_expressions,
         &parsed.binary_expressions,
         &parsed.grouped_expressions,
@@ -3826,18 +3805,18 @@ fn m0028_executable_int_operators_reject_known_non_int_operands() {
 }
 
 #[test]
-fn m0028_executable_int_operators_do_not_type_unknown_operands() {
+fn executable_int_operators_do_not_type_unknown_operands() {
     let parsed = parse_source(SourceFileId::from_raw(92), "func run() { unknown + 1; }");
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, base_report) = type_m0018_accepted_expressions(
+    let (_arena, base_report) = type_accepted_expressions(
         &parsed.literal_expressions,
         &parsed.grouped_expressions,
         &ResolutionTable::new(),
         &[],
     );
-    let report = type_m0028_executable_int_operators(
+    let report = type_executable_int_operators(
         &parsed.unary_expressions,
         &parsed.binary_expressions,
         &parsed.grouped_expressions,
@@ -3853,7 +3832,7 @@ fn m0028_executable_int_operators_do_not_type_unknown_operands() {
 }
 
 #[test]
-fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
+fn core_types_executable_operators_before_initializers_and_assignments() {
     let parsed = parse_source(
         SourceFileId::from_raw(93),
         "func run() { const value: Int = (1 + 2) * 3; var next: Int = value; next = next << 1; }",
@@ -3885,7 +3864,7 @@ fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
         ),
     ];
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -3910,7 +3889,7 @@ fn m0028_core_types_executable_operators_before_initializers_and_assignments() {
 }
 
 #[test]
-fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
+fn core_rejects_non_int_operator_operands_without_generic_deferral() {
     let parsed = parse_source(
         SourceFileId::from_raw(94),
         "func run() { const bad: Int = true + 1; }",
@@ -3918,7 +3897,7 @@ fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -3945,7 +3924,7 @@ fn m0028_core_rejects_non_int_operator_operands_without_generic_deferral() {
 }
 
 #[test]
-fn m0035_core_accepts_boolean_and_equality_operators() {
+fn core_accepts_boolean_and_equality_operators() {
     let parsed = parse_source(
         SourceFileId::from_raw(95),
         "func run() { const logical = !true; const comparison = 1 == 2; }",
@@ -3953,7 +3932,7 @@ fn m0035_core_accepts_boolean_and_equality_operators() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -3977,7 +3956,7 @@ fn m0035_core_accepts_boolean_and_equality_operators() {
 }
 
 #[test]
-fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
+fn executable_core_rejects_invalid_primitive_operator_source() {
     let parsed = parse_source(
         SourceFileId::from_raw(915),
         "func run() { const bad_bool: Bool = !1; const bad_float: Float = 1.5 + 1; }",
@@ -3985,7 +3964,7 @@ fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -4015,7 +3994,7 @@ fn m0035_executable_core_rejects_invalid_primitive_operator_source() {
 }
 
 #[test]
-fn m0035_executable_core_types_byte_literal_in_context() {
+fn executable_core_types_byte_literal_in_context() {
     let parsed = parse_source(
         SourceFileId::from_raw(916),
         "func run() { const first: Byte = 0; const last: Byte = 255; }",
@@ -4023,7 +4002,7 @@ fn m0035_executable_core_types_byte_literal_in_context() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -4046,7 +4025,7 @@ fn m0035_executable_core_types_byte_literal_in_context() {
 }
 
 #[test]
-fn m0035_executable_core_rejects_byte_literal_out_of_range() {
+fn executable_core_rejects_byte_literal_out_of_range() {
     let parsed = parse_source(
         SourceFileId::from_raw(917),
         "func run() { const invalid: Byte = 256; }",
@@ -4054,7 +4033,7 @@ fn m0035_executable_core_rejects_byte_literal_out_of_range() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (_arena, report) = type_m0028_executable_core(
+    let (_arena, report) = type_executable_core(
         &parsed.arena,
         &parsed.local_declarations,
         &parsed.type_name_references,
@@ -4077,7 +4056,7 @@ fn m0035_executable_core_rejects_byte_literal_out_of_range() {
 }
 
 #[test]
-fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
+fn static_integer_diagnostics_cover_adr0043_failures() {
     let parsed = parse_source(
         SourceFileId::from_raw(97),
         "func run() { const range = 9223372036854775808; const overflow = 9223372036854775807 + 1; const zero = 1 / 0; const exponent = 2 ** -1; const shift = 1 << 64; }",
@@ -4085,7 +4064,7 @@ fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let diagnostics = type_m0028_static_integer_diagnostics(
+    let diagnostics = type_static_integer_diagnostics(
         &parsed.integer_literals,
         &parsed.grouped_expressions,
         &parsed.unary_expressions,
@@ -4103,7 +4082,7 @@ fn m0028_static_integer_diagnostics_cover_adr0043_failures() {
 }
 
 #[test]
-fn m0028_static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees() {
+fn static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees() {
     let parsed = parse_source(
         SourceFileId::from_raw(98),
         "func run() { const min = -9223372036854775808; const value: Int = 1; const deferred = value + 9223372036854775808; }",
@@ -4111,7 +4090,7 @@ fn m0028_static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees(
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let diagnostics = type_m0028_static_integer_diagnostics(
+    let diagnostics = type_static_integer_diagnostics(
         &parsed.integer_literals,
         &parsed.grouped_expressions,
         &parsed.unary_expressions,
@@ -4133,7 +4112,7 @@ fn m0028_static_integer_diagnostics_accept_min_int_and_ignore_nonconstant_trees(
 }
 
 #[test]
-fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
+fn static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
     let parsed = parse_source(
         SourceFileId::from_raw(99),
         "func run() { const plus = 1 + 2; const minus = 3 - 2; const product = 2 * 3; const quotient = 8 / 2; const remainder = 7 % 3; const power = 2 ** 8; const left = 1 << 4; const right = -8 >> 2; const and = 6 & 3; const or = 6 | 3; const xor = 6 ^ 3; const unaryPlus = +1; const unaryMinus = -1; const inverted = ~1; const min = -(9223372036854775808); }",
@@ -4141,7 +4120,7 @@ fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let diagnostics = type_m0028_static_integer_diagnostics(
+    let diagnostics = type_static_integer_diagnostics(
         &parsed.integer_literals,
         &parsed.grouped_expressions,
         &parsed.unary_expressions,
@@ -4151,7 +4130,7 @@ fn m0028_static_integer_diagnostics_accept_every_bootstrap_integer_operator() {
 }
 
 #[test]
-fn m0028_entry_point_selects_one_valid_main_in_the_explicit_package() {
+fn entry_point_selects_one_valid_main_in_the_explicit_package() {
     let entry_file = parse_source(
         SourceFileId::from_raw(102),
         "func main(): Int { return 0; }",
@@ -4167,7 +4146,7 @@ fn m0028_entry_point_selects_one_valid_main_in_the_explicit_package() {
         EntryPointFile::new(&other_package, &other_file),
     ];
 
-    let report = check_m0028_entry_point(&entry_package, &files);
+    let report = check_entry_point(&entry_package, &files);
 
     assert_eq!(report.diagnostics(), []);
     assert_eq!(
@@ -4177,7 +4156,7 @@ fn m0028_entry_point_selects_one_valid_main_in_the_explicit_package() {
 }
 
 #[test]
-fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
+fn entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
     let package = PackageNamespace::parse("app").unwrap();
     let missing = parse_source(
         SourceFileId::from_raw(104),
@@ -4196,8 +4175,7 @@ fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
         "func main(value: Int): String { return \"bad\"; }",
     );
 
-    let missing_report =
-        check_m0028_entry_point(&package, &[EntryPointFile::new(&package, &missing)]);
+    let missing_report = check_entry_point(&package, &[EntryPointFile::new(&package, &missing)]);
     assert!(
         missing_report
             .diagnostics()
@@ -4206,7 +4184,7 @@ fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
     );
     assert_eq!(missing_report.entry_point(), None);
 
-    let duplicate_report = check_m0028_entry_point(
+    let duplicate_report = check_entry_point(
         &package,
         &[
             EntryPointFile::new(&package, &duplicate_first),
@@ -4223,8 +4201,7 @@ fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
     );
     assert_eq!(duplicate_report.entry_point(), None);
 
-    let invalid_report =
-        check_m0028_entry_point(&package, &[EntryPointFile::new(&package, &invalid)]);
+    let invalid_report = check_entry_point(&package, &[EntryPointFile::new(&package, &invalid)]);
     assert!(invalid_report.diagnostics().iter().any(|diagnostic| {
         diagnostic.kind() == EntryPointDiagnosticKind::InvalidEntryPointSignature
             && diagnostic.source_span()
@@ -4240,7 +4217,7 @@ fn m0028_entry_point_diagnoses_missing_duplicate_and_invalid_candidates() {
 }
 
 #[test]
-fn m0028_entry_point_rejects_every_non_entry_main_shape() {
+fn entry_point_rejects_every_non_entry_main_shape() {
     let package = PackageNamespace::parse("app").unwrap();
     for (file, source) in [
         (108, "func main() { return 0; }"),
@@ -4249,7 +4226,7 @@ fn m0028_entry_point_rejects_every_non_entry_main_shape() {
     ] {
         let parsed = parse_source(SourceFileId::from_raw(file), source);
         assert!(parsed.diagnostics.is_empty());
-        let report = check_m0028_entry_point(&package, &[EntryPointFile::new(&package, &parsed)]);
+        let report = check_entry_point(&package, &[EntryPointFile::new(&package, &parsed)]);
 
         if file == 110 {
             assert!(report.diagnostics().iter().any(|diagnostic| {
@@ -4265,14 +4242,14 @@ fn m0028_entry_point_rejects_every_non_entry_main_shape() {
 }
 
 #[test]
-fn m0028_straight_line_return_validation_reports_missing_and_unreachable_returns() {
+fn straight_line_return_validation_reports_missing_and_unreachable_returns() {
     let parsed = parse_source(
         SourceFileId::from_raw(112),
         "func valid(): Int { return 1; } func missing(): Int { const value: Int = 1; } func duplicate(): Int { return 1; return 2; } func nested(): Int { if (true) { return 1; }; }",
     );
     assert!(parsed.diagnostics.is_empty());
 
-    let report = check_m0028_straight_line_returns(&parsed);
+    let report = check_straight_line_returns(&parsed);
     let kinds: Vec<_> = report
         .diagnostics()
         .iter()
@@ -4304,14 +4281,14 @@ fn m0028_straight_line_return_validation_reports_missing_and_unreachable_returns
 }
 
 #[test]
-fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
+fn function_signatures_type_explicit_int_parameters_and_returns() {
     let parsed = parse_source(
         SourceFileId::from_raw(113),
         "func add(left: Int, right: Int): Int { return left + right; }",
     );
     assert!(parsed.diagnostics.is_empty());
 
-    let (types, signatures) = type_m0028_function_signatures(
+    let (types, signatures) = type_function_signatures(
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
@@ -4323,7 +4300,7 @@ fn m0028_function_signatures_type_explicit_int_parameters_and_returns() {
 }
 
 #[test]
-fn m0035_function_signatures_type_all_bootstrap_primitives() {
+fn function_signatures_type_all_bootstrap_primitives() {
     let parsed = parse_source(
         SourceFileId::from_raw(919),
         "func bool_value(value: Bool): Bool { return value; } func unit_value(): Unit { return (); } func float_value(value: Float): Float { return value; } func byte_value(value: Byte): Byte { return value; }",
@@ -4331,7 +4308,7 @@ fn m0035_function_signatures_type_all_bootstrap_primitives() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
 
-    let (types, signatures) = type_m0028_function_signatures(
+    let (types, signatures) = type_function_signatures(
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
@@ -4350,7 +4327,7 @@ fn m0035_function_signatures_type_all_bootstrap_primitives() {
 }
 
 #[test]
-fn m0028_function_signatures_share_the_caller_owned_module_arena() {
+fn function_signatures_share_the_caller_owned_module_arena() {
     let first = parse_source(
         SourceFileId::from_raw(114),
         "func first(value: Int): Int { return value; }",
@@ -4361,13 +4338,13 @@ fn m0028_function_signatures_share_the_caller_owned_module_arena() {
     );
     let mut types = TypeArena::new();
 
-    let first_signatures = type_m0028_function_signatures_in(
+    let first_signatures = type_function_signatures_in(
         &mut types,
         &first.function_declarations,
         &first.function_parameters,
         &first.type_name_references,
     );
-    let second_signatures = type_m0028_function_signatures_in(
+    let second_signatures = type_function_signatures_in(
         &mut types,
         &second.function_declarations,
         &second.function_parameters,
@@ -4382,7 +4359,7 @@ fn m0028_function_signatures_share_the_caller_owned_module_arena() {
 }
 
 #[test]
-fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
+fn executable_expression_types_share_the_caller_owned_module_arena() {
     let first = parse_source(
         SourceFileId::from_raw(116),
         "func first() { const value: Int = 1; }",
@@ -4392,7 +4369,7 @@ fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
         "func second() { const value: Int = 2; }",
     );
     let mut types = TypeArena::new();
-    let first_report = type_m0028_executable_core_in(
+    let first_report = type_executable_core_in(
         &mut types,
         &first.arena,
         &first.local_declarations,
@@ -4406,7 +4383,7 @@ fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
         &ResolutionTable::new(),
         &[],
     );
-    let second_report = type_m0028_executable_core_in(
+    let second_report = type_executable_core_in(
         &mut types,
         &second.arena,
         &second.local_declarations,
@@ -4429,7 +4406,7 @@ fn m0028_executable_expression_types_share_the_caller_owned_module_arena() {
 }
 
 #[test]
-fn m0028_direct_calls_type_same_package_helper_arguments() {
+fn direct_calls_type_same_package_helper_arguments() {
     let helper = parse_source(
         SourceFileId::from_raw(118),
         "func helper(value: Int): Int { return value; }",
@@ -4440,19 +4417,19 @@ fn m0028_direct_calls_type_same_package_helper_arguments() {
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
-    let helper_signatures = type_m0028_function_signatures_in(
+    let helper_signatures = type_function_signatures_in(
         &mut types,
         &helper.function_declarations,
         &helper.function_parameters,
         &helper.type_name_references,
     );
-    let caller_signatures = type_m0028_function_signatures_in(
+    let caller_signatures = type_function_signatures_in(
         &mut types,
         &caller.function_declarations,
         &caller.function_parameters,
         &caller.type_name_references,
     );
-    let helper_types = type_m0028_executable_core_in(
+    let helper_types = type_executable_core_in(
         &mut types,
         &helper.arena,
         &helper.local_declarations,
@@ -4466,7 +4443,7 @@ fn m0028_direct_calls_type_same_package_helper_arguments() {
         &ResolutionTable::new(),
         &[],
     );
-    let caller_types = type_m0028_executable_core_in(
+    let caller_types = type_executable_core_in(
         &mut types,
         &caller.arena,
         &caller.local_declarations,
@@ -4480,7 +4457,7 @@ fn m0028_direct_calls_type_same_package_helper_arguments() {
         &ResolutionTable::new(),
         &[],
     );
-    let report = check_m0028_direct_calls(&[
+    let report = check_direct_calls(&[
         ExecutableSourceTypes::new(
             &package,
             &helper,
@@ -4500,7 +4477,7 @@ fn m0028_direct_calls_type_same_package_helper_arguments() {
 }
 
 #[test]
-fn m0028_direct_calls_report_invalid_target_and_arity() {
+fn direct_calls_report_invalid_target_and_arity() {
     let target = parse_source(
         SourceFileId::from_raw(120),
         "func helper(value: Int): Int { return value; }",
@@ -4511,19 +4488,19 @@ fn m0028_direct_calls_report_invalid_target_and_arity() {
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
-    let target_signatures = type_m0028_function_signatures_in(
+    let target_signatures = type_function_signatures_in(
         &mut types,
         &target.function_declarations,
         &target.function_parameters,
         &target.type_name_references,
     );
-    let caller_signatures = type_m0028_function_signatures_in(
+    let caller_signatures = type_function_signatures_in(
         &mut types,
         &caller.function_declarations,
         &caller.function_parameters,
         &caller.type_name_references,
     );
-    let target_types = type_m0028_executable_core_in(
+    let target_types = type_executable_core_in(
         &mut types,
         &target.arena,
         &target.local_declarations,
@@ -4537,7 +4514,7 @@ fn m0028_direct_calls_report_invalid_target_and_arity() {
         &ResolutionTable::new(),
         &[],
     );
-    let caller_types = type_m0028_executable_core_in(
+    let caller_types = type_executable_core_in(
         &mut types,
         &caller.arena,
         &caller.local_declarations,
@@ -4551,7 +4528,7 @@ fn m0028_direct_calls_report_invalid_target_and_arity() {
         &ResolutionTable::new(),
         &[],
     );
-    let report = check_m0028_direct_calls(&[
+    let report = check_direct_calls(&[
         ExecutableSourceTypes::new(
             &package,
             &target,
@@ -4575,20 +4552,20 @@ fn m0028_direct_calls_report_invalid_target_and_arity() {
 }
 
 #[test]
-fn m0028_direct_calls_reject_every_edge_in_a_recursive_cycle() {
+fn direct_calls_reject_every_edge_in_a_recursive_cycle() {
     let parsed = parse_source(
         SourceFileId::from_raw(122),
         "func first(): Int { return second(); } func second(): Int { return third(); } func third(): Int { return first(); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
     );
-    let executable_types = type_m0028_executable_core_in(
+    let executable_types = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -4603,7 +4580,7 @@ fn m0028_direct_calls_reject_every_edge_in_a_recursive_cycle() {
         &[],
     );
 
-    let report = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+    let report = check_direct_calls(&[ExecutableSourceTypes::new(
         &package,
         &parsed,
         &signatures,
@@ -4622,7 +4599,7 @@ fn m0028_direct_calls_reject_every_edge_in_a_recursive_cycle() {
 }
 
 #[test]
-fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodies() {
+fn direct_calls_reject_mismatched_arguments_and_declarations_without_bodies() {
     let target = parse_source(
         SourceFileId::from_raw(123),
         "func helper(value: Int): Int { return value; } func declared(): Int;",
@@ -4633,19 +4610,19 @@ fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodie
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
-    let target_signatures = type_m0028_function_signatures_in(
+    let target_signatures = type_function_signatures_in(
         &mut types,
         &target.function_declarations,
         &target.function_parameters,
         &target.type_name_references,
     );
-    let caller_signatures = type_m0028_function_signatures_in(
+    let caller_signatures = type_function_signatures_in(
         &mut types,
         &caller.function_declarations,
         &caller.function_parameters,
         &caller.type_name_references,
     );
-    let target_types = type_m0028_executable_core_in(
+    let target_types = type_executable_core_in(
         &mut types,
         &target.arena,
         &target.local_declarations,
@@ -4659,7 +4636,7 @@ fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodie
         &ResolutionTable::new(),
         &[],
     );
-    let caller_types = type_m0028_executable_core_in(
+    let caller_types = type_executable_core_in(
         &mut types,
         &caller.arena,
         &caller.local_declarations,
@@ -4674,7 +4651,7 @@ fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodie
         &[],
     );
 
-    let report = check_m0028_direct_calls(&[
+    let report = check_direct_calls(&[
         ExecutableSourceTypes::new(
             &package,
             &target,
@@ -4706,7 +4683,7 @@ fn m0028_direct_calls_reject_mismatched_arguments_and_declarations_without_bodie
 }
 
 #[test]
-fn m0028_executable_core_accepts_checked_direct_calls() {
+fn executable_core_accepts_checked_direct_calls() {
     let helper = parse_source(
         SourceFileId::from_raw(125),
         "func increment(value: Int): Int { return value + 1; }",
@@ -4717,19 +4694,19 @@ fn m0028_executable_core_accepts_checked_direct_calls() {
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
-    let helper_signatures = type_m0028_function_signatures_in(
+    let helper_signatures = type_function_signatures_in(
         &mut types,
         &helper.function_declarations,
         &helper.function_parameters,
         &helper.type_name_references,
     );
-    let caller_signatures = type_m0028_function_signatures_in(
+    let caller_signatures = type_function_signatures_in(
         &mut types,
         &caller.function_declarations,
         &caller.function_parameters,
         &caller.type_name_references,
     );
-    let helper_types = type_m0028_executable_core_in(
+    let helper_types = type_executable_core_in(
         &mut types,
         &helper.arena,
         &helper.local_declarations,
@@ -4743,7 +4720,7 @@ fn m0028_executable_core_accepts_checked_direct_calls() {
         &ResolutionTable::new(),
         &[],
     );
-    let mut caller_types = type_m0028_executable_core_in(
+    let mut caller_types = type_executable_core_in(
         &mut types,
         &caller.arena,
         &caller.local_declarations,
@@ -4757,7 +4734,7 @@ fn m0028_executable_core_accepts_checked_direct_calls() {
         &ResolutionTable::new(),
         &[],
     );
-    let calls = check_m0028_direct_calls(&[
+    let calls = check_direct_calls(&[
         ExecutableSourceTypes::new(
             &package,
             &helper,
@@ -4772,7 +4749,7 @@ fn m0028_executable_core_accepts_checked_direct_calls() {
         ),
     ]);
 
-    apply_m0028_direct_call_results(&mut caller_types, &caller, &calls);
+    apply_direct_call_results(&mut caller_types, &caller, &calls);
 
     let call = &caller.call_expressions[0];
     assert_eq!(
@@ -4787,20 +4764,20 @@ fn m0028_executable_core_accepts_checked_direct_calls() {
 }
 
 #[test]
-fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
+fn executable_core_keeps_invalid_direct_calls_deferred() {
     let parsed = parse_source(
         SourceFileId::from_raw(127),
         "func main(): Int { return missing(); }",
     );
     let package = PackageNamespace::parse("app").unwrap();
     let mut types = TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
     );
-    let mut executable_types = type_m0028_executable_core_in(
+    let mut executable_types = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -4814,14 +4791,14 @@ fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
         &ResolutionTable::new(),
         &[],
     );
-    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+    let calls = check_direct_calls(&[ExecutableSourceTypes::new(
         &package,
         &parsed,
         &signatures,
         executable_types.expression_types(),
     )]);
 
-    apply_m0028_direct_call_results(&mut executable_types, &parsed, &calls);
+    apply_direct_call_results(&mut executable_types, &parsed, &calls);
 
     let call = &parsed.call_expressions[0];
     assert_eq!(executable_types.expression_type(call.expression), None);
@@ -4833,19 +4810,19 @@ fn m0028_executable_core_keeps_invalid_direct_calls_deferred() {
 }
 
 #[test]
-fn m0028_return_expression_types_report_known_mismatches_only() {
+fn return_expression_types_report_known_mismatches_only() {
     let parsed = parse_source(
         SourceFileId::from_raw(128),
         "func bad(): Int { return true; } func unresolved(): Int { return missing; } func valid(): Int { return 1; }",
     );
     let mut types = TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
     );
-    let expressions = type_m0028_executable_core_in(
+    let expressions = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -4861,7 +4838,7 @@ fn m0028_return_expression_types_report_known_mismatches_only() {
     );
 
     let report =
-        check_m0028_return_expression_types(&parsed, &signatures, expressions.expression_types());
+        check_return_expression_types(&parsed, &signatures, expressions.expression_types());
 
     assert_eq!(report.diagnostics().len(), 1);
     assert_eq!(
@@ -4876,14 +4853,14 @@ fn m0028_return_expression_types_report_known_mismatches_only() {
 }
 
 #[test]
-fn m0028_unsupported_executable_forms_report_outermost_source_spans() {
+fn unsupported_executable_forms_report_outermost_source_spans() {
     let parsed = parse_source(
         SourceFileId::from_raw(129),
         "struct Box<T> {} func main(): Int { return \"not executable\"; }",
     );
     assert!(parsed.diagnostics.is_empty());
 
-    let report = check_m0028_unsupported_executable_forms(&parsed);
+    let report = check_unsupported_executable_forms(&parsed);
 
     assert_eq!(report.diagnostics().len(), 1);
     assert_eq!(

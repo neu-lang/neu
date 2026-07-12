@@ -10,14 +10,14 @@ use compiler::{
     },
     source::{ByteSpan, SourceFileId},
     type_check::{
-        ExecutableSourceTypes, ExpressionType, apply_m0028_direct_call_results,
-        check_m0028_direct_calls, type_m0028_executable_core_in, type_m0028_function_signatures_in,
+        ExecutableSourceTypes, ExpressionType, apply_direct_call_results, check_direct_calls,
+        type_executable_core_in, type_function_signatures_in,
     },
     types::{PrimitiveType, TypeArena, TypeRecord},
 };
 
 #[test]
-fn m0031_lowers_int_constant_return_to_verified_cranelift_ir() {
+fn lowers_int_constant_return_to_verified_cranelift_ir() {
     let file = SourceFileId::from_raw(400);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -48,7 +48,7 @@ fn m0031_lowers_int_constant_return_to_verified_cranelift_ir() {
 }
 
 #[test]
-fn m0035_lowers_bool_byte_float_and_unit_returns() {
+fn lowers_bool_byte_float_and_unit_returns() {
     let file = SourceFileId::from_raw(906);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -138,7 +138,7 @@ fn m0035_lowers_bool_byte_float_and_unit_returns() {
 }
 
 #[test]
-fn m0031_rejects_unsupported_mir_instruction() {
+fn rejects_unsupported_mir_instruction() {
     let file = SourceFileId::from_raw(401);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -169,7 +169,7 @@ fn m0031_rejects_unsupported_mir_instruction() {
 }
 
 #[test]
-fn m0031_lowers_checked_addition_with_overflow_trap() {
+fn lowers_checked_addition_with_overflow_trap() {
     let file = SourceFileId::from_raw(402);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -205,7 +205,7 @@ fn m0031_lowers_checked_addition_with_overflow_trap() {
 }
 
 #[test]
-fn m0031_lowers_checked_subtraction_with_overflow_trap() {
+fn lowers_checked_subtraction_with_overflow_trap() {
     let file = SourceFileId::from_raw(403);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -241,7 +241,7 @@ fn m0031_lowers_checked_subtraction_with_overflow_trap() {
 }
 
 #[test]
-fn m0031_lowers_checked_multiplication_with_overflow_trap() {
+fn lowers_checked_multiplication_with_overflow_trap() {
     let file = SourceFileId::from_raw(404);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -277,7 +277,7 @@ fn m0031_lowers_checked_multiplication_with_overflow_trap() {
 }
 
 #[test]
-fn m0031_lowers_checked_division() {
+fn lowers_checked_division() {
     let file = SourceFileId::from_raw(405);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -310,7 +310,7 @@ fn m0031_lowers_checked_division() {
 }
 
 #[test]
-fn m0031_lowers_checked_remainder() {
+fn lowers_checked_remainder() {
     let file = SourceFileId::from_raw(406);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -343,7 +343,7 @@ fn m0031_lowers_checked_remainder() {
 }
 
 #[test]
-fn m0031_lowers_bitwise_operations() {
+fn lowers_bitwise_operations() {
     let file = SourceFileId::from_raw(407);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -392,7 +392,7 @@ fn m0031_lowers_bitwise_operations() {
 }
 
 #[test]
-fn m0031_lowers_checked_shifts() {
+fn lowers_checked_shifts() {
     let file = SourceFileId::from_raw(408);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -434,7 +434,7 @@ fn m0031_lowers_checked_shifts() {
 }
 
 #[test]
-fn m0031_lowers_unary_int_operations() {
+fn lowers_unary_int_operations() {
     let file = SourceFileId::from_raw(409);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -479,7 +479,7 @@ fn m0031_lowers_unary_int_operations() {
 }
 
 #[test]
-fn m0035_lowers_float_byte_bool_and_comparison_operations() {
+fn lowers_float_byte_bool_and_comparison_operations() {
     let file = SourceFileId::from_raw(913);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -573,7 +573,7 @@ fn m0035_lowers_float_byte_bool_and_comparison_operations() {
 }
 
 #[test]
-fn m0035_lowers_conditional_mir_cfg_to_cranelift() {
+fn lowers_conditional_mir_cfg_to_cranelift() {
     let file = SourceFileId::from_raw(920);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -630,7 +630,7 @@ fn m0035_lowers_conditional_mir_cfg_to_cranelift() {
 }
 
 #[test]
-fn m0035_lowers_short_circuit_result_local_through_cfg() {
+fn lowers_short_circuit_result_local_through_cfg() {
     let file = SourceFileId::from_raw(922);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -706,7 +706,7 @@ fn m0035_lowers_short_circuit_result_local_through_cfg() {
 }
 
 #[test]
-fn m0035_lowers_typed_primitive_parameters() {
+fn lowers_typed_primitive_parameters() {
     let file = SourceFileId::from_raw(923);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -770,7 +770,7 @@ fn m0035_lowers_typed_primitive_parameters() {
 }
 
 #[test]
-fn m0035_lowers_primitive_direct_call_through_module_context() {
+fn lowers_primitive_direct_call_through_module_context() {
     let file = SourceFileId::from_raw(927);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -836,7 +836,7 @@ fn m0035_lowers_primitive_direct_call_through_module_context() {
 }
 
 #[test]
-fn m0035_lowers_unit_direct_call_without_abi_result() {
+fn lowers_unit_direct_call_without_abi_result() {
     let file = SourceFileId::from_raw(928);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -897,7 +897,7 @@ fn m0035_lowers_unit_direct_call_without_abi_result() {
 }
 
 #[test]
-fn m0035_source_float_helper_call_reaches_object_emission() {
+fn source_float_helper_call_reaches_object_emission() {
     let parsed = compiler::parser::parse_source(
         SourceFileId::from_raw(929),
         "func helper(): Float { return 1.5; } func caller(): Float { return helper(); }",
@@ -905,7 +905,7 @@ fn m0035_source_float_helper_call_reaches_object_emission() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
     let mut types = TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
@@ -913,7 +913,7 @@ fn m0035_source_float_helper_call_reaches_object_emission() {
     );
     assert_eq!(signatures.len(), 2);
 
-    let mut report = type_m0028_executable_core_in(
+    let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -928,14 +928,14 @@ fn m0035_source_float_helper_call_reaches_object_emission() {
         &[],
     );
     let package = compiler::module::PackageNamespace::parse("app").unwrap();
-    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+    let calls = check_direct_calls(&[ExecutableSourceTypes::new(
         &package,
         &parsed,
         &signatures,
         report.expression_types(),
     )]);
     assert!(calls.diagnostics().is_empty());
-    apply_m0028_direct_call_results(&mut report, &parsed, &calls);
+    apply_direct_call_results(&mut report, &parsed, &calls);
 
     let hir = lower_checked_hir_source(CheckedHirSource::new(
         compiler::module::ModuleName::parse("app").unwrap(),
@@ -952,7 +952,7 @@ fn m0035_source_float_helper_call_reaches_object_emission() {
 }
 
 #[test]
-fn m0035_source_bool_unit_and_byte_helpers_reach_object_emission() {
+fn source_bool_unit_and_byte_helpers_reach_object_emission() {
     let parsed = compiler::parser::parse_source(
         SourceFileId::from_raw(930),
         "func flag(): Bool { return !false; } func done(): Unit { return (); } func locallyDone(): Unit { const value: Unit = (); return value; } func octet(): Byte { return 255; }",
@@ -960,13 +960,13 @@ fn m0035_source_bool_unit_and_byte_helpers_reach_object_emission() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
     let mut types = TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
     );
-    let mut report = type_m0028_executable_core_in(
+    let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -1023,7 +1023,7 @@ fn m0035_source_bool_unit_and_byte_helpers_reach_object_emission() {
 }
 
 #[test]
-fn m0031_lowers_checked_exponentiation() {
+fn lowers_checked_exponentiation() {
     let file = SourceFileId::from_raw(410);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();

@@ -16,7 +16,7 @@ use compiler::{
 };
 
 #[test]
-fn m0024_primitives_follow_adr0037_capabilities() {
+fn primitives_follow_adr0037_capabilities() {
     let mut arena = TypeArena::new();
     let bool_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Bool));
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
@@ -50,7 +50,7 @@ fn m0024_primitives_follow_adr0037_capabilities() {
 }
 
 #[test]
-fn m0089_closure_transfer_requires_send_and_shared_use_requires_share() {
+fn closure_transfer_requires_send_and_shared_use_requires_share() {
     let mut arena = TypeArena::new();
     let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
     let transfer = ClosureCapture::new(
@@ -84,7 +84,7 @@ fn m0089_closure_transfer_requires_send_and_shared_use_requires_share() {
 }
 
 #[test]
-fn m0089_borrowed_and_mutably_shared_captures_are_rejected() {
+fn borrowed_and_mutably_shared_captures_are_rejected() {
     let mut arena = TypeArena::new();
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let boundary = AstNodeId::from_raw(9100);
@@ -126,7 +126,7 @@ fn m0089_borrowed_and_mutably_shared_captures_are_rejected() {
 }
 
 #[test]
-fn m0024_nullable_capabilities_follow_base_type() {
+fn nullable_capabilities_follow_base_type() {
     let mut arena = TypeArena::new();
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
     let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
@@ -171,7 +171,7 @@ fn m0024_nullable_capabilities_follow_base_type() {
 }
 
 #[test]
-fn m0024_nominal_generic_and_missing_types_satisfy_no_capabilities() {
+fn nominal_generic_and_missing_types_satisfy_no_capabilities() {
     let mut arena = TypeArena::new();
     let nominal = arena.insert(TypeRecord::nominal(NominalTypeIdentity::new(
         ModuleName::parse("demo.domain").unwrap(),
@@ -200,7 +200,7 @@ fn m0024_nominal_generic_and_missing_types_satisfy_no_capabilities() {
 }
 
 #[test]
-fn m0024_boundary_analysis_reports_missing_capabilities() {
+fn boundary_analysis_reports_missing_capabilities() {
     let mut arena = TypeArena::new();
     let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
@@ -269,7 +269,7 @@ fn m0024_boundary_analysis_reports_missing_capabilities() {
 }
 
 #[test]
-fn m0024_boundary_diagnostics_preserve_order_and_spans() {
+fn boundary_diagnostics_preserve_order_and_spans() {
     let mut arena = TypeArena::new();
     let generic_ty = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
         AstNodeId::from_raw(90),

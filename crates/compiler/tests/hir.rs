@@ -9,15 +9,15 @@ use compiler::{
     parser::parse_source,
     source::{ByteSpan, SourceFileId},
     type_check::{
-        ExecutableSourceTypes, ExpressionType, FunctionSignature, apply_m0028_direct_call_results,
-        check_m0028_direct_calls, type_m0028_executable_core_in, type_m0028_function_signatures_in,
+        ExecutableSourceTypes, ExpressionType, FunctionSignature, apply_direct_call_results,
+        check_direct_calls, type_executable_core_in, type_function_signatures_in,
         type_parser_literals,
     },
     types::{GenericSpecializationIdentity, TypeId},
 };
 
 #[test]
-fn m0029_hir_model_preserves_typed_source_mapped_executable_facts() {
+fn hir_model_preserves_typed_source_mapped_executable_facts() {
     let file = SourceFileId::from_raw(200);
     let function_span = ByteSpan::new(file, 0, 48).unwrap();
     let parameter_span = ByteSpan::new(file, 14, 24).unwrap();
@@ -88,7 +88,7 @@ fn m0029_hir_model_preserves_typed_source_mapped_executable_facts() {
 }
 
 #[test]
-fn m0085_hir_preserves_specialization_identity() {
+fn hir_preserves_specialization_identity() {
     let file = SourceFileId::from_raw(1085);
     let span = ByteSpan::new(file, 0, 1).unwrap();
     let identity = GenericSpecializationIdentity::new(
@@ -114,7 +114,7 @@ fn m0085_hir_preserves_specialization_identity() {
 }
 
 #[test]
-fn m0087_hir_preserves_function_reference_and_indirect_call_kinds() {
+fn hir_preserves_function_reference_and_indirect_call_kinds() {
     let file = SourceFileId::from_raw(1087);
     let span = ByteSpan::new(file, 0, 1).unwrap();
     let int = TypeId::from_raw(1);
@@ -143,7 +143,7 @@ fn m0087_hir_preserves_function_reference_and_indirect_call_kinds() {
 }
 
 #[test]
-fn m0035_hir_preserves_non_integer_primitive_literal_payloads() {
+fn hir_preserves_non_integer_primitive_literal_payloads() {
     let file = SourceFileId::from_raw(904);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let bool_type = TypeId::from_raw(1);
@@ -171,7 +171,7 @@ fn m0035_hir_preserves_non_integer_primitive_literal_payloads() {
 }
 
 #[test]
-fn m0035_checked_source_lowers_bool_unit_and_float_literals_to_hir() {
+fn checked_source_lowers_bool_unit_and_float_literals_to_hir() {
     let file = SourceFileId::from_raw(907);
     let parsed = parse_source(
         file,
@@ -224,7 +224,7 @@ fn m0035_checked_source_lowers_bool_unit_and_float_literals_to_hir() {
 }
 
 #[test]
-fn m0035_hir_preserves_primitive_operator_kinds_and_operand_order() {
+fn hir_preserves_primitive_operator_kinds_and_operand_order() {
     let file = SourceFileId::from_raw(909);
     let span = ByteSpan::new(file, 0, 5).unwrap();
     let bool_type = TypeId::from_raw(0);
@@ -255,7 +255,7 @@ fn m0035_hir_preserves_primitive_operator_kinds_and_operand_order() {
 }
 
 #[test]
-fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
+fn checked_source_transports_contextual_byte_literal_to_hir() {
     let parsed = parse_source(
         SourceFileId::from_raw(918),
         "func main(): Byte { return 255; }",
@@ -263,7 +263,7 @@ fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
     let mut types = compiler::types::TypeArena::new();
-    let mut report = type_m0028_executable_core_in(
+    let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &[],
@@ -309,7 +309,7 @@ fn m0035_checked_source_transports_contextual_byte_literal_to_hir() {
 }
 
 #[test]
-fn m0035_checked_source_lowers_float_local_and_read_to_hir() {
+fn checked_source_lowers_float_local_and_read_to_hir() {
     let parsed = parse_source(
         SourceFileId::from_raw(919),
         "func ratio(): Float { const value: Float = 1.5; return value; }",
@@ -317,7 +317,7 @@ fn m0035_checked_source_lowers_float_local_and_read_to_hir() {
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
     let mut types = compiler::types::TypeArena::new();
-    let mut report = type_m0028_executable_core_in(
+    let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -337,7 +337,7 @@ fn m0035_checked_source_lowers_float_local_and_read_to_hir() {
         .find(|name| name.name == "value")
         .unwrap();
     report.record_expression_type(ExpressionType::new(name.reference, TypeId::from_raw(5)));
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
@@ -366,7 +366,7 @@ fn m0035_checked_source_lowers_float_local_and_read_to_hir() {
 }
 
 #[test]
-fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() {
+fn hir_executable_expressions_preserve_ordered_operands_and_assignments() {
     let file = SourceFileId::from_raw(201);
     let span = ByteSpan::new(file, 0, 1).unwrap();
     let int = TypeId::from_raw(1);
@@ -434,7 +434,7 @@ fn m0029_hir_executable_expressions_preserve_ordered_operands_and_assignments() 
 }
 
 #[test]
-fn m0035_hir_models_primitive_parameter_reads() {
+fn hir_models_primitive_parameter_reads() {
     let file = SourceFileId::from_raw(924);
     let span = ByteSpan::new(file, 0, 3).unwrap();
     let float_type = TypeId::from_raw(5);
@@ -452,7 +452,7 @@ fn m0035_hir_models_primitive_parameter_reads() {
 }
 
 #[test]
-fn m0035_checked_source_lowers_primitive_parameter_reads() {
+fn checked_source_lowers_primitive_parameter_reads() {
     let file = SourceFileId::from_raw(926);
     let parsed = parse_source(file, "func echo(value: Float): Float { return value; }");
     assert!(parsed.lex_diagnostics.is_empty());
@@ -484,19 +484,19 @@ fn m0035_checked_source_lowers_primitive_parameter_reads() {
 }
 
 #[test]
-fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
+fn checked_source_lowers_integer_helpers_and_direct_calls() {
     let parsed = parse_source(
         SourceFileId::from_raw(203),
         "func helper(): Int { return 1 + 2; } func main(): Int { return helper(); }",
     );
     let mut types = compiler::types::TypeArena::new();
-    let signatures = type_m0028_function_signatures_in(
+    let signatures = type_function_signatures_in(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
     );
-    let mut expressions = type_m0028_executable_core_in(
+    let mut expressions = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -511,13 +511,13 @@ fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
         &[],
     );
     let package = PackageNamespace::parse("app").unwrap();
-    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+    let calls = check_direct_calls(&[ExecutableSourceTypes::new(
         &package,
         &parsed,
         &signatures,
         expressions.expression_types(),
     )]);
-    apply_m0028_direct_call_results(&mut expressions, &parsed, &calls);
+    apply_direct_call_results(&mut expressions, &parsed, &calls);
     let module = lower_checked_hir_source(CheckedHirSource::new(
         ModuleName::parse("app").unwrap(),
         package,
@@ -546,6 +546,6 @@ fn m0029_checked_source_lowers_integer_helpers_and_direct_calls() {
 }
 
 #[test]
-fn m0032_checked_source_preserves_function_symbol_identity() {
-    m0029_checked_source_lowers_integer_helpers_and_direct_calls();
+fn checked_source_preserves_function_symbol_identity() {
+    checked_source_lowers_integer_helpers_and_direct_calls();
 }

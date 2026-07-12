@@ -7,7 +7,7 @@ use compiler::{
 };
 
 #[test]
-fn m0026_unsafe_analysis_accepts_proven_safe_operations_without_context() {
+fn unsafe_analysis_accepts_proven_safe_operations_without_context() {
     let diagnostics = analyze_unsafe_operations(
         &[],
         &[UnsafeOperation::new(
@@ -22,7 +22,7 @@ fn m0026_unsafe_analysis_accepts_proven_safe_operations_without_context() {
 }
 
 #[test]
-fn m0026_unsafe_analysis_accepts_trusted_operations_in_matching_context() {
+fn unsafe_analysis_accepts_trusted_operations_in_matching_context() {
     let context = AstNodeId::from_raw(200);
     let diagnostics = analyze_unsafe_operations(
         &[UnsafeContext::new(context, UnsafeContextKind::Block)],
@@ -38,7 +38,7 @@ fn m0026_unsafe_analysis_accepts_trusted_operations_in_matching_context() {
 }
 
 #[test]
-fn m0026_unsafe_analysis_reports_trusted_operation_without_context() {
+fn unsafe_analysis_reports_trusted_operation_without_context() {
     let operation = AstNodeId::from_raw(300);
     let diagnostics = analyze_unsafe_operations(
         &[],
@@ -66,7 +66,7 @@ fn m0026_unsafe_analysis_reports_trusted_operation_without_context() {
 }
 
 #[test]
-fn m0026_unsafe_analysis_reports_non_matching_context_and_preserves_order() {
+fn unsafe_analysis_reports_non_matching_context_and_preserves_order() {
     let valid_context = AstNodeId::from_raw(400);
     let missing_context = AstNodeId::from_raw(401);
     let first_operation = AstNodeId::from_raw(402);

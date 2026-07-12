@@ -6,8 +6,7 @@ use compiler::{
     source::SourceFileId,
     type_check::{
         ConstructorDiagnosticKind, DispatchDiagnosticKind, TypeRuleDiagnostic,
-        check_m0069_constructor_calls, check_m0070_dispatch, class_lifecycle_facts,
-        type_m0068_class_types,
+        check_constructor_calls, check_dispatch, class_lifecycle_facts, type_class_types,
     },
 };
 use std::{fs, path::PathBuf, process::Command};
@@ -26,7 +25,7 @@ fn parses_class_interface_and_field_surface() {
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert!(parsed.node_kinds().contains(&AstNodeKind::ClassDeclaration));
-    let (_, types) = type_m0068_class_types(
+    let (_, types) = type_class_types(
         &parsed,
         &ModuleName::parse("classes").unwrap(),
         &PackageNamespace::root(),
@@ -62,14 +61,14 @@ fn parses_primary_constructor_and_new_expression() {
     assert_eq!(parsed.new_expressions.len(), 1);
     assert_eq!(parsed.class_declarations[0].constructor_parameters.len(), 2);
     assert!(parsed.class_declarations[0].constructor_parameters[0].field);
-    let (_, types) = type_m0068_class_types(
+    let (_, types) = type_class_types(
         &parsed,
         &ModuleName::parse("classes").unwrap(),
         &PackageNamespace::root(),
     );
     assert_eq!(types.classes()[0].constructor_parameter_count(), 2);
     assert_eq!(types.fields().len(), 2);
-    assert!(check_m0069_constructor_calls(&parsed, &types).is_empty());
+    assert!(check_constructor_calls(&parsed, &types).is_empty());
     let lifecycle = class_lifecycle_facts(&parsed);
     assert_eq!(lifecycle[0].initialization_order(), ["x", "y"]);
     assert_eq!(lifecycle[0].destruction_order(), ["y", "x"]);
@@ -78,13 +77,13 @@ fn parses_primary_constructor_and_new_expression() {
         SourceFileId::from_raw(6803),
         "class Point(val x: Int) {} func make(): Point { return new Missing(1); }",
     );
-    let (_, invalid_types) = type_m0068_class_types(
+    let (_, invalid_types) = type_class_types(
         &invalid,
         &ModuleName::parse("classes").unwrap(),
         &PackageNamespace::root(),
     );
     assert_eq!(
-        check_m0069_constructor_calls(&invalid, &invalid_types)[0].kind(),
+        check_constructor_calls(&invalid, &invalid_types)[0].kind(),
         ConstructorDiagnosticKind::UnknownClass
     );
 }
@@ -102,13 +101,13 @@ fn preserves_explicit_superclass_constructor_arguments() {
         SourceFileId::from_raw(6825),
         "class Base(val value: Int) {} class Child: Base() {}",
     );
-    let (_, types) = type_m0068_class_types(
+    let (_, types) = type_class_types(
         &invalid,
         &ModuleName::parse("classes").unwrap(),
         &PackageNamespace::root(),
     );
     assert_eq!(
-        check_m0069_constructor_calls(&invalid, &types)[0].kind(),
+        check_constructor_calls(&invalid, &types)[0].kind(),
         ConstructorDiagnosticKind::SuperclassArgumentCountMismatch
     );
 }
@@ -188,14 +187,14 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert_eq!(parsed.function_declarations.len(), 2);
     assert!(parsed.function_declarations[1].is_override);
-    assert!(check_m0070_dispatch(&parsed).is_empty());
+    assert!(check_dispatch(&parsed).is_empty());
 
     let invalid = parse_source(
         SourceFileId::from_raw(6806),
         "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } }",
     );
     assert_eq!(
-        check_m0070_dispatch(&invalid)[0].kind(),
+        check_dispatch(&invalid)[0].kind(),
         DispatchDiagnosticKind::MissingOverrideMarker
     );
 
@@ -204,7 +203,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
         "interface Readable { func read(): Int; } class Item: Readable {}",
     );
     assert!(
-        check_m0070_dispatch(&incomplete)
+        check_dispatch(&incomplete)
             .iter()
             .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::MissingInterfaceMethod)
     );
@@ -213,7 +212,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
         SourceFileId::from_raw(6821),
         "class Base(val value: Int) {} class Child: Base() { var value: Int; }",
     );
-    let (_, hiding_types) = type_m0068_class_types(
+    let (_, hiding_types) = type_class_types(
         &hiding,
         &ModuleName::parse("classes").unwrap(),
         &PackageNamespace::root(),
@@ -230,7 +229,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
         "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Bool { return true; } }",
     );
     assert!(
-        check_m0070_dispatch(&incompatible)
+        check_dispatch(&incompatible)
             .iter()
             .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::IncompatibleOverride)
     );
@@ -703,7 +702,7 @@ fn final_class_rejects_subclassing_and_open_is_a_diagnostic() {
         "final class Base {} class Child: Base() {}",
     );
     assert_eq!(
-        check_m0070_dispatch(&final_class)[0].kind(),
+        check_dispatch(&final_class)[0].kind(),
         DispatchDiagnosticKind::FinalClassInheritance
     );
 
@@ -726,7 +725,7 @@ fn final_class_is_accepted_and_final_method_cannot_be_overridden() {
         SourceFileId::from_raw(6833),
         "class Base { final func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
     );
-    assert!(!check_m0070_dispatch(&invalid).is_empty());
+    assert!(!check_dispatch(&invalid).is_empty());
 }
 
 #[test]

@@ -101,7 +101,7 @@ fn executable_program(root: &Path, exit_code: i32) {
 }
 
 #[test]
-fn m0032_builds_deterministic_link_invocation_plan() {
+fn builds_deterministic_link_invocation_plan() {
     let root = fixture_root("valid");
     let pack = compiler::target_pack::TargetPack::resolve(
         &root,
@@ -143,7 +143,7 @@ fn m0032_builds_deterministic_link_invocation_plan() {
 }
 
 #[test]
-fn m0032_link_plan_rejects_missing_object() {
+fn link_plan_rejects_missing_object() {
     let root = fixture_root("missing-object");
     let pack = compiler::target_pack::TargetPack::resolve(
         &root,
@@ -171,7 +171,7 @@ fn m0032_link_plan_rejects_missing_object() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_executes_resolved_linker_successfully() {
+fn executes_resolved_linker_successfully() {
     let root = fixture_root("execute-success");
     output_producing_linker(&root);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -198,7 +198,7 @@ fn m0032_executes_resolved_linker_successfully() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_reports_linker_non_success() {
+fn reports_linker_non_success() {
     let root = fixture_root("execute-failure");
     executable_linker(&root, 23);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -230,7 +230,7 @@ fn m0032_reports_linker_non_success() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_reports_linker_launch_failure() {
+fn reports_linker_launch_failure() {
     let root = fixture_root("execute-unavailable");
     let pack = compiler::target_pack::TargetPack::resolve(
         &root,
@@ -260,7 +260,7 @@ fn m0032_reports_linker_launch_failure() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_accepts_linker_output_file() {
+fn accepts_linker_output_file() {
     let root = fixture_root("output-present");
     output_producing_linker(&root);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -289,7 +289,7 @@ fn m0032_accepts_linker_output_file() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_rejects_linker_success_without_output() {
+fn rejects_linker_success_without_output() {
     let root = fixture_root("output-missing");
     executable_linker(&root, 0);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -319,7 +319,7 @@ fn m0032_rejects_linker_success_without_output() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_runs_linked_output_without_arguments() {
+fn runs_linked_output_without_arguments() {
     let root = fixture_root("run-success");
     executable_program(&root, 17);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -349,7 +349,7 @@ fn m0032_runs_linked_output_without_arguments() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_reports_unavailable_executable() {
+fn reports_unavailable_executable() {
     let root = fixture_root("run-unavailable");
     let pack = compiler::target_pack::TargetPack::resolve(
         &root,
@@ -378,7 +378,7 @@ fn m0032_reports_unavailable_executable() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_verifies_valid_bootstrap_exit() {
+fn verifies_valid_bootstrap_exit() {
     let root = fixture_root("verify-valid");
     executable_program(&root, 17);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -405,7 +405,7 @@ fn m0032_verifies_valid_bootstrap_exit() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_verifies_unsupported_bootstrap_exit() {
+fn verifies_unsupported_bootstrap_exit() {
     let root = fixture_root("verify-unsupported");
     executable_program(&root, 1);
     let pack = compiler::target_pack::TargetPack::resolve(
@@ -432,7 +432,7 @@ fn m0032_verifies_unsupported_bootstrap_exit() {
 
 #[cfg(unix)]
 #[test]
-fn m0032_rejects_unexpected_bootstrap_exit() {
+fn rejects_unexpected_bootstrap_exit() {
     let root = fixture_root("verify-mismatch");
     executable_program(&root, 16);
     let pack = compiler::target_pack::TargetPack::resolve(

@@ -3,7 +3,7 @@ use compiler::{
     module::{ModuleName, PackageNamespace},
     parser::ParsedGenericParameter,
     symbol::{SymbolId, SymbolInterner},
-    type_check::build_m0083_generic_declaration_records,
+    type_check::build_generic_declaration_records,
     types::{
         FunctionType, GenericParameterType, GenericSpecializationIdentity,
         GenericSpecializationRegistry, GenericSubstitution, GenericTypeIdentity,
@@ -175,7 +175,7 @@ fn generic_declaration_records_preserve_owner_and_parameter_order() {
     ];
     let mut symbols = SymbolInterner::new();
     let mut arena = TypeArena::new();
-    let records = build_m0083_generic_declaration_records(&parameters, &mut symbols, &mut arena);
+    let records = build_generic_declaration_records(&parameters, &mut symbols, &mut arena);
 
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].owner(), AstNodeId::from_raw(91));

@@ -11,7 +11,7 @@ use compiler::{
 use object::{Object, ObjectSymbol};
 
 #[test]
-fn m0032_emits_host_object_for_int_return() {
+fn emits_host_object_for_int_return() {
     let file = SourceFileId::from_raw(500);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -54,7 +54,7 @@ fn m0032_emits_host_object_for_int_return() {
 }
 
 #[test]
-fn m0032_object_emission_rejects_missing_function_identity() {
+fn object_emission_rejects_missing_function_identity() {
     let file = SourceFileId::from_raw(501);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -84,7 +84,7 @@ fn m0032_object_emission_rejects_missing_function_identity() {
 }
 
 #[test]
-fn m0032_emits_canonical_language_entry_symbol() {
+fn emits_canonical_language_entry_symbol() {
     let file = SourceFileId::from_raw(502);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();

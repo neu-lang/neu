@@ -27,23 +27,19 @@ use crate::{
     type_check::{
         ConstructorDiagnostic, DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic,
         ExecutableSourceTypes, ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
-        TypeRuleDiagnostic, UnsupportedExecutableFormDiagnostic, apply_m0028_direct_call_results,
-        apply_m0060_control_flow_results, apply_m0068_class_type_facts,
-        apply_m0068_field_access_facts, apply_m0070_method_call_facts,
-        apply_m0070_receiver_name_facts, apply_m0070_receiver_signatures,
-        apply_m0077_value_conditional_results, apply_m0081_enum_constructor_facts,
-        apply_m0081_enum_function_facts, check_m0028_direct_calls, check_m0028_entry_point,
-        check_m0028_return_expression_types, check_m0028_straight_line_returns,
-        check_m0028_unsupported_executable_forms, check_m0069_constructor_calls,
-        check_m0087_indirect_calls, diagnose_m0090_unresolved_types, infer_m0090_local_types,
-        merge_type_check_report, type_m0028_executable_core_in,
-        type_m0028_executable_int_operators, type_m0060_control_flow,
-        type_m0063_array_expressions_with_classes, type_m0063_function_signatures_in_with_classes,
-        type_m0064_string_operations, type_m0068_class_types_in,
-        type_m0073_dynamic_array_operations, type_m0077_value_conditionals, type_m0080_enum_whens,
-        type_m0086_annotation_type, type_m0088_bind_function_values, type_m0088_lambda_expressions,
-        type_m0092_array_iterations, validate_m0061_compile_time_constants,
-        validate_m0090_inferred_assignments,
+        TypeRuleDiagnostic, UnsupportedExecutableFormDiagnostic, apply_class_type_facts,
+        apply_control_flow_results, apply_direct_call_results, apply_enum_constructor_facts,
+        apply_enum_function_facts, apply_field_access_facts, apply_method_call_facts,
+        apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
+        check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
+        check_return_expression_types, check_straight_line_returns,
+        check_unsupported_executable_forms, diagnose_unresolved_types, infer_local_types,
+        merge_type_check_report, type_annotation_type, type_array_expressions_with_classes,
+        type_array_iterations, type_bind_function_values, type_class_types_in, type_control_flow,
+        type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
+        type_executable_int_operators, type_function_signatures_in_with_classes,
+        type_lambda_expressions, type_string_operations, type_value_conditionals,
+        validate_compile_time_constants, validate_inferred_assignments,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -193,7 +189,7 @@ pub fn compile_source_to_executable(
         return Err(DriverError::ParseDiagnostics(parsed.diagnostics.clone()));
     }
 
-    let entry = check_m0028_entry_point(
+    let entry = check_entry_point(
         options.package(),
         &[crate::type_check::EntryPointFile::new(
             options.package(),
@@ -210,18 +206,17 @@ pub fn compile_source_to_executable(
         .resolve(options.target())
         .map_err(DriverError::TargetPack)?;
     let mut types = TypeArena::new();
-    let class_types =
-        type_m0068_class_types_in(&mut types, &parsed, options.module(), options.package());
+    let class_types = type_class_types_in(&mut types, &parsed, options.module(), options.package());
     if !class_types.diagnostics().is_empty() {
         return Err(DriverError::TypeDiagnostics(
             class_types.diagnostics().to_vec(),
         ));
     }
-    let constructor_diagnostics = check_m0069_constructor_calls(&parsed, &class_types);
+    let constructor_diagnostics = check_constructor_calls(&parsed, &class_types);
     if !constructor_diagnostics.is_empty() {
         return Err(DriverError::ConstructorDiagnostics(constructor_diagnostics));
     }
-    let mut signatures = type_m0063_function_signatures_in_with_classes(
+    let mut signatures = type_function_signatures_in_with_classes(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
@@ -243,7 +238,7 @@ pub fn compile_source_to_executable(
                 .iter()
                 .filter(|parameter| parameter.function == function.declaration)
                 .map(|parameter| {
-                    type_m0086_annotation_type(
+                    type_annotation_type(
                         &parsed,
                         parameter.annotation,
                         &mut types,
@@ -251,7 +246,7 @@ pub fn compile_source_to_executable(
                     )
                 })
                 .collect::<Option<Vec<_>>>()?;
-            let return_type = type_m0086_annotation_type(
+            let return_type = type_annotation_type(
                 &parsed,
                 function.return_annotation?,
                 &mut types,
@@ -265,8 +260,8 @@ pub fn compile_source_to_executable(
         })
         .collect::<Vec<_>>();
     signatures.extend(missing_function_signatures);
-    apply_m0070_receiver_signatures(&parsed, &class_types, &mut signatures);
-    let mut report = type_m0028_executable_core_in(
+    apply_receiver_signatures(&parsed, &class_types, &mut signatures);
+    let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
         &parsed.local_declarations,
@@ -280,13 +275,13 @@ pub fn compile_source_to_executable(
         &crate::name_resolution::ResolutionTable::new(),
         &[],
     );
-    apply_m0068_class_type_facts(&parsed, &class_types, &mut report);
+    apply_class_type_facts(&parsed, &class_types, &mut report);
     for local in &parsed.local_declarations {
         let Some(annotation) = local.annotation else {
             continue;
         };
         if let Some(ty) =
-            type_m0086_annotation_type(&parsed, annotation, &mut types, class_types.classes())
+            type_annotation_type(&parsed, annotation, &mut types, class_types.classes())
         {
             report.record_declaration_signature(crate::type_check::DeclarationSignature::new(
                 local.declaration,
@@ -294,28 +289,23 @@ pub fn compile_source_to_executable(
             ));
         }
     }
-    type_m0063_array_expressions_with_classes(
-        &mut types,
-        &parsed,
-        &mut report,
-        class_types.classes(),
-    );
-    type_m0073_dynamic_array_operations(&parsed, &mut report, &types);
-    type_m0064_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
-    apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
-    apply_m0068_field_access_facts(&parsed, &class_types, &mut report);
-    apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
-    apply_m0081_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
-    apply_m0081_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
-    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    type_m0088_lambda_expressions(&parsed, &mut types, &mut report);
-    let array_iterations = type_m0092_array_iterations(&parsed, report.expression_types(), &types);
+    type_array_expressions_with_classes(&mut types, &parsed, &mut report, class_types.classes());
+    type_dynamic_array_operations(&parsed, &mut report, &types);
+    type_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
+    apply_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_field_access_facts(&parsed, &class_types, &mut report);
+    apply_method_call_facts(&parsed, &class_types, &mut report);
+    apply_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
+    apply_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
+    type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    type_lambda_expressions(&parsed, &mut types, &mut report);
+    let array_iterations = type_array_iterations(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, array_iterations);
-    infer_m0090_local_types(&parsed, &mut report);
-    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
-    apply_m0068_field_access_facts(&parsed, &class_types, &mut report);
-    apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
+    infer_local_types(&parsed, &mut report);
+    type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    apply_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_field_access_facts(&parsed, &class_types, &mut report);
+    apply_method_call_facts(&parsed, &class_types, &mut report);
     if let Some(int_type) = types
         .records()
         .iter()
@@ -345,7 +335,7 @@ pub fn compile_source_to_executable(
             })
             .cloned()
             .collect::<Vec<_>>();
-        let inferred_operators = type_m0028_executable_int_operators(
+        let inferred_operators = type_executable_int_operators(
             &int_unary,
             &int_binary,
             &parsed.grouped_expressions,
@@ -354,11 +344,11 @@ pub fn compile_source_to_executable(
         );
         merge_type_check_report(&mut report, inferred_operators);
     }
-    infer_m0090_local_types(&parsed, &mut report);
-    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    diagnose_m0090_unresolved_types(&parsed, &mut report);
-    validate_m0090_inferred_assignments(&parsed, &mut report, &types);
-    let indirect_calls = check_m0087_indirect_calls(&parsed, report.expression_types(), &types);
+    infer_local_types(&parsed, &mut report);
+    type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    diagnose_unresolved_types(&parsed, &mut report);
+    validate_inferred_assignments(&parsed, &mut report, &types);
+    let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed
         .call_expressions
@@ -375,7 +365,7 @@ pub fn compile_source_to_executable(
         !function_typed_calls.contains(&diagnostic.node())
             || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
     });
-    let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
+    let calls = check_direct_calls(&[ExecutableSourceTypes::new(
         options.package(),
         &parsed,
         &signatures,
@@ -387,12 +377,10 @@ pub fn compile_source_to_executable(
             calls.diagnostics().to_vec(),
         ));
     }
-    apply_m0028_direct_call_results(&mut report, &parsed, &calls);
-    let conditional_report =
-        type_m0077_value_conditionals(&parsed, report.expression_types(), &types);
-    apply_m0077_value_conditional_results(&mut report, &conditional_report);
-    let when_report =
-        type_m0080_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
+    apply_direct_call_results(&mut report, &parsed, &calls);
+    let conditional_report = type_value_conditionals(&parsed, report.expression_types(), &types);
+    apply_value_conditional_results(&mut report, &conditional_report);
+    let when_report = type_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
     merge_type_check_report(&mut report, when_report);
     let statement_conditionals = parsed
         .if_statements
@@ -404,7 +392,7 @@ pub fn compile_source_to_executable(
             || statement_conditionals.contains(&diagnostic.node())
     });
     let expression_types = report.expression_types().to_vec();
-    validate_m0061_compile_time_constants(&parsed, &expression_types, &types, &mut report);
+    validate_compile_time_constants(&parsed, &expression_types, &types, &mut report);
     report.retain_diagnostics(|diagnostic| {
         !matches!(
             diagnostic.kind(),
@@ -430,26 +418,25 @@ pub fn compile_source_to_executable(
         .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Bool))
         .map(|record| record.id())
         .expect("bootstrap type checker creates Bool");
-    let control_flow =
-        type_m0060_control_flow(&parsed, report.expression_types(), int_type, bool_type);
-    apply_m0060_control_flow_results(&mut report, &parsed, &control_flow);
-    let array_iterations = type_m0092_array_iterations(&parsed, report.expression_types(), &types);
+    let control_flow = type_control_flow(&parsed, report.expression_types(), int_type, bool_type);
+    apply_control_flow_results(&mut report, &parsed, &control_flow);
+    let array_iterations = type_array_iterations(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, array_iterations);
 
-    let return_paths = check_m0028_straight_line_returns(&parsed);
+    let return_paths = check_straight_line_returns(&parsed);
     if !return_paths.diagnostics().is_empty() {
         return Err(DriverError::ReturnPathDiagnostics(
             return_paths.diagnostics().to_vec(),
         ));
     }
     let return_types =
-        check_m0028_return_expression_types(&parsed, &signatures, report.expression_types());
+        check_return_expression_types(&parsed, &signatures, report.expression_types());
     if !return_types.diagnostics().is_empty() {
         return Err(DriverError::ReturnTypeDiagnostics(
             return_types.diagnostics().to_vec(),
         ));
     }
-    let unsupported = check_m0028_unsupported_executable_forms(&parsed);
+    let unsupported = check_unsupported_executable_forms(&parsed);
     if !unsupported.diagnostics().is_empty() {
         return Err(DriverError::UnsupportedExecutableForms(
             unsupported.diagnostics().to_vec(),
@@ -479,8 +466,7 @@ pub fn compile_source_to_executable(
         .iter()
         .filter_map(|declaration| {
             let annotation = declaration.annotation?;
-            let ty =
-                type_m0086_annotation_type(&parsed, annotation, &mut types, class_types.classes())?;
+            let ty = type_annotation_type(&parsed, annotation, &mut types, class_types.classes())?;
             Some(DeclarationSignature::new(declaration.declaration, ty))
         })
         .collect::<Vec<_>>();

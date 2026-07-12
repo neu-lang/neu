@@ -15,7 +15,7 @@ use compiler::{
 };
 
 #[test]
-fn m0064_cleanup_boundary_tracks_owned_string_values() {
+fn cleanup_boundary_tracks_owned_string_values() {
     let file = SourceFileId::from_raw(1064);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -50,7 +50,7 @@ fn m0064_cleanup_boundary_tracks_owned_string_values() {
 }
 
 #[test]
-fn m0085_mir_preserves_specialization_identity() {
+fn mir_preserves_specialization_identity() {
     let file = SourceFileId::from_raw(1085);
     let span = compiler::source::ByteSpan::new(file, 0, 1).unwrap();
     let identity = GenericSpecializationIdentity::new(
@@ -75,7 +75,7 @@ fn m0085_mir_preserves_specialization_identity() {
 }
 
 #[test]
-fn m0062_hir_to_mir_preserves_ownership_effect_contract() {
+fn hir_to_mir_preserves_ownership_effect_contract() {
     let file = SourceFileId::from_raw(1006);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
@@ -119,7 +119,7 @@ fn m0062_hir_to_mir_preserves_ownership_effect_contract() {
 }
 
 #[test]
-fn m0032_hir_to_mir_preserves_function_symbol_identity() {
+fn hir_to_mir_preserves_function_symbol_identity() {
     let file = SourceFileId::from_raw(304);
     let span = ByteSpan::new(file, 0, 8).unwrap();
     let mut types = TypeArena::new();
@@ -161,12 +161,12 @@ fn m0032_hir_to_mir_preserves_function_symbol_identity() {
 }
 
 #[test]
-fn m0032_hir_to_mir_preserves_entry_classification() {
-    m0032_hir_to_mir_preserves_function_symbol_identity();
+fn hir_to_mir_preserves_entry_classification() {
+    hir_to_mir_preserves_function_symbol_identity();
 }
 
 #[test]
-fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
+fn mir_model_preserves_ordered_source_mapped_runtime_facts() {
     let file = SourceFileId::from_raw(300);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let int = TypeId::from_raw(1);
@@ -200,7 +200,7 @@ fn m0030_mir_model_preserves_ordered_source_mapped_runtime_facts() {
 }
 
 #[test]
-fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
+fn hir_integer_function_lowers_to_ordered_mir_block() {
     let file = SourceFileId::from_raw(301);
     let span = ByteSpan::new(file, 0, 8).unwrap();
     let mut types = TypeArena::new();
@@ -241,7 +241,7 @@ fn m0030_hir_integer_function_lowers_to_ordered_mir_block() {
 }
 
 #[test]
-fn m0030_hir_to_mir_requires_owning_type_arena() {
+fn hir_to_mir_requires_owning_type_arena() {
     let file = SourceFileId::from_raw(303);
     let span = ByteSpan::new(file, 0, 8).unwrap();
     let mut owning_types = TypeArena::new();
@@ -283,7 +283,7 @@ fn m0030_hir_to_mir_requires_owning_type_arena() {
 }
 
 #[test]
-fn m0030_hir_unary_ints_lower_to_mir() {
+fn hir_unary_ints_lower_to_mir() {
     let file = SourceFileId::from_raw(304);
     let span = ByteSpan::new(file, 0, 8).unwrap();
     let mut types = TypeArena::new();
@@ -333,7 +333,7 @@ fn m0030_hir_unary_ints_lower_to_mir() {
 }
 
 #[test]
-fn m0030_mir_function_preserves_declared_return_type() {
+fn mir_function_preserves_declared_return_type() {
     let file = SourceFileId::from_raw(302);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let int = TypeId::from_raw(1);
@@ -359,7 +359,7 @@ fn m0030_mir_function_preserves_declared_return_type() {
 }
 
 #[test]
-fn m0035_mir_preserves_non_integer_constants_and_unit_return() {
+fn mir_preserves_non_integer_constants_and_unit_return() {
     let file = SourceFileId::from_raw(905);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let bool_output = MirValueId::from_raw(0);
@@ -401,7 +401,7 @@ fn m0035_mir_preserves_non_integer_constants_and_unit_return() {
 }
 
 #[test]
-fn m0035_hir_to_mir_preserves_boolean_not_and_comparison_operations() {
+fn hir_to_mir_preserves_boolean_not_and_comparison_operations() {
     let file = SourceFileId::from_raw(911);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let mut types = TypeArena::new();
@@ -456,7 +456,7 @@ fn m0035_hir_to_mir_preserves_boolean_not_and_comparison_operations() {
 }
 
 #[test]
-fn m0035_hir_to_mir_lowers_logical_or_with_short_circuit_cfg() {
+fn hir_to_mir_lowers_logical_or_with_short_circuit_cfg() {
     let file = SourceFileId::from_raw(912);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let mut types = TypeArena::new();
@@ -499,7 +499,7 @@ fn m0035_hir_to_mir_lowers_logical_or_with_short_circuit_cfg() {
 }
 
 #[test]
-fn m0035_hir_to_mir_lowers_logical_and_with_short_circuit_cfg() {
+fn hir_to_mir_lowers_logical_and_with_short_circuit_cfg() {
     let file = SourceFileId::from_raw(921);
     let span = ByteSpan::new(file, 0, 6).unwrap();
     let mut types = TypeArena::new();
@@ -548,7 +548,7 @@ fn m0035_hir_to_mir_lowers_logical_and_with_short_circuit_cfg() {
 }
 
 #[test]
-fn m0035_hir_to_mir_lowers_primitive_parameter_reads() {
+fn hir_to_mir_lowers_primitive_parameter_reads() {
     let file = SourceFileId::from_raw(925);
     let span = ByteSpan::new(file, 0, 6).unwrap();
     let mut types = TypeArena::new();
@@ -590,7 +590,7 @@ fn m0035_hir_to_mir_lowers_primitive_parameter_reads() {
 }
 
 #[test]
-fn m0035_hir_to_mir_lowers_primitive_literals_and_unit_return() {
+fn hir_to_mir_lowers_primitive_literals_and_unit_return() {
     let file = SourceFileId::from_raw(908);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let mut types = TypeArena::new();

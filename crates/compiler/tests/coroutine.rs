@@ -12,7 +12,7 @@ use compiler::{
 };
 
 #[test]
-fn m0089_closure_cleanup_covers_completion_and_cancellation() {
+fn closure_cleanup_covers_completion_and_cancellation() {
     let facts = closure_cleanup_facts(
         AstNodeId::from_raw(8800),
         &[AstNodeId::from_raw(8801), AstNodeId::from_raw(8802)],
@@ -27,7 +27,7 @@ fn m0089_closure_cleanup_covers_completion_and_cancellation() {
 }
 
 #[test]
-fn m0025_structured_scope_accepts_completed_children() {
+fn structured_scope_accepts_completed_children() {
     let scope = AstNodeId::from_raw(100);
     let child = ChildTask::new(AstNodeId::from_raw(101), scope, scope);
 
@@ -38,7 +38,7 @@ fn m0025_structured_scope_accepts_completed_children() {
 }
 
 #[test]
-fn m0025_structured_scope_reports_child_task_escape() {
+fn structured_scope_reports_child_task_escape() {
     let containing_scope = AstNodeId::from_raw(200);
     let completion_scope = AstNodeId::from_raw(201);
     let task = AstNodeId::from_raw(202);
@@ -62,7 +62,7 @@ fn m0025_structured_scope_reports_child_task_escape() {
 }
 
 #[test]
-fn m0025_structured_scope_diagnostics_preserve_order_and_spans() {
+fn structured_scope_diagnostics_preserve_order_and_spans() {
     let first_scope = AstNodeId::from_raw(300);
     let second_scope = AstNodeId::from_raw(400);
     let first_task = AstNodeId::from_raw(301);
@@ -94,7 +94,7 @@ fn m0025_structured_scope_diagnostics_preserve_order_and_spans() {
 }
 
 #[test]
-fn m0025_suspension_accepts_non_concurrent_same_scope_borrows() {
+fn suspension_accepts_non_concurrent_same_scope_borrows() {
     let scope = AstNodeId::from_raw(500);
     let binding = local_binding(50, 500);
 
@@ -123,7 +123,7 @@ fn m0025_suspension_accepts_non_concurrent_same_scope_borrows() {
 }
 
 #[test]
-fn m0025_suspension_reports_concurrent_frame_access() {
+fn suspension_reports_concurrent_frame_access() {
     let scope = AstNodeId::from_raw(600);
     let suspension = AstNodeId::from_raw(601);
     let borrow = AstNodeId::from_raw(602);
@@ -158,7 +158,7 @@ fn m0025_suspension_reports_concurrent_frame_access() {
 }
 
 #[test]
-fn m0025_suspension_reports_outliving_borrowed_value() {
+fn suspension_reports_outliving_borrowed_value() {
     let borrowed_value_scope = AstNodeId::from_raw(700);
     let frame_scope = AstNodeId::from_raw(701);
     let suspension = AstNodeId::from_raw(702);
@@ -198,7 +198,7 @@ fn m0025_suspension_reports_outliving_borrowed_value() {
 }
 
 #[test]
-fn m0025_suspension_reports_both_rejection_reasons_and_preserves_order() {
+fn suspension_reports_both_rejection_reasons_and_preserves_order() {
     let first_binding = local_binding(80, 800);
     let second_binding = local_binding(81, 801);
     let first_suspension = AstNodeId::from_raw(802);

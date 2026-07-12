@@ -46,7 +46,7 @@ fn smoke_function() -> (MirFunction, TypeArena) {
 }
 
 #[test]
-fn m0032_links_and_runs_host_target_pack_smoke() {
+fn links_and_runs_host_target_pack_smoke() {
     let root =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target-packs/aarch64-apple-darwin");
     let manifest = fs::read_to_string(root.join("manifest.toml")).unwrap();

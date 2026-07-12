@@ -9,7 +9,7 @@ use compiler::{
 };
 
 #[test]
-fn m0023_shared_borrows_of_same_local_in_same_region_do_not_conflict() {
+fn shared_borrows_of_same_local_in_same_region_do_not_conflict() {
     let binding = local_binding(10, 100);
     let region = AstNodeId::from_raw(200);
     let borrows = [
@@ -31,7 +31,7 @@ fn m0023_shared_borrows_of_same_local_in_same_region_do_not_conflict() {
 }
 
 #[test]
-fn m0023_exclusive_borrow_conflicts_with_shared_or_exclusive_in_same_region() {
+fn exclusive_borrow_conflicts_with_shared_or_exclusive_in_same_region() {
     let binding = local_binding(10, 100);
     let region = AstNodeId::from_raw(200);
     let borrows = [
@@ -70,7 +70,7 @@ fn m0023_exclusive_borrow_conflicts_with_shared_or_exclusive_in_same_region() {
 }
 
 #[test]
-fn m0023_different_locals_or_regions_do_not_conflict() {
+fn different_locals_or_regions_do_not_conflict() {
     let first = local_binding(10, 100);
     let second = local_binding(11, 101);
     let first_region = AstNodeId::from_raw(200);
@@ -100,7 +100,7 @@ fn m0023_different_locals_or_regions_do_not_conflict() {
 }
 
 #[test]
-fn m0023_lifetime_escape_diagnoses_uses_outside_borrow_region() {
+fn lifetime_escape_diagnoses_uses_outside_borrow_region() {
     let first = local_binding(10, 100);
     let second = local_binding(11, 101);
     let borrow_region = AstNodeId::from_raw(200);
@@ -144,7 +144,7 @@ fn m0023_lifetime_escape_diagnoses_uses_outside_borrow_region() {
 }
 
 #[test]
-fn m0023_borrow_report_combines_conflicts_and_lifetime_escapes() {
+fn borrow_report_combines_conflicts_and_lifetime_escapes() {
     let binding = local_binding(10, 100);
     let region = AstNodeId::from_raw(200);
     let other_region = AstNodeId::from_raw(201);

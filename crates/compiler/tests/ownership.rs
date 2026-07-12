@@ -19,7 +19,7 @@ use compiler::{
 };
 
 #[test]
-fn m0022_primitive_ownership_categories_follow_adr0035() {
+fn primitive_ownership_categories_follow_adr0035() {
     let mut arena = TypeArena::new();
     let bool_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Bool));
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
@@ -40,7 +40,7 @@ fn m0022_primitive_ownership_categories_follow_adr0035() {
 }
 
 #[test]
-fn m0022_nominal_identities_are_move_only() {
+fn nominal_identities_are_move_only() {
     let mut arena = TypeArena::new();
     let nominal = arena.insert(TypeRecord::nominal(NominalTypeIdentity::new(
         ModuleName::parse("demo.domain").unwrap(),
@@ -56,7 +56,7 @@ fn m0022_nominal_identities_are_move_only() {
 }
 
 #[test]
-fn m0022_unsupported_type_categories_do_not_guess() {
+fn unsupported_type_categories_do_not_guess() {
     let mut arena = TypeArena::new();
     let generic = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
         AstNodeId::from_raw(40),
@@ -69,7 +69,7 @@ fn m0022_unsupported_type_categories_do_not_guess() {
 }
 
 #[test]
-fn m0022_transfer_sites_record_only_move_only_local_sources() {
+fn transfer_sites_record_only_move_only_local_sources() {
     let mut arena = TypeArena::new();
     let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
@@ -138,7 +138,7 @@ fn m0022_transfer_sites_record_only_move_only_local_sources() {
 }
 
 #[test]
-fn m0022_use_after_move_diagnostics_report_later_uses_and_origin() {
+fn use_after_move_diagnostics_report_later_uses_and_origin() {
     let moved = local_binding(10, 100);
     let other = local_binding(11, 101);
     let before = ResolvedLocalBinding::new(AstNodeId::from_raw(90), moved.clone());
@@ -171,7 +171,7 @@ fn m0022_use_after_move_diagnostics_report_later_uses_and_origin() {
 }
 
 #[test]
-fn m0022_ownership_report_combines_transfers_and_diagnostics_after_type_checking() {
+fn ownership_report_combines_transfers_and_diagnostics_after_type_checking() {
     let mut arena = TypeArena::new();
     let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));

@@ -564,7 +564,7 @@ impl ConstructorDiagnostic {
     }
 }
 
-pub fn check_m0069_constructor_calls(
+pub fn check_constructor_calls(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
 ) -> Vec<ConstructorDiagnostic> {
@@ -757,7 +757,7 @@ impl DispatchDiagnostic {
     }
 }
 
-pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
+pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
     let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
         if function.is_final
@@ -1027,17 +1027,17 @@ impl ClassTypeReport {
     }
 }
 
-pub fn type_m0068_class_types(
+pub fn type_class_types(
     parsed: &ParseOutput,
     module: &ModuleName,
     package: &PackageNamespace,
 ) -> (TypeArena, ClassTypeReport) {
     let mut types = TypeArena::new();
-    let report = type_m0068_class_types_in(&mut types, parsed, module, package);
+    let report = type_class_types_in(&mut types, parsed, module, package);
     (types, report)
 }
 
-pub fn type_m0068_class_types_in(
+pub fn type_class_types_in(
     types: &mut TypeArena,
     parsed: &ParseOutput,
     module: &ModuleName,
@@ -1207,7 +1207,7 @@ pub fn type_m0068_class_types_in(
     report
 }
 
-pub fn apply_m0068_class_type_facts(
+pub fn apply_class_type_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
@@ -1363,7 +1363,7 @@ pub fn apply_m0068_class_type_facts(
     });
 }
 
-pub fn apply_m0068_field_access_facts(
+pub fn apply_field_access_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
@@ -1510,7 +1510,7 @@ fn class_or_superclass_owns_field(
         .is_some_and(|parent| class_or_superclass_owns_field(parsed, parent, field_owner))
 }
 
-pub fn apply_m0070_method_call_facts(
+pub fn apply_method_call_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
@@ -1566,7 +1566,7 @@ pub fn apply_m0070_method_call_facts(
     }
 }
 
-pub fn apply_m0070_receiver_name_facts(
+pub fn apply_receiver_name_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
@@ -1656,7 +1656,7 @@ pub fn apply_m0070_receiver_name_facts(
     }
 }
 
-pub fn apply_m0070_receiver_signatures(
+pub fn apply_receiver_signatures(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     signatures: &mut [FunctionSignature],
@@ -1830,7 +1830,7 @@ impl DirectCallReport {
     }
 }
 
-pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallReport {
+pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallReport {
     let mut report = DirectCallReport::default();
     let mut resolved_calls = Vec::new();
     let mut call_edges: Vec<(ByteSpan, ByteSpan)> = Vec::new();
@@ -2127,7 +2127,7 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
         let source = &sources[source_index];
         let call = &source.parsed.call_expressions[call_index];
         let target = &sources[target_source_index].signatures[target_signature_index];
-        if m0028_call_path_exists(&call_edges, target_span, source_function_span) {
+        if call_path_exists(&call_edges, target_span, source_function_span) {
             let span = source
                 .parsed
                 .arena
@@ -2517,7 +2517,7 @@ fn overload_type_compatible(
     })
 }
 
-pub fn apply_m0028_direct_call_results(
+pub fn apply_direct_call_results(
     report: &mut TypeCheckReport,
     parsed: &ParseOutput,
     direct_calls: &DirectCallReport,
@@ -2544,11 +2544,7 @@ pub fn apply_m0028_direct_call_results(
     }
 }
 
-fn m0028_call_path_exists(
-    call_edges: &[(ByteSpan, ByteSpan)],
-    start: ByteSpan,
-    goal: ByteSpan,
-) -> bool {
+fn call_path_exists(call_edges: &[(ByteSpan, ByteSpan)], start: ByteSpan, goal: ByteSpan) -> bool {
     let mut pending = vec![start];
     let mut visited = Vec::new();
 
@@ -3022,7 +3018,7 @@ impl KnownSymbolType {
     }
 }
 
-pub fn build_m0020_generic_parameter_types(
+pub fn build_generic_parameter_types(
     parameters: &[ParsedGenericParameter],
     symbols: &mut SymbolInterner,
     type_arena: &mut TypeArena,
@@ -3040,7 +3036,7 @@ pub fn build_m0020_generic_parameter_types(
         .collect()
 }
 
-pub fn build_m0020_capability_bound_records(
+pub fn build_capability_bound_records(
     parameters: &[ParsedGenericParameter],
     parameter_types: &[GenericParameterTypeRecord],
     symbols: &mut SymbolInterner,
@@ -3068,7 +3064,7 @@ pub fn build_m0020_capability_bound_records(
     records
 }
 
-pub fn validate_m0084_capability_bounds(
+pub fn validate_capability_bounds(
     bounds: &[CapabilityBoundRecord],
     substitution: &GenericSubstitution,
     types: &TypeArena,
@@ -3095,12 +3091,12 @@ pub fn validate_m0084_capability_bounds(
     diagnostics
 }
 
-pub fn build_m0083_generic_declaration_records(
+pub fn build_generic_declaration_records(
     parameters: &[ParsedGenericParameter],
     symbols: &mut SymbolInterner,
     type_arena: &mut TypeArena,
 ) -> Vec<GenericDeclarationRecord> {
-    let parameter_types = build_m0020_generic_parameter_types(parameters, symbols, type_arena);
+    let parameter_types = build_generic_parameter_types(parameters, symbols, type_arena);
     let mut records = Vec::new();
     for parameter in parameters {
         let Some(owner) = parameter.owner else {
@@ -3275,7 +3271,7 @@ impl Default for TypeCheckReport {
     }
 }
 
-pub fn check_m0028_entry_point(
+pub fn check_entry_point(
     entry_package: &PackageNamespace,
     files: &[EntryPointFile<'_>],
 ) -> EntryPointReport {
@@ -3353,7 +3349,7 @@ pub fn check_m0028_entry_point(
     }
 }
 
-pub fn check_m0028_straight_line_returns(parsed: &ParseOutput) -> ReturnPathReport {
+pub fn check_straight_line_returns(parsed: &ParseOutput) -> ReturnPathReport {
     let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
         let is_int_function = function.return_annotation.is_some_and(|annotation| {
@@ -3392,7 +3388,7 @@ pub fn check_m0028_straight_line_returns(parsed: &ParseOutput) -> ReturnPathRepo
     ReturnPathReport { diagnostics }
 }
 
-pub fn check_m0028_return_expression_types(
+pub fn check_return_expression_types(
     parsed: &ParseOutput,
     signatures: &[FunctionSignature],
     expression_types: &[ExpressionType],
@@ -3429,9 +3425,7 @@ pub fn check_m0028_return_expression_types(
     ReturnTypeReport { diagnostics }
 }
 
-pub fn check_m0028_unsupported_executable_forms(
-    parsed: &ParseOutput,
-) -> UnsupportedExecutableFormReport {
+pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedExecutableFormReport {
     let specific_form_spans: Vec<_> = parsed
         .arena
         .nodes()
@@ -3539,14 +3533,14 @@ pub fn check_m0028_unsupported_executable_forms(
     for span in candidates {
         if specific_form_spans
             .iter()
-            .any(|specific| m0028_span_contains(*specific, span))
+            .any(|specific| unsupported_form_span_contains(*specific, span))
         {
             continue;
         }
         if diagnostics
             .iter()
             .any(|diagnostic: &UnsupportedExecutableFormDiagnostic| {
-                m0028_span_contains(diagnostic.span, span)
+                unsupported_form_span_contains(diagnostic.span, span)
             })
         {
             continue;
@@ -3557,41 +3551,41 @@ pub fn check_m0028_unsupported_executable_forms(
     UnsupportedExecutableFormReport { diagnostics }
 }
 
-fn m0028_span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+fn unsupported_form_span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.file() == inner.file()
         && outer.start() <= inner.start()
         && inner.end() <= outer.end()
         && outer != inner
 }
 
-pub fn type_m0028_function_signatures(
+pub fn type_function_signatures(
     functions: &[ParsedFunctionDeclaration],
     parameters: &[ParsedFunctionParameter],
     type_name_references: &[ParsedTypeNameReference],
 ) -> (TypeArena, Vec<FunctionSignature>) {
     let mut arena = TypeArena::new();
     let signatures =
-        type_m0028_function_signatures_in(&mut arena, functions, parameters, type_name_references);
+        type_function_signatures_in(&mut arena, functions, parameters, type_name_references);
     (arena, signatures)
 }
 
-pub fn type_m0028_function_signatures_in(
+pub fn type_function_signatures_in(
     arena: &mut TypeArena,
     functions: &[ParsedFunctionDeclaration],
     parameters: &[ParsedFunctionParameter],
     type_name_references: &[ParsedTypeNameReference],
 ) -> Vec<FunctionSignature> {
-    type_m0063_function_signatures_in(arena, functions, parameters, type_name_references, &[])
+    type_function_signatures_with_arrays(arena, functions, parameters, type_name_references, &[])
 }
 
-pub fn type_m0063_function_signatures_in(
+pub fn type_function_signatures_with_arrays(
     arena: &mut TypeArena,
     functions: &[ParsedFunctionDeclaration],
     parameters: &[ParsedFunctionParameter],
     type_name_references: &[ParsedTypeNameReference],
     array_types: &[ParsedArrayType],
 ) -> Vec<FunctionSignature> {
-    type_m0063_function_signatures_in_with_classes(
+    type_function_signatures_in_with_classes(
         arena,
         functions,
         parameters,
@@ -3601,7 +3595,7 @@ pub fn type_m0063_function_signatures_in(
     )
 }
 
-pub fn type_m0063_function_signatures_in_with_classes(
+pub fn type_function_signatures_in_with_classes(
     arena: &mut TypeArena,
     functions: &[ParsedFunctionDeclaration],
     parameters: &[ParsedFunctionParameter],
@@ -3616,7 +3610,7 @@ pub fn type_m0063_function_signatures_in_with_classes(
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        let Some(return_type) = resolve_m0063_annotation_type(
+        let Some(return_type) = resolve_annotation_type(
             return_annotation,
             type_name_references,
             array_types,
@@ -3633,7 +3627,7 @@ pub fn type_m0063_function_signatures_in_with_classes(
         let Some(parameter_types) = function_parameters
             .iter()
             .map(|parameter| {
-                resolve_m0063_annotation_type(
+                resolve_annotation_type(
                     parameter.annotation,
                     type_name_references,
                     array_types,
@@ -3656,7 +3650,7 @@ pub fn type_m0063_function_signatures_in_with_classes(
     signatures
 }
 
-pub fn type_m0086_function_types(
+pub fn type_function_types(
     parsed: &ParseOutput,
     types: &mut TypeArena,
 ) -> Vec<(AstNodeId, TypeId)> {
@@ -3667,7 +3661,7 @@ pub fn type_m0086_function_types(
             .parameters
             .iter()
             .map(|parameter| {
-                resolve_m0063_annotation_type(
+                resolve_annotation_type(
                     *parameter,
                     &parsed.type_name_references,
                     &parsed.array_types,
@@ -3680,7 +3674,7 @@ pub fn type_m0086_function_types(
         else {
             continue;
         };
-        let Some(return_type) = resolve_m0063_annotation_type(
+        let Some(return_type) = resolve_annotation_type(
             function.return_type,
             &parsed.type_name_references,
             &parsed.array_types,
@@ -3698,7 +3692,7 @@ pub fn type_m0086_function_types(
     resolved
 }
 
-pub fn type_m0086_annotation_type(
+pub fn type_annotation_type(
     parsed: &ParseOutput,
     annotation: AstNodeId,
     types: &mut TypeArena,
@@ -3713,7 +3707,7 @@ pub fn type_m0086_annotation_type(
             .parameters
             .iter()
             .map(|parameter| {
-                resolve_m0063_annotation_type(
+                resolve_annotation_type(
                     *parameter,
                     &parsed.type_name_references,
                     &parsed.array_types,
@@ -3723,7 +3717,7 @@ pub fn type_m0086_annotation_type(
                 )
             })
             .collect::<Option<Vec<_>>>()?;
-        let return_type = resolve_m0063_annotation_type(
+        let return_type = resolve_annotation_type(
             function_type.return_type,
             &parsed.type_name_references,
             &parsed.array_types,
@@ -3733,7 +3727,7 @@ pub fn type_m0086_annotation_type(
         )?;
         return Some(types.function(FunctionType::new(parameters, return_type)));
     }
-    resolve_m0063_annotation_type(
+    resolve_annotation_type(
         annotation,
         &parsed.type_name_references,
         &parsed.array_types,
@@ -3743,7 +3737,7 @@ pub fn type_m0086_annotation_type(
     )
 }
 
-pub fn type_m0088_lambda_expressions(
+pub fn type_lambda_expressions(
     parsed: &ParseOutput,
     types: &mut TypeArena,
     report: &mut TypeCheckReport,
@@ -3754,7 +3748,7 @@ pub fn type_m0088_lambda_expressions(
             .iter()
             .find(|declaration| declaration.initializer == Some(lambda.expression))
             .and_then(|declaration| declaration.annotation)
-            .and_then(|annotation| type_m0086_annotation_type(parsed, annotation, types, &[]));
+            .and_then(|annotation| type_annotation_type(parsed, annotation, types, &[]));
         let expected_parameters = expected_type.and_then(|expected| {
             types.get(expected).and_then(|record| match record.kind() {
                 TypeKind::Function(function) => Some(function.parameters().to_vec()),
@@ -3765,7 +3759,7 @@ pub fn type_m0088_lambda_expressions(
             parsed
                 .arena
                 .node(lambda.body)
-                .is_some_and(|body| span_contains(body.span, reference.name_span))
+                .is_some_and(|body| refinement_span_contains(body.span, reference.name_span))
                 && !lambda
                     .parameters
                     .iter()
@@ -3813,9 +3807,7 @@ pub fn type_m0088_lambda_expressions(
             .map(|(index, parameter)| {
                 parameter
                     .annotation
-                    .and_then(|annotation| {
-                        type_m0086_annotation_type(parsed, annotation, types, &[])
-                    })
+                    .and_then(|annotation| type_annotation_type(parsed, annotation, types, &[]))
                     .or_else(|| {
                         expected_parameters
                             .as_ref()
@@ -3845,7 +3837,7 @@ pub fn type_m0088_lambda_expressions(
             }
         }
         let int_type = PrimitiveTypeIds::module_owned(types).int_id;
-        let primitive_report = type_m0028_executable_int_operators(
+        let primitive_report = type_executable_int_operators(
             &parsed.unary_expressions,
             &parsed.binary_expressions,
             &parsed.grouped_expressions,
@@ -3868,7 +3860,7 @@ pub fn type_m0088_lambda_expressions(
     }
 }
 
-pub fn type_m0088_bind_function_values(
+pub fn type_bind_function_values(
     parsed: &ParseOutput,
     signatures: &[FunctionSignature],
     types: &mut TypeArena,
@@ -3904,7 +3896,8 @@ pub fn type_m0088_bind_function_values(
                 .iter()
                 .filter(|reference| reference.name == parameter.name)
             {
-                if body_span.is_some_and(|span| span_contains(span, reference.name_span)) {
+                if body_span.is_some_and(|span| refinement_span_contains(span, reference.name_span))
+                {
                     report.replace_expression_type(ExpressionType::new(
                         reference.reference,
                         parameter_type,
@@ -3968,7 +3961,7 @@ pub fn type_m0088_bind_function_values(
     }
 }
 
-pub fn infer_m0090_local_types(parsed: &ParseOutput, report: &mut TypeCheckReport) {
+pub fn infer_local_types(parsed: &ParseOutput, report: &mut TypeCheckReport) {
     for declaration in &parsed.local_declarations {
         if declaration.annotation.is_some()
             || report
@@ -4016,7 +4009,7 @@ pub fn infer_m0090_local_types(parsed: &ParseOutput, report: &mut TypeCheckRepor
     }
 }
 
-pub fn diagnose_m0090_unresolved_types(parsed: &ParseOutput, report: &mut TypeCheckReport) {
+pub fn diagnose_unresolved_types(parsed: &ParseOutput, report: &mut TypeCheckReport) {
     for declaration in &parsed.local_declarations {
         if declaration.annotation.is_some()
             || report
@@ -4035,7 +4028,7 @@ pub fn diagnose_m0090_unresolved_types(parsed: &ParseOutput, report: &mut TypeCh
     }
 }
 
-pub fn validate_m0090_inferred_assignments(
+pub fn validate_inferred_assignments(
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
     types: &TypeArena,
@@ -4081,11 +4074,11 @@ pub fn validate_m0090_inferred_assignments(
     }
 }
 
-fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+fn refinement_span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
     outer.file() == inner.file() && outer.start() <= inner.start() && inner.end() <= outer.end()
 }
 
-pub fn check_m0087_indirect_calls(
+pub fn check_indirect_calls(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     types: &TypeArena,
@@ -4137,7 +4130,7 @@ pub fn check_m0087_indirect_calls(
     report
 }
 
-fn resolve_m0063_annotation_type(
+fn resolve_annotation_type(
     annotation: AstNodeId,
     type_name_references: &[ParsedTypeNameReference],
     array_types: &[ParsedArrayType],
@@ -4171,7 +4164,7 @@ fn resolve_m0063_annotation_type(
             });
     }
     let array = array_types.iter().find(|array| array.array == annotation)?;
-    let element = resolve_m0063_annotation_type(
+    let element = resolve_annotation_type(
         array.element_type,
         type_name_references,
         array_types,
@@ -4182,15 +4175,15 @@ fn resolve_m0063_annotation_type(
     Some(arena.array(element, array.length?))
 }
 
-pub fn type_m0063_array_expressions(
+pub fn type_array_expressions(
     types: &mut TypeArena,
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
 ) {
-    type_m0063_array_expressions_with_classes(types, parsed, report, &[]);
+    type_array_expressions_with_classes(types, parsed, report, &[]);
 }
 
-pub fn type_m0063_array_expressions_with_classes(
+pub fn type_array_expressions_with_classes(
     types: &mut TypeArena,
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
@@ -4406,7 +4399,7 @@ fn array_element_assignable(actual: TypeId, expected: TypeId, classes: &[ClassTy
     })
 }
 
-pub fn type_m0064_string_operations(
+pub fn type_string_operations(
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
     types: &mut TypeArena,
@@ -4453,7 +4446,7 @@ pub fn type_m0064_string_operations(
 
     for parameter in &parsed.function_parameters {
         let primitives = PrimitiveTypeIds::module_owned(types);
-        let Some(parameter_type) = resolve_m0063_annotation_type(
+        let Some(parameter_type) = resolve_annotation_type(
             parameter.annotation,
             &parsed.type_name_references,
             array_types,
@@ -4683,7 +4676,7 @@ pub fn type_m0064_string_operations(
     }
 }
 
-pub fn type_m0073_dynamic_array_operations(
+pub fn type_dynamic_array_operations(
     parsed: &ParseOutput,
     report: &mut TypeCheckReport,
     types: &TypeArena,
@@ -4835,7 +4828,7 @@ fn resolve_named_const_length(
         })
 }
 
-pub fn recognize_m0019_null_tests(
+pub fn recognize_null_tests(
     binary_expressions: &[ParsedBinaryExpression],
     literal_expressions: &[ParsedLiteralExpression],
     arena: &AstArena,
@@ -4881,7 +4874,7 @@ fn is_name_expression(expression: AstNodeId, arena: &AstArena) -> bool {
         .is_some_and(|node| node.kind == AstNodeKind::NameExpression)
 }
 
-pub fn select_m0019_eligible_null_tests(
+pub fn select_eligible_null_tests(
     null_tests: &[RecognizedNullTest],
     resolutions: &ResolutionTable,
     local_bindings: &[LocalBinding],
@@ -4945,7 +4938,7 @@ pub fn select_m0019_eligible_null_tests(
     (eligible, report)
 }
 
-pub fn record_m0019_branch_refinements(
+pub fn record_branch_refinements(
     eligible_refinements: &[EligibleNullTestRefinement],
     if_expressions: &[ParsedIfExpression],
 ) -> TypeCheckReport {
@@ -4959,7 +4952,7 @@ pub fn record_m0019_branch_refinements(
             continue;
         };
 
-        let Some(region) = m0019_refined_branch_region(eligible.null_test(), if_expression) else {
+        let Some(region) = refined_branch_region(eligible.null_test(), if_expression) else {
             continue;
         };
 
@@ -4976,7 +4969,7 @@ pub fn record_m0019_branch_refinements(
     report
 }
 
-fn m0019_refined_branch_region(
+fn refined_branch_region(
     null_test: RecognizedNullTest,
     if_expression: &ParsedIfExpression,
 ) -> Option<AstNodeId> {
@@ -4986,7 +4979,7 @@ fn m0019_refined_branch_region(
     }
 }
 
-pub fn record_m0019_refined_expression_types(
+pub fn record_refined_expression_types(
     report: &mut TypeCheckReport,
     arena: &AstArena,
     resolved_local_bindings: &[ResolvedLocalBinding],
@@ -5006,7 +4999,7 @@ pub fn record_m0019_refined_expression_types(
         let mut ambiguous = false;
         for refinement in report.refinements() {
             if refinement.binding() != resolved.binding()
-                || !m0019_expression_is_inside_refinement_region(
+                || !expression_is_inside_refinement_region(
                     arena,
                     resolved.reference(),
                     refinement.region(),
@@ -5045,7 +5038,7 @@ pub fn record_m0019_refined_expression_types(
     }
 }
 
-fn m0019_expression_is_inside_refinement_region(
+fn expression_is_inside_refinement_region(
     arena: &AstArena,
     expression: AstNodeId,
     region: AstNodeId,
@@ -5358,7 +5351,7 @@ pub fn type_grouped_expressions(
     report
 }
 
-pub fn type_m0028_executable_int_operators(
+pub fn type_executable_int_operators(
     unary_expressions: &[ParsedUnaryExpression],
     binary_expressions: &[ParsedBinaryExpression],
     grouped_expressions: &[ParsedGroupedExpression],
@@ -5375,7 +5368,7 @@ pub fn type_m0028_executable_int_operators(
 
         for unary in unary_expressions {
             if completed.contains(&unary.expression)
-                || !is_m0028_executable_int_unary_operator(unary.operator)
+                || !is_executable_int_unary_operator(unary.operator)
             {
                 continue;
             }
@@ -5398,7 +5391,7 @@ pub fn type_m0028_executable_int_operators(
 
         for binary in binary_expressions {
             if completed.contains(&binary.expression)
-                || !is_m0028_executable_int_operator(binary.operator)
+                || !is_executable_int_operator(binary.operator)
             {
                 continue;
             }
@@ -5449,7 +5442,7 @@ pub fn type_m0028_executable_int_operators(
     report
 }
 
-fn is_m0028_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
+fn is_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
     matches!(
         operator,
         ParsedBinaryOperator::Plus
@@ -5466,7 +5459,7 @@ fn is_m0028_executable_int_operator(operator: ParsedBinaryOperator) -> bool {
     )
 }
 
-fn is_m0028_executable_int_unary_operator(operator: crate::parser::ParsedUnaryOperator) -> bool {
+fn is_executable_int_unary_operator(operator: crate::parser::ParsedUnaryOperator) -> bool {
     matches!(
         operator,
         crate::parser::ParsedUnaryOperator::Plus
@@ -5475,7 +5468,7 @@ fn is_m0028_executable_int_unary_operator(operator: crate::parser::ParsedUnaryOp
     )
 }
 
-pub fn type_m0035_primitive_operators(
+pub fn type_primitive_operators(
     unary_expressions: &[ParsedUnaryExpression],
     binary_expressions: &[ParsedBinaryExpression],
     known_expression_types: &[ExpressionType],
@@ -5618,7 +5611,7 @@ pub fn type_m0035_primitive_operators(
     report
 }
 
-pub fn type_m0060_control_flow(
+pub fn type_control_flow(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     int_type: TypeId,
@@ -5698,7 +5691,7 @@ pub fn type_m0060_control_flow(
         })
         .cloned()
         .collect::<Vec<_>>();
-    let int_report = type_m0028_executable_int_operators(
+    let int_report = type_executable_int_operators(
         &int_unary,
         &int_binary,
         &parsed.grouped_expressions,
@@ -5731,7 +5724,7 @@ pub fn type_m0060_control_flow(
     report
 }
 
-pub fn type_m0092_array_iterations(
+pub fn type_array_iterations(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     types: &TypeArena,
@@ -5793,7 +5786,7 @@ pub fn type_m0092_array_iterations(
     report
 }
 
-pub fn type_m0077_value_conditionals(
+pub fn type_value_conditionals(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     type_arena: &TypeArena,
@@ -5863,7 +5856,7 @@ pub fn type_m0077_value_conditionals(
     report
 }
 
-pub fn type_m0080_enum_whens(
+pub fn type_enum_whens(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     classes: &ClassTypeReport,
@@ -5961,7 +5954,7 @@ pub fn type_m0080_enum_whens(
                         else {
                             continue;
                         };
-                        let Some(field_type) = resolve_m0063_annotation_type(
+                        let Some(field_type) = resolve_annotation_type(
                             field.annotation,
                             &parsed.type_name_references,
                             &parsed.array_types,
@@ -6020,7 +6013,7 @@ pub fn type_m0080_enum_whens(
     report
 }
 
-pub fn apply_m0081_enum_constructor_facts(
+pub fn apply_enum_constructor_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
@@ -6067,7 +6060,7 @@ pub fn apply_m0081_enum_constructor_facts(
             continue;
         }
         let valid = fields.iter().zip(&call.arguments).all(|(field, argument)| {
-            let Some(expected) = resolve_m0063_annotation_type(
+            let Some(expected) = resolve_annotation_type(
                 field.annotation,
                 &parsed.type_name_references,
                 &parsed.array_types,
@@ -6093,7 +6086,7 @@ pub fn apply_m0081_enum_constructor_facts(
     }
 }
 
-pub fn apply_m0081_enum_function_facts(
+pub fn apply_enum_function_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
@@ -6137,7 +6130,7 @@ pub fn apply_m0081_enum_function_facts(
             .iter()
             .filter(|parameter| parameter.function == function.declaration)
             .map(|parameter| {
-                resolve_m0063_annotation_type(
+                resolve_annotation_type(
                     parameter.annotation,
                     &parsed.type_name_references,
                     &parsed.array_types,
@@ -6161,7 +6154,7 @@ pub fn apply_m0081_enum_function_facts(
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        let Some(return_type) = resolve_m0063_annotation_type(
+        let Some(return_type) = resolve_annotation_type(
             return_annotation,
             &parsed.type_name_references,
             &parsed.array_types,
@@ -6183,10 +6176,7 @@ pub fn apply_m0081_enum_function_facts(
     }
 }
 
-pub fn apply_m0077_value_conditional_results(
-    target: &mut TypeCheckReport,
-    source: &TypeCheckReport,
-) {
+pub fn apply_value_conditional_results(target: &mut TypeCheckReport, source: &TypeCheckReport) {
     merge_type_check_report(target, source.clone());
 }
 
@@ -6229,7 +6219,7 @@ fn conditional_branch_value(parsed: &ParseOutput, block: AstNodeId) -> Option<As
         })
 }
 
-pub fn apply_m0060_control_flow_results(
+pub fn apply_control_flow_results(
     target: &mut TypeCheckReport,
     parsed: &ParseOutput,
     source: &TypeCheckReport,
@@ -6246,7 +6236,7 @@ pub fn apply_m0060_control_flow_results(
     merge_type_check_report(target, source.clone());
 }
 
-pub fn type_m0028_static_integer_diagnostics(
+pub fn type_static_integer_diagnostics(
     literals: &[ParsedIntegerLiteral],
     grouped: &[ParsedGroupedExpression],
     unary: &[ParsedUnaryExpression],
@@ -6288,7 +6278,7 @@ pub fn type_m0028_static_integer_diagnostics(
         else {
             return false;
         };
-        is_m0028_executable_int_operator(expression.operator)
+        is_executable_int_operator(expression.operator)
             && is_constant_expression(expression.left, literals, grouped, unary, binaries)
             && is_constant_expression(expression.right, literals, grouped, unary, binaries)
     }
@@ -6487,7 +6477,7 @@ pub fn type_assignment_statements(
     )
 }
 
-pub fn type_m0019_assignment_statements(
+pub fn type_assignment_statements_with_flow(
     assignments: &[ParsedAssignmentStatement],
     known_expression_types: &[ExpressionType],
     flow_report: &TypeCheckReport,
@@ -6504,7 +6494,7 @@ pub fn type_m0019_assignment_statements(
     )
 }
 
-pub fn type_m0019_local_declaration_initializers(
+pub fn type_local_declaration_initializers(
     declarations: &[ParsedLocalDeclaration],
     declaration_signatures: &[DeclarationSignature],
     known_expression_types: &[ExpressionType],
@@ -6513,7 +6503,7 @@ pub fn type_m0019_local_declaration_initializers(
     ast_arena: &AstArena,
     type_arena: &TypeArena,
 ) -> TypeCheckReport {
-    type_m0019_local_declaration_initializers_with_region_exit_invalidations(
+    type_local_declaration_initializers_with_region_exit_invalidations(
         declarations,
         declaration_signatures,
         known_expression_types,
@@ -6526,7 +6516,7 @@ pub fn type_m0019_local_declaration_initializers(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn type_m0019_region_exit_refinement_invalidations(
+pub fn type_region_exit_refinement_invalidations(
     declarations: &[ParsedLocalDeclaration],
     declaration_signatures: &[DeclarationSignature],
     known_expression_types: &[ExpressionType],
@@ -6536,7 +6526,7 @@ pub fn type_m0019_region_exit_refinement_invalidations(
     ast_arena: &AstArena,
     type_arena: &TypeArena,
 ) -> TypeCheckReport {
-    type_m0019_local_declaration_initializers_with_region_exit_invalidations(
+    type_local_declaration_initializers_with_region_exit_invalidations(
         declarations,
         declaration_signatures,
         known_expression_types,
@@ -6549,7 +6539,7 @@ pub fn type_m0019_region_exit_refinement_invalidations(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn type_m0019_local_declaration_initializers_with_region_exit_invalidations(
+fn type_local_declaration_initializers_with_region_exit_invalidations(
     declarations: &[ParsedLocalDeclaration],
     declaration_signatures: &[DeclarationSignature],
     known_expression_types: &[ExpressionType],
@@ -6584,7 +6574,7 @@ fn type_m0019_local_declaration_initializers_with_region_exit_invalidations(
         else {
             continue;
         };
-        let refined_initializer_type = valid_m0019_refined_value_type(
+        let refined_initializer_type = valid_refined_value_type(
             initializer,
             original_initializer_type,
             Some((flow_report, resolved_local_bindings, ast_arena)),
@@ -6600,7 +6590,7 @@ fn type_m0019_local_declaration_initializers_with_region_exit_invalidations(
                 effective_initializer_type,
             ));
         } else if refined_initializer_type.is_none()
-            && exact_m0019_nullable_name_initializer(
+            && exact_nullable_name_initializer(
                 initializer,
                 original_initializer_type,
                 target_type,
@@ -6610,7 +6600,7 @@ fn type_m0019_local_declaration_initializers_with_region_exit_invalidations(
             )
         {
             let diagnostic = if if_expressions.is_some_and(|if_expressions| {
-                exact_m0019_region_exit_nullable_name_initializer(
+                exact_region_exit_nullable_name_initializer(
                     initializer,
                     original_initializer_type,
                     target_type,
@@ -6667,12 +6657,8 @@ fn type_assignment_statements_with_refinements(
         else {
             continue;
         };
-        let refined_value_type = valid_m0019_refined_value_type(
-            assignment.value,
-            original_value_type,
-            flow_context,
-            arena,
-        );
+        let refined_value_type =
+            valid_refined_value_type(assignment.value, original_value_type, flow_context, arena);
         let effective_value_type = refined_value_type.unwrap_or(original_value_type);
 
         if assignment_compatible(target_type, effective_value_type, arena) {
@@ -6703,7 +6689,7 @@ fn type_assignment_statements_with_refinements(
     report
 }
 
-fn valid_m0019_refined_value_type(
+fn valid_refined_value_type(
     expression: AstNodeId,
     original_type: TypeId,
     flow_context: Option<(&TypeCheckReport, &[ResolvedLocalBinding], &AstArena)>,
@@ -6728,7 +6714,7 @@ fn valid_m0019_refined_value_type(
         || provenance.original_nullable_type() != refined.original_nullable_type()
         || provenance.refined_non_null_type() != refined.refined_non_null_type()
         || provenance.binding().kind() != LocalBindingKind::Immutable
-        || !m0019_expression_is_inside_refinement_region(ast_arena, expression, provenance.region())
+        || !expression_is_inside_refinement_region(ast_arena, expression, provenance.region())
     {
         return None;
     }
@@ -6745,7 +6731,7 @@ fn valid_m0019_refined_value_type(
     (refined.refined_non_null_type() == base).then_some(base)
 }
 
-fn exact_m0019_nullable_name_initializer(
+fn exact_nullable_name_initializer(
     initializer: AstNodeId,
     original_type: TypeId,
     target_type: TypeId,
@@ -6766,7 +6752,7 @@ fn exact_m0019_nullable_name_initializer(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn exact_m0019_region_exit_nullable_name_initializer(
+fn exact_region_exit_nullable_name_initializer(
     initializer: AstNodeId,
     original_type: TypeId,
     target_type: TypeId,
@@ -6818,12 +6804,12 @@ fn exact_m0019_region_exit_nullable_name_initializer(
         is_refined_branch
             && if_expression.span.file() == initializer_span.file()
             && if_expression.span.end() <= initializer_span.start()
-            && m0019_immediate_containing_block(ast_arena, if_expression.span)
-                == m0019_immediate_containing_block(ast_arena, initializer_span)
+            && immediate_containing_block(ast_arena, if_expression.span)
+                == immediate_containing_block(ast_arena, initializer_span)
     })
 }
 
-fn m0019_immediate_containing_block(
+fn immediate_containing_block(
     arena: &AstArena,
     span: crate::source::ByteSpan,
 ) -> Option<AstNodeId> {
@@ -6877,11 +6863,11 @@ fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bo
     }
 }
 
-pub fn type_unsupported_m0018_expressions(arena: &AstArena) -> TypeCheckReport {
-    type_unsupported_expressions(arena, None)
+pub fn type_unsupported_expressions(arena: &AstArena) -> TypeCheckReport {
+    type_unsupported_expressions_with_operators(arena, None)
 }
 
-fn type_unsupported_expressions(
+fn type_unsupported_expressions_with_operators(
     arena: &AstArena,
     executable_operators: Option<(&[ParsedUnaryExpression], &[ParsedBinaryExpression])>,
 ) -> TypeCheckReport {
@@ -6891,12 +6877,12 @@ fn type_unsupported_expressions(
         if executable_operators.is_some_and(|(unary, binary)| {
             unary.iter().any(|expression| {
                 expression.expression == node.id
-                    && (is_m0028_executable_int_unary_operator(expression.operator)
+                    && (is_executable_int_unary_operator(expression.operator)
                         || expression.operator == crate::parser::ParsedUnaryOperator::Not)
             }) || binary.iter().any(|expression| {
                 expression.expression == node.id
-                    && (is_m0028_executable_int_operator(expression.operator)
-                        || is_m0035_primitive_binary_operator(expression.operator))
+                    && (is_executable_int_operator(expression.operator)
+                        || is_primitive_binary_operator(expression.operator))
             })
         }) {
             continue;
@@ -6910,7 +6896,7 @@ fn type_unsupported_expressions(
     report
 }
 
-fn is_m0035_primitive_binary_operator(operator: ParsedBinaryOperator) -> bool {
+fn is_primitive_binary_operator(operator: ParsedBinaryOperator) -> bool {
     matches!(
         operator,
         ParsedBinaryOperator::LogicalOr
@@ -6946,7 +6932,7 @@ fn unsupported_expression_rule(kind: AstNodeKind) -> Option<TypeRuleDiagnostic> 
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn type_m0018_core(
+pub fn type_core(
     arena: &AstArena,
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
@@ -6956,7 +6942,7 @@ pub fn type_m0018_core(
     resolutions: &ResolutionTable,
     local_bindings: &[LocalBinding],
 ) -> (TypeArena, TypeCheckReport) {
-    type_core(
+    type_core_with_options(
         arena,
         declarations,
         type_name_references,
@@ -6971,7 +6957,7 @@ pub fn type_m0018_core(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn type_m0028_executable_core(
+pub fn type_executable_core(
     arena: &AstArena,
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
@@ -6985,7 +6971,7 @@ pub fn type_m0028_executable_core(
     local_bindings: &[LocalBinding],
 ) -> (TypeArena, TypeCheckReport) {
     let mut type_arena = TypeArena::new();
-    let report = type_m0028_executable_core_in(
+    let report = type_executable_core_in(
         &mut type_arena,
         arena,
         declarations,
@@ -7003,7 +6989,7 @@ pub fn type_m0028_executable_core(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn type_m0028_executable_core_in(
+pub fn type_executable_core_in(
     type_arena: &mut TypeArena,
     arena: &AstArena,
     declarations: &[ParsedLocalDeclaration],
@@ -7030,7 +7016,7 @@ pub fn type_m0028_executable_core_in(
         local_bindings,
         Some((unary_expressions, binary_expressions)),
     );
-    for diagnostic in type_m0028_static_integer_diagnostics(
+    for diagnostic in type_static_integer_diagnostics(
         integer_literals,
         grouped_expressions,
         unary_expressions,
@@ -7047,7 +7033,7 @@ enum CompileTimeEvaluationError {
     DependencyCycle,
 }
 
-pub fn validate_m0061_compile_time_constants(
+pub fn validate_compile_time_constants(
     parsed: &ParseOutput,
     expression_types: &[ExpressionType],
     type_arena: &TypeArena,
@@ -7080,7 +7066,7 @@ pub fn validate_m0061_compile_time_constants(
             continue;
         };
 
-        match evaluate_m0061_constant(initializer, parsed, expression_types, type_arena) {
+        match evaluate_constant(initializer, parsed, expression_types, type_arena) {
             Ok(value) => report.record_compile_time_constant(CompileTimeConstant::new(
                 *declaration_id,
                 ty,
@@ -7102,7 +7088,7 @@ pub fn validate_m0061_compile_time_constants(
     }
 }
 
-fn evaluate_m0061_constant(
+fn evaluate_constant(
     expression: AstNodeId,
     parsed: &ParseOutput,
     expression_types: &[ExpressionType],
@@ -7153,24 +7139,24 @@ fn evaluate_m0061_constant(
         .iter()
         .find(|grouped| grouped.expression == expression)
     {
-        return evaluate_m0061_constant(grouped.inner, parsed, expression_types, type_arena);
+        return evaluate_constant(grouped.inner, parsed, expression_types, type_arena);
     }
     if let Some(unary) = parsed
         .unary_expressions
         .iter()
         .find(|unary| unary.expression == expression)
     {
-        let operand = evaluate_m0061_constant(unary.operand, parsed, expression_types, type_arena)?;
-        return evaluate_m0061_unary(unary.operator, operand);
+        let operand = evaluate_constant(unary.operand, parsed, expression_types, type_arena)?;
+        return evaluate_unary(unary.operator, operand);
     }
     if let Some(binary) = parsed
         .binary_expressions
         .iter()
         .find(|binary| binary.expression == expression)
     {
-        let left = evaluate_m0061_constant(binary.left, parsed, expression_types, type_arena)?;
-        let right = evaluate_m0061_constant(binary.right, parsed, expression_types, type_arena)?;
-        return evaluate_m0061_binary(binary.operator, left, right);
+        let left = evaluate_constant(binary.left, parsed, expression_types, type_arena)?;
+        let right = evaluate_constant(binary.right, parsed, expression_types, type_arena)?;
+        return evaluate_binary(binary.operator, left, right);
     }
     if let Some(name) = parsed
         .name_references
@@ -7198,7 +7184,7 @@ fn expression_type_is(
         .is_some_and(|record| record.kind() == &TypeKind::Primitive(primitive))
 }
 
-fn evaluate_m0061_unary(
+fn evaluate_unary(
     operator: ParsedUnaryOperator,
     value: CompileTimeValue,
 ) -> Result<CompileTimeValue, CompileTimeEvaluationError> {
@@ -7229,7 +7215,7 @@ fn evaluate_m0061_unary(
     }
 }
 
-fn evaluate_m0061_binary(
+fn evaluate_binary(
     operator: ParsedBinaryOperator,
     left: CompileTimeValue,
     right: CompileTimeValue,
@@ -7319,7 +7305,7 @@ fn evaluate_m0061_binary(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn type_core(
+fn type_core_with_options(
     arena: &AstArena,
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
@@ -7392,7 +7378,7 @@ fn type_core_with_arena(
     }
 
     let known_symbols = known_local_symbol_types(local_bindings, report.declaration_signatures());
-    record_m0018_accepted_expression_types(
+    record_accepted_expression_types(
         literals,
         grouped_expressions,
         resolutions,
@@ -7453,7 +7439,7 @@ fn type_core_with_arena(
             })
             .cloned()
             .collect();
-        let operator_report = type_m0028_executable_int_operators(
+        let operator_report = type_executable_int_operators(
             &int_unary_expressions,
             &int_binary_expressions,
             grouped_expressions,
@@ -7461,7 +7447,7 @@ fn type_core_with_arena(
             primitives.int_id,
         );
         merge_type_check_report(&mut report, operator_report);
-        let primitive_report = type_m0035_primitive_operators(
+        let primitive_report = type_primitive_operators(
             unary_expressions,
             binary_expressions,
             report.expression_types(),
@@ -7525,7 +7511,8 @@ fn type_core_with_arena(
         type_assignment_statements(assignments, report.expression_types(), type_arena);
     merge_type_check_report(&mut report, assignment_report);
 
-    let unsupported_report = type_unsupported_expressions(arena, executable_operators);
+    let unsupported_report =
+        type_unsupported_expressions_with_operators(arena, executable_operators);
     merge_type_check_report(&mut report, unsupported_report);
 
     report
@@ -7546,13 +7533,13 @@ pub(crate) fn merge_type_check_report(target: &mut TypeCheckReport, source: Type
     }
 }
 
-pub fn type_m0018_accepted_expressions(
+pub fn type_accepted_expressions(
     literals: &[ParsedLiteralExpression],
     grouped_expressions: &[ParsedGroupedExpression],
     resolutions: &ResolutionTable,
     known_symbols: &[KnownSymbolType],
 ) -> (TypeArena, TypeCheckReport) {
-    let (arena, _primitives, report) = type_m0018_accepted_expressions_with_primitives(
+    let (arena, _primitives, report) = type_accepted_expressions_with_primitives(
         literals,
         grouped_expressions,
         resolutions,
@@ -7561,7 +7548,7 @@ pub fn type_m0018_accepted_expressions(
     (arena, report)
 }
 
-fn type_m0018_accepted_expressions_with_primitives(
+fn type_accepted_expressions_with_primitives(
     literals: &[ParsedLiteralExpression],
     grouped_expressions: &[ParsedGroupedExpression],
     resolutions: &ResolutionTable,
@@ -7571,7 +7558,7 @@ fn type_m0018_accepted_expressions_with_primitives(
     let primitives = PrimitiveTypeIds::insert_into(&mut arena);
     let mut report = TypeCheckReport::new();
 
-    record_m0018_accepted_expression_types(
+    record_accepted_expression_types(
         literals,
         grouped_expressions,
         resolutions,
@@ -7583,7 +7570,7 @@ fn type_m0018_accepted_expressions_with_primitives(
     (arena, primitives, report)
 }
 
-fn record_m0018_accepted_expression_types(
+fn record_accepted_expression_types(
     literals: &[ParsedLiteralExpression],
     grouped_expressions: &[ParsedGroupedExpression],
     resolutions: &ResolutionTable,
@@ -7630,7 +7617,7 @@ fn record_m0018_accepted_expression_types(
     }
 }
 
-pub fn type_m0018_local_declaration_initializers(
+pub fn type_primitive_local_declaration_initializers(
     declarations: &[ParsedLocalDeclaration],
     type_name_references: &[ParsedTypeNameReference],
     literals: &[ParsedLiteralExpression],
@@ -7638,7 +7625,7 @@ pub fn type_m0018_local_declaration_initializers(
     resolutions: &ResolutionTable,
     known_symbols: &[KnownSymbolType],
 ) -> (TypeArena, TypeCheckReport) {
-    let (arena, primitives, expression_report) = type_m0018_accepted_expressions_with_primitives(
+    let (arena, primitives, expression_report) = type_accepted_expressions_with_primitives(
         literals,
         grouped_expressions,
         resolutions,

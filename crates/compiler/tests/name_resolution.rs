@@ -18,7 +18,7 @@ use compiler::source::{ByteSpan, SourceFileId};
 use compiler::symbol::{SymbolId, SymbolInterner};
 
 #[test]
-fn m0021_duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
+fn duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
     let file = SourceFileId::from_raw(811);
     let parsed = parse_source(
         file,
@@ -80,7 +80,7 @@ fn m0021_duplicate_match_arm_diagnostics_report_second_variant_and_wildcard() {
 }
 
 #[test]
-fn m0021_exhaustiveness_reports_only_otherwise_valid_missing_coverage() {
+fn exhaustiveness_reports_only_otherwise_valid_missing_coverage() {
     let file = SourceFileId::from_raw(812);
     let parsed = parse_source(
         file,
@@ -154,7 +154,7 @@ fn m0021_exhaustiveness_reports_only_otherwise_valid_missing_coverage() {
 }
 
 #[test]
-fn m0021_duplicate_enum_variant_diagnoses_only_same_enum_repeat() {
+fn duplicate_enum_variant_diagnoses_only_same_enum_repeat() {
     let file = SourceFileId::from_raw(810);
     let parsed = parse_source(file, "enum Signal { Red, Red } enum Other { Red }");
     let diagnostics =
@@ -165,7 +165,7 @@ fn m0021_duplicate_enum_variant_diagnoses_only_same_enum_repeat() {
 }
 
 #[test]
-fn m0021_when_subject_analysis_accepts_enum_parameter_only() {
+fn when_subject_analysis_accepts_enum_parameter_only() {
     let file = SourceFileId::from_raw(806);
     let parsed = parse_source(
         file,
@@ -251,7 +251,7 @@ fn m0021_when_subject_analysis_accepts_enum_parameter_only() {
 }
 
 #[test]
-fn m0021_qualified_variant_arm_resolves_subject_enum_variant() {
+fn qualified_variant_arm_resolves_subject_enum_variant() {
     let file = SourceFileId::from_raw(808);
     let parsed = parse_source(
         file,
@@ -363,7 +363,7 @@ fn m0021_qualified_variant_arm_resolves_subject_enum_variant() {
 }
 
 #[test]
-fn m0021_function_parameter_binding_uses_owning_body_scope() {
+fn function_parameter_binding_uses_owning_body_scope() {
     let file = SourceFileId::from_raw(802);
     let parsed = parse_source(
         file,
@@ -396,7 +396,7 @@ fn m0021_function_parameter_binding_uses_owning_body_scope() {
 }
 
 #[test]
-fn m0021_combined_binding_index_resolves_parameter_use() {
+fn combined_binding_index_resolves_parameter_use() {
     let file = SourceFileId::from_raw(805);
     let parsed = parse_source(
         file,
@@ -428,7 +428,7 @@ fn m0021_combined_binding_index_resolves_parameter_use() {
 }
 
 #[test]
-fn m0021_enum_parameter_type_identity_records_same_package_enum() {
+fn enum_parameter_type_identity_records_same_package_enum() {
     let file = SourceFileId::from_raw(803);
     let parsed = parse_source(
         file,
@@ -481,7 +481,7 @@ fn m0021_enum_parameter_type_identity_records_same_package_enum() {
 }
 
 #[test]
-fn m0021_enum_variant_identity_preserves_enum_and_variant_source_order() {
+fn enum_variant_identity_preserves_enum_and_variant_source_order() {
     let file = SourceFileId::from_raw(800);
     let parsed = parse_source(file, "enum Signal { Red, Green } enum Status { Red }");
     let metadata = ModuleMetadata::with_packages(
@@ -516,7 +516,7 @@ fn m0021_enum_variant_identity_preserves_enum_and_variant_source_order() {
 }
 
 #[test]
-fn m0021_enum_variant_identity_accepts_empty_parser_metadata() {
+fn enum_variant_identity_accepts_empty_parser_metadata() {
     let file = SourceFileId::from_raw(801);
     let metadata = ModuleMetadata::new(ModuleName::parse("demo.app").unwrap(), [file]).unwrap();
     let mut interner = SymbolInterner::new();
@@ -1457,7 +1457,7 @@ fn local_reference_binding_records_visible_local_resolution() {
 }
 
 #[test]
-fn m0019_local_binding_resolution_identity_records_exact_binding() {
+fn local_binding_resolution_identity_records_exact_binding() {
     let source = "func run() { const value = 1; value; }";
     let file = SourceFileId::from_raw(83);
     let parsed = parse_source(file, source);
@@ -1487,7 +1487,7 @@ fn m0019_local_binding_resolution_identity_records_exact_binding() {
 }
 
 #[test]
-fn m0019_local_binding_resolution_identity_distinguishes_nested_shadowing() {
+fn local_binding_resolution_identity_distinguishes_nested_shadowing() {
     let source = "func run() { const same = 1; if (ready) { same; const same = 2; same; }; same; }";
     let file = SourceFileId::from_raw(84);
     let parsed = parse_source(file, source);
@@ -1549,7 +1549,7 @@ fn m0019_local_binding_resolution_identity_distinguishes_nested_shadowing() {
 }
 
 #[test]
-fn m0019_local_binding_resolution_identity_skips_unresolved_uses() {
+fn local_binding_resolution_identity_skips_unresolved_uses() {
     let source = "func run() { missing; }";
     let file = SourceFileId::from_raw(85);
     let parsed = parse_source(file, source);

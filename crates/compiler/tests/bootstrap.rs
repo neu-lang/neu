@@ -3,7 +3,7 @@ use compiler::bootstrap::{
 };
 
 #[test]
-fn m0032_maps_bootstrap_exit_boundaries() {
+fn maps_bootstrap_exit_boundaries() {
     assert_eq!(map_main_result(0, 1), BootstrapOutcome::Exit(0));
     assert_eq!(map_main_result(255, 1), BootstrapOutcome::Exit(255));
     assert_eq!(
@@ -23,7 +23,7 @@ fn m0032_maps_bootstrap_exit_boundaries() {
 }
 
 #[test]
-fn m0032_preserves_bootstrap_trap_reasons() {
+fn preserves_bootstrap_trap_reasons() {
     for trap in [
         BootstrapTrap::IntegerOverflow,
         BootstrapTrap::DivisionByZero,

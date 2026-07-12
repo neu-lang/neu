@@ -360,7 +360,7 @@ fn optional_control_header_parentheses_preserve_metadata() {
 }
 
 #[test]
-fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
+fn generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);
     let output = parse_source(file, source);
@@ -401,7 +401,7 @@ fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds()
 }
 
 #[test]
-fn m0020_generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
+fn generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
     let output = parse_source(
         SourceFileId::from_raw(201),
         "struct Bad<T: > {} func use(): Box<Send> {};",
@@ -417,7 +417,7 @@ fn m0020_generic_parameter_metadata_excludes_malformed_lists_and_arguments() {
 }
 
 #[test]
-fn m0021_enum_variants_preserve_enclosing_enum_order_and_spans() {
+fn enum_variants_preserve_enclosing_enum_order_and_spans() {
     let file = SourceFileId::from_raw(202);
     let output = parse_source(file, "enum Signal { Red, Yellow; Green }");
 
@@ -444,7 +444,7 @@ fn m0021_enum_variants_preserve_enclosing_enum_order_and_spans() {
 }
 
 #[test]
-fn m0021_enum_variants_record_payload_arguments() {
+fn enum_variants_record_payload_arguments() {
     let empty = parse_source(SourceFileId::from_raw(203), "enum Empty {}");
     assert!(empty.diagnostics.is_empty());
     assert!(empty.enum_variants.is_empty());
@@ -456,7 +456,7 @@ fn m0021_enum_variants_record_payload_arguments() {
 }
 
 #[test]
-fn m0021_when_expression_records_subject_and_ordered_arms() {
+fn when_expression_records_subject_and_ordered_arms() {
     let file = SourceFileId::from_raw(205);
     let output = parse_source(
         file,
@@ -490,7 +490,7 @@ fn m0021_when_expression_records_subject_and_ordered_arms() {
 }
 
 #[test]
-fn m0021_when_expression_rejects_incomplete_or_unsupported_arms() {
+fn when_expression_rejects_incomplete_or_unsupported_arms() {
     let missing_body = parse_source(
         SourceFileId::from_raw(206),
         "func bad() { when (x) { A.B -> } }",
@@ -507,7 +507,7 @@ fn m0021_when_expression_rejects_incomplete_or_unsupported_arms() {
 }
 
 #[test]
-fn m0021_qualified_case_pattern_records_exact_identifier_metadata() {
+fn qualified_case_pattern_records_exact_identifier_metadata() {
     let file = SourceFileId::from_raw(208);
     let output = parse_source(file, "func code() { when (signal) { Signal.Red -> 0 } }");
 
@@ -530,7 +530,7 @@ fn m0021_qualified_case_pattern_records_exact_identifier_metadata() {
 }
 
 #[test]
-fn m0021_typed_function_parameter_records_function_and_named_type() {
+fn typed_function_parameter_records_function_and_named_type() {
     let file = SourceFileId::from_raw(210);
     let output = parse_source(
         file,
@@ -602,7 +602,7 @@ fn parses_adr0024_body_statements_and_expressions() {
 }
 
 #[test]
-fn m0028_records_executable_binary_operator_metadata() {
+fn records_executable_binary_operator_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(66),
         "func run() { a + b - c * d / e % f ** g << h >> i & j ^ k | l; }",
@@ -630,7 +630,7 @@ fn m0028_records_executable_binary_operator_metadata() {
 }
 
 #[test]
-fn m0028_parses_executable_unary_operators() {
+fn parses_executable_unary_operators() {
     let output = parse_source(
         SourceFileId::from_raw(67),
         "func run() { const a = +value; const b = -value; const c = ~value; }",
@@ -649,7 +649,7 @@ fn m0028_parses_executable_unary_operators() {
 }
 
 #[test]
-fn m0028_records_executable_unary_operator_metadata() {
+fn records_executable_unary_operator_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(69),
         "func run() { const a = +value; const b = -value; const c = ~value; }",
@@ -679,7 +679,7 @@ fn m0028_records_executable_unary_operator_metadata() {
 }
 
 #[test]
-fn m0028_parses_exponentiation_right_associatively() {
+fn parses_exponentiation_right_associatively() {
     let output = parse_source(SourceFileId::from_raw(68), "func run() { a ** b ** c; }");
 
     assert!(output.lex_diagnostics.is_empty());
@@ -780,7 +780,7 @@ fn records_float_and_unit_literal_metadata() {
 }
 
 #[test]
-fn m0028_records_integer_literal_values_without_truncation() {
+fn records_integer_literal_values_without_truncation() {
     let output = parse_source(
         SourceFileId::from_raw(96),
         "func run() { const decimal = 1_000; const binary = 0b10_10; const hexadecimal = 0x7f; const minimumMagnitude = 9223372036854775808; const tooLarge = 18446744073709551616; }",
@@ -1222,7 +1222,7 @@ fn parses_trailing_expression_and_if_expression_body() {
 }
 
 #[test]
-fn m0019_records_binary_expression_metadata_for_flow_inputs() {
+fn records_binary_expression_metadata_for_flow_inputs() {
     let output = parse_source(
         SourceFileId::from_raw(90),
         "func check() { const maybe: String? = null; if (maybe != null) { const definite = maybe; } }",
@@ -1250,7 +1250,7 @@ fn m0019_records_binary_expression_metadata_for_flow_inputs() {
 }
 
 #[test]
-fn m0019_records_if_expression_condition_and_branch_metadata() {
+fn records_if_expression_condition_and_branch_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(91),
         "func check() { if (null == maybe) { const fallback = \"missing\"; } else { const definite = maybe; } }",
@@ -1284,7 +1284,7 @@ fn m0019_records_if_expression_condition_and_branch_metadata() {
 }
 
 #[test]
-fn m0019_records_if_expression_without_else_as_none() {
+fn records_if_expression_without_else_as_none() {
     let output = parse_source(
         SourceFileId::from_raw(92),
         "func check() { if (maybe != null) { const definite = maybe; } }",
@@ -1341,7 +1341,7 @@ fn rejects_deferred_body_forms() {
 }
 
 #[test]
-fn m0024_unspecified_concurrency_forms_remain_blocked() {
+fn unspecified_concurrency_forms_remain_blocked() {
     let output = parse_source(
         SourceFileId::from_raw(83),
         "func concurrent() { async { run(); } while (ready) { run(); } }",
@@ -1423,7 +1423,7 @@ fn declaration_name_metadata_excludes_nested_declarations_and_missing_names() {
 }
 
 #[test]
-fn m0028_records_executable_function_return_and_call_metadata() {
+fn records_executable_function_return_and_call_metadata() {
     let output = parse_source(
         SourceFileId::from_raw(100),
         "func helper(value: Int): Int { return value + 1; } func main(): Int { return helper(1, 2 + 3); } func external(): Int;",
@@ -1479,7 +1479,7 @@ fn m0028_records_executable_function_return_and_call_metadata() {
 }
 
 #[test]
-fn m0028_executable_metadata_excludes_malformed_function_and_call_records() {
+fn executable_metadata_excludes_malformed_function_and_call_records() {
     let output = parse_source(
         SourceFileId::from_raw(101),
         "func broken(: Int) { return; } func run(): Int { return helper(,); }",
@@ -1494,7 +1494,7 @@ fn m0028_executable_metadata_excludes_malformed_function_and_call_records() {
 }
 
 #[test]
-fn m0028_records_return_statement_enclosing_blocks_in_source_order() {
+fn records_return_statement_enclosing_blocks_in_source_order() {
     let output = parse_source(
         SourceFileId::from_raw(111),
         "func main(): Int { return 1; if (true) { return 2; }; return 3; }",
@@ -1513,7 +1513,7 @@ fn m0028_records_return_statement_enclosing_blocks_in_source_order() {
 }
 
 #[test]
-fn m0029_records_executable_body_statements_in_function_source_order() {
+fn records_executable_body_statements_in_function_source_order() {
     let parsed = parse_source(
         SourceFileId::from_raw(202),
         "func run(): Int { const value: Int = 1; var next: Int = value; next = next + 1; return next; }",
@@ -1551,7 +1551,7 @@ fn m0029_records_executable_body_statements_in_function_source_order() {
 }
 
 #[test]
-fn m0060_records_for_range_and_loop_controls() {
+fn records_for_range_and_loop_controls() {
     let parsed = parse_source(
         SourceFileId::from_raw(203),
         "func run(): Int { for (index in 0..3) { continue; break; } return 0; }",
@@ -1565,7 +1565,7 @@ fn m0060_records_for_range_and_loop_controls() {
 }
 
 #[test]
-fn m0060_keeps_while_unsupported() {
+fn keeps_while_unsupported() {
     let parsed = parse_source(
         SourceFileId::from_raw(204),
         "func run(): Int { while (true) { return 1; } return 0; }",
