@@ -1287,6 +1287,40 @@ fn lower_instruction(
             values.insert(*output, length);
             Ok(())
         }
+        MirInstruction::DynamicArrayLoad {
+            output,
+            array,
+            index,
+            ..
+        } => {
+            let pointer = values
+                .get(array)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let index = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let invalid = builder
+                .ins()
+                .icmp(IntCC::UnsignedGreaterThanOrEqual, index, length);
+            builder.ins().trapnz(invalid, TrapCode::unwrap_user(7));
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let offset = builder.ins().imul_imm(index, 8);
+            let address = builder.ins().iadd(data, offset);
+            values.insert(
+                *output,
+                builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::new(), address, 0),
+            );
+            Ok(())
+        }
         MirInstruction::DynamicArrayAdd {
             array,
             value,
@@ -1569,6 +1603,36 @@ fn lower_instruction(
                     .copied()
                     .ok_or(CraneliftLoweringError::MissingValue)?;
                 let value = builder.use_var(variable);
+                let matches = builder
+                    .ins()
+                    .icmp_imm(IntCC::Equal, index_value, position as i64);
+                result = Some(match result {
+                    Some(current) => builder.ins().select(matches, value, current),
+                    None => value,
+                });
+            }
+            values.insert(*output, result.ok_or(CraneliftLoweringError::MissingValue)?);
+            Ok(())
+        }
+        MirInstruction::ArrayElementLoad {
+            output,
+            array,
+            index,
+            ..
+        } => {
+            let index_value = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let source = aggregate_values
+                .get(array)
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let negative = builder
+                .ins()
+                .icmp_imm(IntCC::SignedLessThan, index_value, 0);
+            builder.ins().trapnz(negative, TrapCode::unwrap_user(3));
+            let mut result = None;
+            for (position, value) in source.iter().copied().enumerate().rev() {
                 let matches = builder
                     .ins()
                     .icmp_imm(IntCC::Equal, index_value, position as i64);

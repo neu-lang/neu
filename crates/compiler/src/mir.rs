@@ -309,6 +309,12 @@ pub enum MirInstruction {
         index: MirValueId,
         span: ByteSpan,
     },
+    ArrayElementLoad {
+        output: MirValueId,
+        array: MirValueId,
+        index: MirValueId,
+        span: ByteSpan,
+    },
     ArrayStore {
         local: MirLocalId,
         index: MirValueId,
@@ -363,6 +369,12 @@ pub enum MirInstruction {
     DynamicArraySize {
         output: MirValueId,
         array: MirValueId,
+        span: ByteSpan,
+    },
+    DynamicArrayLoad {
+        output: MirValueId,
+        array: MirValueId,
+        index: MirValueId,
         span: ByteSpan,
     },
     DynamicArrayAdd {
@@ -476,12 +488,14 @@ impl MirInstruction {
             Self::StringConstant { span, .. }
             | Self::StringLength { span, .. }
             | Self::StringIndex { span, .. }
+            | Self::ArrayElementLoad { span, .. }
             | Self::StringClone { span, .. }
             | Self::StringConcat { span, .. }
             | Self::StringCompare { span, .. } => *span,
             Self::NewObject { span, .. } => *span,
             Self::DynamicArrayNew { span, .. } => *span,
             Self::DynamicArraySize { span, .. }
+            | Self::DynamicArrayLoad { span, .. }
             | Self::DynamicArrayAdd { span, .. }
             | Self::DynamicArrayRemove { span, .. } => *span,
             Self::FieldLoad { span, .. } => *span,
@@ -1138,7 +1152,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         });
                     } else if !matches!(
                         types.get(local.ty()).map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
                     ) {
                         instructions.push(MirInstruction::StoreLocal {
                             local: MirLocalId::from_raw(local.id().index()),
@@ -1478,7 +1492,16 @@ impl<'a> ShortCircuitLowerer<'a> {
                 self.push(MirInstruction::unit_constant(expression.span()));
             }
             HirExpressionKind::LocalRead(local) => {
-                if !matches!(
+                if matches!(
+                    self.types.get(expression.ty()).map(|record| record.kind()),
+                    Some(TypeKind::Array(_))
+                ) {
+                    self.push(MirInstruction::ArrayValue {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        span: expression.span(),
+                    });
+                } else if !matches!(
                     self.types.get(expression.ty()).map(|record| record.kind()),
                     Some(TypeKind::Primitive(PrimitiveType::Unit))
                 ) {
@@ -1631,16 +1654,83 @@ impl<'a> ShortCircuitLowerer<'a> {
             HirExpressionKind::Conditional { .. } | HirExpressionKind::When { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
-            HirExpressionKind::ArrayLiteral(_)
-            | HirExpressionKind::Index { .. }
+            HirExpressionKind::DynamicArrayNew => {
+                self.push(MirInstruction::DynamicArrayNew {
+                    output,
+                    type_id: expression.ty(),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::DynamicArraySize(array) => {
+                let array = self.lower_expression(*array)?;
+                self.push(MirInstruction::DynamicArraySize {
+                    output,
+                    array,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::DynamicArrayAdd {
+                array,
+                value,
+                index,
+            } => {
+                let array_value = self.lower_expression(*array)?;
+                let value = self.lower_expression(*value)?;
+                let element_type = self
+                    .types
+                    .get(
+                        self.function
+                            .expressions()
+                            .iter()
+                            .find(|candidate| candidate.id() == *array)
+                            .map(|candidate| candidate.ty())
+                            .ok_or(MirLoweringError::UnsupportedExpression)?,
+                    )
+                    .and_then(|record| match record.kind() {
+                        TypeKind::DynamicArray(array) => Some(array.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                let index = index
+                    .map(|index| self.lower_expression(index))
+                    .transpose()?;
+                self.push(MirInstruction::DynamicArrayAdd {
+                    element_type,
+                    array: array_value,
+                    value,
+                    index,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ArrayLiteral(elements) => {
+                let local = self
+                    .function
+                    .locals()
+                    .iter()
+                    .find(|local| local.initializer() == Some(id))
+                    .map(|local| local.id())
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                let element_values = elements
+                    .iter()
+                    .map(|element| self.lower_expression(*element))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.push(MirInstruction::ArrayInit {
+                    local: MirLocalId::from_raw(local.index()),
+                    elements: element_values,
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::ArrayValue {
+                    output,
+                    local: MirLocalId::from_raw(local.index()),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }
             | HirExpressionKind::NewObject { .. }
-            | HirExpressionKind::DynamicArrayNew
-            | HirExpressionKind::DynamicArraySize(_)
-            | HirExpressionKind::DynamicArrayAdd { .. }
             | HirExpressionKind::DynamicArrayRemove { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
@@ -1908,7 +1998,16 @@ impl<'a> ControlFlowLowerer<'a> {
                 });
             }
             HirExpressionKind::LocalRead(local) => {
-                if !matches!(
+                if matches!(
+                    self.types.get(expression.ty()).map(|record| record.kind()),
+                    Some(TypeKind::Array(_))
+                ) {
+                    self.push(MirInstruction::ArrayValue {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        span: expression.span(),
+                    });
+                } else if !matches!(
                     self.types.get(expression.ty()).map(|record| record.kind()),
                     Some(TypeKind::Primitive(PrimitiveType::Unit))
                 ) {
@@ -2119,8 +2218,30 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::ArrayLiteral(_)
-            | HirExpressionKind::Index { .. }
+            HirExpressionKind::ArrayLiteral(elements) => {
+                let local = self
+                    .function
+                    .locals()
+                    .iter()
+                    .find(|local| local.initializer() == Some(id))
+                    .map(|local| local.id())
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                let element_values = elements
+                    .iter()
+                    .map(|element| self.lower_expression(*element))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.push(MirInstruction::ArrayInit {
+                    local: MirLocalId::from_raw(local.index()),
+                    elements: element_values,
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::ArrayValue {
+                    output,
+                    local: MirLocalId::from_raw(local.index()),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
@@ -2149,7 +2270,7 @@ impl<'a> ControlFlowLowerer<'a> {
                         self.types
                             .get(self.local_type(*local)?)
                             .map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit))
+                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
                     ) {
                         self.push(MirInstruction::StoreLocal {
                             local: MirLocalId::from_raw(local.index()),
@@ -2157,6 +2278,9 @@ impl<'a> ControlFlowLowerer<'a> {
                             span: *span,
                         });
                     }
+                }
+                HirControlFlow::Expression { value, .. } => {
+                    let _ = self.lower_expression(*value)?;
                 }
                 HirControlFlow::Assignment(assignment) => {
                     let value = self.lower_expression(assignment.value())?;
@@ -2291,6 +2415,142 @@ impl<'a> ControlFlowLowerer<'a> {
                     });
                     self.current = exit;
                 }
+                HirControlFlow::ForEach {
+                    binding,
+                    array,
+                    body,
+                    span,
+                } => {
+                    let array_value = self.lower_expression(*array)?;
+                    let array_type = self
+                        .function
+                        .expressions()
+                        .iter()
+                        .find(|expression| expression.id() == *array)
+                        .map(|expression| expression.ty())
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let is_dynamic = matches!(
+                        self.types.get(array_type).map(|record| record.kind()),
+                        Some(TypeKind::DynamicArray(_))
+                    );
+                    let fixed_length = match self.types.get(array_type).map(|record| record.kind())
+                    {
+                        Some(TypeKind::Array(array)) => Some(array.length()),
+                        _ => None,
+                    };
+                    let index_local = MirLocalId::from_raw(self.locals.len());
+                    self.locals
+                        .push(MirLocal::new(index_local, self.int_type()?, *span));
+                    let zero = self.fresh_value();
+                    self.push(MirInstruction::int_constant(zero, 0, *span));
+                    self.push(MirInstruction::StoreLocal {
+                        local: index_local,
+                        value: zero,
+                        span: *span,
+                    });
+                    let header = self.new_block();
+                    let body_block = self.new_block();
+                    let update = self.new_block();
+                    let exit = self.new_block();
+                    self.terminate(MirTerminator::Branch {
+                        target: self.blocks[header].id,
+                        span: *span,
+                    });
+                    self.current = header;
+                    let index = self.fresh_value();
+                    self.push(MirInstruction::LoadLocal {
+                        output: index,
+                        local: index_local,
+                        span: *span,
+                    });
+                    let length = self.fresh_value();
+                    if is_dynamic {
+                        self.push(MirInstruction::DynamicArraySize {
+                            output: length,
+                            array: array_value,
+                            span: *span,
+                        });
+                    } else {
+                        self.push(MirInstruction::int_constant(
+                            length,
+                            i64::try_from(fixed_length.unwrap_or(0)).unwrap_or(0),
+                            *span,
+                        ));
+                    }
+                    let condition = self.fresh_value();
+                    self.push(MirInstruction::Compare {
+                        output: condition,
+                        operation: MirComparison::Less,
+                        left: index,
+                        right: length,
+                        span: *span,
+                    });
+                    self.terminate(MirTerminator::branch_if(
+                        condition,
+                        self.blocks[body_block].id,
+                        self.blocks[exit].id,
+                        *span,
+                    ));
+                    self.loops
+                        .push((self.blocks[exit].id, self.blocks[update].id));
+                    self.current = body_block;
+                    let element = self.fresh_value();
+                    if is_dynamic {
+                        self.push(MirInstruction::DynamicArrayLoad {
+                            output: element,
+                            array: array_value,
+                            index,
+                            span: *span,
+                        });
+                    } else {
+                        self.push(MirInstruction::ArrayElementLoad {
+                            output: element,
+                            array: array_value,
+                            index,
+                            span: *span,
+                        });
+                    }
+                    self.push(MirInstruction::StoreLocal {
+                        local: MirLocalId::from_raw(binding.index()),
+                        value: element,
+                        span: *span,
+                    });
+                    self.lower_sequence(body)?;
+                    if !self.is_terminated() {
+                        self.terminate(MirTerminator::Branch {
+                            target: self.blocks[update].id,
+                            span: *span,
+                        });
+                    }
+                    self.loops.pop();
+                    self.current = update;
+                    let current = self.fresh_value();
+                    self.push(MirInstruction::LoadLocal {
+                        output: current,
+                        local: index_local,
+                        span: *span,
+                    });
+                    let one = self.fresh_value();
+                    self.push(MirInstruction::int_constant(one, 1, *span));
+                    let next = self.fresh_value();
+                    self.push(MirInstruction::CheckedArithmetic {
+                        output: next,
+                        operation: MirArithmetic::Add,
+                        left: current,
+                        right: one,
+                        span: *span,
+                    });
+                    self.push(MirInstruction::StoreLocal {
+                        local: index_local,
+                        value: next,
+                        span: *span,
+                    });
+                    self.terminate(MirTerminator::Branch {
+                        target: self.blocks[header].id,
+                        span: *span,
+                    });
+                    self.current = exit;
+                }
                 HirControlFlow::Break { span } => {
                     let (target, _) = self
                         .loops
@@ -2325,6 +2585,15 @@ impl<'a> ControlFlowLowerer<'a> {
             .find(|candidate| candidate.id() == local)
             .map(|candidate| candidate.ty())
             .ok_or(MirLoweringError::UnsupportedExpression)
+    }
+
+    fn int_type(&self) -> Result<TypeId, MirLoweringError> {
+        self.types
+            .records()
+            .iter()
+            .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
+            .map(|record| record.id())
+            .ok_or(MirLoweringError::UnsupportedRuntimeType)
     }
 
     fn is_unit(&self, ty: TypeId) -> bool {

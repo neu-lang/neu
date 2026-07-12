@@ -37,7 +37,8 @@ use crate::{
         type_m0064_string_operations, type_m0068_class_types_in,
         type_m0073_dynamic_array_operations, type_m0077_value_conditionals, type_m0080_enum_whens,
         type_m0086_annotation_type, type_m0088_bind_function_values, type_m0088_lambda_expressions,
-        validate_m0061_compile_time_constants, validate_m0090_inferred_assignments,
+        type_m0092_array_iterations, validate_m0061_compile_time_constants,
+        validate_m0090_inferred_assignments,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -247,6 +248,8 @@ pub fn compile_source_to_executable(
     apply_m0081_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
     type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     type_m0088_lambda_expressions(&parsed, &mut types, &mut report);
+    let array_iterations = type_m0092_array_iterations(&parsed, report.expression_types(), &types);
+    merge_type_check_report(&mut report, array_iterations);
     infer_m0090_local_types(&parsed, &mut report);
     type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
@@ -369,6 +372,8 @@ pub fn compile_source_to_executable(
     let control_flow =
         type_m0060_control_flow(&parsed, report.expression_types(), int_type, bool_type);
     apply_m0060_control_flow_results(&mut report, &parsed, &control_flow);
+    let array_iterations = type_m0092_array_iterations(&parsed, report.expression_types(), &types);
+    merge_type_check_report(&mut report, array_iterations);
 
     let return_paths = check_m0028_straight_line_returns(&parsed);
     if !return_paths.diagnostics().is_empty() {

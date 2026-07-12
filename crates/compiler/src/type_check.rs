@@ -81,6 +81,8 @@ pub enum TypeRuleDiagnostic {
     ArrayElementTypeMismatch,
     ArrayIndexTypeMismatch,
     ArrayIndexOutOfBounds,
+    ArrayIterationTargetInvalid,
+    ArrayIterationStructuralMutation,
     ImmutableArrayMutation,
     StringIndexTypeMismatch,
     StringIndexOutOfBounds,
@@ -5445,13 +5447,15 @@ pub fn type_m0060_control_flow(
         }) {
             report.record_expression_type(ExpressionType::new(reference.reference, int_type));
         }
-        for expression in [loop_statement.start, loop_statement.end] {
-            if let Some(actual) = report.expression_type(expression)
-                && actual != int_type
-            {
-                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
-                    expression, int_type, actual,
-                ));
+        if loop_statement.array.is_none() {
+            for expression in [loop_statement.start, loop_statement.end] {
+                if let Some(actual) = report.expression_type(expression)
+                    && actual != int_type
+                {
+                    report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                        expression, int_type, actual,
+                    ));
+                }
             }
         }
     }
@@ -5518,6 +5522,68 @@ pub fn type_m0060_control_flow(
             )
         {
             report.record_expression_type(ExpressionType::new(binary.expression, bool_type));
+        }
+    }
+    report
+}
+
+pub fn type_m0092_array_iterations(
+    parsed: &ParseOutput,
+    known_expression_types: &[ExpressionType],
+    types: &TypeArena,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+    for loop_statement in parsed
+        .for_statements
+        .iter()
+        .filter(|loop_| loop_.array.is_some())
+    {
+        let Some(array_expression) = loop_statement.array else {
+            continue;
+        };
+        let Some(array_type) = report.expression_type(array_expression) else {
+            continue;
+        };
+        let element_type = match types.get(array_type).map(|record| record.kind()) {
+            Some(TypeKind::Array(array)) => Some(array.element()),
+            Some(TypeKind::DynamicArray(array)) => Some(array.element()),
+            _ => None,
+        };
+        let Some(element_type) = element_type else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ArrayIterationTargetInvalid,
+                array_expression,
+            ));
+            continue;
+        };
+        let Some(body_span) = parsed.arena.node(loop_statement.body).map(|node| node.span) else {
+            continue;
+        };
+        if let Some(member) = parsed.member_expressions.iter().find(|member| {
+            body_span.start() <= member.span.start()
+                && member.span.end() <= body_span.end()
+                && matches!(member.name.as_str(), "add" | "remove")
+        }) && parsed.call_expressions.iter().any(|call| {
+            call.callee == member.expression
+                && parsed.arena.node(call.expression).is_some_and(|node| {
+                    body_span.start() <= node.span.start() && node.span.end() <= body_span.end()
+                })
+        }) {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ArrayIterationStructuralMutation,
+                member.expression,
+            ));
+        }
+        for reference in parsed.name_references.iter().filter(|reference| {
+            reference.name == loop_statement.binding_name
+                && body_span.file() == reference.name_span.file()
+                && body_span.start() <= reference.name_span.start()
+                && reference.name_span.end() <= body_span.end()
+        }) {
+            report.replace_expression_type(ExpressionType::new(reference.reference, element_type));
         }
     }
     report

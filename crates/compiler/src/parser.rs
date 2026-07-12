@@ -197,6 +197,7 @@ pub struct ParsedForStatement {
     pub binding_name_span: ByteSpan,
     pub start: AstNodeId,
     pub end: AstNodeId,
+    pub array: Option<AstNodeId>,
     pub body: AstNodeId,
     pub span: ByteSpan,
 }
@@ -1814,22 +1815,19 @@ impl<'source> Parser<'source> {
             self.skip_to_statement_boundary();
             return;
         };
-        if self.current_kind() != Some(TokenKind::DotDot) {
-            self.diagnostic_current_or_span(
-                DiagnosticKind::MalformedConditional,
-                self.span_at(start),
-            );
-            self.skip_to_statement_boundary();
-            return;
-        }
-        self.advance();
-        let Some(end_span) = self.parse_expression() else {
-            self.diagnostic_current_or_span(
-                DiagnosticKind::MalformedConditional,
-                self.span_at(start),
-            );
-            self.skip_to_statement_boundary();
-            return;
+        let (end_span, is_array) = if self.current_kind() == Some(TokenKind::DotDot) {
+            self.advance();
+            let Some(end_span) = self.parse_expression() else {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedConditional,
+                    self.span_at(start),
+                );
+                self.skip_to_statement_boundary();
+                return;
+            };
+            (end_span, false)
+        } else {
+            (start_span, true)
         };
         if parenthesized && self.current_kind() != Some(TokenKind::RightParen) {
             self.diagnostic_current_or_span(
@@ -1865,6 +1863,7 @@ impl<'source> Parser<'source> {
             binding_name_span: binding_token.span,
             start: start_expression,
             end: end_expression,
+            array: is_array.then_some(start_expression),
             body,
             span,
         });

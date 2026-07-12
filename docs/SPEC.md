@@ -726,6 +726,22 @@ innermost loop and `continue` advances it; neither carries a value or label.
 borrowing, initialization, cleanup, and source-mapping obligations. No runtime,
 stdlib, printing, or scheduler behavior is added.
 
+## ADR-0092: Array Element Iteration
+
+`for (value in array)` and the equivalent unparenthesized header iterate fixed
+`T[N]` and compiler-managed `Array<T>` values exactly once, in ascending index
+order. Empty arrays execute no iterations. The loop binding is an immutable
+compiler-inferred read-only binding: copyable elements are copied, while
+move-only elements are implicitly shared-borrowed and do not consume the array.
+The binding cannot be assigned, and the array remains usable after the loop.
+
+Indexed writes continue to use existing `var`, ownership, and projection rules;
+structural dynamic-array mutation during iteration is rejected. `break` and
+`continue` retain ADR-0060 behavior. HIR and MIR preserve the target,
+fixed/dynamic identity, element projection, ownership, cleanup, and loop
+back-edge facts. Iterator objects, slices, views, generators, custom steps,
+labels, and structural mutation during iteration remain deferred.
+
 ## ADR-0062: Inferred Ownership Effects
 
 Neu infers read-only, exclusive-mutating, consuming, storing, and

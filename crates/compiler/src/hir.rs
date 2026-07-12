@@ -206,12 +206,25 @@ pub fn lower_checked_hir_source(
             .iter()
             .filter(|loop_| loop_.function == function.declaration)
         {
-            let ty = source
+            let loop_type = source
                 .expression_types
                 .iter()
                 .find(|typed| typed.expression() == loop_.start)
                 .map(|typed| typed.ty())
                 .ok_or(HirLoweringError::MissingType)?;
+            let ty = if loop_.array.is_some() {
+                match source
+                    .type_arena
+                    .and_then(|arena| arena.get(loop_type))
+                    .map(|record| record.kind())
+                {
+                    Some(TypeKind::Array(array)) => array.element(),
+                    Some(TypeKind::DynamicArray(array)) => array.element(),
+                    _ => return Err(HirLoweringError::MissingType),
+                }
+            } else {
+                loop_type
+            };
             let span = source
                 .parsed
                 .for_statements
@@ -2541,6 +2554,34 @@ fn lower_control_flow_block(
             .iter()
             .find(|candidate| candidate.statement == statement.statement)
         {
+            if let Some(array_expression) = for_statement.array {
+                let array = lower_expression(
+                    source,
+                    function_declaration,
+                    array_expression,
+                    local_bindings,
+                    expressions,
+                )?;
+                let binding = local_bindings
+                    .iter()
+                    .find(|(candidate, _)| *candidate == for_statement.binding)
+                    .map(|(_, local)| *local)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                let body = lower_control_flow_block(
+                    source,
+                    function_declaration,
+                    for_statement.body,
+                    local_bindings,
+                    expressions,
+                )?;
+                output.push(HirControlFlow::ForEach {
+                    binding,
+                    array,
+                    body,
+                    span: for_statement.span,
+                });
+                continue;
+            }
             let start = lower_expression(
                 source,
                 function_declaration,
@@ -2693,6 +2734,42 @@ fn lower_control_flow_block(
                 crate::parser::ParsedLoopControlKind::Continue => {
                     HirControlFlow::Continue { span: control.span }
                 }
+            });
+            continue;
+        }
+        if source
+            .parsed
+            .arena
+            .node(statement.statement)
+            .is_some_and(|node| node.kind == AstNodeKind::ExpressionStatement)
+        {
+            let expression = source
+                .parsed
+                .arena
+                .nodes()
+                .iter()
+                .filter(|node| {
+                    node.span.file() == statement.span.file()
+                        && node.span.start() == statement.span.start()
+                        && node.span.end() <= statement.span.end()
+                        && !matches!(
+                            node.kind,
+                            AstNodeKind::ExpressionStatement | AstNodeKind::Block
+                        )
+                })
+                .max_by_key(|node| node.span.end())
+                .map(|node| node.id)
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let value = lower_expression(
+                source,
+                function_declaration,
+                expression,
+                local_bindings,
+                expressions,
+            )?;
+            output.push(HirControlFlow::Expression {
+                value,
+                span: statement.span,
             });
         }
     }
@@ -3479,6 +3556,10 @@ pub enum HirControlFlow {
         value: HirExpressionId,
         span: ByteSpan,
     },
+    Expression {
+        value: HirExpressionId,
+        span: ByteSpan,
+    },
     Assignment(HirAssignment),
     Return(HirReturn),
     If {
@@ -3491,6 +3572,12 @@ pub enum HirControlFlow {
         binding: HirLocalId,
         start: HirExpressionId,
         end: HirExpressionId,
+        body: Vec<HirControlFlow>,
+        span: ByteSpan,
+    },
+    ForEach {
+        binding: HirLocalId,
+        array: HirExpressionId,
         body: Vec<HirControlFlow>,
         span: ByteSpan,
     },

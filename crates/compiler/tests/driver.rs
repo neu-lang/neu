@@ -59,6 +59,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("lambdas", 7),
         ("inferred_locals", 7),
         ("optional_headers", 7),
+        ("array_iteration", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

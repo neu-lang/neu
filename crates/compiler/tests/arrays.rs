@@ -63,6 +63,85 @@ fn compiles_and_runs_fixed_array_program() {
 }
 
 #[test]
+fn iterates_fixed_array_elements_in_order() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-array-iteration-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "public func main(): Int { val values: Int[3] = [1, 2, 4]; var total: Int = 0; for (value in values) { total = total + value; } return total; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6315),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn iterates_dynamic_array_elements() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-dynamic-array-iteration-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "func make(): Array<Int> { var values: Array<Int> = new Int[]; values.add(1); values.add(2); values.add(4); return values; } public func main(): Int { val values: Array<Int> = make(); var total: Int = 0; for value in values { total = total + value; } return total; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6316),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn rejects_dynamic_array_structural_mutation_during_iteration() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-array-iteration-negative-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "public func main(): Int { var values: Array<Int> = new Int[]; for value in values { values.add(value); } return 0; }";
+    let error = compiler::driver::compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6317),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("ArrayIterationStructuralMutation"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn rejects_array_length_and_immutable_index_mutation() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-array-negative-{}", std::process::id()));
