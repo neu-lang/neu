@@ -1,0 +1,15 @@
+enum Color(val rgb: Int) {
+    Red(10),
+    Green(20),
+    func value(): Int {
+        return this.rgb;
+    }
+    static func maximum(): Int {
+        return 20;
+    }
+}
+
+public func main(): Int {
+    val color: Color = Color.Green(20);
+    return color.value() + Color.maximum();
+}

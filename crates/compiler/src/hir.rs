@@ -217,7 +217,7 @@ pub fn lower_checked_hir_source(
             local_bindings.push((loop_.binding, local_id));
         }
         let mut parameters = Vec::new();
-        if function.owner.is_some() {
+        if function.owner.is_some() && !function.is_static {
             let parameter_span = source
                 .parsed
                 .arena
@@ -250,10 +250,12 @@ pub fn lower_checked_hir_source(
                         .span;
                     let ty = *signature
                         .parameter_types()
-                        .get(index + usize::from(function.owner.is_some()))
+                        .get(index + usize::from(function.owner.is_some() && !function.is_static))
                         .ok_or(HirLoweringError::UnsupportedExpression)?;
                     Ok(HirParameter::new(
-                        HirParameterId::from_raw(index + usize::from(function.owner.is_some())),
+                        HirParameterId::from_raw(
+                            index + usize::from(function.owner.is_some() && !function.is_static),
+                        ),
                         parameter_span,
                         ty,
                     ))
@@ -634,13 +636,72 @@ fn lower_expression(
                         })
                         .and_then(|tag| i64::try_from(tag).ok())
                 });
-            let value = lower_expression(
-                source,
-                function_declaration,
-                arm.body,
-                local_bindings,
-                output,
-            )?;
+            let value = if let Some(reference) = source
+                .parsed
+                .name_references
+                .iter()
+                .find(|reference| reference.reference == arm.body)
+            {
+                let binding = source.parsed.pattern_bindings.iter().find(|binding| {
+                    binding.name == reference.name
+                        && source
+                            .parsed
+                            .qualified_case_patterns
+                            .iter()
+                            .find(|pattern| pattern.pattern == arm.pattern)
+                            .is_some_and(|pattern| pattern.payloads.contains(&binding.pattern))
+                });
+                if let Some(binding) = binding {
+                    let index = source
+                        .parsed
+                        .qualified_case_patterns
+                        .iter()
+                        .find(|pattern| pattern.pattern == arm.pattern)
+                        .and_then(|pattern| {
+                            pattern
+                                .payloads
+                                .iter()
+                                .position(|id| *id == binding.pattern)
+                        })
+                        .ok_or(HirLoweringError::UnsupportedExpression)?;
+                    let value_id = HirExpressionId::from_raw(output.len());
+                    let value_ty = source
+                        .expression_types
+                        .iter()
+                        .find(|typed| typed.expression() == arm.body)
+                        .map(|typed| typed.ty())
+                        .ok_or(HirLoweringError::MissingType)?;
+                    output.push(HirExpression::enum_payload(
+                        value_id,
+                        source
+                            .parsed
+                            .arena
+                            .node(arm.body)
+                            .ok_or(HirLoweringError::UnsupportedExpression)?
+                            .span,
+                        value_ty,
+                        subject,
+                        index,
+                    ));
+                    value_id
+                } else {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        arm.body,
+                        local_bindings,
+                        output,
+                    )?
+                }
+            } else {
+                lower_expression(
+                    source,
+                    function_declaration,
+                    arm.body,
+                    local_bindings,
+                    output,
+                )?
+            };
             arms.push((tag, value));
         }
         let when_id = HirExpressionId::from_raw(output.len());
@@ -761,6 +822,10 @@ fn lower_expression(
             output,
         )?;
         let id = HirExpressionId::from_raw(output.len());
+        if let Some(index) = enum_field_index(source, member.receiver, &member.name) {
+            output.push(HirExpression::enum_payload(id, span, ty, receiver, index));
+            return Ok(id);
+        }
         if member.name == "length" {
             output.push(HirExpression::string_length(id, span, ty, receiver));
         } else {
@@ -970,6 +1035,29 @@ fn lower_expression(
         .iter()
         .find(|call| call.expression == expression)
     {
+        if let Some(member) = source
+            .parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+            && let Some(tag) = enum_variant_tag(source, member)
+        {
+            let payloads = call
+                .arguments
+                .iter()
+                .map(|argument| {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        *argument,
+                        local_bindings,
+                        output,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            output.push(HirExpression::enum_construct(id, span, ty, tag, payloads));
+            return Ok(id);
+        }
         let is_clone = source
             .parsed
             .name_references
@@ -1088,13 +1176,32 @@ fn lower_expression(
             .iter()
             .find(|member| member.expression == call.callee)
         {
-            arguments.push(lower_expression(
-                source,
-                function_declaration,
-                member.receiver,
-                local_bindings,
-                output,
-            )?);
+            let is_static = source
+                .parsed
+                .function_declarations
+                .iter()
+                .find(|function| {
+                    hir_function_index(
+                        source.parsed,
+                        source
+                            .parsed
+                            .function_declarations
+                            .iter()
+                            .position(|candidate| candidate.declaration == function.declaration)
+                            .unwrap_or(usize::MAX),
+                    )
+                    .is_some_and(|index| index == declaration)
+                })
+                .is_some_and(|function| function.is_static);
+            if !is_static {
+                arguments.push(lower_expression(
+                    source,
+                    function_declaration,
+                    member.receiver,
+                    local_bindings,
+                    output,
+                )?);
+            }
         }
         arguments.extend(
             call.arguments
@@ -1153,6 +1260,40 @@ fn enum_variant_tag(
         .filter(|variant| variant.enum_declaration == declaration)
         .position(|variant| variant.name == member.name)
         .and_then(|tag| i64::try_from(tag).ok())
+}
+
+fn enum_field_index(
+    source: &CheckedHirSource<'_>,
+    receiver: crate::ast::AstNodeId,
+    field_name: &str,
+) -> Option<usize> {
+    let receiver_type = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression() == receiver)
+        .map(|typed| typed.ty())?;
+    let class = source
+        .class_types?
+        .classes()
+        .iter()
+        .find(|class| class.type_id() == receiver_type)?;
+    if !source
+        .parsed
+        .enum_variants
+        .iter()
+        .any(|variant| variant.enum_declaration == class.declaration())
+    {
+        return None;
+    }
+    source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|declaration| declaration.declaration == class.declaration())?
+        .constructor_parameters
+        .iter()
+        .filter(|parameter| parameter.field)
+        .position(|parameter| parameter.name == field_name)
 }
 
 fn conditional_branch_expression(
@@ -1557,6 +1698,33 @@ fn method_declaration_index(
         .name_references
         .iter()
         .find(|name| name.reference == member.receiver)?;
+    if let Some(class) = source.class_types.and_then(|classes| {
+        classes.classes().iter().find(|class| {
+            class.name() == receiver.name
+                && source
+                    .parsed
+                    .enum_variants
+                    .iter()
+                    .any(|variant| variant.enum_declaration == class.declaration())
+        })
+    }) {
+        let declaration = source
+            .parsed
+            .function_declarations
+            .iter()
+            .find(|function| {
+                function.owner == Some(class.declaration())
+                    && function.name == member.name
+                    && function.is_static
+            })?
+            .declaration;
+        let index = source
+            .parsed
+            .function_declarations
+            .iter()
+            .position(|function| function.declaration == declaration)?;
+        return hir_function_index(source.parsed, index);
+    }
     if matches!(receiver.name.as_str(), "this" | "super") {
         let owner = source
             .parsed
@@ -1748,6 +1916,14 @@ fn method_dispatch_facts(
     else {
         return (HirDispatchKind::Direct, Vec::new());
     };
+    if source
+        .parsed
+        .enum_variants
+        .iter()
+        .any(|variant| variant.enum_declaration == receiver_record.declaration())
+    {
+        return (HirDispatchKind::Direct, Vec::new());
+    }
     let Some(static_function) = parsed_function_for_hir(source.parsed, static_callee) else {
         return (HirDispatchKind::Direct, Vec::new());
     };
@@ -2645,6 +2821,14 @@ pub enum HirExpressionKind {
         subject: HirExpressionId,
         arms: Vec<(Option<i64>, HirExpressionId)>,
     },
+    EnumConstruct {
+        tag: i64,
+        payloads: Vec<HirExpressionId>,
+    },
+    EnumPayload {
+        subject: HirExpressionId,
+        index: usize,
+    },
     DirectCall(HirDirectCall),
     ArrayLiteral(Vec<HirExpressionId>),
     Index {
@@ -2833,6 +3017,36 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::When { subject, arms },
+        }
+    }
+
+    pub fn enum_construct(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        tag: i64,
+        payloads: Vec<HirExpressionId>,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::EnumConstruct { tag, payloads },
+        }
+    }
+
+    pub fn enum_payload(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        subject: HirExpressionId,
+        index: usize,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::EnumPayload { subject, index },
         }
     }
 

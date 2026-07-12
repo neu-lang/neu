@@ -265,14 +265,15 @@ fn m0021_enum_variants_preserve_enclosing_enum_order_and_spans() {
 }
 
 #[test]
-fn m0021_enum_variants_exclude_empty_and_payload_shaped_entries() {
+fn m0021_enum_variants_record_payload_arguments() {
     let empty = parse_source(SourceFileId::from_raw(203), "enum Empty {}");
     assert!(empty.diagnostics.is_empty());
     assert!(empty.enum_variants.is_empty());
 
-    let payload = parse_source(SourceFileId::from_raw(204), "enum Bad { Value(Int) }");
-    assert!(!payload.diagnostics.is_empty());
-    assert!(payload.enum_variants.is_empty());
+    let payload = parse_source(SourceFileId::from_raw(204), "enum Bad { Value(1) }");
+    assert!(payload.diagnostics.is_empty());
+    assert_eq!(payload.enum_variants.len(), 1);
+    assert_eq!(payload.enum_variants[0].arguments.len(), 1);
 }
 
 #[test]
@@ -345,7 +346,8 @@ fn m0021_qualified_case_pattern_records_exact_identifier_metadata() {
         SourceFileId::from_raw(209),
         "func code() { when (signal) { Signal.Red.Blue -> 0; Signal.Red(_) -> 1 } }",
     );
-    assert!(unsupported.qualified_case_patterns.is_empty());
+    assert_eq!(unsupported.qualified_case_patterns.len(), 1);
+    assert_eq!(unsupported.qualified_case_patterns[0].payloads.len(), 1);
 }
 
 #[test]

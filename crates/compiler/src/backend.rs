@@ -804,6 +804,47 @@ fn lower_instruction(
             values.insert(*output, builder.ins().iconst(types::I64, *value));
             Ok(())
         }
+        MirInstruction::EnumConstruct {
+            output,
+            tag,
+            payload,
+            ..
+        } => {
+            let payload = values
+                .get(payload)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let shift = builder.ins().iconst(types::I64, 8);
+            let packed = builder.ins().ishl(payload, shift);
+            let tag = builder.ins().iconst(types::I64, *tag);
+            values.insert(*output, builder.ins().iadd(packed, tag));
+            Ok(())
+        }
+        MirInstruction::EnumPayload {
+            output,
+            value,
+            index,
+            ..
+        } => {
+            if *index != 0 {
+                return Err(CraneliftLoweringError::UnsupportedInstruction);
+            }
+            let value = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(*output, builder.ins().sshr_imm(value, 8));
+            Ok(())
+        }
+        MirInstruction::EnumTag { output, value, .. } => {
+            let value = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let mask = builder.ins().iconst(types::I64, 0xff);
+            values.insert(*output, builder.ins().band(value, mask));
+            Ok(())
+        }
         MirInstruction::BoolConstant { output, value, .. } => {
             values.insert(*output, builder.ins().iconst(types::I8, i64::from(*value)));
             Ok(())

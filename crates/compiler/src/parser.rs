@@ -91,6 +91,7 @@ pub struct ParseOutput {
     pub when_expressions: Vec<ParsedWhenExpression>,
     pub match_arms: Vec<ParsedMatchArm>,
     pub qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
+    pub pattern_bindings: Vec<ParsedPatternBinding>,
     pub class_declarations: Vec<ParsedClassDeclaration>,
     pub field_declarations: Vec<ParsedFieldDeclaration>,
 }
@@ -165,6 +166,7 @@ pub struct ParsedFunctionDeclaration {
     pub return_annotation: Option<AstNodeId>,
     pub parameters: Vec<AstNodeId>,
     pub top_level: bool,
+    pub is_static: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -243,6 +245,7 @@ pub struct ParsedEnumVariant {
     pub variant: AstNodeId,
     pub name: String,
     pub name_span: ByteSpan,
+    pub arguments: Vec<AstNodeId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -269,6 +272,14 @@ pub struct ParsedQualifiedCasePattern {
     pub enum_name_span: ByteSpan,
     pub variant_name: String,
     pub variant_name_span: ByteSpan,
+    pub payloads: Vec<AstNodeId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedPatternBinding {
+    pub pattern: AstNodeId,
+    pub name: String,
+    pub name_span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -503,6 +514,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         call_expressions: parser.call_expressions,
         new_expressions: parser.new_expressions,
         enum_variants: parser.enum_variants,
+        pattern_bindings: parser.pattern_bindings,
         when_expressions: parser.when_expressions,
         match_arms: parser.match_arms,
         qualified_case_patterns: parser.qualified_case_patterns,
@@ -551,6 +563,7 @@ struct Parser<'source> {
     when_expressions: Vec<ParsedWhenExpression>,
     match_arms: Vec<ParsedMatchArm>,
     qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
+    pattern_bindings: Vec<ParsedPatternBinding>,
     class_declarations: Vec<ParsedClassDeclaration>,
     field_declarations: Vec<ParsedFieldDeclaration>,
     block_return_indices: Vec<Vec<usize>>,
@@ -561,6 +574,7 @@ struct Parser<'source> {
     pending_method_visibility: String,
     pending_method_override: bool,
     pending_method_final: bool,
+    pending_method_static: bool,
 }
 
 impl<'source> Parser<'source> {
@@ -589,6 +603,7 @@ impl<'source> Parser<'source> {
             when_expressions: Vec::new(),
             match_arms: Vec::new(),
             qualified_case_patterns: Vec::new(),
+            pattern_bindings: Vec::new(),
             class_declarations: Vec::new(),
             field_declarations: Vec::new(),
             block_return_indices: Vec::new(),
@@ -615,6 +630,7 @@ impl<'source> Parser<'source> {
             pending_method_visibility: "internal".to_owned(),
             pending_method_override: false,
             pending_method_final: false,
+            pending_method_static: false,
         }
     }
 
@@ -817,6 +833,7 @@ impl<'source> Parser<'source> {
                         .map(|parameter| parameter.parameter)
                         .collect(),
                     top_level: !in_body,
+                    is_static: self.pending_method_static,
                 });
                 self.advance();
             }
@@ -853,6 +870,7 @@ impl<'source> Parser<'source> {
                     return_annotation,
                     parameters: parameter_nodes,
                     top_level: !in_body,
+                    is_static: self.pending_method_static,
                 });
             }
             _ => {
@@ -1040,8 +1058,10 @@ impl<'source> Parser<'source> {
 
         self.parse_generic_parameters();
 
-        let constructor_parameters = if kind == AstNodeKind::ClassDeclaration
-            && self.current_kind() == Some(TokenKind::LeftParen)
+        let constructor_parameters = if matches!(
+            kind,
+            AstNodeKind::ClassDeclaration | AstNodeKind::EnumDeclaration
+        ) && self.current_kind() == Some(TokenKind::LeftParen)
         {
             self.parse_constructor_parameters()
         } else {
@@ -1160,7 +1180,9 @@ impl<'source> Parser<'source> {
         self.record_declaration_name(declaration, DeclarationKind::Type, &name, in_body);
         self.saw_top_level_declaration |= !in_body;
         if kind == AstNodeKind::EnumDeclaration {
+            let previous_class = self.current_class.replace(declaration);
             self.parse_enum_body(declaration);
+            self.current_class = previous_class;
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
@@ -1169,7 +1191,7 @@ impl<'source> Parser<'source> {
                 superclass_arguments: Vec::new(),
                 interfaces: Vec::new(),
                 fields: Vec::new(),
-                constructor_parameters: Vec::new(),
+                constructor_parameters,
                 interface: false,
             });
         } else if kind == AstNodeKind::ClassDeclaration {
@@ -1453,6 +1475,20 @@ impl<'source> Parser<'source> {
 
         while !self.is_eof() {
             match self.current_kind() {
+                Some(TokenKind::KwFunc) => {
+                    self.pending_method_static = false;
+                    self.parse_declaration(true);
+                }
+                Some(TokenKind::Identifier) if self.current_text() == Some("static") => {
+                    self.advance();
+                    if self.current_kind() == Some(TokenKind::KwFunc) {
+                        self.pending_method_static = true;
+                        self.parse_declaration(true);
+                    } else {
+                        self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+                        self.skip_to_enum_variant_boundary();
+                    }
+                }
                 Some(TokenKind::RightBrace) => {
                     self.advance();
                     return;
@@ -1460,14 +1496,25 @@ impl<'source> Parser<'source> {
                 Some(TokenKind::Identifier) => {
                     let name = self.current().expect("enum variant name exists").clone();
                     self.advance();
+                    let arguments = if self.current_kind() == Some(TokenKind::LeftParen) {
+                        self.parse_argument_list()
+                            .and_then(|(_, arguments)| arguments)
+                    } else {
+                        Some(Vec::new())
+                    };
                     match self.current_kind() {
                         Some(TokenKind::Comma | TokenKind::Semicolon | TokenKind::RightBrace) => {
+                            let Some(arguments) = arguments else {
+                                self.skip_to_enum_variant_boundary();
+                                continue;
+                            };
                             let variant = self.arena.add_enum_variant(name.span);
                             self.enum_variants.push(ParsedEnumVariant {
                                 enum_declaration: declaration,
                                 variant,
                                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                                 name_span: name.span,
+                                arguments,
                             });
                             if self.current_kind() != Some(TokenKind::RightBrace) {
                                 self.advance();
@@ -2783,7 +2830,7 @@ impl<'source> Parser<'source> {
         let first = self.current()?.clone();
         let start = first.span.start();
         let mut end = first.span.end();
-        let mut names = vec![first];
+        let mut names = vec![first.clone()];
         self.advance();
         let mut qualified = false;
         while self.current_kind() == Some(TokenKind::Dot)
@@ -2802,7 +2849,24 @@ impl<'source> Parser<'source> {
         let has_arguments = self.current_kind() == Some(TokenKind::LeftParen);
         if self.current_kind() == Some(TokenKind::LeftParen) {
             qualified = true;
-            end = self.parse_pattern_arguments().unwrap_or(end);
+            let (argument_end, payloads) =
+                self.parse_pattern_arguments().unwrap_or((end, Vec::new()));
+            end = argument_end;
+            let span = self.span(start, end);
+            if names.len() == 2 {
+                let pattern = self.arena.add_qualified_case_pattern(span);
+                self.qualified_case_patterns
+                    .push(ParsedQualifiedCasePattern {
+                        pattern,
+                        enum_name: self.text[names[0].span.start()..names[0].span.end()].to_owned(),
+                        enum_name_span: names[0].span,
+                        variant_name: self.text[names[1].span.start()..names[1].span.end()]
+                            .to_owned(),
+                        variant_name_span: names[1].span,
+                        payloads,
+                    });
+                return Some(span);
+            }
         }
         let span = self.span(start, end);
         if qualified {
@@ -2816,27 +2880,37 @@ impl<'source> Parser<'source> {
                         variant_name: self.text[names[1].span.start()..names[1].span.end()]
                             .to_owned(),
                         variant_name_span: names[1].span,
+                        payloads: Vec::new(),
                     });
             }
         } else {
-            self.arena.add_binding_pattern(span);
+            let pattern = self.arena.add_binding_pattern(span);
+            self.pattern_bindings.push(ParsedPatternBinding {
+                pattern,
+                name: self.text[first.span.start()..first.span.end()].to_owned(),
+                name_span: first.span,
+            });
         }
         Some(span)
     }
 
     #[allow(dead_code)]
-    fn parse_pattern_arguments(&mut self) -> Option<usize> {
+    fn parse_pattern_arguments(&mut self) -> Option<(usize, Vec<AstNodeId>)> {
         self.advance();
+        let mut patterns = Vec::new();
         if self.current_kind() == Some(TokenKind::RightParen) {
             let end = self.current().expect("right paren exists").span.end();
             self.advance();
-            return Some(end);
+            return Some((end, patterns));
         }
         loop {
-            if self.parse_pattern().is_none() {
+            let Some(pattern_span) = self.parse_pattern() else {
                 self.diagnostic_current(DiagnosticKind::MalformedPattern);
                 self.skip_to_pattern_boundary();
-                return self.previous_span().map(|span| span.end());
+                return self.previous_span().map(|span| (span.end(), patterns));
+            };
+            if let Some(pattern) = self.latest_pattern_node_for_span(pattern_span) {
+                patterns.push(pattern);
             }
             match self.current_kind() {
                 Some(TokenKind::Comma) => {
@@ -2845,18 +2919,18 @@ impl<'source> Parser<'source> {
                         self.diagnostic_current(DiagnosticKind::MalformedPattern);
                         let end = self.current().expect("right paren exists").span.end();
                         self.advance();
-                        return Some(end);
+                        return Some((end, patterns));
                     }
                 }
                 Some(TokenKind::RightParen) => {
                     let end = self.current().expect("right paren exists").span.end();
                     self.advance();
-                    return Some(end);
+                    return Some((end, patterns));
                 }
                 _ => {
                     self.diagnostic_current(DiagnosticKind::MalformedPattern);
                     self.skip_to_pattern_boundary();
-                    return self.previous_span().map(|span| span.end());
+                    return self.previous_span().map(|span| (span.end(), patterns));
                 }
             }
         }

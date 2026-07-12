@@ -177,6 +177,23 @@ pub enum MirInstruction {
         value: i64,
         span: ByteSpan,
     },
+    EnumConstruct {
+        output: MirValueId,
+        tag: i64,
+        payload: MirValueId,
+        span: ByteSpan,
+    },
+    EnumPayload {
+        output: MirValueId,
+        value: MirValueId,
+        index: usize,
+        span: ByteSpan,
+    },
+    EnumTag {
+        output: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
     BoolConstant {
         output: MirValueId,
         value: bool,
@@ -419,6 +436,9 @@ impl MirInstruction {
     pub fn span(&self) -> ByteSpan {
         match self {
             Self::IntConstant { span, .. }
+            | Self::EnumConstruct { span, .. }
+            | Self::EnumPayload { span, .. }
+            | Self::EnumTag { span, .. }
             | Self::BoolConstant { span, .. }
             | Self::FloatConstant { span, .. }
             | Self::ByteConstant { span, .. }
@@ -757,6 +777,26 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::EnumVariant(value) => instructions.push(
                     MirInstruction::int_constant(output, *value, expression.span()),
                 ),
+                HirExpressionKind::EnumConstruct { tag, payloads } => {
+                    let payload = payloads
+                        .first()
+                        .copied()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    instructions.push(MirInstruction::EnumConstruct {
+                        output,
+                        tag: *tag,
+                        payload: mir_expression_value_id(function, payload),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::EnumPayload { subject, index } => {
+                    instructions.push(MirInstruction::EnumPayload {
+                        output,
+                        value: mir_expression_value_id(function, *subject),
+                        index: *index,
+                        span: expression.span(),
+                    });
+                }
                 HirExpressionKind::BoolLiteral(value) => instructions.push(
                     MirInstruction::bool_constant(output, *value, expression.span()),
                 ),
@@ -1322,6 +1362,28 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::EnumConstruct { tag, payloads } => {
+                let payload = payloads
+                    .first()
+                    .copied()
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                let payload = self.lower_expression(payload)?;
+                self.push(MirInstruction::EnumConstruct {
+                    output,
+                    tag: *tag,
+                    payload,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::EnumPayload { subject, index } => {
+                let value = self.lower_expression(*subject)?;
+                self.push(MirInstruction::EnumPayload {
+                    output,
+                    value,
+                    index: *index,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::BoolLiteral(value) => {
                 self.push(MirInstruction::bool_constant(
                     output,
@@ -1702,6 +1764,28 @@ impl<'a> ControlFlowLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::EnumConstruct { tag, payloads } => {
+                let payload = payloads
+                    .first()
+                    .copied()
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                let payload = self.lower_expression(payload)?;
+                self.push(MirInstruction::EnumConstruct {
+                    output,
+                    tag: *tag,
+                    payload,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::EnumPayload { subject, index } => {
+                let value = self.lower_expression(*subject)?;
+                self.push(MirInstruction::EnumPayload {
+                    output,
+                    value,
+                    index: *index,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::BoolLiteral(value) => {
                 self.push(MirInstruction::bool_constant(
                     output,
@@ -1840,7 +1924,13 @@ impl<'a> ControlFlowLowerer<'a> {
                 });
             }
             HirExpressionKind::When { subject, arms } => {
-                let subject = self.lower_expression(*subject)?;
+                let subject_value = self.lower_expression(*subject)?;
+                let subject = self.fresh_value();
+                self.push(MirInstruction::EnumTag {
+                    output: subject,
+                    value: subject_value,
+                    span: expression.span(),
+                });
                 let result_local = self.fresh_local(expression.ty(), expression.span());
                 let merge_block = self.new_block();
                 let mut test_block = self.current;

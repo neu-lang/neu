@@ -1551,6 +1551,9 @@ pub fn apply_m0070_receiver_signatures(
         else {
             continue;
         };
+        if function.is_static {
+            continue;
+        }
         if let Some(signature) = signatures
             .iter_mut()
             .find(|signature| signature.declaration == function.declaration)
@@ -1740,6 +1743,12 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 .member_expressions
                 .iter()
                 .find(|member| member.expression == call.callee);
+            if member.is_some_and(|member| is_enum_variant_call(source, member, call)) {
+                continue;
+            }
+            if member.is_some_and(|member| is_enum_static_call(source, member, call)) {
+                continue;
+            }
             let Some((target_name, diagnostic_span)) =
                 callee_name.or_else(|| member.map(|member| (member.name.clone(), member.span)))
             else {
@@ -2072,6 +2081,76 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
         }
     }
     report
+}
+
+fn is_enum_variant_call(
+    source: &ExecutableSourceTypes<'_>,
+    member: &crate::parser::ParsedMemberExpression,
+    call: &crate::parser::ParsedCallExpression,
+) -> bool {
+    let Some(receiver_name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|reference| reference.reference == member.receiver)
+        .map(|reference| reference.name.as_str())
+    else {
+        return false;
+    };
+    let Some(classes) = source.class_types else {
+        return false;
+    };
+    let Some(class) = classes.classes().iter().find(|class| {
+        class.name() == receiver_name
+            && source.parsed.enum_variants.iter().any(|variant| {
+                variant.enum_declaration == class.declaration() && variant.name == member.name
+            })
+    }) else {
+        return false;
+    };
+    source
+        .parsed
+        .enum_variants
+        .iter()
+        .find(|variant| {
+            variant.enum_declaration == class.declaration() && variant.name == member.name
+        })
+        .is_some_and(|variant| variant.arguments.len() == call.arguments.len())
+}
+
+fn is_enum_static_call(
+    source: &ExecutableSourceTypes<'_>,
+    member: &crate::parser::ParsedMemberExpression,
+    call: &crate::parser::ParsedCallExpression,
+) -> bool {
+    let Some(receiver_name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|reference| reference.reference == member.receiver)
+        .map(|reference| reference.name.as_str())
+    else {
+        return false;
+    };
+    let Some(classes) = source.class_types else {
+        return false;
+    };
+    let Some(class) = classes.classes().iter().find(|class| {
+        class.name() == receiver_name
+            && source
+                .parsed
+                .enum_variants
+                .iter()
+                .any(|variant| variant.enum_declaration == class.declaration())
+    }) else {
+        return false;
+    };
+    source.parsed.function_declarations.iter().any(|function| {
+        function.owner == Some(class.declaration())
+            && function.name == member.name
+            && function.is_static
+            && function.parameters.len() == call.arguments.len()
+    })
 }
 
 fn member_receiver_class_name(
@@ -4895,12 +4974,14 @@ pub fn type_m0080_enum_whens(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     classes: &ClassTypeReport,
+    type_arena: &mut TypeArena,
 ) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
     for expression_type in known_expression_types {
         report.record_expression_type(*expression_type);
     }
     for when in &parsed.when_expressions {
+        let primitives = PrimitiveTypeIds::module_owned(type_arena);
         let Some(subject_type) = report.expression_type(when.subject) else {
             report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                 TypeRuleDiagnostic::WhenSubjectInvalid,
@@ -4956,6 +5037,59 @@ pub fn type_m0080_enum_whens(
                         arm.pattern,
                     ));
                 }
+                if let Some(pattern) = parsed
+                    .qualified_case_patterns
+                    .iter()
+                    .find(|pattern| pattern.pattern == arm.pattern)
+                {
+                    let fields = parsed
+                        .class_declarations
+                        .iter()
+                        .find(|declaration| declaration.declaration == enum_class.declaration())
+                        .map(|declaration| {
+                            declaration
+                                .constructor_parameters
+                                .iter()
+                                .filter(|parameter| parameter.field)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    if fields.len() != pattern.payloads.len() {
+                        report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                            TypeRuleDiagnostic::WhenPatternInvalid,
+                            arm.pattern,
+                        ));
+                    }
+                    for (binding, field) in pattern.payloads.iter().zip(fields) {
+                        let Some(binding_name) = parsed
+                            .pattern_bindings
+                            .iter()
+                            .find(|candidate| candidate.pattern == *binding)
+                        else {
+                            continue;
+                        };
+                        let Some(field_type) = resolve_m0063_annotation_type(
+                            field.annotation,
+                            &parsed.type_name_references,
+                            &parsed.array_types,
+                            &primitives,
+                            classes.classes(),
+                            type_arena,
+                        ) else {
+                            continue;
+                        };
+                        for reference in parsed
+                            .name_references
+                            .iter()
+                            .filter(|reference| reference.name == binding_name.name)
+                        {
+                            report.replace_expression_type(ExpressionType::new(
+                                reference.reference,
+                                field_type,
+                            ));
+                        }
+                    }
+                }
             } else {
                 report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                     TypeRuleDiagnostic::WhenPatternInvalid,
@@ -4991,6 +5125,169 @@ pub fn type_m0080_enum_whens(
         }
     }
     report
+}
+
+pub fn apply_m0081_enum_constructor_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+    types: &mut TypeArena,
+) {
+    let primitives = PrimitiveTypeIds::module_owned(types);
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let Some(receiver_name) = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == member.receiver)
+            .map(|reference| reference.name.as_str())
+        else {
+            continue;
+        };
+        let Some(class) = classes.classes().iter().find(|class| {
+            class.name() == receiver_name
+                && parsed.enum_variants.iter().any(|variant| {
+                    variant.enum_declaration == class.declaration() && variant.name == member.name
+                })
+        }) else {
+            continue;
+        };
+        let Some(declaration) = parsed
+            .class_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == class.declaration())
+        else {
+            continue;
+        };
+        let fields = declaration
+            .constructor_parameters
+            .iter()
+            .filter(|parameter| parameter.field)
+            .collect::<Vec<_>>();
+        if fields.len() != call.arguments.len() {
+            continue;
+        }
+        let valid = fields.iter().zip(&call.arguments).all(|(field, argument)| {
+            let Some(expected) = resolve_m0063_annotation_type(
+                field.annotation,
+                &parsed.type_name_references,
+                &parsed.array_types,
+                &primitives,
+                classes.classes(),
+                types,
+            ) else {
+                return false;
+            };
+            report.expression_type(*argument) == Some(expected)
+        });
+        if valid {
+            report.replace_expression_type(ExpressionType::new(call.expression, class.type_id));
+            report.retain_diagnostics(|diagnostic| {
+                (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                    || !matches!(
+                        diagnostic.rule(),
+                        TypeRuleDiagnostic::DirectCallDeferred
+                            | TypeRuleDiagnostic::MemberExpressionDeferred
+                    )
+            });
+        }
+    }
+}
+
+pub fn apply_m0081_enum_function_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+    types: &mut TypeArena,
+) {
+    let primitives = PrimitiveTypeIds::module_owned(types);
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let Some(receiver_name) = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == member.receiver)
+            .map(|reference| reference.name.as_str())
+        else {
+            continue;
+        };
+        let Some(class) = classes.classes().iter().find(|class| {
+            class.name() == receiver_name
+                && parsed
+                    .enum_variants
+                    .iter()
+                    .any(|variant| variant.enum_declaration == class.declaration())
+        }) else {
+            continue;
+        };
+        let Some(function) = parsed.function_declarations.iter().find(|function| {
+            function.owner == Some(class.declaration())
+                && function.name == member.name
+                && function.is_static
+        }) else {
+            continue;
+        };
+        let parameter_types = parsed
+            .function_parameters
+            .iter()
+            .filter(|parameter| parameter.function == function.declaration)
+            .map(|parameter| {
+                resolve_m0063_annotation_type(
+                    parameter.annotation,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &primitives,
+                    classes.classes(),
+                    types,
+                )
+            })
+            .collect::<Option<Vec<_>>>();
+        let Some(parameter_types) = parameter_types else {
+            continue;
+        };
+        if parameter_types.len() != call.arguments.len()
+            || !parameter_types
+                .iter()
+                .zip(&call.arguments)
+                .all(|(expected, argument)| report.expression_type(*argument) == Some(*expected))
+        {
+            continue;
+        }
+        let Some(return_annotation) = function.return_annotation else {
+            continue;
+        };
+        let Some(return_type) = resolve_m0063_annotation_type(
+            return_annotation,
+            &parsed.type_name_references,
+            &parsed.array_types,
+            &primitives,
+            classes.classes(),
+            types,
+        ) else {
+            continue;
+        };
+        report.replace_expression_type(ExpressionType::new(call.expression, return_type));
+        report.retain_diagnostics(|diagnostic| {
+            (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                || !matches!(
+                    diagnostic.rule(),
+                    TypeRuleDiagnostic::DirectCallDeferred
+                        | TypeRuleDiagnostic::MemberExpressionDeferred
+                )
+        });
+    }
 }
 
 pub fn apply_m0077_value_conditional_results(

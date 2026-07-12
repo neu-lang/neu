@@ -55,6 +55,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("optional_semicolons", 4),
         ("enum_values", 7),
         ("enum_when", 3),
+        ("enum_functions", 40),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -193,6 +194,78 @@ fn compiles_enum_when_statement_and_expression_forms() {
     )
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(3));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_payload_enum_construction_and_when_extraction() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-enum-payload-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        enum Color(val rgb: Int) {
+            Red(10),
+            Green(20)
+        }
+        func value(color: Color): Int {
+            return when (color) {
+                Color.Red(rgb) -> rgb;
+                Color.Green(rgb) -> rgb;
+            };
+        }
+        public func main(): Int {
+            return value(Color.Green(20));
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(8100),
+            ModuleName::parse("enum_payload").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(20));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_enum_instance_and_associated_functions() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-enum-functions-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        enum Color(val rgb: Int) {
+            Red(10),
+            func value(): Int { return this.rgb; }
+            static func maximum(): Int { return 20; }
+        }
+        public func main(): Int {
+            val color: Color = Color.Red(10);
+            return color.value() + Color.maximum();
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(8110),
+            ModuleName::parse("enum_functions").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(30));
     let _ = fs::remove_dir_all(workspace);
 }
 

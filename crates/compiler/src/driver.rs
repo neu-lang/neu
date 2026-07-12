@@ -26,7 +26,8 @@ use crate::{
         apply_m0060_control_flow_results, apply_m0068_class_type_facts,
         apply_m0068_field_access_facts, apply_m0070_method_call_facts,
         apply_m0070_receiver_name_facts, apply_m0070_receiver_signatures,
-        apply_m0077_value_conditional_results, check_m0028_direct_calls, check_m0028_entry_point,
+        apply_m0077_value_conditional_results, apply_m0081_enum_constructor_facts,
+        apply_m0081_enum_function_facts, check_m0028_direct_calls, check_m0028_entry_point,
         check_m0028_return_expression_types, check_m0028_straight_line_returns,
         check_m0028_unsupported_executable_forms, check_m0069_constructor_calls,
         merge_type_check_report, type_m0028_executable_core_in, type_m0060_control_flow,
@@ -190,6 +191,8 @@ pub fn compile_source_to_executable(
     apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_m0068_field_access_facts(&parsed, &class_types, &mut report);
     apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
+    apply_m0081_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
+    apply_m0081_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
     let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
         options.package(),
         &parsed,
@@ -206,7 +209,8 @@ pub fn compile_source_to_executable(
     let conditional_report =
         type_m0077_value_conditionals(&parsed, report.expression_types(), &types);
     apply_m0077_value_conditional_results(&mut report, &conditional_report);
-    let when_report = type_m0080_enum_whens(&parsed, report.expression_types(), &class_types);
+    let when_report =
+        type_m0080_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
     merge_type_check_report(&mut report, when_report);
     let statement_conditionals = parsed
         .if_statements
