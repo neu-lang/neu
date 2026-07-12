@@ -676,6 +676,10 @@ fn lower_expression(
         .iter()
         .find(|member| member.expression == expression)
     {
+        if let Some(tag) = enum_variant_tag(source, member) {
+            output.push(HirExpression::enum_variant(id, span, ty, tag));
+            return Ok(id);
+        }
         let receiver = lower_expression(
             source,
             function_declaration,
@@ -1046,6 +1050,36 @@ fn lower_expression(
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn enum_variant_tag(
+    source: &CheckedHirSource<'_>,
+    member: &crate::parser::ParsedMemberExpression,
+) -> Option<i64> {
+    let receiver_name = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == member.receiver)
+        .map(|name| name.name.as_str())?;
+    let declaration = source
+        .class_types?
+        .classes()
+        .iter()
+        .find(|class| {
+            class.name() == receiver_name
+                && source.parsed.enum_variants.iter().any(|variant| {
+                    variant.enum_declaration == class.declaration() && variant.name == member.name
+                })
+        })
+        .map(|class| class.declaration())?;
+    source
+        .parsed
+        .enum_variants
+        .iter()
+        .filter(|variant| variant.enum_declaration == declaration)
+        .position(|variant| variant.name == member.name)
+        .and_then(|tag| i64::try_from(tag).ok())
 }
 
 fn conditional_branch_expression(
@@ -2520,6 +2554,7 @@ impl HirDirectCall {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HirExpressionKind {
     IntLiteral(i64),
+    EnumVariant(i64),
     BoolLiteral(bool),
     UnitLiteral,
     FloatLiteral(u64),
@@ -2578,6 +2613,15 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::IntLiteral(value),
+        }
+    }
+
+    pub fn enum_variant(id: HirExpressionId, span: ByteSpan, ty: TypeId, tag: i64) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::EnumVariant(tag),
         }
     }
 

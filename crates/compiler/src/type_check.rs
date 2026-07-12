@@ -1156,6 +1156,30 @@ pub fn apply_m0068_class_type_facts(
         }
     }
 
+    for member in &parsed.member_expressions {
+        let Some(receiver_name) = parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == member.receiver)
+            .map(|name| name.name.as_str())
+        else {
+            continue;
+        };
+        let Some(enum_class) = classes.classes.iter().find(|class| {
+            class.name == receiver_name
+                && parsed.enum_variants.iter().any(|variant| {
+                    variant.enum_declaration == class.declaration && variant.name == member.name
+                })
+        }) else {
+            continue;
+        };
+        report.replace_expression_type(ExpressionType::new(member.expression, enum_class.type_id));
+        report.retain_diagnostics(|diagnostic| {
+            diagnostic.node() != member.expression
+                || diagnostic.rule() != TypeRuleDiagnostic::MemberExpressionDeferred
+        });
+    }
+
     for parameter in &parsed.function_parameters {
         let Some(reference) = parsed
             .type_name_references
@@ -3030,7 +3054,6 @@ pub fn check_m0028_unsupported_executable_forms(
                 node.kind,
                 AstNodeKind::ImportDeclaration
                     | AstNodeKind::StructDeclaration
-                    | AstNodeKind::EnumDeclaration
                     | AstNodeKind::NullableType
                     | AstNodeKind::GenericParameter
                     | AstNodeKind::CapabilityBound
@@ -3567,6 +3590,9 @@ pub fn type_m0064_string_operations(
     }
 
     for member in &parsed.member_expressions {
+        if report.expression_type(member.expression).is_some() {
+            continue;
+        }
         if report
             .expression_type(member.receiver)
             .is_some_and(|receiver| {

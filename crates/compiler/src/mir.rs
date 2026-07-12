@@ -751,6 +751,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::IntLiteral(value) => instructions.push(
                     MirInstruction::int_constant(output, *value, expression.span()),
                 ),
+                HirExpressionKind::EnumVariant(value) => instructions.push(
+                    MirInstruction::int_constant(output, *value, expression.span()),
+                ),
                 HirExpressionKind::BoolLiteral(value) => instructions.push(
                     MirInstruction::bool_constant(output, *value, expression.span()),
                 ),
@@ -1306,6 +1309,13 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::EnumVariant(value) => {
+                self.push(MirInstruction::int_constant(
+                    output,
+                    *value,
+                    expression.span(),
+                ));
+            }
             HirExpressionKind::BoolLiteral(value) => {
                 self.push(MirInstruction::bool_constant(
                     output,
@@ -1673,6 +1683,13 @@ impl<'a> ControlFlowLowerer<'a> {
         }
         match expression.kind() {
             HirExpressionKind::IntLiteral(value) => {
+                self.push(MirInstruction::int_constant(
+                    output,
+                    *value,
+                    expression.span(),
+                ));
+            }
+            HirExpressionKind::EnumVariant(value) => {
                 self.push(MirInstruction::int_constant(
                     output,
                     *value,
@@ -2120,6 +2137,9 @@ fn require_hir_expression_type(
 ) -> Result<(), MirLoweringError> {
     let expected = match expression.kind() {
         HirExpressionKind::IntLiteral(_) => PrimitiveType::Int,
+        HirExpressionKind::EnumVariant(_) => {
+            return require_bootstrap_runtime_type(expression.ty(), types);
+        }
         HirExpressionKind::BoolLiteral(_) => PrimitiveType::Bool,
         HirExpressionKind::FloatLiteral(_) => PrimitiveType::Float,
         HirExpressionKind::ByteLiteral(_) => PrimitiveType::Byte,

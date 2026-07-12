@@ -975,6 +975,21 @@ preserved through HIR, MIR, Cranelift, and the existing private ABI. Missing
 results, invalid conditions, incompatible branches, and branch-dependent
 consumption are diagnosed before lowering.
 
+## ADR-0079: Zero-Payload Enum Values And Typed Transport
+
+Enums are closed nominal types. Bare variants are declared in deterministic
+order and are constructed with `EnumName.VariantName`. The expression has the
+enclosing enum type and transports through same-module function and method
+parameters and returns using a compiler-private typed scalar tag. The tag,
+layout, symbols, and representation are not public ABI or FFI contracts.
+
+The initial runtime slice accepts zero-payload variants only. Duplicate
+variants are diagnostics. Zero-payload values are immutable copyable tags;
+payload variants, fields, argument-bearing constructors, enum-associated
+functions, inheritance, generic enums, reflection, serialization, and FFI are
+deferred. HIR, MIR, Cranelift, object emission, and linking preserve nominal
+enum and variant identity and source mappings without exposing layout.
+
 ## ADR-0078: Optional Semicolons And Newline Termination
 
 Neu preserves line-boundary metadata on lexer tokens. Ordinary declarations,

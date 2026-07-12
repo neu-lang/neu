@@ -1161,6 +1161,17 @@ impl<'source> Parser<'source> {
         self.saw_top_level_declaration |= !in_body;
         if kind == AstNodeKind::EnumDeclaration {
             self.parse_enum_body(declaration);
+            self.class_declarations.push(ParsedClassDeclaration {
+                declaration,
+                name: self.text[name.span.start()..name.span.end()].to_owned(),
+                is_final: true,
+                superclass: None,
+                superclass_arguments: Vec::new(),
+                interfaces: Vec::new(),
+                fields: Vec::new(),
+                constructor_parameters: Vec::new(),
+                interface: false,
+            });
         } else if kind == AstNodeKind::ClassDeclaration {
             let previous_class = self.current_class.replace(declaration);
             let fields = self.parse_class_body(declaration);

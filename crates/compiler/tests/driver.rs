@@ -53,6 +53,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("dynamic_arrays", 1),
         ("nominal_arrays", 4),
         ("optional_semicolons", 4),
+        ("enum_values", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -114,6 +115,38 @@ fn compiles_primitive_parameter_and_return_matrix() {
     )
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_zero_payload_enum_values_through_typed_parameters_and_returns() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-enum-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        enum Signal { Red, Green }
+        func red(): Signal { return Signal.Red; }
+        func select(value: Signal): Int { return 7; }
+        public func main(): Int {
+            val signal: Signal = Signal.Red;
+            return select(signal);
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(7900),
+            ModuleName::parse("enum_values").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(workspace);
 }
 
