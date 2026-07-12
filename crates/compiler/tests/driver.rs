@@ -113,6 +113,137 @@ fn rejects_non_host_targets_before_compilation() {
 }
 
 #[test]
+fn rejects_spawn_outside_scope_and_await_outside_suspend() {
+    let output =
+        std::env::temp_dir().join(format!("neu-invalid-concurrency-{}", std::process::id()));
+    let error = compile_source_to_executable(
+        "public func main(): Int { val task = spawn { -> 7 }; return await(task); }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1005),
+            ModuleName::parse("invalid_concurrency").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    let debug = format!("{error:?}");
+    assert!(debug.contains("SpawnOutsideScope"), "{debug}");
+    assert!(debug.contains("AwaitOutsideSuspend"), "{debug}");
+}
+
+#[test]
+fn awaiting_one_task_twice_reports_use_after_move() {
+    let output = std::env::temp_dir().join(format!("neu-await-move-{}", std::process::id()));
+    let error = compile_source_to_executable(
+        "suspend func main(): Int { scope { val task = spawn { -> 7 }; await(task); return await(task); } return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1006),
+            ModuleName::parse("await_move").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("UseAfterMove"));
+}
+
+#[test]
+fn cancelling_a_task_makes_await_trap() {
+    let workspace = std::env::temp_dir().join(format!("neu-cancel-task-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let output = compile_source_to_executable(
+        "suspend func main(): Int { scope { val task = spawn { -> 7 }; task.cancel(); return await(task); } return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1007),
+            ModuleName::parse("cancel_task").unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    let status = Command::new(output).status().unwrap();
+    assert!(!status.success());
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn old_free_cancel_operation_is_rejected() {
+    let output = std::env::temp_dir().join(format!("neu-old-cancel-{}", std::process::id()));
+    let error = compile_source_to_executable(
+        "suspend func main(): Int { scope { val task = spawn { -> 7 }; cancel(task); return 0; } return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1009),
+            ModuleName::parse("old_cancel").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("InvalidTaskOperation"));
+}
+
+#[test]
+fn unawaited_task_is_cleaned_up_at_scope_exit() {
+    let workspace = std::env::temp_dir().join(format!("neu-task-cleanup-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let output = compile_source_to_executable(
+        "suspend func main(): Int { scope { val task = spawn { -> 7 }; task.cancel(); } return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1010),
+            ModuleName::parse("task_cleanup").unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn invalid_task_operation_is_rejected_before_lowering() {
+    let output = std::env::temp_dir().join(format!("neu-invalid-task-op-{}", std::process::id()));
+    let error = compile_source_to_executable(
+        "suspend func main(): Int { scope { val value: Int = 7; await(value); return 0; } return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1008),
+            ModuleName::parse("invalid_task_operation").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        format!("{error:?}").contains("InvalidTaskOperation"),
+        "{error:?}"
+    );
+    assert!(!output.exists());
+}
+
+#[test]
+fn member_cancellation_outside_scope_is_rejected_before_lowering() {
+    let output = std::env::temp_dir().join(format!("neu-cancel-scope-{}", std::process::id()));
+    let error = compile_source_to_executable(
+        "suspend func main(): Int { val task = spawn { -> 7 }; task.cancel(); return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1011),
+            ModuleName::parse("cancel_scope").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    let debug = format!("{error:?}");
+    assert!(debug.contains("SpawnOutsideScope"), "{debug}");
+    assert!(debug.contains("InvalidTaskOperation"), "{debug}");
+    assert!(!output.exists());
+}
+
+#[test]
 fn compiles_current_example_to_host_executable_with_exit_status_seven() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let source_path = repo_root.join("examples/current/bootstrap_backend_smoke.neu");
@@ -168,6 +299,15 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("move_only_captures", 7),
         ("function_values", 7),
         ("visibility_public", 7),
+        ("structured_scope", 7),
+        ("cancellation", 0),
+        ("spawn", 7),
+        ("await", 9),
+        ("task_results", 7),
+        ("cancel_task", 0),
+        ("runtime_entry", 7),
+        ("concurrency_diagnostics", 0),
+        ("channels", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

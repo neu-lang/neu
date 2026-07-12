@@ -56,6 +56,7 @@ pub enum AstNodeKind {
     ForStatement,
     BreakStatement,
     ContinueStatement,
+    ScopeStatement,
     WildcardPattern,
     LiteralPattern,
     BindingPattern,
@@ -243,6 +244,10 @@ impl AstArena {
 
     pub fn add_continue_statement(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::ContinueStatement, span)
+    }
+
+    pub fn add_scope_statement(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::ScopeStatement, span)
     }
 
     pub fn add_wildcard_pattern(&mut self, span: ByteSpan) -> AstNodeId {

@@ -468,6 +468,28 @@ fn accepts_derived_to_base_assignment() {
 }
 
 #[test]
+fn user_defined_class_cancel_methods_are_not_task_operations() {
+    let workspace = std::env::temp_dir().join(format!("neu-class-cancel-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Counter { func cancel(): Int { return 12; } } public func main(): Int { val counter: Counter = new Counter(); return counter.cancel(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6840),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(12)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn class_method_reads_its_implicit_this_receiver() {
     let workspace = std::env::temp_dir().join(format!("neu-method-this-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);

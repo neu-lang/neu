@@ -1,0 +1,12 @@
+package examples.current
+
+suspend func main(): Int {
+    var value: Int = 0;
+    scope {
+        scope {
+            val task = spawn { -> 7 };
+            value = await(task);
+        }
+    }
+    return value;
+}

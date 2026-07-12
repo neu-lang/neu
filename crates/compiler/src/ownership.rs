@@ -25,7 +25,10 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
         TypeKind::Function(_) => Some(OwnershipCategory::Copyable),
         TypeKind::Primitive(PrimitiveType::String)
         | TypeKind::Nominal(_)
-        | TypeKind::GenericInstance(_) => Some(OwnershipCategory::MoveOnly),
+        | TypeKind::GenericInstance(_)
+        | TypeKind::Task(_)
+        | TypeKind::Channel(_)
+        | TypeKind::ChannelResult(_) => Some(OwnershipCategory::MoveOnly),
         TypeKind::Array(array) => classify_ownership_category(types, array.element()),
         TypeKind::DynamicArray(_) => Some(OwnershipCategory::MoveOnly),
         TypeKind::GenericParameter(_) | TypeKind::Nullable(_) => None,
@@ -142,6 +145,24 @@ pub fn collect_ownership_call_transfers(
         else {
             continue;
         };
+        if callee.name == "await" {
+            let Some(argument) = call.arguments.first().copied() else {
+                continue;
+            };
+            let Some(resolved) = resolved_local_bindings
+                .iter()
+                .find(|resolved| resolved.reference() == argument)
+            else {
+                continue;
+            };
+            transfers.push(OwnershipTransfer::new(
+                OwnershipTransferKind::ConsumingCallArgument,
+                call.expression,
+                argument,
+                resolved.binding().clone(),
+            ));
+            continue;
+        }
         let Some(declaration) = parsed
             .declaration_names
             .iter()

@@ -34,11 +34,12 @@ use crate::{
         check_return_expression_types, check_straight_line_returns,
         check_unsupported_executable_forms, diagnose_unresolved_types, infer_local_types,
         merge_type_check_report, type_annotation_type, type_array_expressions_with_classes,
-        type_array_iterations, type_bind_function_values, type_class_types_in, type_control_flow,
-        type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
-        type_executable_int_operators, type_function_signatures_in_with_classes,
-        type_lambda_expressions, type_string_operations, type_value_conditionals,
-        validate_compile_time_constants, validate_inferred_assignments,
+        type_array_iterations, type_bind_function_values, type_class_types_in,
+        type_concurrency_operations, type_control_flow, type_dynamic_array_operations,
+        type_enum_whens, type_executable_core_in, type_executable_int_operators,
+        type_function_signatures_in_with_classes, type_lambda_expressions, type_string_operations,
+        type_value_conditionals, validate_compile_time_constants, validate_concurrency_structure,
+        validate_inferred_assignments, validate_task_member_cancellation_structure,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -310,9 +311,74 @@ pub fn compile_source_to_executable(
     merge_type_check_report(&mut report, array_iterations);
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    type_concurrency_operations(&parsed, &mut types, &mut report);
+    validate_concurrency_structure(&parsed, &mut report, &types);
+    infer_local_types(&parsed, &mut report);
+    type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    type_concurrency_operations(&parsed, &mut types, &mut report);
+    validate_task_member_cancellation_structure(&parsed, &mut report, &types);
+    let mut concurrency_calls = parsed
+        .call_expressions
+        .iter()
+        .filter(|call| {
+            parsed
+                .name_references
+                .iter()
+                .find(|reference| reference.reference == call.callee)
+                .is_some_and(|reference| {
+                    matches!(
+                        reference.name.as_str(),
+                        "spawn" | "await" | "cancel" | "channel" | "send" | "receive" | "close"
+                    )
+                })
+                || parsed.member_expressions.iter().any(|member| {
+                    member.expression == call.callee
+                        && member.name == "cancel"
+                        && report.expression_type(member.receiver).is_some_and(|ty| {
+                            types
+                                .get(ty)
+                                .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+                        })
+                })
+        })
+        .map(|call| call.expression)
+        .collect::<Vec<_>>();
+    concurrency_calls.extend(
+        parsed
+            .call_expressions
+            .iter()
+            .filter(|call| {
+                parsed.member_expressions.iter().any(|member| {
+                    member.expression == call.callee
+                        && member.name == "cancel"
+                        && report.expression_type(member.receiver).is_some_and(|ty| {
+                            types
+                                .get(ty)
+                                .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+                        })
+                })
+            })
+            .map(|call| call.callee),
+    );
+    report.retain_diagnostics(|diagnostic| {
+        !concurrency_calls.contains(&diagnostic.node())
+            || !matches!(
+                diagnostic.rule(),
+                TypeRuleDiagnostic::DirectCallDeferred
+                    | TypeRuleDiagnostic::MemberExpressionDeferred
+            )
+    });
     apply_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
+    report.retain_diagnostics(|diagnostic| {
+        !concurrency_calls.contains(&diagnostic.node())
+            || !matches!(
+                diagnostic.rule(),
+                TypeRuleDiagnostic::DirectCallDeferred
+                    | TypeRuleDiagnostic::MemberExpressionDeferred
+            )
+    });
     if let Some(int_type) = types
         .records()
         .iter()

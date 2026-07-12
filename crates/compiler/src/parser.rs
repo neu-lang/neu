@@ -89,6 +89,7 @@ pub struct ParseOutput {
     pub for_statements: Vec<ParsedForStatement>,
     pub if_statements: Vec<ParsedIfStatement>,
     pub loop_control_statements: Vec<ParsedLoopControlStatement>,
+    pub scope_statements: Vec<ParsedScopeStatement>,
     pub call_expressions: Vec<ParsedCallExpression>,
     pub new_expressions: Vec<ParsedNewExpression>,
     pub enum_variants: Vec<ParsedEnumVariant>,
@@ -184,6 +185,7 @@ pub struct ParsedFunctionDeclaration {
     pub parameters: Vec<AstNodeId>,
     pub top_level: bool,
     pub is_static: bool,
+    pub is_suspend: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -428,6 +430,14 @@ pub struct ParsedFloatLiteral {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedScopeStatement {
+    pub statement: AstNodeId,
+    pub function: AstNodeId,
+    pub body: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedGroupedExpression {
     pub expression: crate::ast::AstNodeId,
     pub inner: crate::ast::AstNodeId,
@@ -555,6 +565,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         for_statements: parser.for_statements,
         if_statements: parser.if_statements,
         loop_control_statements: parser.loop_control_statements,
+        scope_statements: parser.scope_statements,
         call_expressions: parser.call_expressions,
         new_expressions: parser.new_expressions,
         enum_variants: parser.enum_variants,
@@ -605,6 +616,7 @@ struct Parser<'source> {
     for_statements: Vec<ParsedForStatement>,
     if_statements: Vec<ParsedIfStatement>,
     loop_control_statements: Vec<ParsedLoopControlStatement>,
+    scope_statements: Vec<ParsedScopeStatement>,
     call_expressions: Vec<ParsedCallExpression>,
     new_expressions: Vec<ParsedNewExpression>,
     enum_variants: Vec<ParsedEnumVariant>,
@@ -627,6 +639,7 @@ struct Parser<'source> {
     pending_method_final: bool,
     pending_method_abstract: bool,
     pending_method_static: bool,
+    pending_method_suspend: bool,
     pending_generic_parameters: Vec<AstNodeId>,
 }
 
@@ -650,6 +663,7 @@ impl<'source> Parser<'source> {
             for_statements: Vec::new(),
             if_statements: Vec::new(),
             loop_control_statements: Vec::new(),
+            scope_statements: Vec::new(),
             call_expressions: Vec::new(),
             new_expressions: Vec::new(),
             enum_variants: Vec::new(),
@@ -690,6 +704,7 @@ impl<'source> Parser<'source> {
             pending_method_final: false,
             pending_method_abstract: false,
             pending_method_static: false,
+            pending_method_suspend: false,
             pending_generic_parameters: Vec::new(),
         }
     }
@@ -834,6 +849,9 @@ impl<'source> Parser<'source> {
                 } else {
                     self.pending_method_abstract = true;
                 }
+            } else if token.kind == TokenKind::Identifier && self.current_text() == Some("suspend")
+            {
+                self.pending_method_suspend = true;
             } else {
                 self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
             }
@@ -970,6 +988,7 @@ impl<'source> Parser<'source> {
                         .collect(),
                     top_level: !in_body,
                     is_static: self.pending_method_static,
+                    is_suspend: self.pending_method_suspend,
                 });
                 self.advance();
             }
@@ -1009,6 +1028,7 @@ impl<'source> Parser<'source> {
                     parameters: parameter_nodes,
                     top_level: !in_body,
                     is_static: self.pending_method_static,
+                    is_suspend: self.pending_method_suspend,
                 });
             }
             _ => {
@@ -1021,6 +1041,7 @@ impl<'source> Parser<'source> {
         }
         self.pending_method_static = false;
         self.pending_method_abstract = false;
+        self.pending_method_suspend = false;
     }
 
     fn function_parameter_list_is_typed(&self) -> bool {
@@ -1414,6 +1435,7 @@ impl<'source> Parser<'source> {
                 self.pending_method_final = false;
                 self.pending_method_abstract = false;
                 self.pending_method_static = false;
+                self.pending_method_suspend = false;
                 while self.is_visibility()
                     || matches!(
                         self.current_kind(),
@@ -1767,6 +1789,12 @@ impl<'source> Parser<'source> {
                     self.skip_deferred_construct();
                 }
                 Some(TokenKind::KwIf) => self.parse_if_statement(),
+                Some(TokenKind::Identifier)
+                    if self.current_text() == Some("scope")
+                        && self.peek_kind() == Some(TokenKind::LeftBrace) =>
+                {
+                    self.parse_scope_statement()
+                }
                 Some(kind) if self.can_start_expression_kind(kind) => {
                     let checkpoint = self.index;
                     let expression_start = self.current().map_or(start, |token| token.span.start());
@@ -1857,6 +1885,12 @@ impl<'source> Parser<'source> {
                 Some(TokenKind::KwBreak | TokenKind::KwContinue) => {
                     self.parse_loop_control_statement()
                 }
+                Some(TokenKind::Identifier)
+                    if self.current_text() == Some("scope")
+                        && self.peek_kind() == Some(TokenKind::LeftBrace) =>
+                {
+                    self.parse_scope_statement()
+                }
                 Some(TokenKind::KwUnsafe) => {
                     self.diagnostic_current(DiagnosticKind::MalformedUnsafeBlock);
                     self.advance();
@@ -1900,6 +1934,12 @@ impl<'source> Parser<'source> {
             Some(TokenKind::KwReturn) => self.parse_return_statement(),
             Some(TokenKind::KwFor) => self.parse_for_statement(),
             Some(TokenKind::KwBreak | TokenKind::KwContinue) => self.parse_loop_control_statement(),
+            Some(TokenKind::Identifier)
+                if self.current_text() == Some("scope")
+                    && self.peek_kind() == Some(TokenKind::LeftBrace) =>
+            {
+                self.parse_scope_statement()
+            }
             Some(TokenKind::Identifier) if self.current_text() == Some("async") => {
                 self.diagnostic_current(DiagnosticKind::MalformedCoroutineConstruct);
                 self.advance();
@@ -1910,6 +1950,28 @@ impl<'source> Parser<'source> {
                 self.skip_to_statement_boundary();
             }
             None => {}
+        }
+    }
+
+    fn parse_scope_statement(&mut self) {
+        let start = self.current().expect("scope token exists").span.start();
+        self.advance();
+        let Some(body_span) = self.parse_body_block() else {
+            return;
+        };
+        let Some(body) = self.latest_node_for_span(body_span, AstNodeKind::Block) else {
+            return;
+        };
+        let span = self.span(start, body_span.end());
+        let statement = self.arena.add_scope_statement(span);
+        if let Some(function) = self.current_function {
+            self.scope_statements.push(ParsedScopeStatement {
+                statement,
+                function,
+                body,
+                span,
+            });
+            self.record_executable_body_statement(statement);
         }
     }
 
@@ -2348,6 +2410,35 @@ impl<'source> Parser<'source> {
                             callee,
                             generic_arguments: Vec::new(),
                             arguments,
+                        });
+                    }
+                }
+                Some(TokenKind::LeftBrace) => {
+                    let start = span.start();
+                    let callee = self.latest_expression_node_for_span(span);
+                    let is_spawn = callee.is_some_and(|callee| {
+                        self.name_references.iter().any(|reference| {
+                            reference.reference == callee && reference.name == "spawn"
+                        })
+                    });
+                    if !is_spawn {
+                        return Some(span);
+                    }
+                    let Some(argument_span) = self.parse_lambda_expression() else {
+                        return Some(span);
+                    };
+                    let Some(argument) = self.latest_expression_node_for_span(argument_span) else {
+                        return Some(span);
+                    };
+                    span = self.span(start, argument_span.end());
+                    let expression = self.arena.add_call_expression(span);
+                    if let (Some(function), Some(callee)) = (self.current_function, callee) {
+                        self.call_expressions.push(ParsedCallExpression {
+                            expression,
+                            function,
+                            callee,
+                            generic_arguments: Vec::new(),
+                            arguments: vec![argument],
                         });
                     }
                 }

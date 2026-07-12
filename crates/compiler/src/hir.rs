@@ -7,7 +7,7 @@ use crate::{
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
     type_check::{ClassTypeReport, ExpressionType, FunctionSignature, ResolvedCallDeclaration},
-    types::{GenericSpecializationIdentity, TypeArena, TypeId, TypeKind},
+    types::{GenericSpecializationIdentity, PrimitiveType, TypeArena, TypeId, TypeKind},
 };
 
 macro_rules! hir_id {
@@ -485,6 +485,11 @@ pub fn lower_checked_hir_source(
                 .loop_control_statements
                 .iter()
                 .any(|statement| statement.function == function.declaration)
+            || source
+                .parsed
+                .scope_statements
+                .iter()
+                .any(|statement| statement.function == function.declaration)
             || source.parsed.when_expressions.iter().any(|when| {
                 function
                     .body
@@ -525,6 +530,7 @@ pub fn lower_checked_hir_source(
         )
         .with_assignments(assignments)
         .with_control_flow(control_flow)
+        .with_suspend(signature.is_suspend())
         .with_symbol_identity(symbol_identity);
         let function = match source.effect_contracts.and_then(|contracts| {
             contracts
@@ -776,6 +782,23 @@ fn lower_expression(
                                 .position(|candidate| candidate.variant == variant.variant)
                         })
                         .and_then(|tag| i64::try_from(tag).ok())
+                        .or_else(|| {
+                            source
+                                .parsed
+                                .qualified_case_patterns
+                                .iter()
+                                .find(|pattern| pattern.pattern == arm.pattern)
+                                .and_then(|pattern| {
+                                    match (
+                                        pattern.enum_name.as_str(),
+                                        pattern.variant_name.as_str(),
+                                    ) {
+                                        ("ChannelResult", "Message") => Some(0),
+                                        ("ChannelResult", "Closed") => Some(1),
+                                        _ => None,
+                                    }
+                                })
+                        })
                 });
             let value = if let Some(reference) = source
                 .parsed
@@ -1305,12 +1328,135 @@ fn lower_expression(
             output.push(HirExpression::enum_construct(id, span, ty, tag, payloads));
             return Ok(id);
         }
+        if let Some(member) = source
+            .parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+            && member.name == "cancel"
+            && source.type_arena.is_some_and(|arena| {
+                let receiver_type = source
+                    .expression_types
+                    .iter()
+                    .find(|typed| typed.expression() == member.receiver)
+                    .map(|typed| typed.ty());
+                matches!(
+                    arena.get(ty).map(|record| record.kind()),
+                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                ) && receiver_type.is_some_and(|receiver_type| {
+                    arena
+                        .get(receiver_type)
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+                })
+            })
+        {
+            let receiver = lower_expression(
+                source,
+                function_declaration,
+                member.receiver,
+                local_bindings,
+                output,
+            )?;
+            let operation_id = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::task_cancel(operation_id, span, ty, receiver));
+            return Ok(operation_id);
+        }
         let is_clone = source
             .parsed
             .name_references
             .iter()
             .find(|name| name.reference == call.callee)
             .is_some_and(|name| name.name == "clone");
+        let builtin_name = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == call.callee)
+            .map(|name| name.name.as_str());
+        if matches!(builtin_name, Some("spawn" | "await")) {
+            let argument = *call
+                .arguments
+                .first()
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let argument = lower_expression(
+                source,
+                function_declaration,
+                argument,
+                local_bindings,
+                output,
+            )?;
+            let operation_id = HirExpressionId::from_raw(output.len());
+            match builtin_name {
+                Some("spawn") => {
+                    output.push(HirExpression::task_spawn(operation_id, span, ty, argument))
+                }
+                Some("await") => {
+                    output.push(HirExpression::task_await(operation_id, span, ty, argument))
+                }
+                _ => unreachable!(),
+            }
+            return Ok(operation_id);
+        }
+        if matches!(builtin_name, Some("channel" | "send" | "receive" | "close")) {
+            let arguments = call
+                .arguments
+                .iter()
+                .map(|argument| {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        *argument,
+                        local_bindings,
+                        output,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let operation_id = HirExpressionId::from_raw(output.len());
+            match builtin_name {
+                Some("channel") => output.push(HirExpression::channel_create(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                )),
+                Some("send") => output.push(HirExpression::channel_send(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                    arguments
+                        .get(1)
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                )),
+                Some("receive") => output.push(HirExpression::channel_receive(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                )),
+                Some("close") => output.push(HirExpression::channel_close(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                )),
+                _ => unreachable!(),
+            }
+            return Ok(operation_id);
+        }
         if is_clone {
             let argument = *call
                 .arguments
@@ -2569,6 +2715,14 @@ fn lower_control_flow_block(
                 .filter(|statement| statement.function == function_declaration)
                 .map(|statement| Some(statement.body)),
         )
+        .chain(
+            source
+                .parsed
+                .scope_statements
+                .iter()
+                .filter(|statement| statement.function == function_declaration)
+                .map(|statement| Some(statement.body)),
+        )
         .flatten()
         .filter_map(|body| source.parsed.arena.node(body).map(|node| node.span))
         .collect();
@@ -2580,9 +2734,11 @@ fn lower_control_flow_block(
         .filter(|statement| {
             statement.function == function_declaration
                 && span_contains(block_span, statement.span)
-                && !nested_bodies
-                    .iter()
-                    .any(|body| *body != block_span && span_contains(*body, statement.span))
+                && !nested_bodies.iter().any(|body| {
+                    *body != block_span
+                        && span_contains(block_span, *body)
+                        && span_contains(*body, statement.span)
+                })
         })
         .collect();
     let mut output = Vec::new();
@@ -2629,6 +2785,25 @@ fn lower_control_flow_block(
                 then_body,
                 else_body,
                 span: if_statement.span,
+            });
+            continue;
+        }
+        if let Some(scope) = source
+            .parsed
+            .scope_statements
+            .iter()
+            .find(|candidate| candidate.statement == statement.statement)
+        {
+            let body = lower_control_flow_block(
+                source,
+                function_declaration,
+                scope.body,
+                local_bindings,
+                expressions,
+            )?;
+            output.push(HirControlFlow::Scope {
+                body,
+                span: scope.span,
             });
             continue;
         }
@@ -3251,6 +3426,16 @@ pub enum HirExpressionKind {
     StringLiteral(Vec<u8>),
     StringLength(HirExpressionId),
     StringClone(HirExpressionId),
+    TaskSpawn(HirExpressionId),
+    TaskAwait(HirExpressionId),
+    TaskCancel(HirExpressionId),
+    ChannelCreate(HirExpressionId),
+    ChannelSend {
+        channel: HirExpressionId,
+        value: HirExpressionId,
+    },
+    ChannelReceive(HirExpressionId),
+    ChannelClose(HirExpressionId),
     FieldAccess {
         receiver: HirExpressionId,
         name: String,
@@ -3544,6 +3729,105 @@ impl HirExpression {
         }
     }
 
+    pub fn task_spawn(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        callable: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::TaskSpawn(callable),
+        }
+    }
+
+    pub fn task_await(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        task: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::TaskAwait(task),
+        }
+    }
+
+    pub fn task_cancel(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        task: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::TaskCancel(task),
+        }
+    }
+
+    pub fn channel_create(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        capacity: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ChannelCreate(capacity),
+        }
+    }
+
+    pub fn channel_send(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        channel: HirExpressionId,
+        value: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ChannelSend { channel, value },
+        }
+    }
+
+    pub fn channel_receive(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        channel: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ChannelReceive(channel),
+        }
+    }
+
+    pub fn channel_close(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        channel: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ChannelClose(channel),
+        }
+    }
+
     pub fn field_access(
         id: HirExpressionId,
         span: ByteSpan,
@@ -3665,6 +3949,10 @@ pub enum HirControlFlow {
         body: Vec<HirControlFlow>,
         span: ByteSpan,
     },
+    Scope {
+        body: Vec<HirControlFlow>,
+        span: ByteSpan,
+    },
     Break {
         span: ByteSpan,
     },
@@ -3775,6 +4063,19 @@ pub struct HirCapture {
 }
 
 impl HirCapture {
+    pub fn new(
+        source: AstNodeId,
+        binding: AstNodeId,
+        mode: HirCaptureMode,
+        span: ByteSpan,
+    ) -> Self {
+        Self {
+            source,
+            binding,
+            mode,
+            span,
+        }
+    }
     pub fn source(&self) -> AstNodeId {
         self.source
     }
@@ -3817,6 +4118,7 @@ pub struct HirFunction {
     effect_contract: Option<OwnershipEffectContract>,
     specialization_identity: Option<GenericSpecializationIdentity>,
     captures: Vec<HirCapture>,
+    suspend: bool,
 }
 impl HirFunction {
     #[allow(clippy::too_many_arguments)]
@@ -3853,6 +4155,7 @@ impl HirFunction {
             effect_contract: None,
             specialization_identity: None,
             captures: Vec::new(),
+            suspend: false,
         }
     }
     pub fn id(&self) -> HirFunctionId {
@@ -3869,6 +4172,13 @@ impl HirFunction {
     }
     pub fn is_entry(&self) -> bool {
         self.entry
+    }
+    pub fn is_suspend(&self) -> bool {
+        self.suspend
+    }
+    pub fn with_suspend(mut self, suspend: bool) -> Self {
+        self.suspend = suspend;
+        self
     }
     pub fn return_type(&self) -> TypeId {
         self.return_type

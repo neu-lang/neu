@@ -88,6 +88,10 @@ pub enum TypeRuleDiagnostic {
     StringIndexOutOfBounds,
     StringOperationUnsupported,
     LambdaCaptureUnsupported,
+    SpawnOutsideScope,
+    AwaitOutsideSuspend,
+    InvalidTaskOperation,
+    InvalidChannelOperation,
     InferredInitializerRequired,
     InferredTypeUnavailable,
     StaticFunctionInstanceAccess,
@@ -457,6 +461,7 @@ pub struct FunctionSignature {
     declaration: AstNodeId,
     parameter_types: Vec<TypeId>,
     return_type: TypeId,
+    is_suspend: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1888,7 +1893,30 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
                 ));
                 continue;
             };
-            if member.is_none() && target_name == "clone" {
+            if member.is_none()
+                && matches!(
+                    target_name.as_str(),
+                    "clone"
+                        | "spawn"
+                        | "await"
+                        | "cancel"
+                        | "channel"
+                        | "send"
+                        | "receive"
+                        | "close"
+                )
+            {
+                continue;
+            }
+            if member.is_some_and(|member| member.name == "cancel")
+                && !sources.iter().any(|candidate| {
+                    candidate
+                        .parsed
+                        .function_declarations
+                        .iter()
+                        .any(|function| function.owner.is_some() && function.name == "cancel")
+                })
+            {
                 continue;
             }
             if member
@@ -2572,6 +2600,7 @@ impl FunctionSignature {
             declaration,
             parameter_types,
             return_type,
+            is_suspend: false,
         }
     }
 
@@ -2585,6 +2614,15 @@ impl FunctionSignature {
 
     pub fn return_type(&self) -> TypeId {
         self.return_type
+    }
+
+    pub fn is_suspend(&self) -> bool {
+        self.is_suspend
+    }
+
+    pub fn with_suspend(mut self, is_suspend: bool) -> Self {
+        self.is_suspend = is_suspend;
+        self
     }
 
     pub fn prepend_parameter_type(&mut self, parameter_type: TypeId) {
@@ -3644,6 +3682,7 @@ pub fn type_function_signatures_in_with_classes(
             declaration: function.declaration,
             parameter_types,
             return_type,
+            is_suspend: function.is_suspend,
         });
     }
 
@@ -3858,6 +3897,391 @@ pub fn type_lambda_expressions(
         let function_type = types.function(FunctionType::new(parameter_types, body_type));
         report.record_expression_type(ExpressionType::new(lambda.expression, function_type));
     }
+}
+
+pub fn type_concurrency_operations(
+    parsed: &ParseOutput,
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    let unit = PrimitiveTypeIds::module_owned(types).unit_id;
+    let int = PrimitiveTypeIds::module_owned(types).int_id;
+    for call in &parsed.call_expressions {
+        if let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+            && member.name == "cancel"
+        {
+            let Some(receiver_type) = report.expression_type(member.receiver) else {
+                continue;
+            };
+            let is_task = types
+                .get(receiver_type)
+                .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)));
+            if !is_task {
+                continue;
+            }
+            if call.arguments.is_empty() {
+                report.replace_expression_type(ExpressionType::new(call.expression, unit));
+            } else {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::InvalidTaskOperation,
+                    call.expression,
+                ));
+            }
+            continue;
+        }
+        let Some(name) = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == call.callee)
+            .map(|reference| reference.name.as_str())
+        else {
+            continue;
+        };
+        match name {
+            "channel" => {
+                let Some(element_node) = call
+                    .generic_arguments
+                    .first()
+                    .copied()
+                    .filter(|_| call.generic_arguments.len() == 1)
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                let Some(element) = resolve_builtin_generic_argument(parsed, element_node, types)
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                let valid_capacity = call.arguments.len() == 1
+                    && report.expression_type(call.arguments[0]) == Some(int);
+                if !valid_capacity {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                }
+                report.replace_expression_type(ExpressionType::new(
+                    call.expression,
+                    types.channel(element),
+                ));
+            }
+            "send" => {
+                if call.arguments.len() != 2 {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                }
+                let Some(channel_type) = report.expression_type(call.arguments[0]) else {
+                    continue;
+                };
+                let Some(value_type) = report.expression_type(call.arguments[1]) else {
+                    continue;
+                };
+                let valid = types
+                    .get(channel_type)
+                    .and_then(|record| match record.kind() {
+                        TypeKind::Channel(channel) => Some(channel.element()),
+                        _ => None,
+                    })
+                    .is_some_and(|element| value_type == element);
+                if valid {
+                    report.replace_expression_type(ExpressionType::new(call.expression, unit));
+                } else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                }
+            }
+            "receive" => {
+                let Some(argument) = call
+                    .arguments
+                    .first()
+                    .copied()
+                    .filter(|_| call.arguments.len() == 1)
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                let Some(channel) = report.expression_type(argument) else {
+                    continue;
+                };
+                let Some(element) = types.get(channel).and_then(|record| match record.kind() {
+                    TypeKind::Channel(channel) => Some(channel.element()),
+                    _ => None,
+                }) else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                report.replace_expression_type(ExpressionType::new(
+                    call.expression,
+                    types.channel_result(element),
+                ));
+            }
+            "close" => {
+                if call.arguments.len() != 1 {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                    continue;
+                }
+                let Some(channel) = report.expression_type(call.arguments[0]) else {
+                    continue;
+                };
+                let valid = types
+                    .get(channel)
+                    .is_some_and(|record| matches!(record.kind(), TypeKind::Channel(_)));
+                if valid {
+                    report.replace_expression_type(ExpressionType::new(call.expression, unit));
+                } else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidChannelOperation,
+                        call.expression,
+                    ));
+                }
+            }
+            "spawn" => {
+                let Some(argument) = call
+                    .arguments
+                    .first()
+                    .copied()
+                    .filter(|_| call.arguments.len() == 1)
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidTaskOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                let Some(argument_type) = report.expression_type(argument) else {
+                    continue;
+                };
+                let Some(function_type) = types.get(argument_type).and_then(|record| match record
+                    .kind()
+                {
+                    TypeKind::Function(function) => Some(function.return_type()),
+                    _ => None,
+                }) else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidTaskOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                report.replace_expression_type(ExpressionType::new(
+                    call.expression,
+                    types.task(function_type),
+                ));
+            }
+            "await" => {
+                let Some(argument) = call
+                    .arguments
+                    .first()
+                    .copied()
+                    .filter(|_| call.arguments.len() == 1)
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidTaskOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                let Some(argument_type) = report.expression_type(argument) else {
+                    continue;
+                };
+                let Some(result) =
+                    types
+                        .get(argument_type)
+                        .and_then(|record| match record.kind() {
+                            TypeKind::Task(task) => Some(task.result()),
+                            _ => None,
+                        })
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::InvalidTaskOperation,
+                        call.expression,
+                    ));
+                    continue;
+                };
+                report.replace_expression_type(ExpressionType::new(call.expression, result));
+            }
+            "cancel" => {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::InvalidTaskOperation,
+                    call.expression,
+                ));
+            }
+            _ => {}
+        }
+    }
+}
+
+fn resolve_builtin_generic_argument(
+    parsed: &ParseOutput,
+    argument: AstNodeId,
+    types: &mut TypeArena,
+) -> Option<TypeId> {
+    let primitives = PrimitiveTypeIds::module_owned(types);
+    let name = parsed
+        .type_name_references
+        .iter()
+        .find(|reference| reference.reference == argument)
+        .map(|reference| reference.name.clone())
+        .or_else(|| {
+            let argument_span = parsed.arena.node(argument).map(|node| node.span)?;
+            parsed
+                .type_name_references
+                .iter()
+                .find(|reference| {
+                    parsed
+                        .arena
+                        .node(reference.reference)
+                        .is_some_and(|node| node.span == argument_span)
+                })
+                .map(|reference| reference.name.clone())
+        })
+        .or_else(|| {
+            parsed.type_name_references.iter().find_map(|reference| {
+                reference
+                    .generic_arguments
+                    .iter()
+                    .position(|candidate| *candidate == argument)
+                    .and_then(|index| reference.generic_argument_names.get(index))
+                    .cloned()
+            })
+        })?;
+    primitives.type_for_primitive_name(&name)
+}
+
+pub fn validate_concurrency_structure(
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    for call in &parsed.call_expressions {
+        let member_cancel = parsed.member_expressions.iter().any(|member| {
+            member.expression == call.callee
+                && member.name == "cancel"
+                && report.expression_type(member.receiver).is_some_and(|ty| {
+                    types
+                        .get(ty)
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+                })
+        });
+        let name = if member_cancel {
+            "cancel"
+        } else if let Some(name) = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == call.callee)
+            .map(|reference| reference.name.as_str())
+        {
+            name
+        } else {
+            continue;
+        };
+        let Some(span) = parsed.arena.node(call.expression).map(|node| node.span) else {
+            continue;
+        };
+        let in_scope = parsed.scope_statements.iter().any(|scope| {
+            scope.function == call.function && concurrency_span_contains(scope.span, span)
+        });
+        match name {
+            "spawn" if !in_scope => {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::SpawnOutsideScope,
+                    call.expression,
+                ))
+            }
+            "await" => {
+                let suspend = parsed
+                    .function_declarations
+                    .iter()
+                    .find(|function| function.declaration == call.function)
+                    .is_some_and(|function| function.is_suspend);
+                if !suspend {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::AwaitOutsideSuspend,
+                        call.expression,
+                    ));
+                }
+            }
+            "cancel" if !in_scope => {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::InvalidTaskOperation,
+                    call.expression,
+                ))
+            }
+            _ => {}
+        }
+    }
+}
+
+pub fn validate_task_member_cancellation_structure(
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee && member.name == "cancel")
+        else {
+            continue;
+        };
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        if !types
+            .get(receiver_type)
+            .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+        {
+            continue;
+        }
+        let in_scope = parsed.scope_statements.iter().any(|scope| {
+            scope.function == call.function
+                && parsed
+                    .arena
+                    .node(call.expression)
+                    .is_some_and(|node| concurrency_span_contains(scope.span, node.span))
+        });
+        if !in_scope
+            && !report.diagnostics().iter().any(|diagnostic| {
+                diagnostic.node() == call.expression
+                    && diagnostic.rule() == TypeRuleDiagnostic::InvalidTaskOperation
+            })
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::InvalidTaskOperation,
+                call.expression,
+            ));
+        }
+    }
+}
+
+fn concurrency_span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+    outer.file() == inner.file() && outer.start() <= inner.start() && inner.end() <= outer.end()
 }
 
 pub fn type_bind_function_values(
@@ -4153,6 +4577,18 @@ fn resolve_annotation_type(
                         .map(|class| class.type_id)
                 })?;
             return Some(arena.dynamic_array(element));
+        }
+        if reference.name == "Channel" && reference.generic_argument_names.len() == 1 {
+            let element_name = &reference.generic_argument_names[0];
+            let element = primitives
+                .type_for_primitive_name(element_name)
+                .or_else(|| {
+                    classes
+                        .iter()
+                        .find(|class| class.name == *element_name)
+                        .map(|class| class.type_id)
+                })?;
+            return Some(arena.channel(element));
         }
         return primitives
             .type_for_primitive_name(&reference.name)
@@ -5875,6 +6311,96 @@ pub fn type_enum_whens(
             ));
             continue;
         };
+        if let Some(element_type) =
+            type_arena
+                .get(subject_type)
+                .and_then(|record| match record.kind() {
+                    TypeKind::ChannelResult(result) => Some(result.element()),
+                    _ => None,
+                })
+        {
+            let mut covered = std::collections::HashSet::new();
+            let mut arm_type = None;
+            for arm_id in &when.arms {
+                let Some(arm) = parsed.match_arms.iter().find(|arm| arm.arm == *arm_id) else {
+                    continue;
+                };
+                let Some(pattern) = parsed
+                    .qualified_case_patterns
+                    .iter()
+                    .find(|pattern| pattern.pattern == arm.pattern)
+                else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::WhenPatternInvalid,
+                        arm.pattern,
+                    ));
+                    continue;
+                };
+                let tag = match (pattern.enum_name.as_str(), pattern.variant_name.as_str()) {
+                    ("ChannelResult", "Message") if pattern.payloads.len() == 1 => Some(0_i64),
+                    ("ChannelResult", "Closed") if pattern.payloads.is_empty() => Some(1_i64),
+                    _ => None,
+                };
+                let Some(tag) = tag else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::WhenPatternInvalid,
+                        arm.pattern,
+                    ));
+                    continue;
+                };
+                if !covered.insert(tag) {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::WhenDuplicatePattern,
+                        arm.pattern,
+                    ));
+                }
+                if tag == 0 {
+                    let binding = parsed
+                        .pattern_bindings
+                        .iter()
+                        .find(|binding| pattern.payloads.contains(&binding.pattern));
+                    if let Some(binding) = binding {
+                        for reference in parsed
+                            .name_references
+                            .iter()
+                            .filter(|reference| reference.name == binding.name)
+                        {
+                            report.replace_expression_type(ExpressionType::new(
+                                reference.reference,
+                                element_type,
+                            ));
+                        }
+                    }
+                }
+                let Some(body_type) = report.expression_type(arm.body) else {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::WhenMissingArmValue,
+                        arm.body,
+                    ));
+                    continue;
+                };
+                if let Some(expected) = arm_type {
+                    if expected != body_type {
+                        report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                            TypeRuleDiagnostic::WhenArmTypeMismatch,
+                            arm.body,
+                        ));
+                    }
+                } else {
+                    arm_type = Some(body_type);
+                }
+            }
+            if covered.len() != 2 {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::WhenNonExhaustive,
+                    when.expression,
+                ));
+            }
+            if let Some(arm_type) = arm_type {
+                report.record_expression_type(ExpressionType::new(when.expression, arm_type));
+            }
+            continue;
+        }
         let Some(enum_class) = classes.classes().iter().find(|class| {
             class.type_id == subject_type
                 && parsed

@@ -385,6 +385,10 @@ fn lower_mir_function_with_module(
     let mut builder_context = FunctionBuilderContext::new();
     let mut values = HashMap::new();
     let mut aggregate_values = HashMap::new();
+    let mut task_results = HashMap::new();
+    let mut task_origins = HashMap::new();
+    let mut task_locals = HashMap::new();
+    let mut scope_tasks = Vec::new();
 
     {
         let mut builder = FunctionBuilder::new(&mut clif_function, &mut builder_context);
@@ -442,6 +446,9 @@ fn lower_mir_function_with_module(
                 aggregate_values.insert(*value_id, parameter_values);
             } else if let Some(value) = parameter_values.first().copied() {
                 values.insert(*value_id, value);
+                if let Some(result) = task_result_type(*parameter_type, type_arena) {
+                    task_results.insert(*value_id, result);
+                }
             }
         }
 
@@ -456,6 +463,10 @@ fn lower_mir_function_with_module(
                     &mut builder,
                     &mut values,
                     &mut aggregate_values,
+                    &mut task_results,
+                    &mut task_origins,
+                    &mut task_locals,
+                    &mut scope_tasks,
                     &locals,
                     &array_locals,
                     &mut module,
@@ -611,6 +622,9 @@ fn require_bootstrap_runtime_type(
                 | PrimitiveType::Unit
         )) | Some(TypeKind::Array(_))
             | Some(TypeKind::DynamicArray(_))
+            | Some(TypeKind::Task(_))
+            | Some(TypeKind::Channel(_))
+            | Some(TypeKind::ChannelResult(_))
             | Some(TypeKind::Nominal(_))
             | Some(TypeKind::GenericInstance(_))
             | Some(TypeKind::Function(_))
@@ -630,6 +644,8 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
             Some(types::I64)
         }
         Some(TypeKind::DynamicArray(_)) => Some(types::I64),
+        Some(TypeKind::Task(_)) => Some(types::I64),
+        Some(TypeKind::Channel(_)) | Some(TypeKind::ChannelResult(_)) => Some(types::I64),
         _ => None,
     }
 }
@@ -661,6 +677,13 @@ fn flattened_cranelift_types(
 fn array_shape(ty: TypeId, type_arena: &TypeArena) -> Option<(TypeId, u64)> {
     match type_arena.get(ty).map(|record| record.kind()) {
         Some(TypeKind::Array(array)) => Some((array.element(), array.length())),
+        _ => None,
+    }
+}
+
+fn task_result_type(ty: TypeId, type_arena: &TypeArena) -> Option<TypeId> {
+    match type_arena.get(ty).map(|record| record.kind()) {
+        Some(TypeKind::Task(task)) => Some(task.result()),
         _ => None,
     }
 }
@@ -822,6 +845,10 @@ fn lower_instruction(
     builder: &mut FunctionBuilder<'_>,
     values: &mut HashMap<MirValueId, Value>,
     aggregate_values: &mut HashMap<MirValueId, Vec<Value>>,
+    task_results: &mut HashMap<MirValueId, TypeId>,
+    task_origins: &mut HashMap<MirValueId, MirValueId>,
+    task_locals: &mut HashMap<crate::mir::MirLocalId, MirValueId>,
+    scope_tasks: &mut Vec<Vec<MirValueId>>,
     locals: &HashMap<crate::mir::MirLocalId, Variable>,
     array_locals: &HashMap<(crate::mir::MirLocalId, u64), Variable>,
     module: &mut Option<&mut ObjectModule>,
@@ -887,6 +914,27 @@ fn lower_instruction(
             Ok(())
         }
         MirInstruction::UnitConstant { .. } => Ok(()),
+        MirInstruction::Suspend { .. } | MirInstruction::Resume { .. } => Ok(()),
+        MirInstruction::ScopeEnter { .. } => {
+            scope_tasks.push(Vec::new());
+            Ok(())
+        }
+        MirInstruction::ScopeExit { .. } => {
+            let handles = scope_tasks.pop().unwrap_or_default();
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let free_ref = runtime.reference(builder.func, runtime.free, false);
+            for origin in handles {
+                if let Some(handle) = values.get(&origin).copied() {
+                    builder.ins().call(free_ref, &[handle]);
+                }
+                task_results.remove(&origin);
+                task_origins.retain(|_, candidate| *candidate != origin);
+                task_locals.retain(|_, candidate| *candidate != origin);
+            }
+            Ok(())
+        }
         MirInstruction::ParameterRead {
             output, parameter, ..
         } => {
@@ -909,6 +957,10 @@ fn lower_instruction(
                 *output,
                 normalize_bool_value(value, ty, context.type_arena, builder),
             );
+            if let Some(result) = task_result_type(ty, context.type_arena) {
+                task_results.insert(*output, result);
+                task_origins.insert(*output, parameter_id);
+            }
             Ok(())
         }
         MirInstruction::DirectCall {
@@ -948,6 +1000,295 @@ fn lower_instruction(
                     normalize_bool_value(value, ty, context.type_arena, builder),
                 );
             }
+            Ok(())
+        }
+        MirInstruction::TaskSpawn { output, callee, .. } => {
+            let function_id = function_ids
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let result_type = context
+                .function_return_types
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let module = module
+                .as_deref_mut()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let function_ref = module.declare_func_in_func(function_id, builder.func);
+            let call = builder.ins().call(function_ref, &[]);
+            let result = builder.inst_results(call).first().copied();
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let size = builder.ins().iconst(types::I64, 16);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let allocation = builder.ins().call(malloc_ref, &[size]);
+            let handle = *builder
+                .inst_results(allocation)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(handle, TrapCode::unwrap_user(7));
+            let status = builder.ins().iconst(types::I8, 0);
+            builder.ins().store(MemFlagsData::new(), status, handle, 0);
+            if let Some(result) = result {
+                builder.ins().store(MemFlagsData::new(), result, handle, 8);
+            }
+            values.insert(*output, handle);
+            task_results.insert(*output, result_type);
+            task_origins.insert(*output, *output);
+            if let Some(scope) = scope_tasks.last_mut() {
+                scope.push(*output);
+            }
+            Ok(())
+        }
+        MirInstruction::TaskAwait { output, task, .. } => {
+            let handle = values
+                .get(task)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let result_type = task_results
+                .get(task)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let origin = task_origins.get(task).copied().unwrap_or(*task);
+            let status = builder
+                .ins()
+                .load(types::I8, MemFlagsData::new(), handle, 0);
+            builder.ins().trapnz(status, TrapCode::unwrap_user(8));
+            if !matches!(
+                context
+                    .type_arena
+                    .get(result_type)
+                    .map(|record| record.kind()),
+                Some(TypeKind::Primitive(PrimitiveType::Unit))
+            ) {
+                let value_type = cranelift_type(result_type, context.type_arena)
+                    .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+                let value = builder
+                    .ins()
+                    .load(value_type, MemFlagsData::new(), handle, 8);
+                values.insert(
+                    *output,
+                    normalize_bool_value(value, result_type, context.type_arena, builder),
+                );
+            }
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let free_ref = runtime.reference(builder.func, runtime.free, false);
+            builder.ins().call(free_ref, &[handle]);
+            task_results.remove(task);
+            task_results.remove(&origin);
+            task_origins.remove(task);
+            task_origins.remove(&origin);
+            for scope in scope_tasks.iter_mut() {
+                scope.retain(|candidate| *candidate != origin);
+            }
+            Ok(())
+        }
+        MirInstruction::TaskCancel { task, .. } => {
+            let handle = values
+                .get(task)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let status = builder.ins().iconst(types::I8, 1);
+            builder.ins().store(MemFlagsData::new(), status, handle, 0);
+            Ok(())
+        }
+        MirInstruction::ChannelCreate {
+            output, capacity, ..
+        } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let capacity = values
+                .get(capacity)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let zero = builder.ins().iconst(types::I64, 0);
+            let negative = builder.ins().icmp(IntCC::SignedLessThan, capacity, zero);
+            builder.ins().trapnz(negative, TrapCode::unwrap_user(10));
+            let header_size = builder.ins().iconst(types::I64, 48);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let header_call = builder.ins().call(malloc_ref, &[header_size]);
+            let header = *builder
+                .inst_results(header_call)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(header, TrapCode::unwrap_user(11));
+            let has_capacity = builder.ins().icmp(IntCC::NotEqual, capacity, zero);
+            let one = builder.ins().iconst(types::I64, 1);
+            let data_count = builder.ins().select(has_capacity, capacity, one);
+            let data_size = builder.ins().imul_imm(data_count, 8);
+            let data_call = builder.ins().call(malloc_ref, &[data_size]);
+            let data = *builder
+                .inst_results(data_call)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(data, TrapCode::unwrap_user(11));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), capacity, header, 0);
+            builder.ins().store(MemFlagsData::new(), zero, header, 8);
+            builder.ins().store(MemFlagsData::new(), zero, header, 16);
+            builder.ins().store(MemFlagsData::new(), zero, header, 24);
+            builder.ins().store(MemFlagsData::new(), zero, header, 32);
+            builder.ins().store(MemFlagsData::new(), data, header, 40);
+            values.insert(*output, header);
+            Ok(())
+        }
+        MirInstruction::ChannelSend {
+            channel,
+            value,
+            element_type,
+            ..
+        } => {
+            let pointer = values
+                .get(channel)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let value = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let closed = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 32);
+            builder.ins().trapnz(closed, TrapCode::unwrap_user(12));
+            let capacity = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 8);
+            let has_capacity = builder.ins().icmp_imm(IntCC::NotEqual, capacity, 0);
+            let full = builder
+                .ins()
+                .icmp(IntCC::UnsignedGreaterThanOrEqual, length, capacity);
+            let full_and_bounded = builder.ins().band(has_capacity, full);
+            builder
+                .ins()
+                .trapnz(full_and_bounded, TrapCode::unwrap_user(13));
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 40);
+            let tail = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 24);
+            let offset = builder.ins().imul_imm(tail, 8);
+            let address = builder.ins().iadd(data, offset);
+            let element_clif = cranelift_type(*element_type, context.type_arena)
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            builder.ins().store(MemFlagsData::new(), value, address, 0);
+            let next_raw = builder.ins().iadd_imm(tail, 1);
+            let one = builder.ins().iconst(types::I64, 1);
+            let safe_capacity = builder.ins().select(has_capacity, capacity, one);
+            let next_mod = builder.ins().urem(next_raw, safe_capacity);
+            let zero = builder.ins().iconst(types::I64, 0);
+            let next_tail = builder.ins().select(has_capacity, next_mod, zero);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), next_tail, pointer, 24);
+            let new_length = builder.ins().iadd_imm(length, 1);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), new_length, pointer, 8);
+            let _ = element_clif;
+            Ok(())
+        }
+        MirInstruction::ChannelReceive {
+            output,
+            channel,
+            element_type,
+            ..
+        } => {
+            let pointer = values
+                .get(channel)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 8);
+            let closed = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 32);
+            let empty = builder.ins().icmp_imm(IntCC::Equal, length, 0);
+            let open = builder.ins().icmp_imm(IntCC::Equal, closed, 0);
+            let empty_and_open = builder.ins().band(empty, open);
+            builder
+                .ins()
+                .trapnz(empty_and_open, TrapCode::unwrap_user(14));
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 40);
+            let head = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let offset = builder.ins().imul_imm(head, 8);
+            let address = builder.ins().iadd(data, offset);
+            let element_clif = cranelift_type(*element_type, context.type_arena)
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            let loaded = builder
+                .ins()
+                .load(element_clif, MemFlagsData::new(), address, 0);
+            let loaded = if element_clif == types::I8 {
+                builder.ins().uextend(types::I64, loaded)
+            } else if element_clif == types::I64 {
+                loaded
+            } else {
+                return Err(CraneliftLoweringError::UnsupportedRuntimeType);
+            };
+            let zero = builder.ins().iconst(types::I64, 0);
+            let payload = builder.ins().select(empty, zero, loaded);
+            let one = builder.ins().iconst(types::I64, 1);
+            let tag = builder.ins().select(empty, one, zero);
+            let shifted_payload = builder.ins().ishl_imm(payload, 8);
+            let result = builder.ins().iadd(shifted_payload, tag);
+            values.insert(*output, result);
+            let next_raw = builder.ins().iadd_imm(head, 1);
+            let capacity = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let has_capacity = builder.ins().icmp_imm(IntCC::NotEqual, capacity, 0);
+            let one = builder.ins().iconst(types::I64, 1);
+            let safe_capacity = builder.ins().select(has_capacity, capacity, one);
+            let next_mod = builder.ins().urem(next_raw, safe_capacity);
+            let zero = builder.ins().iconst(types::I64, 0);
+            let next_head = builder.ins().select(has_capacity, next_mod, zero);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), next_head, pointer, 16);
+            let remaining = builder.ins().iadd_imm(length, -1);
+            let new_length = builder.ins().select(empty, length, remaining);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), new_length, pointer, 8);
+            Ok(())
+        }
+        MirInstruction::ChannelClose { channel, .. } => {
+            let pointer = values
+                .get(channel)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let one = builder.ins().iconst(types::I64, 1);
+            builder.ins().store(MemFlagsData::new(), one, pointer, 32);
+            Ok(())
+        }
+        MirInstruction::DestroyChannel { value, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 40);
+            let free_ref = runtime.reference(builder.func, runtime.free, false);
+            builder.ins().call(free_ref, &[data]);
+            builder.ins().call(free_ref, &[pointer]);
             Ok(())
         }
         MirInstruction::FunctionReference { output, callee, .. } => {
@@ -2010,18 +2351,34 @@ fn lower_instruction(
                 *output,
                 normalize_bool_value(value, ty, context.type_arena, builder),
             );
+            if let Some(result) = task_result_type(ty, context.type_arena) {
+                task_results.insert(*output, result);
+                if let Some(origin) = task_locals.get(&local_id).copied() {
+                    task_origins.insert(*output, origin);
+                }
+            }
             Ok(())
         }
-        MirInstruction::StoreLocal { local, value, .. } => {
+        MirInstruction::StoreLocal {
+            local,
+            value: source_value,
+            ..
+        } => {
+            let local_id = *local;
             let local = locals
                 .get(local)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             let value = values
-                .get(value)
+                .get(source_value)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             builder.def_var(local, value);
+            if let Some(origin) = task_origins.get(source_value).copied() {
+                task_locals.insert(local_id, origin);
+            } else {
+                task_locals.remove(&local_id);
+            }
             Ok(())
         }
         MirInstruction::CheckedArithmetic {

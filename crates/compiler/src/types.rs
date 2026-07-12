@@ -209,6 +209,51 @@ pub struct DynamicArrayType {
     element: TypeId,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct TaskType {
+    result: TypeId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ChannelType {
+    element: TypeId,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct ChannelResultType {
+    element: TypeId,
+}
+
+impl TaskType {
+    pub fn new(result: TypeId) -> Self {
+        Self { result }
+    }
+
+    pub fn result(self) -> TypeId {
+        self.result
+    }
+}
+
+impl ChannelType {
+    pub fn new(element: TypeId) -> Self {
+        Self { element }
+    }
+
+    pub fn element(self) -> TypeId {
+        self.element
+    }
+}
+
+impl ChannelResultType {
+    pub fn new(element: TypeId) -> Self {
+        Self { element }
+    }
+
+    pub fn element(self) -> TypeId {
+        self.element
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct FunctionType {
     parameters: Vec<TypeId>,
@@ -275,6 +320,9 @@ pub enum TypeKind {
     Nullable(NullableType),
     Array(ArrayType),
     DynamicArray(DynamicArrayType),
+    Task(TaskType),
+    Channel(ChannelType),
+    ChannelResult(ChannelResultType),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -393,6 +441,27 @@ impl TypeRecord {
         }
     }
 
+    pub fn task(task: TaskType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::Task(task),
+        }
+    }
+
+    pub fn channel(channel: ChannelType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::Channel(channel),
+        }
+    }
+
+    pub fn channel_result(result: ChannelResultType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::ChannelResult(result),
+        }
+    }
+
     pub fn id(&self) -> TypeId {
         self.id
     }
@@ -463,6 +532,30 @@ impl TypeArena {
         self.insert(TypeRecord::dynamic_array(DynamicArrayType::new(element)))
     }
 
+    pub fn task(&mut self, result: TypeId) -> TypeId {
+        let kind = TypeKind::Task(TaskType::new(result));
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::task(TaskType::new(result)))
+    }
+
+    pub fn channel(&mut self, element: TypeId) -> TypeId {
+        let kind = TypeKind::Channel(ChannelType::new(element));
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::channel(ChannelType::new(element)))
+    }
+
+    pub fn channel_result(&mut self, element: TypeId) -> TypeId {
+        let kind = TypeKind::ChannelResult(ChannelResultType::new(element));
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::channel_result(ChannelResultType::new(element)))
+    }
+
     pub fn nominal(&mut self, identity: NominalTypeIdentity) -> TypeId {
         let kind = TypeKind::Nominal(identity.clone());
         if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
@@ -526,6 +619,18 @@ impl GenericSubstitution {
             TypeKind::DynamicArray(array) => {
                 let element = self.apply(array.element(), arena);
                 arena.dynamic_array(element)
+            }
+            TypeKind::Task(task) => {
+                let result = self.apply(task.result(), arena);
+                arena.task(result)
+            }
+            TypeKind::Channel(channel) => {
+                let element = self.apply(channel.element(), arena);
+                arena.channel(element)
+            }
+            TypeKind::ChannelResult(result) => {
+                let element = self.apply(result.element(), arena);
+                arena.channel_result(element)
             }
             TypeKind::GenericInstance(instance) => {
                 let arguments = instance

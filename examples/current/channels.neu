@@ -1,0 +1,19 @@
+package examples.current
+
+public func main(): Int {
+    val queue = channel<Int>(2);
+    send(queue, 3);
+    send(queue, 4);
+    val first = receive(queue);
+    val second = receive(queue);
+    close(queue);
+    val first_value: Int = when (first) {
+        ChannelResult.Message(value) -> value;
+        ChannelResult.Closed -> 0;
+    };
+    val second_value: Int = when (second) {
+        ChannelResult.Message(value) -> value;
+        ChannelResult.Closed -> 0;
+    };
+    return first_value + second_value;
+}

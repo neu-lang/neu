@@ -171,6 +171,35 @@ fn hir_preserves_non_integer_primitive_literal_payloads() {
 }
 
 #[test]
+fn hir_preserves_channel_operation_kinds() {
+    let file = SourceFileId::from_raw(1210);
+    let span = ByteSpan::new(file, 0, 4).unwrap();
+    let channel = TypeId::from_raw(10);
+    let unit = TypeId::from_raw(11);
+    let result = TypeId::from_raw(12);
+    let capacity = HirExpressionId::from_raw(0);
+    let value = HirExpressionId::from_raw(1);
+    let channel_value = HirExpressionId::from_raw(2);
+    assert!(matches!(
+        HirExpression::channel_create(HirExpressionId::from_raw(3), span, channel, capacity).kind(),
+        HirExpressionKind::ChannelCreate(id) if *id == capacity
+    ));
+    assert!(matches!(
+        HirExpression::channel_send(HirExpressionId::from_raw(4), span, unit, channel_value, value).kind(),
+        HirExpressionKind::ChannelSend { channel: actual_channel, value: actual_value }
+            if *actual_channel == channel_value && *actual_value == value
+    ));
+    assert!(matches!(
+        HirExpression::channel_receive(HirExpressionId::from_raw(5), span, result, channel_value).kind(),
+        HirExpressionKind::ChannelReceive(id) if *id == channel_value
+    ));
+    assert!(matches!(
+        HirExpression::channel_close(HirExpressionId::from_raw(6), span, unit, channel_value).kind(),
+        HirExpressionKind::ChannelClose(id) if *id == channel_value
+    ));
+}
+
+#[test]
 fn checked_source_lowers_bool_unit_and_float_literals_to_hir() {
     let file = SourceFileId::from_raw(907);
     let parsed = parse_source(

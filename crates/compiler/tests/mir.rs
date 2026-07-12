@@ -1,8 +1,9 @@
 use compiler::{
     ast::AstNodeId,
     hir::{
-        HirBinaryOperator, HirExpression, HirExpressionId, HirFunction, HirFunctionId, HirLocal,
-        HirModule, HirParameter, HirReturn, HirSafetyFacts, HirUnaryOperator,
+        HirBinaryOperator, HirCapture, HirCaptureMode, HirExpression, HirExpressionId, HirFunction,
+        HirFunctionId, HirLocal, HirModule, HirParameter, HirReturn, HirSafetyFacts,
+        HirUnaryOperator,
     },
     mir::{
         MirBasicBlock, MirBlockId, MirCleanupBoundary, MirFunction, MirFunctionId, MirInstruction,
@@ -50,6 +51,71 @@ fn cleanup_boundary_tracks_owned_string_values() {
 }
 
 #[test]
+fn cleanup_boundary_tracks_owned_task_values() {
+    let file = SourceFileId::from_raw(1111);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let task = types.task(int);
+    let function = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("tasks").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        vec![HirParameter::new(
+            compiler::hir::HirParameterId::from_raw(0),
+            span,
+            task,
+        )],
+        vec![HirLocal::new(
+            compiler::hir::HirLocalId::from_raw(0),
+            span,
+            task,
+            false,
+        )],
+        vec![],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    );
+    let boundary = MirCleanupBoundary::for_function(&function, &types);
+    assert_eq!(boundary.owned_tasks(), &[MirLocalId::from_raw(0)]);
+    assert_eq!(boundary.owned_task_parameters(), &[MirValueId::from_raw(0)]);
+}
+
+#[test]
+fn cleanup_boundary_tracks_owned_channel_values() {
+    let file = SourceFileId::from_raw(1211);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let channel = types.channel(int);
+    let function = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("channels").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        Vec::new(),
+        vec![HirLocal::new(
+            compiler::hir::HirLocalId::from_raw(0),
+            span,
+            channel,
+            false,
+        )],
+        vec![],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    );
+    let boundary = MirCleanupBoundary::for_function(&function, &types);
+    assert_eq!(boundary.owned_channels(), &[MirLocalId::from_raw(0)]);
+}
+
+#[test]
 fn mir_preserves_specialization_identity() {
     let file = SourceFileId::from_raw(1085);
     let span = compiler::source::ByteSpan::new(file, 0, 1).unwrap();
@@ -72,6 +138,34 @@ fn mir_preserves_specialization_identity() {
     )
     .with_specialization_identity(identity.clone());
     assert_eq!(function.specialization_identity(), Some(&identity));
+}
+
+#[test]
+fn mir_preserves_lambda_capture_facts() {
+    let file = SourceFileId::from_raw(1112);
+    let span = ByteSpan::new(file, 0, 1).unwrap();
+    let capture = HirCapture::new(
+        AstNodeId::from_raw(1),
+        AstNodeId::from_raw(2),
+        HirCaptureMode::Move,
+        span,
+    );
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        Vec::new(),
+        TypeId::from_raw(1),
+        Vec::new(),
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            Vec::new(),
+            MirTerminator::ReturnUnit { span },
+        )],
+        MirCleanupBoundary::default(),
+    )
+    .with_captures(vec![capture]);
+    assert_eq!(function.captures()[0].mode(), HirCaptureMode::Move);
+    assert_eq!(function.captures()[0].binding(), AstNodeId::from_raw(2));
 }
 
 #[test]
@@ -663,4 +757,63 @@ fn hir_to_mir_lowers_primitive_literals_and_unit_return() {
         mir.functions()[3].blocks()[0].terminator(),
         MirTerminator::ReturnUnit { span }
     );
+}
+
+#[test]
+fn mir_preserves_await_suspension_and_resume_boundaries() {
+    let file = SourceFileId::from_raw(1110);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let task = types.task(int);
+    let hir = HirModule::new(
+        ModuleName::parse("concurrency").unwrap(),
+        vec![HirFunction::new(
+            compiler::hir::HirFunctionId::from_raw(0),
+            ModuleName::parse("concurrency").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            span,
+            false,
+            int,
+            vec![],
+            vec![HirLocal::new(
+                compiler::hir::HirLocalId::from_raw(0),
+                span,
+                task,
+                false,
+            )],
+            vec![
+                HirExpression::local_read(
+                    HirExpressionId::from_raw(0),
+                    span,
+                    task,
+                    compiler::hir::HirLocalId::from_raw(0),
+                ),
+                HirExpression::task_await(
+                    HirExpressionId::from_raw(1),
+                    span,
+                    int,
+                    HirExpressionId::from_raw(0),
+                ),
+            ],
+            vec![HirReturn::new(span, HirExpressionId::from_raw(1))],
+            HirSafetyFacts::executable_subset_checked(),
+            vec![],
+        )],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let instructions = mir.functions()[0].blocks()[0].instructions();
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        MirInstruction::Suspend { span: instruction_span } if *instruction_span == span
+    )));
+    assert!(
+        instructions
+            .iter()
+            .any(|instruction| matches!(instruction, MirInstruction::TaskAwait { .. }))
+    );
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction,
+        MirInstruction::Resume { span: instruction_span } if *instruction_span == span
+    )));
 }

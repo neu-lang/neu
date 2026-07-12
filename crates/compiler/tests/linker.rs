@@ -1,9 +1,20 @@
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    path::Path,
+    process::Command,
+    sync::{Mutex, OnceLock},
+};
 
 use compiler::linker::{LinkInvocationError, SystemLinkInvocation};
 
+fn linker_environment_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+}
+
 #[test]
 fn host_link_plan_uses_cc_and_preserves_object_order() {
+    let _environment_lock = linker_environment_lock();
     let root = std::env::temp_dir().join(format!("neu-system-link-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();
@@ -22,6 +33,7 @@ fn host_link_plan_uses_cc_and_preserves_object_order() {
 
 #[test]
 fn neu_linker_overrides_cc() {
+    let _environment_lock = linker_environment_lock();
     let root = std::env::temp_dir().join(format!("neu-linker-override-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();

@@ -1,7 +1,7 @@
 use crate::{
     hir::{
-        HirBinaryOperator, HirDirectCall, HirDispatchKind, HirExpressionId, HirExpressionKind,
-        HirFunction, HirLocalId, HirModule, HirUnaryOperator,
+        HirBinaryOperator, HirCapture, HirDirectCall, HirDispatchKind, HirExpressionId,
+        HirExpressionKind, HirFunction, HirLocalId, HirModule, HirUnaryOperator,
     },
     hir::{HirControlFlow, HirExpression},
     module::{FunctionSymbolIdentity, ModuleName},
@@ -252,6 +252,54 @@ pub enum MirInstruction {
         value: MirValueId,
         span: ByteSpan,
     },
+    ScopeEnter {
+        span: ByteSpan,
+    },
+    ScopeExit {
+        span: ByteSpan,
+    },
+    Suspend {
+        span: ByteSpan,
+    },
+    Resume {
+        span: ByteSpan,
+    },
+    TaskSpawn {
+        output: MirValueId,
+        callee: MirFunctionId,
+        callable: MirValueId,
+        span: ByteSpan,
+    },
+    TaskAwait {
+        output: MirValueId,
+        task: MirValueId,
+        span: ByteSpan,
+    },
+    TaskCancel {
+        task: MirValueId,
+        span: ByteSpan,
+    },
+    ChannelCreate {
+        output: MirValueId,
+        capacity: MirValueId,
+        span: ByteSpan,
+    },
+    ChannelSend {
+        channel: MirValueId,
+        value: MirValueId,
+        element_type: TypeId,
+        span: ByteSpan,
+    },
+    ChannelReceive {
+        output: MirValueId,
+        channel: MirValueId,
+        element_type: TypeId,
+        span: ByteSpan,
+    },
+    ChannelClose {
+        channel: MirValueId,
+        span: ByteSpan,
+    },
     DirectCall {
         output: MirValueId,
         callee: MirFunctionId,
@@ -410,6 +458,10 @@ pub enum MirInstruction {
         value: MirValueId,
         span: ByteSpan,
     },
+    DestroyChannel {
+        value: MirValueId,
+        span: ByteSpan,
+    },
 }
 impl MirInstruction {
     pub fn int_constant(output: MirValueId, value: i64, span: ByteSpan) -> Self {
@@ -474,6 +526,17 @@ impl MirInstruction {
             | Self::Compare { span, .. }
             | Self::LoadLocal { span, .. }
             | Self::StoreLocal { span, .. }
+            | Self::ScopeEnter { span }
+            | Self::ScopeExit { span }
+            | Self::Suspend { span }
+            | Self::Resume { span }
+            | Self::TaskSpawn { span, .. }
+            | Self::TaskAwait { span, .. }
+            | Self::TaskCancel { span, .. }
+            | Self::ChannelCreate { span, .. }
+            | Self::ChannelSend { span, .. }
+            | Self::ChannelReceive { span, .. }
+            | Self::ChannelClose { span, .. }
             | Self::DirectCall { span, .. }
             | Self::FunctionReference { span, .. }
             | Self::IndirectCall { span, .. }
@@ -502,6 +565,7 @@ impl MirInstruction {
             Self::FieldStore { span, .. } => *span,
             Self::DestroyObject { span, .. } => *span,
             Self::DestroyDynamicArray { span, .. } => *span,
+            Self::DestroyChannel { span, .. } => *span,
         }
     }
 }
@@ -602,7 +666,11 @@ pub struct MirCleanupBoundary {
     owned_locals: Vec<MirLocalId>,
     owned_objects: Vec<MirLocalId>,
     owned_dynamic_arrays: Vec<MirLocalId>,
+    owned_tasks: Vec<MirLocalId>,
+    owned_channels: Vec<MirLocalId>,
     owned_parameters: Vec<MirValueId>,
+    owned_task_parameters: Vec<MirValueId>,
+    owned_channel_parameters: Vec<MirValueId>,
     returns_owned: bool,
 }
 impl MirCleanupBoundary {
@@ -611,7 +679,11 @@ impl MirCleanupBoundary {
             owned_locals: Vec::new(),
             owned_objects: Vec::new(),
             owned_dynamic_arrays: Vec::new(),
+            owned_tasks: Vec::new(),
+            owned_channels: Vec::new(),
             owned_parameters: Vec::new(),
+            owned_task_parameters: Vec::new(),
+            owned_channel_parameters: Vec::new(),
             returns_owned: false,
         }
     }
@@ -651,10 +723,50 @@ impl MirCleanupBoundary {
                 })
                 .map(|local| MirLocalId::from_raw(local.id().index()))
                 .collect(),
+            owned_tasks: function
+                .locals()
+                .iter()
+                .filter(|local| {
+                    types
+                        .get(local.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+                })
+                .map(|local| MirLocalId::from_raw(local.id().index()))
+                .collect(),
+            owned_channels: function
+                .locals()
+                .iter()
+                .filter(|local| {
+                    types
+                        .get(local.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Channel(_)))
+                })
+                .map(|local| MirLocalId::from_raw(local.id().index()))
+                .collect(),
             owned_parameters: function
                 .parameters()
                 .iter()
                 .filter(|parameter| is_string(parameter.ty()))
+                .map(|parameter| MirValueId::from_raw(parameter.id().index()))
+                .collect(),
+            owned_task_parameters: function
+                .parameters()
+                .iter()
+                .filter(|parameter| {
+                    types
+                        .get(parameter.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
+                })
+                .map(|parameter| MirValueId::from_raw(parameter.id().index()))
+                .collect(),
+            owned_channel_parameters: function
+                .parameters()
+                .iter()
+                .filter(|parameter| {
+                    types
+                        .get(parameter.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::Channel(_)))
+                })
                 .map(|parameter| MirValueId::from_raw(parameter.id().index()))
                 .collect(),
             returns_owned: is_string(function.return_type()),
@@ -664,7 +776,11 @@ impl MirCleanupBoundary {
         self.owned_locals.is_empty()
             && self.owned_objects.is_empty()
             && self.owned_dynamic_arrays.is_empty()
+            && self.owned_tasks.is_empty()
+            && self.owned_channels.is_empty()
             && self.owned_parameters.is_empty()
+            && self.owned_task_parameters.is_empty()
+            && self.owned_channel_parameters.is_empty()
             && !self.returns_owned
     }
     pub fn owned_locals(&self) -> &[MirLocalId] {
@@ -678,6 +794,18 @@ impl MirCleanupBoundary {
     }
     pub fn owned_dynamic_arrays(&self) -> &[MirLocalId] {
         &self.owned_dynamic_arrays
+    }
+    pub fn owned_tasks(&self) -> &[MirLocalId] {
+        &self.owned_tasks
+    }
+    pub fn owned_channels(&self) -> &[MirLocalId] {
+        &self.owned_channels
+    }
+    pub fn owned_task_parameters(&self) -> &[MirValueId] {
+        &self.owned_task_parameters
+    }
+    pub fn owned_channel_parameters(&self) -> &[MirValueId] {
+        &self.owned_channel_parameters
     }
     pub fn returns_owned(&self) -> bool {
         self.returns_owned
@@ -694,8 +822,10 @@ pub struct MirFunction {
     cleanup_boundary: MirCleanupBoundary,
     symbol_identity: Option<FunctionSymbolIdentity>,
     entry: bool,
+    suspend: bool,
     effect_contract: Option<OwnershipEffectContract>,
     specialization_identity: Option<GenericSpecializationIdentity>,
+    captures: Vec<HirCapture>,
 }
 impl MirFunction {
     pub fn new(
@@ -717,8 +847,10 @@ impl MirFunction {
             cleanup_boundary,
             symbol_identity: None,
             entry: false,
+            suspend: false,
             effect_contract: None,
             specialization_identity: None,
+            captures: Vec::new(),
         }
     }
     pub fn id(&self) -> MirFunctionId {
@@ -742,6 +874,13 @@ impl MirFunction {
     pub fn cleanup_boundary(&self) -> &MirCleanupBoundary {
         &self.cleanup_boundary
     }
+    pub fn captures(&self) -> &[HirCapture] {
+        &self.captures
+    }
+    pub fn with_captures(mut self, captures: Vec<HirCapture>) -> Self {
+        self.captures = captures;
+        self
+    }
     pub fn with_symbol_identity(mut self, identity: FunctionSymbolIdentity) -> Self {
         self.symbol_identity = Some(identity);
         self
@@ -759,6 +898,13 @@ impl MirFunction {
     pub fn with_entry(mut self, entry: bool) -> Self {
         self.entry = entry;
         self
+    }
+    pub fn with_suspend(mut self, suspend: bool) -> Self {
+        self.suspend = suspend;
+        self
+    }
+    pub fn is_suspend(&self) -> bool {
+        self.suspend
     }
     pub fn with_effect_contract(mut self, contract: OwnershipEffectContract) -> Self {
         self.effect_contract = Some(contract);
@@ -1130,6 +1276,91 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     });
                 }
+                HirExpressionKind::TaskSpawn(callable) => {
+                    let callee = mir_task_callee(function, *callable)?;
+                    instructions.push(MirInstruction::TaskSpawn {
+                        output,
+                        callee,
+                        callable: mir_expression_value_id(function, *callable),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::TaskAwait(task) => {
+                    instructions.push(MirInstruction::Suspend {
+                        span: expression.span(),
+                    });
+                    instructions.push(MirInstruction::TaskAwait {
+                        output,
+                        task: mir_expression_value_id(function, *task),
+                        span: expression.span(),
+                    });
+                    instructions.push(MirInstruction::Resume {
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::TaskCancel(task) => {
+                    instructions.push(MirInstruction::TaskCancel {
+                        task: mir_expression_value_id(function, *task),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ChannelCreate(capacity) => {
+                    instructions.push(MirInstruction::ChannelCreate {
+                        output,
+                        capacity: mir_expression_value_id(function, *capacity),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ChannelSend { channel, value } => {
+                    let element_type = types
+                        .get(
+                            function
+                                .expressions()
+                                .iter()
+                                .find(|candidate| candidate.id() == *channel)
+                                .map(|candidate| candidate.ty())
+                                .ok_or(MirLoweringError::UnsupportedExpression)?,
+                        )
+                        .and_then(|record| match record.kind() {
+                            TypeKind::Channel(channel) => Some(channel.element()),
+                            _ => None,
+                        })
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    instructions.push(MirInstruction::ChannelSend {
+                        channel: mir_expression_value_id(function, *channel),
+                        value: mir_expression_value_id(function, *value),
+                        element_type,
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ChannelReceive(channel) => {
+                    let element_type = types
+                        .get(
+                            function
+                                .expressions()
+                                .iter()
+                                .find(|candidate| candidate.id() == *channel)
+                                .map(|candidate| candidate.ty())
+                                .ok_or(MirLoweringError::UnsupportedExpression)?,
+                        )
+                        .and_then(|record| match record.kind() {
+                            TypeKind::Channel(channel) => Some(channel.element()),
+                            _ => None,
+                        })
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    instructions.push(MirInstruction::ChannelReceive {
+                        output,
+                        channel: mir_expression_value_id(function, *channel),
+                        element_type,
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ChannelClose(channel) => {
+                    instructions.push(MirInstruction::ChannelClose {
+                        channel: mir_expression_value_id(function, *channel),
+                        span: expression.span(),
+                    });
+                }
                 HirExpressionKind::Conditional { .. } => {
                     return Err(MirLoweringError::UnsupportedExpression);
                 }
@@ -1239,6 +1470,22 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     span: local.span(),
                 });
             }
+            for local in function.locals().iter().filter(|local| {
+                matches!(
+                    types.get(local.ty()).map(|record| record.kind()),
+                    Some(TypeKind::Channel(_))
+                )
+            }) {
+                instructions.push(MirInstruction::LoadLocal {
+                    output: cleanup_value,
+                    local: MirLocalId::from_raw(local.id().index()),
+                    span: local.span(),
+                });
+                instructions.push(MirInstruction::DestroyChannel {
+                    value: cleanup_value,
+                    span: local.span(),
+                });
+            }
         }
         let returned = function
             .returns()
@@ -1284,7 +1531,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             )],
             MirCleanupBoundary::for_function(function, types),
         )
-        .with_entry(function.is_entry());
+        .with_entry(function.is_entry())
+        .with_suspend(function.is_suspend())
+        .with_captures(function.captures().to_vec());
         if let Some(contract) = function.effect_contract() {
             mir_function = mir_function.with_effect_contract(contract.clone());
         }
@@ -1301,6 +1550,23 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
 
 fn mir_expression_value_id(function: &HirFunction, expression: HirExpressionId) -> MirValueId {
     MirValueId::from_raw(function.parameters().len() + expression.index())
+}
+
+fn mir_task_callee(
+    function: &HirFunction,
+    callable: HirExpressionId,
+) -> Result<MirFunctionId, MirLoweringError> {
+    match function
+        .expressions()
+        .iter()
+        .find(|expression| expression.id() == callable)
+        .map(|expression| expression.kind())
+    {
+        Some(HirExpressionKind::FunctionReference(callee)) => {
+            Ok(MirFunctionId::from_raw(callee.index()))
+        }
+        _ => Err(MirLoweringError::UnsupportedExpression),
+    }
 }
 
 struct LowerBlock {
@@ -1716,6 +1982,96 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::TaskSpawn(callable) => {
+                let callable_id = *callable;
+                let callable = self.lower_expression(callable_id)?;
+                let callee = mir_task_callee(self.function, callable_id)?;
+                self.push(MirInstruction::TaskSpawn {
+                    output,
+                    callee,
+                    callable,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::TaskAwait(task) => {
+                let task = self.lower_expression(*task)?;
+                self.push(MirInstruction::Suspend {
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::TaskAwait {
+                    output,
+                    task,
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::Resume {
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::TaskCancel(task) => {
+                let task = self.lower_expression(*task)?;
+                self.push(MirInstruction::TaskCancel {
+                    task,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelCreate(capacity) => {
+                let capacity = self.lower_expression(*capacity)?;
+                self.push(MirInstruction::ChannelCreate {
+                    output,
+                    capacity,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelSend { channel, value } => {
+                let channel_id = *channel;
+                let channel_value = self.lower_expression(channel_id)?;
+                let value = self.lower_expression(*value)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == channel_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::Channel(channel) => Some(channel.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::ChannelSend {
+                    channel: channel_value,
+                    value,
+                    element_type,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelReceive(channel) => {
+                let channel_id = *channel;
+                let channel = self.lower_expression(channel_id)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == channel_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::Channel(channel) => Some(channel.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::ChannelReceive {
+                    output,
+                    channel,
+                    element_type,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelClose(channel) => {
+                let channel = self.lower_expression(*channel)?;
+                self.push(MirInstruction::ChannelClose {
+                    channel,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
@@ -1806,7 +2162,8 @@ impl<'a> ShortCircuitLowerer<'a> {
             blocks,
             MirCleanupBoundary::for_function(self.function, self.types),
         )
-        .with_entry(self.function.is_entry());
+        .with_entry(self.function.is_entry())
+        .with_suspend(self.function.is_suspend());
         if let Some(contract) = self.function.effect_contract() {
             mir = mir.with_effect_contract(contract.clone());
         }
@@ -2232,6 +2589,96 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::TaskSpawn(callable) => {
+                let callable_id = *callable;
+                let callable = self.lower_expression(callable_id)?;
+                let callee = mir_task_callee(self.function, callable_id)?;
+                self.push(MirInstruction::TaskSpawn {
+                    output,
+                    callee,
+                    callable,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::TaskAwait(task) => {
+                let task = self.lower_expression(*task)?;
+                self.push(MirInstruction::Suspend {
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::TaskAwait {
+                    output,
+                    task,
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::Resume {
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::TaskCancel(task) => {
+                let task = self.lower_expression(*task)?;
+                self.push(MirInstruction::TaskCancel {
+                    task,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelCreate(capacity) => {
+                let capacity = self.lower_expression(*capacity)?;
+                self.push(MirInstruction::ChannelCreate {
+                    output,
+                    capacity,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelSend { channel, value } => {
+                let channel_id = *channel;
+                let channel_value = self.lower_expression(channel_id)?;
+                let value = self.lower_expression(*value)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == channel_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::Channel(channel) => Some(channel.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::ChannelSend {
+                    channel: channel_value,
+                    value,
+                    element_type,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelReceive(channel) => {
+                let channel_id = *channel;
+                let channel = self.lower_expression(channel_id)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == channel_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::Channel(channel) => Some(channel.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::ChannelReceive {
+                    output,
+                    channel,
+                    element_type,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ChannelClose(channel) => {
+                let channel = self.lower_expression(*channel)?;
+                self.push(MirInstruction::ChannelClose {
+                    channel,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
@@ -2272,6 +2719,13 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
                 HirControlFlow::Expression { value, .. } => {
                     let _ = self.lower_expression(*value)?;
+                }
+                HirControlFlow::Scope { body, span } => {
+                    self.push(MirInstruction::ScopeEnter { span: *span });
+                    self.lower_sequence(body)?;
+                    if !self.is_terminated() {
+                        self.push(MirInstruction::ScopeExit { span: *span });
+                    }
                 }
                 HirControlFlow::Assignment(assignment) => {
                     let value = self.lower_expression(assignment.value())?;
@@ -2650,7 +3104,8 @@ fn lower_hir_function_with_control_flow(
         blocks,
         MirCleanupBoundary::for_function(function, types),
     )
-    .with_entry(function.is_entry());
+    .with_entry(function.is_entry())
+    .with_suspend(function.is_suspend());
     if let Some(contract) = function.effect_contract() {
         mir = mir.with_effect_contract(contract.clone());
     }
@@ -2672,6 +3127,11 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
         )) => Ok(()),
         Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
         Some(TypeKind::DynamicArray(_)) => Ok(()),
+        Some(TypeKind::Task(task)) => require_bootstrap_runtime_type(task.result(), types),
+        Some(TypeKind::Channel(_)) => Ok(()),
+        Some(TypeKind::ChannelResult(result)) => {
+            require_bootstrap_runtime_type(result.element(), types)
+        }
         Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_)) => Ok(()),
         _ => Err(MirLoweringError::UnsupportedRuntimeType),
     }

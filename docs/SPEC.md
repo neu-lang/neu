@@ -1266,6 +1266,63 @@ foreign-target executable contract is provided. Compiler-owned runtime support
 remains private and does not define a public allocation, object-layout, or FFI
 ABI. `main(): Int` remains the executable entry contract.
 
+## ADR-0101: Structured Concurrency Runtime Semantics
+
+Neu provides cooperative, single-threaded structured concurrency through
+compiler-owned `suspend func`, `scope { ... }`, `spawn { ... }`, and
+`await(task)` forms. `spawn` is valid only inside an active lexical scope and
+returns an opaque move-only `Task<T>`. `await` consumes the handle once and
+returns its owned result. Scope exit waits for all registered children and
+performs cleanup; child failure cancels unfinished siblings and reports the
+first failure in deterministic creation order. The scheduler is FIFO at
+accepted suspension points and does not imply OS threads or parallel execution.
+
+Ownership and capability checks apply to captures: moved captures require
+`Send`, shared captures require `Share`, and borrowed or mutable-shared captures
+are rejected. Borrows may cross suspension only under the proof already
+defined by ADR-0009. HIR and MIR retain scope, task, suspension, result,
+ownership, cleanup, and source-mapping facts. Task handles, frames, and runtime
+symbols have no public layout or FFI ABI. Explicit cancellation, channels,
+timers, I/O, detached tasks, OS threads, parallel execution, and concurrency
+standard-library APIs remain deferred.
+
+## ADR-0104: Member Task Cancellation
+
+`task.cancel()` requests idempotent cancellation of an owned child task without
+forceful termination. The receiver must be an owned `Task<T>` and the call has
+no arguments. The former free `cancel(task)` spelling is rejected. Cancellation
+is observed at accepted suspension and
+cleanup points, propagates from scopes to unfinished descendants, and runs
+ownership cleanup before completion. A cancelled task may be awaited once to
+observe its deterministic cancellation result. Cancellation does not introduce
+tokens, callbacks, timeouts, OS signals, or public runtime types.
+
+## ADR-0103: Bounded Channel Contract
+
+`channel<T>(capacity)` creates an opaque bounded channel. `send`, `receive`, and
+`close` provide FIFO message transfer, suspension while full or empty, and
+idempotent closure. `receive` returns the compiler-provided
+`ChannelResult<T>` type defined by ADR-0105: `ChannelResult.Message(value)` for
+a queued message and `ChannelResult.Closed` after closure and draining. This
+keeps end-of-stream distinct from every message value, including nullable or
+otherwise empty values. Capacity zero is a
+rendezvous channel. Multiple senders and one logical receiver are supported;
+concurrent receiver use is diagnosed. Sent values must satisfy `Send`, and
+move-only values are consumed when a send completes. Channel identity, element
+type, capacity, ownership, suspension, closure, cancellation, cleanup, and
+source spans remain in HIR/MIR without a public layout or FFI ABI.
+
+## ADR-0105: Channel Receive Result
+
+`ChannelResult<T>` is a compiler-provided nominal result with exactly the
+payload-bearing `Message(T)` and zero-payload `Closed` variants. Existing
+payload-bearing `when` matching from ADR-0081 inspects the result; no new
+pattern, nullable-EOF convention, public result library, or allocation syntax
+is introduced. Ownership follows `T`: receiving a move-only message transfers
+ownership through the `Message` payload, while copyable messages follow normal
+copy rules. The result representation, channel state, and runtime operations
+remain compiler-private with no stable ABI or FFI layout.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers

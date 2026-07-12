@@ -1,0 +1,10 @@
+package examples.current
+
+suspend func main(): Int {
+    scope {
+        val first = spawn { -> 3 };
+        val second = spawn { -> 4 };
+        return await(first) + await(second);
+    }
+    return 0;
+}

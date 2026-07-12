@@ -1,0 +1,9 @@
+package examples.current
+
+suspend func main(): Int {
+    scope {
+        val task = spawn { -> 7 };
+        task.cancel();
+    }
+    return 0;
+}

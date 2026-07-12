@@ -1359,6 +1359,49 @@ fn unspecified_concurrency_forms_remain_blocked() {
 }
 
 #[test]
+fn suspend_function_modifier_is_preserved_in_declaration_metadata() {
+    let output = parse_source(
+        SourceFileId::from_raw(901),
+        "suspend func load(): Int { return 7; }",
+    );
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.function_declarations.len(), 1);
+    assert!(output.function_declarations[0].is_suspend);
+}
+
+#[test]
+fn structured_scope_and_spawn_lambda_are_preserved_by_parser() {
+    let output = parse_source(
+        SourceFileId::from_raw(902),
+        "suspend func run(): Int { scope { val task = spawn { -> 7 }; return await(task); } return 0; }",
+    );
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.scope_statements.len(), 1);
+    assert_eq!(output.lambda_expressions.len(), 1);
+    assert_eq!(output.call_expressions.len(), 2);
+}
+
+#[test]
+fn task_cancellation_uses_member_call_syntax() {
+    let output = parse_source(
+        SourceFileId::from_raw(903),
+        "suspend func run(): Unit { scope { val task = spawn { -> () }; task.cancel(); } }",
+    );
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    let cancellation = output
+        .call_expressions
+        .iter()
+        .find(|call| {
+            output
+                .member_expressions
+                .iter()
+                .any(|member| member.expression == call.callee && member.name == "cancel")
+        })
+        .expect("member cancellation call");
+    assert!(cancellation.arguments.is_empty());
+}
+
+#[test]
 fn records_top_level_function_declaration_name_metadata() {
     let output = parse_source(SourceFileId::from_raw(12), "public func main(): Int;");
 

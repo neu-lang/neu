@@ -237,6 +237,11 @@ pub fn satisfies_thread_capability(
         TypeKind::Nominal(_) | TypeKind::GenericParameter(_) | TypeKind::GenericInstance(_) => {
             false
         }
+        TypeKind::Task(_) => false,
+        TypeKind::Channel(_) => true,
+        TypeKind::ChannelResult(result) => {
+            satisfies_thread_capability(types, result.element(), capability)
+        }
     }
 }
 
