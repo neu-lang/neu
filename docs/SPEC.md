@@ -1050,3 +1050,18 @@ or variance, solve constraints, erase types, specialize code, or define a
 runtime generic layout. Generic metadata is source-mapped and compiler-private;
 generic declarations, constraints, specialization, and cross-module lookup
 remain governed by later accepted decisions.
+
+## ADR-0083: Generic Declaration Environments
+
+Top-level functions, classes, interfaces, enums, and accepted members may
+declare explicit generic parameters. A member environment is its enclosing
+type parameters followed by its own parameters. Duplicate names in one list
+are rejected; member-level shadowing is allowed because parameter identity is
+the declaration node, not the spelling.
+
+Generic fields, constructors, parameters, returns, enum payloads, and member
+signatures preserve visible parameter identity and source spans. Generic
+inheritance and interface implementation use exact invariant substituted
+arguments. No inference, default arguments, variance, implicit conversion,
+cross-module lookup, or executable lowering of unspecialized declarations is
+added; specialization is a later accepted decision.

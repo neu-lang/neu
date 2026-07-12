@@ -18,6 +18,7 @@ pub enum DiagnosticKind {
     MalformedNullableType,
     MalformedGenericParameterList,
     MalformedGenericArgumentList,
+    DuplicateGenericParameter,
     MissingGenericBound,
     MalformedCapabilityBound,
     MalformedFunctionType,
@@ -140,6 +141,7 @@ pub struct ParsedCapabilityBound {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedGenericParameter {
     pub parameter: AstNodeId,
+    pub owner: Option<AstNodeId>,
     pub name: String,
     pub name_span: ByteSpan,
     pub capability_bounds: Vec<ParsedCapabilityBound>,
@@ -575,6 +577,7 @@ struct Parser<'source> {
     pending_method_override: bool,
     pending_method_final: bool,
     pending_method_static: bool,
+    pending_generic_parameters: Vec<AstNodeId>,
 }
 
 impl<'source> Parser<'source> {
@@ -631,6 +634,7 @@ impl<'source> Parser<'source> {
             pending_method_override: false,
             pending_method_final: false,
             pending_method_static: false,
+            pending_generic_parameters: Vec::new(),
         }
     }
 
@@ -811,6 +815,7 @@ impl<'source> Parser<'source> {
             Some(TokenKind::Semicolon) => {
                 let end = self.current().expect("semicolon exists").span.end();
                 let declaration = self.arena.add_function_declaration(self.span(start, end));
+                self.assign_pending_generic_owner(declaration);
                 self.record_declaration_name(
                     declaration,
                     DeclarationKind::Function,
@@ -842,6 +847,7 @@ impl<'source> Parser<'source> {
                 let declaration = self
                     .arena
                     .add_function_declaration(self.span(start, body_start));
+                self.assign_pending_generic_owner(declaration);
                 self.record_declaration_name(
                     declaration,
                     DeclarationKind::Function,
@@ -1177,6 +1183,7 @@ impl<'source> Parser<'source> {
                 .add_interface_declaration(self.span(start, body_start)),
             _ => unreachable!("only named body declarations are parsed here"),
         };
+        self.assign_pending_generic_owner(declaration);
         self.record_declaration_name(declaration, DeclarationKind::Type, &name, in_body);
         self.saw_top_level_declaration |= !in_body;
         if kind == AstNodeKind::EnumDeclaration {
@@ -2954,6 +2961,7 @@ impl<'source> Parser<'source> {
     }
 
     fn parse_generic_parameters(&mut self) {
+        self.pending_generic_parameters.clear();
         if self.current_kind() != Some(TokenKind::Less) {
             return;
         }
@@ -2996,6 +3004,18 @@ impl<'source> Parser<'source> {
                 .current()
                 .expect("generic parameter name exists")
                 .clone();
+            if self
+                .pending_generic_parameters
+                .iter()
+                .filter_map(|parameter| {
+                    self.generic_parameters
+                        .iter()
+                        .find(|candidate| candidate.parameter == *parameter)
+                })
+                .any(|parameter| parameter.name == self.text[name.span.start()..name.span.end()])
+            {
+                self.diagnostic(DiagnosticKind::DuplicateGenericParameter, name.span);
+            }
             self.advance();
 
             let mut capability_bounds = Vec::new();
@@ -3018,10 +3038,12 @@ impl<'source> Parser<'source> {
             let bound_count = capability_bounds.len();
             self.generic_parameters.push(ParsedGenericParameter {
                 parameter,
+                owner: None,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 name_span: name.span,
                 capability_bounds,
             });
+            self.pending_generic_parameters.push(parameter);
 
             match self.current_kind() {
                 Some(TokenKind::Comma) => {
@@ -3049,6 +3071,19 @@ impl<'source> Parser<'source> {
                 }
             }
         }
+    }
+
+    fn assign_pending_generic_owner(&mut self, owner: AstNodeId) {
+        for parameter in &self.pending_generic_parameters {
+            if let Some(parsed) = self
+                .generic_parameters
+                .iter_mut()
+                .find(|candidate| candidate.parameter == *parameter)
+            {
+                parsed.owner = Some(owner);
+            }
+        }
+        self.pending_generic_parameters.clear();
     }
 
     fn parse_type(&mut self) -> Option<ByteSpan> {

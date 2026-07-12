@@ -1,7 +1,9 @@
 use compiler::{
     ast::AstNodeId,
     module::{ModuleName, PackageNamespace},
-    symbol::SymbolId,
+    parser::ParsedGenericParameter,
+    symbol::{SymbolId, SymbolInterner},
+    type_check::build_m0083_generic_declaration_records,
     types::{
         GenericParameterType, GenericSubstitution, GenericTypeIdentity, NominalTypeIdentity,
         NullableType, PrimitiveType, TypeArena, TypeDiagnostic, TypeDiagnosticKind, TypeId,
@@ -140,6 +142,51 @@ fn generic_substitution_recurses_through_nullable_array_and_instance_types() {
         panic!("expected substituted nullable element");
     };
     assert_eq!(nullable.base(), int_type);
+}
+
+#[test]
+fn generic_declaration_records_preserve_owner_and_parameter_order() {
+    let parameters = vec![
+        ParsedGenericParameter {
+            parameter: AstNodeId::from_raw(90),
+            owner: Some(AstNodeId::from_raw(91)),
+            name: "T".to_owned(),
+            name_span: compiler::source::ByteSpan::new(
+                compiler::source::SourceFileId::from_raw(90),
+                0,
+                1,
+            )
+            .unwrap(),
+            capability_bounds: Vec::new(),
+        },
+        ParsedGenericParameter {
+            parameter: AstNodeId::from_raw(92),
+            owner: Some(AstNodeId::from_raw(91)),
+            name: "U".to_owned(),
+            name_span: compiler::source::ByteSpan::new(
+                compiler::source::SourceFileId::from_raw(90),
+                2,
+                3,
+            )
+            .unwrap(),
+            capability_bounds: Vec::new(),
+        },
+    ];
+    let mut symbols = SymbolInterner::new();
+    let mut arena = TypeArena::new();
+    let records = build_m0083_generic_declaration_records(&parameters, &mut symbols, &mut arena);
+
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].owner(), AstNodeId::from_raw(91));
+    assert_eq!(records[0].parameters().len(), 2);
+    assert_eq!(
+        records[0].parameters()[0].parameter(),
+        parameters[0].parameter
+    );
+    assert_eq!(
+        records[0].parameters()[1].parameter(),
+        parameters[1].parameter
+    );
 }
 
 #[test]

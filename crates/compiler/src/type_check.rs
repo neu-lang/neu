@@ -2696,6 +2696,26 @@ pub struct GenericParameterTypeRecord {
     ty: TypeId,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenericDeclarationRecord {
+    owner: AstNodeId,
+    parameters: Vec<GenericParameterTypeRecord>,
+}
+
+impl GenericDeclarationRecord {
+    pub fn new(owner: AstNodeId, parameters: Vec<GenericParameterTypeRecord>) -> Self {
+        Self { owner, parameters }
+    }
+
+    pub fn owner(&self) -> AstNodeId {
+        self.owner
+    }
+
+    pub fn parameters(&self) -> &[GenericParameterTypeRecord] {
+        &self.parameters
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CapabilityBoundRecord {
     parameter: AstNodeId,
@@ -2802,6 +2822,38 @@ pub fn build_m0020_capability_bound_records(
         }
     }
 
+    records
+}
+
+pub fn build_m0083_generic_declaration_records(
+    parameters: &[ParsedGenericParameter],
+    symbols: &mut SymbolInterner,
+    type_arena: &mut TypeArena,
+) -> Vec<GenericDeclarationRecord> {
+    let parameter_types = build_m0020_generic_parameter_types(parameters, symbols, type_arena);
+    let mut records = Vec::new();
+    for parameter in parameters {
+        let Some(owner) = parameter.owner else {
+            continue;
+        };
+        if records
+            .iter()
+            .any(|record: &GenericDeclarationRecord| record.owner == owner)
+        {
+            continue;
+        }
+        let owned = parameters
+            .iter()
+            .filter(|candidate| candidate.owner == Some(owner))
+            .filter_map(|candidate| {
+                parameter_types
+                    .iter()
+                    .find(|record| record.parameter() == candidate.parameter)
+                    .copied()
+            })
+            .collect();
+        records.push(GenericDeclarationRecord::new(owner, owned));
+    }
     records
 }
 

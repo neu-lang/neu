@@ -204,6 +204,43 @@ fn generic_argument_metadata_preserves_direct_nested_arguments() {
 }
 
 #[test]
+fn generic_parameters_record_their_declaration_owner() {
+    let output = parse_source(
+        SourceFileId::from_raw(212),
+        "class Box<T> {} func identity<U>(value: U): U;",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    let class = output
+        .class_declarations
+        .iter()
+        .find(|class| class.name == "Box")
+        .unwrap();
+    let function = output
+        .function_declarations
+        .iter()
+        .find(|function| function.name == "identity")
+        .unwrap();
+    assert_eq!(output.generic_parameters.len(), 2);
+    assert_eq!(output.generic_parameters[0].owner, Some(class.declaration));
+    assert_eq!(
+        output.generic_parameters[1].owner,
+        Some(function.declaration)
+    );
+}
+
+#[test]
+fn duplicate_generic_parameters_are_diagnosed() {
+    let output = parse_source(SourceFileId::from_raw(213), "func identity<T, T>(): Unit;");
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::DuplicateGenericParameter)
+    );
+}
+
+#[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);
