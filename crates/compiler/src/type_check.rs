@@ -83,6 +83,12 @@ pub enum TypeRuleDiagnostic {
     DuplicateField,
     FieldHiding,
     ImmutableFieldMutation,
+    WhenSubjectInvalid,
+    WhenPatternInvalid,
+    WhenNonExhaustive,
+    WhenDuplicatePattern,
+    WhenArmTypeMismatch,
+    WhenMissingArmValue,
 }
 
 impl PartialEq<AmbiguousTypeRule> for TypeRuleDiagnostic {
@@ -3059,7 +3065,6 @@ pub fn check_m0028_unsupported_executable_forms(
                     | AstNodeKind::CapabilityBound
                     | AstNodeKind::FunctionType
                     | AstNodeKind::GroupedType
-                    | AstNodeKind::WhenExpression
             )
         })
         .map(|node| node.span)
@@ -4886,6 +4891,108 @@ pub fn type_m0077_value_conditionals(
     report
 }
 
+pub fn type_m0080_enum_whens(
+    parsed: &ParseOutput,
+    known_expression_types: &[ExpressionType],
+    classes: &ClassTypeReport,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+    for when in &parsed.when_expressions {
+        let Some(subject_type) = report.expression_type(when.subject) else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::WhenSubjectInvalid,
+                when.subject,
+            ));
+            continue;
+        };
+        let Some(enum_class) = classes.classes().iter().find(|class| {
+            class.type_id == subject_type
+                && parsed
+                    .enum_variants
+                    .iter()
+                    .any(|variant| variant.enum_declaration == class.declaration())
+        }) else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::WhenSubjectInvalid,
+                when.subject,
+            ));
+            continue;
+        };
+        let variants = parsed
+            .enum_variants
+            .iter()
+            .filter(|variant| variant.enum_declaration == enum_class.declaration())
+            .collect::<Vec<_>>();
+        let mut covered = std::collections::HashSet::new();
+        let mut wildcard = false;
+        let mut arm_type = None;
+        for arm_id in &when.arms {
+            let Some(arm) = parsed.match_arms.iter().find(|arm| arm.arm == *arm_id) else {
+                continue;
+            };
+            let pattern_variant = parsed
+                .qualified_case_patterns
+                .iter()
+                .find(|pattern| pattern.pattern == arm.pattern)
+                .and_then(|pattern| {
+                    variants.iter().find(|variant| {
+                        variant.name == pattern.variant_name
+                            && enum_class.name() == pattern.enum_name
+                    })
+                });
+            if parsed
+                .arena
+                .node(arm.pattern)
+                .is_some_and(|node| node.kind == crate::ast::AstNodeKind::WildcardPattern)
+            {
+                wildcard = true;
+            } else if let Some(variant) = pattern_variant {
+                if !covered.insert(variant.variant) {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::WhenDuplicatePattern,
+                        arm.pattern,
+                    ));
+                }
+            } else {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::WhenPatternInvalid,
+                    arm.pattern,
+                ));
+            }
+            let Some(body_type) = report.expression_type(arm.body) else {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::WhenMissingArmValue,
+                    arm.body,
+                ));
+                continue;
+            };
+            if let Some(expected) = arm_type {
+                if expected != body_type {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::WhenArmTypeMismatch,
+                        arm.body,
+                    ));
+                }
+            } else {
+                arm_type = Some(body_type);
+            }
+        }
+        if !wildcard && covered.len() != variants.len() {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::WhenNonExhaustive,
+                when.expression,
+            ));
+        }
+        if let Some(arm_type) = arm_type {
+            report.record_expression_type(ExpressionType::new(when.expression, arm_type));
+        }
+    }
+    report
+}
+
 pub fn apply_m0077_value_conditional_results(
     target: &mut TypeCheckReport,
     source: &TypeCheckReport,
@@ -6227,7 +6334,7 @@ fn type_core_with_arena(
     report
 }
 
-fn merge_type_check_report(target: &mut TypeCheckReport, source: TypeCheckReport) {
+pub(crate) fn merge_type_check_report(target: &mut TypeCheckReport, source: TypeCheckReport) {
     for expression_type in source.expression_types() {
         target.record_expression_type(*expression_type);
     }

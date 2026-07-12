@@ -1635,7 +1635,16 @@ impl<'source> Parser<'source> {
                     self.advance();
                     self.skip_deferred_construct();
                 }
-                Some(TokenKind::KwWhile | TokenKind::KwWhen) => {
+                Some(TokenKind::KwWhen) => {
+                    let start = self.current().expect("when token exists").span.start();
+                    if let Some(span) = self.parse_when_expression() {
+                        let statement = self
+                            .arena
+                            .add_expression_statement(self.span(start, span.end()));
+                        self.record_executable_body_statement(statement);
+                    }
+                }
+                Some(TokenKind::KwWhile) => {
                     self.diagnostic_current(DiagnosticKind::UnsupportedStatementForm);
                     self.advance();
                     self.skip_deferred_construct();
@@ -2655,7 +2664,17 @@ impl<'source> Parser<'source> {
                 continue;
             }
             self.advance();
-            let Some(body_span) = self.parse_expression() else {
+            let body_span = if self.current_kind() == Some(TokenKind::KwReturn) {
+                let return_count = self.return_statements.len();
+                self.parse_return_statement();
+                self.return_statements
+                    .get(return_count)
+                    .and_then(|returned| returned.value)
+                    .and_then(|value| self.arena.node(value).map(|node| node.span))
+            } else {
+                self.parse_expression()
+            };
+            let Some(body_span) = body_span else {
                 self.diagnostic_current_or_span(
                     DiagnosticKind::MissingPatternArmBody,
                     pattern_span,

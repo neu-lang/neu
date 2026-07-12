@@ -724,7 +724,10 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
         require_bootstrap_runtime_type(function.return_type(), types)?;
         if !function.control_flow().is_empty()
             || function.expressions().iter().any(|expression| {
-                matches!(expression.kind(), HirExpressionKind::Conditional { .. })
+                matches!(
+                    expression.kind(),
+                    HirExpressionKind::Conditional { .. } | HirExpressionKind::When { .. }
+                )
             })
         {
             functions.push(lower_hir_function_with_control_flow(function, types)?);
@@ -1024,6 +1027,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     });
                 }
                 HirExpressionKind::Conditional { .. } => {
+                    return Err(MirLoweringError::UnsupportedExpression);
+                }
+                HirExpressionKind::When { .. } => {
                     return Err(MirLoweringError::UnsupportedExpression);
                 }
             }
@@ -1470,7 +1476,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
-            HirExpressionKind::Conditional { .. } => {
+            HirExpressionKind::Conditional { .. } | HirExpressionKind::When { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
             HirExpressionKind::ArrayLiteral(_)
@@ -1826,6 +1832,78 @@ impl<'a> ControlFlowLowerer<'a> {
                     target: self.blocks[merge_block].id,
                     span: expression.span(),
                 });
+                self.current = merge_block;
+                self.push(MirInstruction::LoadLocal {
+                    output,
+                    local: result_local,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::When { subject, arms } => {
+                let subject = self.lower_expression(*subject)?;
+                let result_local = self.fresh_local(expression.ty(), expression.span());
+                let merge_block = self.new_block();
+                let mut test_block = self.current;
+                let mut wildcard = None;
+                for (tag, value) in arms {
+                    let Some(tag) = tag else {
+                        wildcard = Some(*value);
+                        continue;
+                    };
+                    let matched_block = self.new_block();
+                    let next_block = self.new_block();
+                    self.current = test_block;
+                    let tag_value = self.fresh_value();
+                    self.push(MirInstruction::int_constant(
+                        tag_value,
+                        *tag,
+                        expression.span(),
+                    ));
+                    let condition = self.fresh_value();
+                    self.push(MirInstruction::Compare {
+                        output: condition,
+                        operation: MirComparison::Equal,
+                        left: subject,
+                        right: tag_value,
+                        span: expression.span(),
+                    });
+                    self.terminate(MirTerminator::branch_if(
+                        condition,
+                        self.blocks[matched_block].id,
+                        self.blocks[next_block].id,
+                        expression.span(),
+                    ));
+                    self.current = matched_block;
+                    let value = self.lower_expression(*value)?;
+                    self.push(MirInstruction::StoreLocal {
+                        local: result_local,
+                        value,
+                        span: expression.span(),
+                    });
+                    self.terminate(MirTerminator::Branch {
+                        target: self.blocks[merge_block].id,
+                        span: expression.span(),
+                    });
+                    test_block = next_block;
+                }
+                self.current = test_block;
+                if let Some(value) = wildcard {
+                    let value = self.lower_expression(value)?;
+                    self.push(MirInstruction::StoreLocal {
+                        local: result_local,
+                        value,
+                        span: expression.span(),
+                    });
+                    self.terminate(MirTerminator::Branch {
+                        target: self.blocks[merge_block].id,
+                        span: expression.span(),
+                    });
+                } else {
+                    self.terminate(MirTerminator::Trap {
+                        reason: MirTrap::UnsupportedRuntime,
+                        span: expression.span(),
+                    });
+                }
                 self.current = merge_block;
                 self.push(MirInstruction::LoadLocal {
                     output,

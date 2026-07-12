@@ -54,6 +54,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("nominal_arrays", 4),
         ("optional_semicolons", 4),
         ("enum_values", 7),
+        ("enum_when", 3),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -147,6 +148,51 @@ fn compiles_zero_payload_enum_values_through_typed_parameters_and_returns() {
     )
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_enum_when_statement_and_expression_forms() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-enum-when-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        enum Signal { Red, Green }
+        func expression(signal: Signal): Int {
+            return when (signal) {
+                Signal.Red -> 3;
+                Signal.Green -> 4;
+            };
+        }
+        func statement(signal: Signal): Int {
+            when (signal) {
+                Signal.Red -> 5;
+                Signal.Green -> 6;
+            }
+            return 0;
+        }
+        public func main(): Int {
+            val statement_signal: Signal = Signal.Red;
+            statement(statement_signal);
+            val expression_signal: Signal = Signal.Red;
+            return expression(expression_signal);
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(8000),
+            ModuleName::parse("enum_when").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(3));
     let _ = fs::remove_dir_all(workspace);
 }
 

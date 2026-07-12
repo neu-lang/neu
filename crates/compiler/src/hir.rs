@@ -427,6 +427,14 @@ pub fn lower_checked_hir_source(
                             .find(|member| member.span.start() == statement.span.start())
                             .map(|member| member.expression)
                     })
+                    .or_else(|| {
+                        source
+                            .parsed
+                            .when_expressions
+                            .iter()
+                            .find(|when| when.span.start() == statement.span.start())
+                            .map(|when| when.expression)
+                    })
                 else {
                     continue;
                 };
@@ -453,7 +461,15 @@ pub fn lower_checked_hir_source(
                 .parsed
                 .loop_control_statements
                 .iter()
-                .any(|statement| statement.function == function.declaration);
+                .any(|statement| statement.function == function.declaration)
+            || source.parsed.when_expressions.iter().any(|when| {
+                function
+                    .body
+                    .and_then(|body| source.parsed.arena.node(body))
+                    .is_some_and(|body| {
+                        body.span.start() <= when.span.start() && when.span.end() <= body.span.end()
+                    })
+            });
         let control_flow = if has_control_flow {
             if let Some(body) = function.body {
                 lower_control_flow_block(
@@ -573,6 +589,63 @@ fn lower_expression(
             else_value,
         ));
         return Ok(conditional_id);
+    }
+    if let Some(when) = source
+        .parsed
+        .when_expressions
+        .iter()
+        .find(|when| when.expression == expression)
+    {
+        let subject = lower_expression(
+            source,
+            function_declaration,
+            when.subject,
+            local_bindings,
+            output,
+        )?;
+        let mut arms = Vec::new();
+        for arm_id in &when.arms {
+            let arm = source
+                .parsed
+                .match_arms
+                .iter()
+                .find(|arm| arm.arm == *arm_id)
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let tag = source
+                .parsed
+                .qualified_case_patterns
+                .iter()
+                .find(|pattern| pattern.pattern == arm.pattern)
+                .and_then(|pattern| {
+                    source
+                        .parsed
+                        .enum_variants
+                        .iter()
+                        .find(|variant| variant.name == pattern.variant_name)
+                        .and_then(|variant| {
+                            source
+                                .parsed
+                                .enum_variants
+                                .iter()
+                                .filter(|candidate| {
+                                    candidate.enum_declaration == variant.enum_declaration
+                                })
+                                .position(|candidate| candidate.variant == variant.variant)
+                        })
+                        .and_then(|tag| i64::try_from(tag).ok())
+                });
+            let value = lower_expression(
+                source,
+                function_declaration,
+                arm.body,
+                local_bindings,
+                output,
+            )?;
+            arms.push((tag, value));
+        }
+        let when_id = HirExpressionId::from_raw(output.len());
+        output.push(HirExpression::when(when_id, span, ty, subject, arms));
+        return Ok(when_id);
     }
     if let Some(literal) = source
         .parsed
@@ -2568,6 +2641,10 @@ pub enum HirExpressionKind {
         then_value: HirExpressionId,
         else_value: HirExpressionId,
     },
+    When {
+        subject: HirExpressionId,
+        arms: Vec<(Option<i64>, HirExpressionId)>,
+    },
     DirectCall(HirDirectCall),
     ArrayLiteral(Vec<HirExpressionId>),
     Index {
@@ -2741,6 +2818,21 @@ impl HirExpression {
                 then_value,
                 else_value,
             },
+        }
+    }
+
+    pub fn when(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        subject: HirExpressionId,
+        arms: Vec<(Option<i64>, HirExpressionId)>,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::When { subject, arms },
         }
     }
 

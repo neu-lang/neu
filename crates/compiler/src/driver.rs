@@ -29,10 +29,10 @@ use crate::{
         apply_m0077_value_conditional_results, check_m0028_direct_calls, check_m0028_entry_point,
         check_m0028_return_expression_types, check_m0028_straight_line_returns,
         check_m0028_unsupported_executable_forms, check_m0069_constructor_calls,
-        type_m0028_executable_core_in, type_m0060_control_flow,
+        merge_type_check_report, type_m0028_executable_core_in, type_m0060_control_flow,
         type_m0063_array_expressions_with_classes, type_m0063_function_signatures_in_with_classes,
         type_m0064_string_operations, type_m0068_class_types_in,
-        type_m0073_dynamic_array_operations, type_m0077_value_conditionals,
+        type_m0073_dynamic_array_operations, type_m0077_value_conditionals, type_m0080_enum_whens,
         validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
@@ -206,6 +206,8 @@ pub fn compile_source_to_executable(
     let conditional_report =
         type_m0077_value_conditionals(&parsed, report.expression_types(), &types);
     apply_m0077_value_conditional_results(&mut report, &conditional_report);
+    let when_report = type_m0080_enum_whens(&parsed, report.expression_types(), &class_types);
+    merge_type_check_report(&mut report, when_report);
     let statement_conditionals = parsed
         .if_statements
         .iter()

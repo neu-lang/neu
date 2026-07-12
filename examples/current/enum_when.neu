@@ -1,0 +1,13 @@
+enum Signal { Red, Green }
+
+func classify(signal: Signal): Int {
+    return when (signal) {
+        Signal.Red -> 3
+        Signal.Green -> 4
+    }
+}
+
+public func main(): Int {
+    val signal: Signal = Signal.Red
+    return classify(signal)
+}

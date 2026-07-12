@@ -990,6 +990,16 @@ functions, inheritance, generic enums, reflection, serialization, and FFI are
 deferred. HIR, MIR, Cranelift, object emission, and linking preserve nominal
 enum and variant identity and source mappings without exposing layout.
 
+## ADR-0080: Zero-Payload Enum `when` Patterns
+
+`when` supports qualified zero-payload enum variant patterns and `_`. The
+subject is evaluated once, arms are considered in source order, and only the
+selected arm executes. Statement arms need not produce values. Expression-form
+`when` requires exhaustive coverage and exact result type equality across all
+reachable arms; a wildcard covers remaining variants. Duplicate and
+unreachable arms are diagnostics. Payload, destructuring, guards, nullable
+matching, and generic patterns remain deferred.
+
 ## ADR-0078: Optional Semicolons And Newline Termination
 
 Neu preserves line-boundary metadata on lexer tokens. Ordinary declarations,

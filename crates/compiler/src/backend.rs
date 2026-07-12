@@ -2036,6 +2036,9 @@ fn lower_terminator(
                 .brif(condition, then_target, &[], else_target, &[]);
             Ok(())
         }
-        MirTerminator::Trap { .. } => Err(CraneliftLoweringError::UnsupportedTerminator),
+        MirTerminator::Trap { .. } => {
+            builder.ins().trap(TrapCode::unwrap_user(6));
+            Ok(())
+        }
     }
 }
