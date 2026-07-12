@@ -1,0 +1,11 @@
+package examples.current
+
+func apply(operation: (Int) -> Int, value: Int): Int {
+    return operation(value);
+}
+
+public func main(): Int {
+    val base: Int = 3;
+    val add_base: (Int) -> Int = { value: Int -> value + base };
+    return apply(add_base, 4);
+}

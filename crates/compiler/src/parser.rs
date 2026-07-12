@@ -4121,6 +4121,7 @@ fn expression_node_kind(kind: AstNodeKind) -> bool {
             | AstNodeKind::MemberExpression
             | AstNodeKind::ArrayLiteralExpression
             | AstNodeKind::IndexExpression
+            | AstNodeKind::LambdaExpression
     )
 }
 

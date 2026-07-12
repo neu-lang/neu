@@ -2,6 +2,7 @@ use crate::{
     ast::{AstArena, AstNodeId, AstNodeKind},
     module::{ModuleName, PackageNamespace},
     name_resolution::{LocalBinding, LocalBindingKind, ResolutionTable, ResolvedLocalBinding},
+    ownership::{OwnershipCategory, classify_ownership_category},
     parser::{
         ParseOutput, ParsedArrayType, ParsedAssignmentStatement, ParsedBinaryExpression,
         ParsedBinaryOperator, ParsedClassDeclaration, ParsedFunctionDeclaration,
@@ -84,6 +85,7 @@ pub enum TypeRuleDiagnostic {
     StringIndexTypeMismatch,
     StringIndexOutOfBounds,
     StringOperationUnsupported,
+    LambdaCaptureUnsupported,
     DuplicateField,
     FieldHiding,
     ImmutableFieldMutation,
@@ -1736,6 +1738,9 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
             }
         }
         for (call_index, call) in source.parsed.call_expressions.iter().enumerate() {
+            if is_function_typed_local_or_parameter(source, call) {
+                continue;
+            }
             let callee_name = source
                 .parsed
                 .name_references
@@ -2085,6 +2090,40 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
         }
     }
     report
+}
+
+fn is_function_typed_local_or_parameter(
+    source: &ExecutableSourceTypes<'_>,
+    call: &crate::parser::ParsedCallExpression,
+) -> bool {
+    let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|reference| reference.reference == call.callee)
+        .map(|reference| reference.name.as_str())
+    else {
+        return false;
+    };
+    source.parsed.function_parameters.iter().any(|parameter| {
+        parameter.function == call.function
+            && parameter.name == name
+            && source
+                .parsed
+                .arena
+                .node(parameter.annotation)
+                .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+    }) || source.parsed.local_binding_names.iter().any(|binding| {
+        binding.name == name
+            && source
+                .parsed
+                .local_declarations
+                .iter()
+                .find(|declaration| declaration.declaration == binding.binding)
+                .and_then(|declaration| declaration.annotation)
+                .and_then(|annotation| source.parsed.arena.node(annotation))
+                .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+    })
 }
 
 fn is_enum_variant_call(
@@ -3251,7 +3290,6 @@ pub fn check_m0028_unsupported_executable_forms(
                     | AstNodeKind::NullableType
                     | AstNodeKind::GenericParameter
                     | AstNodeKind::CapabilityBound
-                    | AstNodeKind::FunctionType
                     | AstNodeKind::GroupedType
             )
         })
@@ -3484,6 +3522,320 @@ pub fn type_m0086_function_types(
         ));
     }
     resolved
+}
+
+pub fn type_m0086_annotation_type(
+    parsed: &ParseOutput,
+    annotation: AstNodeId,
+    types: &mut TypeArena,
+    classes: &[ClassTypeRecord],
+) -> Option<TypeId> {
+    if let Some(function_type) = parsed
+        .function_types
+        .iter()
+        .find(|function_type| function_type.function_type == annotation)
+    {
+        let parameters = function_type
+            .parameters
+            .iter()
+            .map(|parameter| {
+                resolve_m0063_annotation_type(
+                    *parameter,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &PrimitiveTypeIds::module_owned(types),
+                    classes,
+                    types,
+                )
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let return_type = resolve_m0063_annotation_type(
+            function_type.return_type,
+            &parsed.type_name_references,
+            &parsed.array_types,
+            &PrimitiveTypeIds::module_owned(types),
+            classes,
+            types,
+        )?;
+        return Some(types.function(FunctionType::new(parameters, return_type)));
+    }
+    resolve_m0063_annotation_type(
+        annotation,
+        &parsed.type_name_references,
+        &parsed.array_types,
+        &PrimitiveTypeIds::module_owned(types),
+        classes,
+        types,
+    )
+}
+
+pub fn type_m0088_lambda_expressions(
+    parsed: &ParseOutput,
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for lambda in &parsed.lambda_expressions {
+        let expected_type = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.initializer == Some(lambda.expression))
+            .and_then(|declaration| declaration.annotation)
+            .and_then(|annotation| type_m0086_annotation_type(parsed, annotation, types, &[]));
+        let expected_parameters = expected_type.and_then(|expected| {
+            types.get(expected).and_then(|record| match record.kind() {
+                TypeKind::Function(function) => Some(function.parameters().to_vec()),
+                _ => None,
+            })
+        });
+        for reference in parsed.name_references.iter().filter(|reference| {
+            parsed
+                .arena
+                .node(lambda.body)
+                .is_some_and(|body| span_contains(body.span, reference.name_span))
+                && !lambda
+                    .parameters
+                    .iter()
+                    .any(|parameter| parameter.name == reference.name)
+        }) {
+            let capture_is_literal = parsed
+                .local_binding_names
+                .iter()
+                .find(|binding| binding.name == reference.name)
+                .and_then(|binding| {
+                    parsed
+                        .local_declarations
+                        .iter()
+                        .find(|declaration| declaration.declaration == binding.binding)
+                })
+                .and_then(|declaration| declaration.initializer)
+                .is_some_and(|initializer| {
+                    parsed
+                        .literal_expressions
+                        .iter()
+                        .any(|literal| literal.expression == initializer)
+                });
+            let copyable = report
+                .expression_type(reference.reference)
+                .and_then(|typed| classify_ownership_category(types, typed))
+                == Some(OwnershipCategory::Copyable);
+            if !capture_is_literal || !copyable {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::LambdaCaptureUnsupported,
+                    reference.reference,
+                ));
+            }
+        }
+        let Some(parameter_types) = lambda
+            .parameters
+            .iter()
+            .enumerate()
+            .map(|(index, parameter)| {
+                parameter
+                    .annotation
+                    .and_then(|annotation| {
+                        type_m0086_annotation_type(parsed, annotation, types, &[])
+                    })
+                    .or_else(|| {
+                        expected_parameters
+                            .as_ref()
+                            .and_then(|types| types.get(index).copied())
+                    })
+            })
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        for (parameter, parameter_type) in lambda.parameters.iter().zip(&parameter_types) {
+            for reference in parsed
+                .name_references
+                .iter()
+                .filter(|reference| reference.name == parameter.name)
+            {
+                if parsed.arena.node(lambda.body).is_some_and(|body| {
+                    body.span.file() == reference.name_span.file()
+                        && body.span.start() <= reference.name_span.start()
+                        && reference.name_span.end() <= body.span.end()
+                }) {
+                    report.replace_expression_type(ExpressionType::new(
+                        reference.reference,
+                        *parameter_type,
+                    ));
+                }
+            }
+        }
+        let int_type = PrimitiveTypeIds::module_owned(types).int_id;
+        let primitive_report = type_m0028_executable_int_operators(
+            &parsed.unary_expressions,
+            &parsed.binary_expressions,
+            &parsed.grouped_expressions,
+            report.expression_types(),
+            int_type,
+        );
+        merge_type_check_report(report, primitive_report);
+        let body_type = report.expression_type(lambda.body).or_else(|| {
+            parsed
+                .literal_expressions
+                .iter()
+                .find(|literal| literal.expression == lambda.body)
+                .and_then(|literal| report.expression_type(literal.expression))
+        });
+        let Some(body_type) = body_type else {
+            continue;
+        };
+        let function_type = types.function(FunctionType::new(parameter_types, body_type));
+        report.record_expression_type(ExpressionType::new(lambda.expression, function_type));
+    }
+}
+
+pub fn type_m0088_bind_function_values(
+    parsed: &ParseOutput,
+    signatures: &[FunctionSignature],
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for function in &parsed.function_declarations {
+        let Some(signature) = signatures
+            .iter()
+            .find(|signature| signature.declaration == function.declaration)
+        else {
+            continue;
+        };
+        let body_span = function
+            .body
+            .and_then(|body| parsed.arena.node(body))
+            .map(|node| node.span);
+        for (index, parameter) in parsed
+            .function_parameters
+            .iter()
+            .filter(|parameter| parameter.function == function.declaration)
+            .enumerate()
+        {
+            let Some(parameter_type) = signature.parameter_types.get(index).copied() else {
+                continue;
+            };
+            for reference in parsed
+                .name_references
+                .iter()
+                .filter(|reference| reference.name == parameter.name)
+            {
+                if body_span.is_some_and(|span| span_contains(span, reference.name_span)) {
+                    report.replace_expression_type(ExpressionType::new(
+                        reference.reference,
+                        parameter_type,
+                    ));
+                }
+            }
+        }
+    }
+
+    for binding in &parsed.local_binding_names {
+        let Some(declaration) = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == binding.binding)
+        else {
+            continue;
+        };
+        let Some(local_type) = report
+            .declaration_signatures()
+            .iter()
+            .find(|signature| signature.declaration() == declaration.declaration)
+            .map(|signature| signature.ty())
+        else {
+            continue;
+        };
+        let declaration_span = parsed.arena.node(binding.binding).map(|node| node.span);
+        for reference in parsed
+            .name_references
+            .iter()
+            .filter(|reference| reference.name == binding.name)
+        {
+            if declaration_span.is_some_and(|span| span.end() <= reference.name_span.start()) {
+                report
+                    .replace_expression_type(ExpressionType::new(reference.reference, local_type));
+            }
+        }
+    }
+
+    for function in parsed
+        .function_declarations
+        .iter()
+        .filter(|function| function.owner.is_none())
+    {
+        let Some(signature) = signatures
+            .iter()
+            .find(|signature| signature.declaration == function.declaration)
+        else {
+            continue;
+        };
+        let function_type = types.function(FunctionType::new(
+            signature.parameter_types.clone(),
+            signature.return_type,
+        ));
+        for reference in parsed
+            .name_references
+            .iter()
+            .filter(|reference| reference.name == function.name)
+        {
+            report.replace_expression_type(ExpressionType::new(reference.reference, function_type));
+        }
+    }
+}
+
+fn span_contains(outer: ByteSpan, inner: ByteSpan) -> bool {
+    outer.file() == inner.file() && outer.start() <= inner.start() && inner.end() <= outer.end()
+}
+
+pub fn check_m0087_indirect_calls(
+    parsed: &ParseOutput,
+    known_expression_types: &[ExpressionType],
+    types: &TypeArena,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+    for call in &parsed.call_expressions {
+        let Some(callee_type) = report.expression_type(call.callee) else {
+            continue;
+        };
+        let Some(function_type) = types
+            .get(callee_type)
+            .and_then(|record| match record.kind() {
+                TypeKind::Function(function) => Some(function),
+                _ => None,
+            })
+        else {
+            continue;
+        };
+        if function_type.parameters().len() != call.arguments.len() {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::FunctionTypeApplicationDeferred,
+                call.expression,
+            ));
+            continue;
+        }
+        let mut valid = true;
+        for (argument, expected) in call.arguments.iter().zip(function_type.parameters()) {
+            let Some(actual) = report.expression_type(*argument) else {
+                valid = false;
+                continue;
+            };
+            if actual != *expected {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    *argument, *expected, actual,
+                ));
+                valid = false;
+            }
+        }
+        if valid {
+            report.record_expression_type(ExpressionType::new(
+                call.expression,
+                function_type.return_type(),
+            ));
+        }
+    }
+    report
 }
 
 fn resolve_m0063_annotation_type(
@@ -6627,6 +6979,13 @@ fn type_core_with_arena(
     let mut report = TypeCheckReport::new();
 
     for declaration in declarations {
+        if declaration.annotation.is_some_and(|annotation| {
+            arena
+                .node(annotation)
+                .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+        }) {
+            continue;
+        }
         let Some(annotation_type) =
             primitive_annotation_type(declaration, type_name_references, primitives)
         else {

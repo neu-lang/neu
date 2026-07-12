@@ -30,10 +30,12 @@ use crate::{
         apply_m0081_enum_function_facts, check_m0028_direct_calls, check_m0028_entry_point,
         check_m0028_return_expression_types, check_m0028_straight_line_returns,
         check_m0028_unsupported_executable_forms, check_m0069_constructor_calls,
-        merge_type_check_report, type_m0028_executable_core_in, type_m0060_control_flow,
-        type_m0063_array_expressions_with_classes, type_m0063_function_signatures_in_with_classes,
-        type_m0064_string_operations, type_m0068_class_types_in,
-        type_m0073_dynamic_array_operations, type_m0077_value_conditionals, type_m0080_enum_whens,
+        check_m0087_indirect_calls, merge_type_check_report, type_m0028_executable_core_in,
+        type_m0060_control_flow, type_m0063_array_expressions_with_classes,
+        type_m0063_function_signatures_in_with_classes, type_m0064_string_operations,
+        type_m0068_class_types_in, type_m0073_dynamic_array_operations,
+        type_m0077_value_conditionals, type_m0080_enum_whens, type_m0086_annotation_type,
+        type_m0088_bind_function_values, type_m0088_lambda_expressions,
         validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
@@ -164,6 +166,42 @@ pub fn compile_source_to_executable(
         &parsed.array_types,
         class_types.classes(),
     );
+    let missing_function_signatures = parsed
+        .function_declarations
+        .iter()
+        .filter(|function| {
+            !signatures
+                .iter()
+                .any(|signature| signature.declaration() == function.declaration)
+        })
+        .filter_map(|function| {
+            let parameters = parsed
+                .function_parameters
+                .iter()
+                .filter(|parameter| parameter.function == function.declaration)
+                .map(|parameter| {
+                    type_m0086_annotation_type(
+                        &parsed,
+                        parameter.annotation,
+                        &mut types,
+                        class_types.classes(),
+                    )
+                })
+                .collect::<Option<Vec<_>>>()?;
+            let return_type = type_m0086_annotation_type(
+                &parsed,
+                function.return_annotation?,
+                &mut types,
+                class_types.classes(),
+            )?;
+            Some(crate::type_check::FunctionSignature::new(
+                function.declaration,
+                parameters,
+                return_type,
+            ))
+        })
+        .collect::<Vec<_>>();
+    signatures.extend(missing_function_signatures);
     apply_m0070_receiver_signatures(&parsed, &class_types, &mut signatures);
     let mut report = type_m0028_executable_core_in(
         &mut types,
@@ -180,6 +218,21 @@ pub fn compile_source_to_executable(
         &[],
     );
     apply_m0068_class_type_facts(&parsed, &class_types, &mut report);
+    for local in &parsed.local_declarations {
+        let Some(annotation) = local.annotation else {
+            continue;
+        };
+        if let Some(ty) =
+            type_m0086_annotation_type(&parsed, annotation, &mut types, class_types.classes())
+        {
+            report.record_declaration_signature(crate::type_check::DeclarationSignature::new(
+                local.declaration,
+                ty,
+            ));
+        }
+    }
+    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    type_m0088_lambda_expressions(&parsed, &mut types, &mut report);
     type_m0063_array_expressions_with_classes(
         &mut types,
         &parsed,
@@ -193,6 +246,23 @@ pub fn compile_source_to_executable(
     apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
     apply_m0081_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
     apply_m0081_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
+    let indirect_calls = check_m0087_indirect_calls(&parsed, report.expression_types(), &types);
+    merge_type_check_report(&mut report, indirect_calls);
+    let function_typed_calls = parsed
+        .call_expressions
+        .iter()
+        .filter(|call| {
+            report
+                .expression_type(call.callee)
+                .and_then(|ty| types.get(ty))
+                .is_some_and(|record| matches!(record.kind(), TypeKind::Function(_)))
+        })
+        .map(|call| call.expression)
+        .collect::<Vec<_>>();
+    report.retain_diagnostics(|diagnostic| {
+        !function_typed_calls.contains(&diagnostic.node())
+            || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
+    });
     let calls = check_m0028_direct_calls(&[ExecutableSourceTypes::new(
         options.package(),
         &parsed,
@@ -295,27 +365,8 @@ pub fn compile_source_to_executable(
         .iter()
         .filter_map(|declaration| {
             let annotation = declaration.annotation?;
-            let name = parsed
-                .type_name_references
-                .iter()
-                .find(|reference| reference.reference == annotation)?
-                .name
-                .as_str();
-            let ty = types
-                .records()
-                .iter()
-                .find(|record| {
-                    matches!(
-                        (name, record.kind()),
-                        ("Bool", TypeKind::Primitive(PrimitiveType::Bool))
-                            | ("Int", TypeKind::Primitive(PrimitiveType::Int))
-                            | ("Unit", TypeKind::Primitive(PrimitiveType::Unit))
-                            | ("Float", TypeKind::Primitive(PrimitiveType::Float))
-                            | ("Byte", TypeKind::Primitive(PrimitiveType::Byte))
-                            | ("String", TypeKind::Primitive(PrimitiveType::String))
-                    )
-                })
-                .map(|record| record.id())?;
+            let ty =
+                type_m0086_annotation_type(&parsed, annotation, &mut types, class_types.classes())?;
             Some(DeclarationSignature::new(declaration.declaration, ty))
         })
         .collect::<Vec<_>>();
@@ -360,6 +411,7 @@ pub fn compile_source_to_executable(
             true,
         )
         .with_byte_type(byte_type)
+        .with_type_arena(&types)
         .with_effect_contracts(&effect_contracts)
         .with_class_types(&class_types)
         .with_call_targets(calls.resolved_declarations()),

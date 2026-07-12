@@ -56,6 +56,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("enum_values", 7),
         ("enum_when", 3),
         ("enum_functions", 40),
+        ("lambdas", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -117,6 +118,71 @@ fn compiles_primitive_parameter_and_return_matrix() {
     )
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_a_no_capture_lambda() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-lambda-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        func apply(operation: (Int) -> Int, value: Int): Int {
+            return operation(value);
+        }
+        public func main(): Int {
+            val increment: (Int) -> Int = { value -> value + 1 };
+            return apply(increment, 6);
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9400),
+            ModuleName::parse("lambda").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_a_copy_capturing_lambda() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-capture-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        func apply(operation: (Int) -> Int, value: Int): Int {
+            return operation(value);
+        }
+        public func main(): Int {
+            val base: Int = 3;
+            val add_base: (Int) -> Int = { value: Int -> value + base };
+            return apply(add_base, 4);
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9401),
+            ModuleName::parse("capture").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(workspace);
 }
 

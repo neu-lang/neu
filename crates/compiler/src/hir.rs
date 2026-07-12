@@ -6,7 +6,7 @@ use crate::{
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
     type_check::{ClassTypeReport, ExpressionType, FunctionSignature, ResolvedCallDeclaration},
-    types::{GenericSpecializationIdentity, TypeId},
+    types::{GenericSpecializationIdentity, TypeArena, TypeId, TypeKind},
 };
 
 macro_rules! hir_id {
@@ -41,6 +41,7 @@ pub struct CheckedHirSource<'a> {
     effect_contracts: Option<&'a [OwnershipEffectContract]>,
     class_types: Option<&'a ClassTypeReport>,
     call_targets: Option<&'a [ResolvedCallDeclaration]>,
+    type_arena: Option<&'a TypeArena>,
 }
 impl<'a> CheckedHirSource<'a> {
     pub fn new(
@@ -62,6 +63,7 @@ impl<'a> CheckedHirSource<'a> {
             effect_contracts: None,
             class_types: None,
             call_targets: None,
+            type_arena: None,
         }
     }
 
@@ -85,6 +87,11 @@ impl<'a> CheckedHirSource<'a> {
 
     pub fn with_call_targets(mut self, call_targets: &'a [ResolvedCallDeclaration]) -> Self {
         self.call_targets = Some(call_targets);
+        self
+    }
+
+    pub fn with_type_arena(mut self, type_arena: &'a TypeArena) -> Self {
+        self.type_arena = Some(type_arena);
         self
     }
 }
@@ -515,7 +522,80 @@ pub fn lower_checked_hir_source(
         };
         functions.push(function);
     }
+    for (lambda_index, lambda) in source.parsed.lambda_expressions.iter().enumerate() {
+        let id = HirFunctionId::from_raw(
+            source
+                .parsed
+                .function_declarations
+                .iter()
+                .filter(|function| function.body.is_some())
+                .count()
+                + lambda_index,
+        );
+        functions.push(lower_lambda_function(&source, lambda, id)?);
+    }
     Ok(HirModule::new(source.module, functions))
+}
+
+fn lower_lambda_function(
+    source: &CheckedHirSource<'_>,
+    lambda: &crate::parser::ParsedLambdaExpression,
+    id: HirFunctionId,
+) -> Result<HirFunction, HirLoweringError> {
+    let ty = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression() == lambda.expression)
+        .map(|typed| typed.ty())
+        .ok_or(HirLoweringError::MissingType)?;
+    let type_arena = source.type_arena.ok_or(HirLoweringError::MissingType)?;
+    let TypeKind::Function(function_type) = type_arena
+        .get(ty)
+        .ok_or(HirLoweringError::MissingType)?
+        .kind()
+    else {
+        return Err(HirLoweringError::UnsupportedExpression);
+    };
+    let parameters = lambda
+        .parameters
+        .iter()
+        .enumerate()
+        .map(|(index, parameter)| {
+            HirParameter::new(
+                HirParameterId::from_raw(index),
+                parameter.name_span,
+                function_type.parameters()[index],
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut expressions = Vec::new();
+    let body = lower_expression(
+        source,
+        lambda.expression,
+        lambda.body,
+        &[],
+        &mut expressions,
+    )?;
+    let span = lambda.span;
+    Ok(HirFunction::new(
+        id,
+        source.module.clone(),
+        source.package.clone(),
+        span,
+        false,
+        function_type.return_type(),
+        parameters,
+        Vec::new(),
+        expressions,
+        vec![HirReturn::new(span, body)],
+        HirSafetyFacts::executable_subset_checked(),
+        Vec::new(),
+    )
+    .with_symbol_identity(FunctionSymbolIdentity::new(
+        source.module.clone(),
+        source.package.clone(),
+        format!("lambda_{}", id.index()),
+    )))
 }
 
 fn lower_expression(
@@ -707,6 +787,32 @@ fn lower_expression(
         let when_id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::when(when_id, span, ty, subject, arms));
         return Ok(when_id);
+    }
+    if source
+        .parsed
+        .lambda_expressions
+        .iter()
+        .any(|lambda| lambda.expression == expression)
+    {
+        let function_index = source
+            .parsed
+            .function_declarations
+            .iter()
+            .filter(|function| function.body.is_some())
+            .count()
+            + source
+                .parsed
+                .lambda_expressions
+                .iter()
+                .position(|lambda| lambda.expression == expression)
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+        output.push(HirExpression::function_reference(
+            id,
+            span,
+            ty,
+            HirFunctionId::from_raw(function_index),
+        ));
+        return Ok(id);
     }
     if let Some(literal) = source
         .parsed
@@ -998,6 +1104,66 @@ fn lower_expression(
         ));
         return Ok(id);
     }
+    if let Some(lambda) = source
+        .parsed
+        .lambda_expressions
+        .iter()
+        .find(|lambda| lambda.expression == function_declaration)
+        && let Some(name) = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == expression)
+        && let Some(parameter_index) = lambda
+            .parameters
+            .iter()
+            .position(|parameter| parameter.name == name.name)
+    {
+        output.push(HirExpression::parameter_read(
+            id,
+            span,
+            ty,
+            HirParameterId::from_raw(parameter_index),
+        ));
+        return Ok(id);
+    }
+    if source
+        .parsed
+        .lambda_expressions
+        .iter()
+        .any(|lambda| lambda.expression == function_declaration)
+        && let Some(name) = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == expression)
+        && let Some(initializer) = source
+            .parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == name.name)
+            .and_then(|binding| {
+                source
+                    .parsed
+                    .local_declarations
+                    .iter()
+                    .find(|declaration| declaration.declaration == binding.binding)
+            })
+            .and_then(|declaration| declaration.initializer)
+        && source
+            .parsed
+            .literal_expressions
+            .iter()
+            .any(|literal| literal.expression == initializer)
+    {
+        return lower_expression(
+            source,
+            function_declaration,
+            initializer,
+            local_bindings,
+            output,
+        );
+    }
     if let Some(name) = source
         .parsed
         .name_references
@@ -1098,6 +1264,33 @@ fn lower_expression(
             )?;
             let id = HirExpressionId::from_raw(output.len());
             output.push(HirExpression::string_clone(id, span, ty, argument));
+            return Ok(id);
+        }
+        if is_function_typed_call(source, call) {
+            let callee = lower_expression(
+                source,
+                function_declaration,
+                call.callee,
+                local_bindings,
+                output,
+            )?;
+            let arguments = call
+                .arguments
+                .iter()
+                .map(|argument| {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        *argument,
+                        local_bindings,
+                        output,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let id = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::indirect_call(
+                id, span, ty, callee, arguments,
+            ));
             return Ok(id);
         }
         if let Some(member) = source
@@ -2557,6 +2750,40 @@ fn local_binding_id(
         })
         .max_by_key(|(_, end)| *end)
         .map(|(local_id, _)| local_id)
+}
+
+fn is_function_typed_call(
+    source: &CheckedHirSource<'_>,
+    call: &crate::parser::ParsedCallExpression,
+) -> bool {
+    let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|reference| reference.reference == call.callee)
+        .map(|reference| reference.name.as_str())
+    else {
+        return false;
+    };
+    source.parsed.function_parameters.iter().any(|parameter| {
+        parameter.function == call.function
+            && parameter.name == name
+            && source
+                .parsed
+                .arena
+                .node(parameter.annotation)
+                .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+    }) || source.parsed.local_binding_names.iter().any(|binding| {
+        binding.name == name
+            && source
+                .parsed
+                .local_declarations
+                .iter()
+                .find(|declaration| declaration.declaration == binding.binding)
+                .and_then(|declaration| declaration.annotation)
+                .and_then(|annotation| source.parsed.arena.node(annotation))
+                .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+    })
 }
 
 fn declaration_is_main(parsed: &ParseOutput, declaration: crate::ast::AstNodeId) -> bool {
