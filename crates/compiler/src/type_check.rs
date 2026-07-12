@@ -3794,6 +3794,12 @@ pub fn type_lambda_expressions(
                 _ => None,
             })
         });
+        let spawned = parsed.call_expressions.iter().any(|call| {
+            call.arguments.contains(&lambda.expression)
+                && parsed.name_references.iter().any(|reference| {
+                    reference.reference == call.callee && reference.name == "spawn"
+                })
+        });
         for reference in parsed.name_references.iter().filter(|reference| {
             parsed
                 .arena
@@ -3822,6 +3828,9 @@ pub fn type_lambda_expressions(
                         .iter()
                         .any(|literal| literal.expression == initializer)
                 });
+            if report.expression_type(reference.reference).is_none() {
+                continue;
+            }
             let copyable = report
                 .expression_type(reference.reference)
                 .and_then(|typed| classify_ownership_category(types, typed))
@@ -3832,7 +3841,13 @@ pub fn type_lambda_expressions(
                 == Some(OwnershipCategory::MoveOnly);
             let immutable =
                 binding.is_some_and(|binding| binding.kind == LocalBindingKind::Immutable);
-            if !capture_is_literal || !(copyable || move_only && immutable) {
+            let spawned_capture = spawned
+                && report
+                    .expression_type(reference.reference)
+                    .is_some_and(|ty| {
+                        satisfies_thread_capability(types, ty, ThreadCapability::Send)
+                    });
+            if !(capture_is_literal && (copyable || move_only && immutable)) && !spawned_capture {
                 report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                     TypeRuleDiagnostic::LambdaCaptureUnsupported,
                     reference.reference,

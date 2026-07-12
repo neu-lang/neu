@@ -16,6 +16,8 @@ for diagnostic and adversarial regression coverage.
 matching.
 `channel_receive.neu` exercises the receive suspension boundary and message
 payload extraction.
+`producer_consumer.neu` exercises a spawned producer and parent consumer sharing
+an opaque channel handle.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by

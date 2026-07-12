@@ -1,0 +1,12 @@
+suspend func main(): Int {
+    scope {
+        val queue = channel<Int>(1);
+        val producer = spawn { -> send(queue, 8) };
+        val result = receive(queue);
+        return when (result) {
+            ChannelResult.Message(value) -> value;
+            ChannelResult.Closed -> 0;
+        };
+    }
+    return 0;
+}

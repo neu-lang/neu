@@ -27,8 +27,8 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
         | TypeKind::Nominal(_)
         | TypeKind::GenericInstance(_)
         | TypeKind::Task(_)
-        | TypeKind::Channel(_)
         | TypeKind::ChannelResult(_) => Some(OwnershipCategory::MoveOnly),
+        TypeKind::Channel(_) => Some(OwnershipCategory::Copyable),
         TypeKind::Array(array) => classify_ownership_category(types, array.element()),
         TypeKind::DynamicArray(_) => Some(OwnershipCategory::MoveOnly),
         TypeKind::GenericParameter(_) | TypeKind::Nullable(_) => None,

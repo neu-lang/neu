@@ -576,7 +576,9 @@ fn lower_lambda_function(
     else {
         return Err(HirLoweringError::UnsupportedExpression);
     };
-    let parameters = lambda
+    let captures = collect_lambda_captures(source, lambda, type_arena);
+    let captures_in_abi = lambda_is_spawned(source, lambda);
+    let mut parameters = lambda
         .parameters
         .iter()
         .enumerate()
@@ -588,6 +590,19 @@ fn lower_lambda_function(
             )
         })
         .collect::<Vec<_>>();
+    for (index, capture) in captures.iter().enumerate().filter(|_| captures_in_abi) {
+        let ty = source
+            .expression_types
+            .iter()
+            .find(|typed| typed.expression() == capture.source())
+            .map(|typed| typed.ty())
+            .ok_or(HirLoweringError::MissingType)?;
+        parameters.push(HirParameter::new(
+            HirParameterId::from_raw(lambda.parameters.len() + index),
+            capture.span(),
+            ty,
+        ));
+    }
     let mut expressions = Vec::new();
     let body = lower_expression(
         source,
@@ -596,6 +611,34 @@ fn lower_lambda_function(
         &[],
         &mut expressions,
     )?;
+    let span = lambda.span;
+    Ok(HirFunction::new(
+        id,
+        source.module.clone(),
+        source.package.clone(),
+        span,
+        false,
+        function_type.return_type(),
+        parameters,
+        Vec::new(),
+        expressions,
+        vec![HirReturn::new(span, body)],
+        HirSafetyFacts::executable_subset_checked(),
+        Vec::new(),
+    )
+    .with_captures(captures)
+    .with_symbol_identity(FunctionSymbolIdentity::new(
+        source.module.clone(),
+        source.package.clone(),
+        format!("lambda_{}", id.index()),
+    )))
+}
+
+fn collect_lambda_captures(
+    source: &CheckedHirSource<'_>,
+    lambda: &crate::parser::ParsedLambdaExpression,
+    type_arena: &TypeArena,
+) -> Vec<HirCapture> {
     let mut captures = Vec::new();
     for reference in source.parsed.name_references.iter().filter(|reference| {
         source
@@ -618,7 +661,7 @@ fn lower_lambda_function(
         };
         if captures
             .iter()
-            .any(|capture: &HirCapture| capture.binding == binding.binding)
+            .any(|capture: &HirCapture| capture.binding() == binding.binding)
         {
             continue;
         }
@@ -626,43 +669,71 @@ fn lower_lambda_function(
             .expression_types
             .iter()
             .find(|typed| typed.expression() == reference.reference)
-            .and_then(|typed| {
-                source
-                    .type_arena
-                    .and_then(|arena| classify_ownership_category(arena, typed.ty()))
-            }) {
+            .and_then(|typed| classify_ownership_category(type_arena, typed.ty()))
+        {
             Some(OwnershipCategory::Copyable) => HirCaptureMode::Copy,
             Some(OwnershipCategory::MoveOnly) => HirCaptureMode::Move,
             None => HirCaptureMode::Borrow,
         };
-        captures.push(HirCapture {
-            source: reference.reference,
-            binding: binding.binding,
+        captures.push(HirCapture::new(
+            reference.reference,
+            binding.binding,
             mode,
-            span: reference.name_span,
-        });
+            reference.name_span,
+        ));
     }
-    let span = lambda.span;
-    Ok(HirFunction::new(
-        id,
-        source.module.clone(),
-        source.package.clone(),
-        span,
-        false,
-        function_type.return_type(),
-        parameters,
-        Vec::new(),
-        expressions,
-        vec![HirReturn::new(span, body)],
-        HirSafetyFacts::executable_subset_checked(),
-        Vec::new(),
-    )
-    .with_captures(captures)
-    .with_symbol_identity(FunctionSymbolIdentity::new(
-        source.module.clone(),
-        source.package.clone(),
-        format!("lambda_{}", id.index()),
-    )))
+    captures
+}
+
+fn lambda_capture_index(
+    source: &CheckedHirSource<'_>,
+    lambda: &crate::parser::ParsedLambdaExpression,
+    name: &str,
+) -> Option<usize> {
+    let mut seen = Vec::new();
+    for reference in source.parsed.name_references.iter().filter(|reference| {
+        source
+            .parsed
+            .arena
+            .node(lambda.body)
+            .is_some_and(|body| span_contains(body.span, reference.name_span))
+            && !lambda
+                .parameters
+                .iter()
+                .any(|parameter| parameter.name == reference.name)
+    }) {
+        let Some(binding) = source
+            .parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == reference.name)
+        else {
+            continue;
+        };
+        if seen.contains(&binding.binding) {
+            continue;
+        }
+        let index = seen.len();
+        seen.push(binding.binding);
+        if reference.name == name {
+            return Some(index);
+        }
+    }
+    None
+}
+
+fn lambda_is_spawned(
+    source: &CheckedHirSource<'_>,
+    lambda: &crate::parser::ParsedLambdaExpression,
+) -> bool {
+    source.parsed.call_expressions.iter().any(|call| {
+        call.arguments.contains(&lambda.expression)
+            && source
+                .parsed
+                .name_references
+                .iter()
+                .any(|reference| reference.reference == call.callee && reference.name == "spawn")
+    })
 }
 
 fn lower_expression(
@@ -871,6 +942,27 @@ fn lower_expression(
         let when_id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::when(when_id, span, ty, subject, arms));
         return Ok(when_id);
+    }
+    if let Some(lambda) = source
+        .parsed
+        .lambda_expressions
+        .iter()
+        .find(|lambda| lambda.expression == function_declaration)
+        && let Some(name) = source
+            .parsed
+            .name_references
+            .iter()
+            .find(|name| name.reference == expression)
+        && lambda_is_spawned(source, lambda)
+        && let Some(capture_index) = lambda_capture_index(source, lambda, &name.name)
+    {
+        output.push(HirExpression::parameter_read(
+            id,
+            span,
+            ty,
+            HirParameterId::from_raw(lambda.parameters.len() + capture_index),
+        ));
+        return Ok(id);
     }
     if source
         .parsed
@@ -1385,17 +1477,53 @@ fn lower_expression(
                 local_bindings,
                 output,
             )?;
-            let operation_id = HirExpressionId::from_raw(output.len());
             match builtin_name {
                 Some("spawn") => {
-                    output.push(HirExpression::task_spawn(operation_id, span, ty, argument))
+                    let captures = source
+                        .parsed
+                        .lambda_expressions
+                        .iter()
+                        .find(|lambda| lambda.expression == call.arguments[0])
+                        .map(|lambda| {
+                            collect_lambda_captures(
+                                source,
+                                lambda,
+                                source.type_arena.expect("checked source has types"),
+                            )
+                        })
+                        .map(|captures| {
+                            captures
+                                .iter()
+                                .map(|capture| {
+                                    lower_expression(
+                                        source,
+                                        function_declaration,
+                                        capture.source(),
+                                        local_bindings,
+                                        output,
+                                    )
+                                })
+                                .collect::<Result<Vec<_>, _>>()
+                        })
+                        .transpose()?
+                        .unwrap_or_default();
+                    let operation_id = HirExpressionId::from_raw(output.len());
+                    output.push(HirExpression::task_spawn(
+                        operation_id,
+                        span,
+                        ty,
+                        argument,
+                        captures,
+                    ));
+                    return Ok(operation_id);
                 }
                 Some("await") => {
-                    output.push(HirExpression::task_await(operation_id, span, ty, argument))
+                    let operation_id = HirExpressionId::from_raw(output.len());
+                    output.push(HirExpression::task_await(operation_id, span, ty, argument));
+                    return Ok(operation_id);
                 }
                 _ => unreachable!(),
             }
-            return Ok(operation_id);
         }
         if matches!(builtin_name, Some("channel" | "send" | "receive" | "close")) {
             let arguments = call
@@ -3045,6 +3173,14 @@ fn local_binding_id(
     expression: crate::ast::AstNodeId,
     local_bindings: &[(crate::ast::AstNodeId, HirLocalId)],
 ) -> Option<HirLocalId> {
+    if !source
+        .parsed
+        .arena
+        .node(expression)
+        .is_some_and(|node| node.kind == crate::ast::AstNodeKind::NameExpression)
+    {
+        return None;
+    }
     let name = source
         .parsed
         .name_references
@@ -3426,7 +3562,10 @@ pub enum HirExpressionKind {
     StringLiteral(Vec<u8>),
     StringLength(HirExpressionId),
     StringClone(HirExpressionId),
-    TaskSpawn(HirExpressionId),
+    TaskSpawn {
+        callable: HirExpressionId,
+        captures: Vec<HirExpressionId>,
+    },
     TaskAwait(HirExpressionId),
     TaskCancel(HirExpressionId),
     ChannelCreate(HirExpressionId),
@@ -3734,12 +3873,13 @@ impl HirExpression {
         span: ByteSpan,
         ty: TypeId,
         callable: HirExpressionId,
+        captures: Vec<HirExpressionId>,
     ) -> Self {
         Self {
             id,
             span,
             ty,
-            kind: HirExpressionKind::TaskSpawn(callable),
+            kind: HirExpressionKind::TaskSpawn { callable, captures },
         }
     }
 

@@ -1035,7 +1035,12 @@ fn lower_instruction(
             }
             Ok(())
         }
-        MirInstruction::TaskSpawn { output, callee, .. } => {
+        MirInstruction::TaskSpawn {
+            output,
+            callee,
+            captures,
+            ..
+        } => {
             let function_id = function_ids
                 .get(callee)
                 .copied()
@@ -1049,7 +1054,16 @@ fn lower_instruction(
                 .as_deref_mut()
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
             let function_ref = module.declare_func_in_func(function_id, builder.func);
-            let call = builder.ins().call(function_ref, &[]);
+            let capture_values = captures
+                .iter()
+                .map(|capture| {
+                    values
+                        .get(capture)
+                        .copied()
+                        .ok_or(CraneliftLoweringError::MissingValue)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let call = builder.ins().call(function_ref, &capture_values);
             let result = builder.inst_results(call).first().copied();
             let runtime = context
                 .runtime

@@ -1323,6 +1323,15 @@ ownership through the `Message` payload, while copyable messages follow normal
 copy rules. The result representation, channel state, and runtime operations
 remain compiler-private with no stable ABI or FFI layout.
 
+## ADR-0106: Shared Channel Handles
+
+`Channel<T>` is a copyable compiler-owned handle to shared channel state. It
+may be captured by multiple structured tasks and is not consumed by `send`,
+`receive`, or `close`; message ownership still follows ADR-0103 and ADR-0062.
+Channel handles satisfy the accepted `Send` and `Share` capability checks.
+Private state lifetime, queue storage, and cleanup are compiler/runtime facts,
+not source-visible layout or allocation APIs.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers

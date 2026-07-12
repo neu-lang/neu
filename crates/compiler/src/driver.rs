@@ -314,9 +314,14 @@ pub fn compile_source_to_executable(
     type_concurrency_operations(&parsed, &mut types, &mut report);
     validate_concurrency_structure(&parsed, &mut report, &types);
     infer_local_types(&parsed, &mut report);
+    type_lambda_expressions(&parsed, &mut types, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     type_concurrency_operations(&parsed, &mut types, &mut report);
     validate_task_member_cancellation_structure(&parsed, &mut report, &types);
+    infer_local_types(&parsed, &mut report);
+    type_lambda_expressions(&parsed, &mut types, &mut report);
+    type_concurrency_operations(&parsed, &mut types, &mut report);
+    infer_local_types(&parsed, &mut report);
     let mut concurrency_calls = parsed
         .call_expressions
         .iter()

@@ -156,3 +156,19 @@ fn closed_channel_can_be_received_repeatedly_without_messages() {
     "#;
     assert_eq!(compile_and_run(source, "channel_repeated_closed"), 5);
 }
+
+#[test]
+fn spawned_producer_and_parent_consumer_share_a_channel() {
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val queue = channel<Int>(1);
+                val producer = spawn { -> send(queue, 8) };
+                val result = receive(queue);
+                return 8;
+            }
+            return 0;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "channel_producer_consumer"), 8);
+}

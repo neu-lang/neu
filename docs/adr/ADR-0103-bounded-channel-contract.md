@@ -45,3 +45,4 @@ ABI or FFI contract.
 - ADR-0062
 - ADR-0100
 - ADR-0105
+- ADR-0106

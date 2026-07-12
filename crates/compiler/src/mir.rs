@@ -279,6 +279,7 @@ pub enum MirInstruction {
         output: MirValueId,
         callee: MirFunctionId,
         callable: MirValueId,
+        captures: Vec<MirValueId>,
         span: ByteSpan,
     },
     TaskAwait {
@@ -1309,12 +1310,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     });
                 }
-                HirExpressionKind::TaskSpawn(callable) => {
+                HirExpressionKind::TaskSpawn { callable, captures } => {
                     let callee = mir_task_callee(function, *callable)?;
                     instructions.push(MirInstruction::TaskSpawn {
                         output,
                         callee,
                         callable: mir_expression_value_id(function, *callable),
+                        captures: captures
+                            .iter()
+                            .map(|capture| mir_expression_value_id(function, *capture))
+                            .collect(),
                         span: expression.span(),
                     });
                 }
@@ -2037,14 +2042,19 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::TaskSpawn(callable) => {
+            HirExpressionKind::TaskSpawn { callable, captures } => {
                 let callable_id = *callable;
                 let callable = self.lower_expression(callable_id)?;
                 let callee = mir_task_callee(self.function, callable_id)?;
+                let captures = captures
+                    .iter()
+                    .map(|capture| self.lower_expression(*capture))
+                    .collect::<Result<Vec<_>, _>>()?;
                 self.push(MirInstruction::TaskSpawn {
                     output,
                     callee,
                     callable,
+                    captures,
                     span: expression.span(),
                 });
             }
@@ -2682,14 +2692,19 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::TaskSpawn(callable) => {
+            HirExpressionKind::TaskSpawn { callable, captures } => {
                 let callable_id = *callable;
                 let callable = self.lower_expression(callable_id)?;
                 let callee = mir_task_callee(self.function, callable_id)?;
+                let captures = captures
+                    .iter()
+                    .map(|capture| self.lower_expression(*capture))
+                    .collect::<Result<Vec<_>, _>>()?;
                 self.push(MirInstruction::TaskSpawn {
                     output,
                     callee,
                     callable,
+                    captures,
                     span: expression.span(),
                 });
             }
