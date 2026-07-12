@@ -5,9 +5,10 @@ use compiler::{
     symbol::{SymbolId, SymbolInterner},
     type_check::build_m0083_generic_declaration_records,
     types::{
-        GenericParameterType, GenericSubstitution, GenericTypeIdentity, NominalTypeIdentity,
-        NullableType, PrimitiveType, TypeArena, TypeDiagnostic, TypeDiagnosticKind, TypeId,
-        TypeKind, TypeRecord, UnsupportedTypeForm,
+        GenericParameterType, GenericSpecializationIdentity, GenericSpecializationRegistry,
+        GenericSubstitution, GenericTypeIdentity, NominalTypeIdentity, NullableType, PrimitiveType,
+        TypeArena, TypeDiagnostic, TypeDiagnosticKind, TypeId, TypeKind, TypeRecord,
+        UnsupportedTypeForm,
     },
 };
 
@@ -186,6 +187,37 @@ fn generic_declaration_records_preserve_owner_and_parameter_order() {
     assert_eq!(
         records[0].parameters()[1].parameter(),
         parameters[1].parameter
+    );
+}
+
+#[test]
+fn generic_specialization_identity_is_deduplicated_and_ordered() {
+    let mut arena = TypeArena::new();
+    let int_type = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let byte_type = arena.insert(TypeRecord::primitive(PrimitiveType::Byte));
+    let declaration = AstNodeId::from_raw(100);
+    let first = GenericSpecializationIdentity::new(declaration, vec![int_type, byte_type]);
+    let same = GenericSpecializationIdentity::new(declaration, vec![int_type, byte_type]);
+    let reversed = GenericSpecializationIdentity::new(declaration, vec![byte_type, int_type]);
+
+    assert_eq!(first, same);
+    assert_ne!(first, reversed);
+    assert_eq!(first.arguments(), &[int_type, byte_type]);
+    assert_eq!(first.mangle("identity"), "identity$g100$0_1");
+
+    let mut registry = GenericSpecializationRegistry::new();
+    assert_eq!(
+        registry.request(first.clone()),
+        compiler::types::SpecializationRequest::New(0)
+    );
+    assert_eq!(
+        registry.request(first.clone()),
+        compiler::types::SpecializationRequest::Recursive
+    );
+    registry.finish(&first);
+    assert_eq!(
+        registry.request(first),
+        compiler::types::SpecializationRequest::Existing(0)
     );
 }
 

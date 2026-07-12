@@ -7,7 +7,7 @@ use crate::{
     module::{FunctionSymbolIdentity, ModuleName},
     ownership_effects::OwnershipEffectContract,
     source::ByteSpan,
-    types::{PrimitiveType, TypeArena, TypeId, TypeKind},
+    types::{GenericSpecializationIdentity, PrimitiveType, TypeArena, TypeId, TypeKind},
 };
 
 macro_rules! mir_id {
@@ -667,6 +667,7 @@ pub struct MirFunction {
     symbol_identity: Option<FunctionSymbolIdentity>,
     entry: bool,
     effect_contract: Option<OwnershipEffectContract>,
+    specialization_identity: Option<GenericSpecializationIdentity>,
 }
 impl MirFunction {
     pub fn new(
@@ -689,6 +690,7 @@ impl MirFunction {
             symbol_identity: None,
             entry: false,
             effect_contract: None,
+            specialization_identity: None,
         }
     }
     pub fn id(&self) -> MirFunctionId {
@@ -718,6 +720,13 @@ impl MirFunction {
     }
     pub fn symbol_identity(&self) -> Option<&FunctionSymbolIdentity> {
         self.symbol_identity.as_ref()
+    }
+    pub fn with_specialization_identity(mut self, identity: GenericSpecializationIdentity) -> Self {
+        self.specialization_identity = Some(identity);
+        self
+    }
+    pub fn specialization_identity(&self) -> Option<&GenericSpecializationIdentity> {
+        self.specialization_identity.as_ref()
     }
     pub fn with_entry(mut self, entry: bool) -> Self {
         self.entry = entry;
@@ -1226,6 +1235,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
         .with_entry(function.is_entry());
         if let Some(contract) = function.effect_contract() {
             mir_function = mir_function.with_effect_contract(contract.clone());
+        }
+        if let Some(identity) = function.specialization_identity() {
+            mir_function = mir_function.with_specialization_identity(identity.clone());
         }
         functions.push(match function.symbol_identity() {
             Some(identity) => mir_function.with_symbol_identity(identity.clone()),

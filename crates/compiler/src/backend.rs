@@ -563,6 +563,18 @@ fn bootstrap_symbol(
     )
 }
 
+pub fn bootstrap_specialized_symbol(
+    identity: &crate::module::FunctionSymbolIdentity,
+    specialization: &crate::types::GenericSpecializationIdentity,
+    parameter_types: impl IntoIterator<Item = crate::types::TypeId>,
+) -> String {
+    format!(
+        "{}_s{}",
+        bootstrap_symbol(identity, parameter_types),
+        encode_symbol_component(&specialization.mangle("specialization")),
+    )
+}
+
 fn encode_symbol_component(value: &str) -> String {
     let mut encoded = String::new();
     for byte in value.as_bytes() {

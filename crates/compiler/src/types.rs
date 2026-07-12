@@ -86,6 +86,85 @@ pub struct GenericTypeIdentity {
     arguments: Vec<TypeId>,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GenericSpecializationIdentity {
+    declaration: AstNodeId,
+    arguments: Vec<TypeId>,
+}
+
+impl GenericSpecializationIdentity {
+    pub fn new(declaration: AstNodeId, arguments: Vec<TypeId>) -> Self {
+        Self {
+            declaration,
+            arguments,
+        }
+    }
+
+    pub fn declaration(&self) -> AstNodeId {
+        self.declaration
+    }
+
+    pub fn arguments(&self) -> &[TypeId] {
+        &self.arguments
+    }
+
+    pub fn mangle(&self, base: &str) -> String {
+        let arguments = self
+            .arguments
+            .iter()
+            .map(|argument| argument.index().to_string())
+            .collect::<Vec<_>>()
+            .join("_");
+        format!("{base}$g{}${arguments}", self.declaration.index())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpecializationRequest {
+    New(usize),
+    Existing(usize),
+    Recursive,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GenericSpecializationRegistry {
+    identities: Vec<GenericSpecializationIdentity>,
+    active: Vec<GenericSpecializationIdentity>,
+}
+
+impl GenericSpecializationRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn request(&mut self, identity: GenericSpecializationIdentity) -> SpecializationRequest {
+        if self.active.iter().any(|active| active == &identity) {
+            return SpecializationRequest::Recursive;
+        }
+        if let Some(index) = self
+            .identities
+            .iter()
+            .position(|existing| existing == &identity)
+        {
+            return SpecializationRequest::Existing(index);
+        }
+        let index = self.identities.len();
+        self.identities.push(identity.clone());
+        self.active.push(identity);
+        SpecializationRequest::New(index)
+    }
+
+    pub fn finish(&mut self, identity: &GenericSpecializationIdentity) {
+        if let Some(index) = self.active.iter().position(|active| active == identity) {
+            self.active.remove(index);
+        }
+    }
+
+    pub fn identities(&self) -> &[GenericSpecializationIdentity] {
+        &self.identities
+    }
+}
+
 impl GenericTypeIdentity {
     pub fn new(declaration: NominalTypeIdentity, arguments: Vec<TypeId>) -> Self {
         Self {

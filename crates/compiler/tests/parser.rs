@@ -241,6 +241,19 @@ fn duplicate_generic_parameters_are_diagnosed() {
 }
 
 #[test]
+fn generic_call_metadata_preserves_explicit_type_arguments() {
+    let output = parse_source(
+        SourceFileId::from_raw(214),
+        "func use(): Int { return identity<Int>(1); }",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    let call = &output.call_expressions[0];
+    assert_eq!(call.generic_arguments.len(), 1);
+    assert_eq!(call.arguments.len(), 1);
+}
+
+#[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);

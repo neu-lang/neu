@@ -228,6 +228,7 @@ pub struct ParsedCallExpression {
     pub expression: AstNodeId,
     pub function: AstNodeId,
     pub callee: AstNodeId,
+    pub generic_arguments: Vec<AstNodeId>,
     pub arguments: Vec<AstNodeId>,
 }
 
@@ -2133,6 +2134,31 @@ impl<'source> Parser<'source> {
     fn parse_postfix_expression(&mut self) -> Option<ByteSpan> {
         let mut span = self.parse_primary_expression()?;
         loop {
+            if self.current_kind() == Some(TokenKind::Less) && self.generic_call_follows() {
+                let start = span.start();
+                let callee = self.latest_expression_node_for_span(span);
+                let (_, generic_arguments) = self
+                    .parse_generic_arguments()
+                    .expect("generic call argument list exists");
+                let Some((end, arguments)) = self.parse_argument_list() else {
+                    self.diagnostic_current_or_span(DiagnosticKind::MalformedCallExpression, span);
+                    return Some(span);
+                };
+                span = self.span(start, end);
+                let expression = self.arena.add_call_expression(span);
+                if let (Some(function), Some(callee), Some(arguments)) =
+                    (self.current_function, callee, arguments)
+                {
+                    self.call_expressions.push(ParsedCallExpression {
+                        expression,
+                        function,
+                        callee,
+                        generic_arguments,
+                        arguments,
+                    });
+                }
+                continue;
+            }
             match self.current_kind() {
                 Some(TokenKind::LeftParen) => {
                     let start = span.start();
@@ -2153,6 +2179,7 @@ impl<'source> Parser<'source> {
                             expression,
                             function,
                             callee,
+                            generic_arguments: Vec::new(),
                             arguments,
                         });
                     }
@@ -2221,6 +2248,44 @@ impl<'source> Parser<'source> {
                 _ => return Some(span),
             }
         }
+    }
+
+    fn generic_call_follows(&self) -> bool {
+        let mut depth = 0usize;
+        for token in self.tokens.iter().skip(self.index) {
+            match token.kind {
+                TokenKind::Less => depth += 1,
+                TokenKind::Greater => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return self
+                            .tokens
+                            .iter()
+                            .skip(self.index)
+                            .position(|candidate| candidate.span == token.span)
+                            .and_then(|position| self.tokens.get(self.index + position + 1))
+                            .is_some_and(|candidate| candidate.kind == TokenKind::LeftParen);
+                    }
+                }
+                TokenKind::GreaterGreater if depth >= 2 => {
+                    depth -= 2;
+                    if depth == 0 {
+                        return self
+                            .tokens
+                            .iter()
+                            .skip(self.index)
+                            .position(|candidate| candidate.span == token.span)
+                            .and_then(|position| self.tokens.get(self.index + position + 1))
+                            .is_some_and(|candidate| candidate.kind == TokenKind::LeftParen);
+                    }
+                }
+                TokenKind::Semicolon | TokenKind::LeftBrace | TokenKind::RightBrace => {
+                    return false;
+                }
+                _ => {}
+            }
+        }
+        false
     }
 
     fn parse_argument_list(&mut self) -> Option<(usize, Option<Vec<AstNodeId>>)> {

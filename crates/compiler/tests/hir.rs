@@ -13,7 +13,7 @@ use compiler::{
         check_m0028_direct_calls, type_m0028_executable_core_in, type_m0028_function_signatures_in,
         type_parser_literals,
     },
-    types::TypeId,
+    types::{GenericSpecializationIdentity, TypeId},
 };
 
 #[test]
@@ -85,6 +85,32 @@ fn m0029_hir_model_preserves_typed_source_mapped_executable_facts() {
         function.unsupported_forms()[0].span(),
         ByteSpan::new(file, 50, 60).unwrap()
     );
+}
+
+#[test]
+fn m0085_hir_preserves_specialization_identity() {
+    let file = SourceFileId::from_raw(1085);
+    let span = ByteSpan::new(file, 0, 1).unwrap();
+    let identity = GenericSpecializationIdentity::new(
+        compiler::ast::AstNodeId::from_raw(1085),
+        vec![TypeId::from_raw(1)],
+    );
+    let function = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("specialized").unwrap(),
+        PackageNamespace::root(),
+        span,
+        false,
+        TypeId::from_raw(1),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        HirSafetyFacts::executable_subset_checked(),
+        Vec::new(),
+    )
+    .with_specialization_identity(identity.clone());
+    assert_eq!(function.specialization_identity(), Some(&identity));
 }
 
 #[test]

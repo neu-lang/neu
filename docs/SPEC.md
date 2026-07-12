@@ -1064,6 +1064,19 @@ Unknown, unresolved, recursive, and stale bounds are diagnostics. Constraints
 do not change overload identity and do not add inference, conversions,
 variance, wildcards, higher-kinded types, or public ABI behavior.
 
+## ADR-0085: Generic Specialization And Private ABI
+
+Concrete generic calls use explicit type arguments before their argument list.
+Specialization identity is the generic declaration plus ordered concrete type
+identities. Equal identities are deduplicated, recursive expansion is rejected,
+and specialization occurs after constraint validation before MIR lowering.
+
+Substituted HIR/MIR preserves ownership, cleanup, aggregate, dispatch, and
+source facts. Generated symbols and layouts are compiler-private; unsupported
+bootstrap or target-pack representations are diagnosed before object emission.
+Erasure, inference, reflection, public generic ABI, and separate-compilation
+caches remain deferred.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

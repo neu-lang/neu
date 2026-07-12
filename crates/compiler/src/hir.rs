@@ -6,7 +6,7 @@ use crate::{
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
     type_check::{ClassTypeReport, ExpressionType, FunctionSignature, ResolvedCallDeclaration},
-    types::TypeId,
+    types::{GenericSpecializationIdentity, TypeId},
 };
 
 macro_rules! hir_id {
@@ -3332,6 +3332,7 @@ pub struct HirFunction {
     unsupported_forms: Vec<HirUnsupportedForm>,
     symbol_identity: Option<FunctionSymbolIdentity>,
     effect_contract: Option<OwnershipEffectContract>,
+    specialization_identity: Option<GenericSpecializationIdentity>,
 }
 impl HirFunction {
     #[allow(clippy::too_many_arguments)]
@@ -3366,6 +3367,7 @@ impl HirFunction {
             unsupported_forms,
             symbol_identity: None,
             effect_contract: None,
+            specialization_identity: None,
         }
     }
     pub fn id(&self) -> HirFunctionId {
@@ -3431,6 +3433,13 @@ impl HirFunction {
     }
     pub fn symbol_identity(&self) -> Option<&FunctionSymbolIdentity> {
         self.symbol_identity.as_ref()
+    }
+    pub fn with_specialization_identity(mut self, identity: GenericSpecializationIdentity) -> Self {
+        self.specialization_identity = Some(identity);
+        self
+    }
+    pub fn specialization_identity(&self) -> Option<&GenericSpecializationIdentity> {
+        self.specialization_identity.as_ref()
     }
     pub fn direct_call(&self, id: HirExpressionId) -> Option<&HirDirectCall> {
         self.expressions

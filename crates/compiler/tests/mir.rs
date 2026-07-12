@@ -11,7 +11,7 @@ use compiler::{
     module::ModuleName,
     ownership_effects::{EffectKind, OwnershipEffectContract, infer_parameter_effects},
     source::{ByteSpan, SourceFileId},
-    types::{PrimitiveType, TypeArena, TypeId, TypeRecord},
+    types::{GenericSpecializationIdentity, PrimitiveType, TypeArena, TypeId, TypeRecord},
 };
 
 #[test]
@@ -47,6 +47,31 @@ fn m0064_cleanup_boundary_tracks_owned_string_values() {
     assert_eq!(boundary.owned_locals(), &[MirLocalId::from_raw(0)]);
     assert_eq!(boundary.owned_parameters(), &[MirValueId::from_raw(0)]);
     assert!(boundary.returns_owned());
+}
+
+#[test]
+fn m0085_mir_preserves_specialization_identity() {
+    let file = SourceFileId::from_raw(1085);
+    let span = compiler::source::ByteSpan::new(file, 0, 1).unwrap();
+    let identity = GenericSpecializationIdentity::new(
+        compiler::ast::AstNodeId::from_raw(1085),
+        vec![TypeId::from_raw(1)],
+    );
+    let function = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        Vec::new(),
+        TypeId::from_raw(1),
+        Vec::new(),
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            Vec::new(),
+            MirTerminator::ReturnUnit { span },
+        )],
+        MirCleanupBoundary::default(),
+    )
+    .with_specialization_identity(identity.clone());
+    assert_eq!(function.specialization_identity(), Some(&identity));
 }
 
 #[test]
