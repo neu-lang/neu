@@ -1308,16 +1308,14 @@ impl<'source> Parser<'source> {
                 self.skip_to_declaration_boundary(true);
                 continue;
             };
-            if self.current_kind() != Some(TokenKind::Semicolon) {
+            let Some(end) = self.consume_statement_terminator(annotation_span.end()) else {
                 self.diagnostic_current_or_span(
                     DiagnosticKind::MalformedDeclarationHeader,
                     name.span,
                 );
                 self.skip_to_declaration_boundary(true);
                 continue;
-            }
-            let end = self.current().expect("field terminator exists").span.end();
-            self.advance();
+            };
             let declaration = self
                 .arena
                 .add_field_declaration(self.span(name.span.start(), end));
@@ -1570,9 +1568,10 @@ impl<'source> Parser<'source> {
                                 continue;
                             };
                             let value = self.latest_expression_node_for_span(value_span);
-                            if self.current_kind() == Some(TokenKind::Semicolon) {
-                                let end = self.current().expect("semicolon exists").span.end();
-                                self.advance();
+                            if let Some(end) = self.consume_statement_terminator(
+                                self.previous_span()
+                                    .map_or(expression_span.end(), ByteSpan::end),
+                            ) {
                                 let statement = self
                                     .arena
                                     .add_assignment_statement(self.span(expression_start, end));
@@ -1592,7 +1591,21 @@ impl<'source> Parser<'source> {
                                 self.skip_to_statement_boundary();
                             }
                         }
-                        Some(TokenKind::RightBrace) => {}
+                        Some(TokenKind::RightBrace) => {
+                            let statement = self.arena.add_expression_statement(
+                                self.span(expression_span.start(), expression_span.end()),
+                            );
+                            self.record_executable_body_statement(statement);
+                        }
+                        _ if self.can_implicitly_terminate_statement() => {
+                            let end = self
+                                .previous_span()
+                                .map_or(expression_span.end(), ByteSpan::end);
+                            let statement = self
+                                .arena
+                                .add_expression_statement(self.span(expression_span.start(), end));
+                            self.record_executable_body_statement(statement);
+                        }
                         _ => {
                             self.diagnostic(
                                 DiagnosticKind::UnexpectedTokenInStatement,
@@ -1799,9 +1812,7 @@ impl<'source> Parser<'source> {
             _ => unreachable!(),
         };
         self.advance();
-        let end = if self.current_kind() == Some(TokenKind::Semicolon) {
-            let end = self.current().expect("semicolon exists").span.end();
-            self.advance();
+        let end = if let Some(end) = self.consume_statement_terminator(token.span.end()) {
             end
         } else {
             self.diagnostic_current_or_span(DiagnosticKind::UnexpectedTokenInStatement, token.span);
@@ -1885,9 +1896,9 @@ impl<'source> Parser<'source> {
             }
         }
 
-        if self.current_kind() == Some(TokenKind::Semicolon) {
-            let end = self.current().expect("semicolon exists").span.end();
-            self.advance();
+        if let Some(end) =
+            self.consume_statement_terminator(self.previous_span().map_or(start, ByteSpan::end))
+        {
             let binding = self
                 .arena
                 .add_variable_declaration_statement(self.span(start, end));
@@ -1919,7 +1930,11 @@ impl<'source> Parser<'source> {
         let start = self.current().expect("return token exists").span.start();
         self.advance();
 
-        let value = if self.current_kind() == Some(TokenKind::Semicolon) {
+        let value = if self.current().is_none_or(|token| token.line_break_before)
+            || matches!(
+                self.current_kind(),
+                Some(TokenKind::Semicolon | TokenKind::RightBrace)
+            ) {
             None
         } else if let Some(span) = self.parse_expression() {
             self.latest_expression_node_for_span(span)
@@ -1932,9 +1947,9 @@ impl<'source> Parser<'source> {
             return;
         };
 
-        if self.current_kind() == Some(TokenKind::Semicolon) {
-            let end = self.current().expect("semicolon exists").span.end();
-            self.advance();
+        if let Some(end) =
+            self.consume_statement_terminator(self.previous_span().map_or(start, ByteSpan::end))
+        {
             let statement = self.arena.add_return_statement(self.span(start, end));
             if let Some(function) = self.current_function {
                 let return_index = self.return_statements.len();
@@ -3405,6 +3420,9 @@ impl<'source> Parser<'source> {
                 self.advance();
                 return;
             }
+            if self.current().is_some_and(|token| token.line_break_before) {
+                return;
+            }
             if kind == TokenKind::RightBrace || self.is_declaration_starter() {
                 return;
             }
@@ -3561,6 +3579,56 @@ impl<'source> Parser<'source> {
 
     fn current_kind(&self) -> Option<TokenKind> {
         self.current().map(|token| token.kind)
+    }
+
+    fn can_implicitly_terminate_statement(&self) -> bool {
+        let Some(token) = self.current() else {
+            return true;
+        };
+        if token.kind == TokenKind::RightBrace {
+            return true;
+        }
+        if !token.line_break_before {
+            return false;
+        }
+        !matches!(
+            token.kind,
+            TokenKind::Plus
+                | TokenKind::Minus
+                | TokenKind::Star
+                | TokenKind::Slash
+                | TokenKind::Percent
+                | TokenKind::StarStar
+                | TokenKind::LessLess
+                | TokenKind::GreaterGreater
+                | TokenKind::EqualEqual
+                | TokenKind::BangEqual
+                | TokenKind::Less
+                | TokenKind::Greater
+                | TokenKind::LessEqual
+                | TokenKind::GreaterEqual
+                | TokenKind::AmpAmp
+                | TokenKind::PipePipe
+                | TokenKind::Amp
+                | TokenKind::Pipe
+                | TokenKind::Caret
+                | TokenKind::Dot
+                | TokenKind::Comma
+                | TokenKind::LeftParen
+                | TokenKind::LeftBracket
+        )
+    }
+
+    fn consume_statement_terminator(&mut self, fallback_end: usize) -> Option<usize> {
+        if self.current_kind() == Some(TokenKind::Semicolon) {
+            let end = self.current().expect("semicolon exists").span.end();
+            self.advance();
+            Some(end)
+        } else if self.can_implicitly_terminate_statement() {
+            Some(self.previous_span().map_or(fallback_end, ByteSpan::end))
+        } else {
+            None
+        }
     }
 
     fn peek_kind(&self) -> Option<TokenKind> {

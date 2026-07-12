@@ -88,6 +88,7 @@ pub enum TokenKind {
 pub struct Token {
     pub kind: TokenKind,
     pub span: ByteSpan,
+    pub line_break_before: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -125,6 +126,7 @@ struct Lexer<'source> {
     offset: usize,
     tokens: Vec<Token>,
     diagnostics: Vec<Diagnostic>,
+    line_break_pending: bool,
 }
 
 impl<'source> Lexer<'source> {
@@ -135,6 +137,7 @@ impl<'source> Lexer<'source> {
             offset: 0,
             tokens: Vec::new(),
             diagnostics: Vec::new(),
+            line_break_pending: false,
         }
     }
 
@@ -171,15 +174,19 @@ impl<'source> Lexer<'source> {
     }
 
     fn skip_whitespace(&mut self) -> bool {
-        let Some(ch) = self.current_char() else {
-            return false;
-        };
-        if matches!(ch, ' ' | '\t' | '\r' | '\n' | '\u{000C}') {
-            self.offset += ch.len_utf8();
-            true
-        } else {
-            false
+        let mut skipped = false;
+        while let Some(ch) = self.current_char() {
+            if matches!(ch, ' ' | '\t' | '\r' | '\n' | '\u{000C}') {
+                if matches!(ch, '\r' | '\n') {
+                    self.line_break_pending = true;
+                }
+                self.offset += ch.len_utf8();
+                skipped = true;
+            } else {
+                break;
+            }
         }
+        skipped
     }
 
     fn skip_comment(&mut self) -> bool {
@@ -209,6 +216,12 @@ impl<'source> Lexer<'source> {
                         return true;
                     }
                 } else {
+                    if self
+                        .current_char()
+                        .is_some_and(|ch| matches!(ch, '\r' | '\n'))
+                    {
+                        self.line_break_pending = true;
+                    }
                     self.bump_char();
                 }
             }
@@ -406,6 +419,7 @@ impl<'source> Lexer<'source> {
         self.tokens.push(Token {
             kind,
             span: self.span(start, end),
+            line_break_before: std::mem::take(&mut self.line_break_pending),
         });
     }
 

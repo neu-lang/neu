@@ -135,6 +135,24 @@ fn skips_comments_and_reports_unterminated_block_comment() {
 }
 
 #[test]
+fn preserves_line_boundaries_without_emitting_newline_tokens() {
+    let output = lex(SourceFileId::from_raw(901), "val first\n// gap\nval second");
+    assert_eq!(
+        output
+            .tokens
+            .iter()
+            .map(|token| (token.kind, token.line_break_before))
+            .collect::<Vec<_>>(),
+        vec![
+            (TokenKind::KwVal, false),
+            (TokenKind::Identifier, false),
+            (TokenKind::KwVal, true),
+            (TokenKind::Identifier, false),
+        ]
+    );
+}
+
+#[test]
 fn lexes_operators_and_delimiters_with_longest_match() {
     assert_eq!(
         kinds("++ -- == != <= >= && || -> => .. ..< + - * / % = < > ! & | . ? :"),

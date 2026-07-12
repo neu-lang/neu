@@ -974,3 +974,22 @@ ownership, initialization, cleanup, source mappings, and CFG joins are
 preserved through HIR, MIR, Cranelift, and the existing private ABI. Missing
 results, invalid conditions, incompatible branches, and branch-dependent
 consumption are diagnosed before lowering.
+
+## ADR-0078: Optional Semicolons And Newline Termination
+
+Neu preserves line-boundary metadata on lexer tokens. Ordinary declarations,
+assignments, expression statements, `return`, `break`, and `continue` may end
+at a newline when the preceding token completes a statement and the next token
+does not continue the expression. Explicit semicolons remain valid and may
+separate multiple same-line statements. Closing braces and end of input also
+terminate completed statements.
+
+Newlines after operators, dots, commas, opening delimiters, and other accepted
+continuation points do not terminate expressions. Parentheses and brackets
+preserve their existing list and expression structure. `else` attaches to the
+preceding `if` across line breaks. A `return` expression must begin on the same
+logical line as `return`; a newline immediately after it is a bare return.
+Comments and blank lines preserve line boundaries, while newlines in strings
+remain rejected. Recovery uses line boundaries, semicolons, braces, and
+declaration starters. This syntax decision changes no type, ownership, HIR,
+MIR, ABI, backend, or runtime semantics.

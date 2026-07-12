@@ -1,0 +1,6 @@
+public func main(): Int {
+    val first: Int = 1
+    var second: Int = first + 2
+    second = second + 1
+    return second
+}

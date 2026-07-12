@@ -52,6 +52,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("conditional_values", 10),
         ("dynamic_arrays", 1),
         ("nominal_arrays", 4),
+        ("optional_semicolons", 4),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

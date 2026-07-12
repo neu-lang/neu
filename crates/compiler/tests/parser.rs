@@ -25,6 +25,33 @@ fn parses_package_import_and_function_declaration() {
 }
 
 #[test]
+fn parses_newline_terminated_statements_and_return() {
+    let output = parse_source(
+        SourceFileId::from_raw(900),
+        "func answer(): Int {\n    val first: Int = 1\n    var second: Int = first + 2\n    second = second + 1\n    return second\n}",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.local_declarations.len(), 2);
+    assert_eq!(output.assignment_statements.len(), 1);
+    assert_eq!(output.return_statements.len(), 1);
+}
+
+#[test]
+fn keeps_multiline_expressions_together_and_attaches_else() {
+    let output = parse_source(
+        SourceFileId::from_raw(901),
+        "func answer(value: Int): Int {\n    if (value >\n        0) {\n        return value\n    }\n    else {\n        return 0\n    }\n}",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.if_expressions.len(), 1);
+    assert!(output.if_expressions[0].else_block.is_some());
+}
+
+#[test]
 fn func_is_the_accepted_function_declaration_keyword() {
     let output = parse_source(SourceFileId::from_raw(10001), "public func main();");
     assert!(output.lex_diagnostics.is_empty());
