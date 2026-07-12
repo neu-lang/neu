@@ -1,7 +1,7 @@
 use crate::{
     hir::{
-        HirBinaryOperator, HirExpressionId, HirExpressionKind, HirFunction, HirLocalId, HirModule,
-        HirUnaryOperator,
+        HirBinaryOperator, HirDirectCall, HirDispatchKind, HirExpressionId, HirExpressionKind,
+        HirFunction, HirLocalId, HirModule, HirUnaryOperator,
     },
     hir::{HirControlFlow, HirExpression},
     module::{FunctionSymbolIdentity, ModuleName},
@@ -97,6 +97,79 @@ pub enum MirComparison {
     LessEqual,
     GreaterEqual,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MirDispatchKind {
+    Direct,
+    VirtualClass,
+    Interface,
+    StaticSuper,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MirDispatchTarget {
+    receiver_type: TypeId,
+    callee: MirFunctionId,
+}
+
+fn mir_call_instruction(
+    call: &HirDirectCall,
+    output: MirValueId,
+    arguments: Vec<MirValueId>,
+    span: ByteSpan,
+) -> MirInstruction {
+    let targets = call
+        .targets()
+        .iter()
+        .map(|target| {
+            MirDispatchTarget::new(
+                target.receiver_type(),
+                MirFunctionId::from_raw(target.callee().index()),
+            )
+        })
+        .collect();
+    match call.dispatch() {
+        HirDispatchKind::Direct => MirInstruction::DirectCall {
+            output,
+            callee: MirFunctionId::from_raw(call.callee().index()),
+            arguments,
+            span,
+        },
+        HirDispatchKind::VirtualClass => MirInstruction::VirtualCall {
+            output,
+            arguments,
+            targets,
+            span,
+        },
+        HirDispatchKind::Interface => MirInstruction::InterfaceCall {
+            output,
+            arguments,
+            targets,
+            span,
+        },
+        HirDispatchKind::StaticSuper => MirInstruction::StaticSuperCall {
+            output,
+            callee: MirFunctionId::from_raw(call.callee().index()),
+            arguments,
+            span,
+        },
+    }
+}
+
+impl MirDispatchTarget {
+    pub fn new(receiver_type: TypeId, callee: MirFunctionId) -> Self {
+        Self {
+            receiver_type,
+            callee,
+        }
+    }
+    pub fn receiver_type(self) -> TypeId {
+        self.receiver_type
+    }
+    pub fn callee(self) -> MirFunctionId {
+        self.callee
+    }
+}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MirInstruction {
     IntConstant {
@@ -168,6 +241,24 @@ pub enum MirInstruction {
         arguments: Vec<MirValueId>,
         span: ByteSpan,
     },
+    VirtualCall {
+        output: MirValueId,
+        arguments: Vec<MirValueId>,
+        targets: Vec<MirDispatchTarget>,
+        span: ByteSpan,
+    },
+    InterfaceCall {
+        output: MirValueId,
+        arguments: Vec<MirValueId>,
+        targets: Vec<MirDispatchTarget>,
+        span: ByteSpan,
+    },
+    StaticSuperCall {
+        output: MirValueId,
+        callee: MirFunctionId,
+        arguments: Vec<MirValueId>,
+        span: ByteSpan,
+    },
     ArrayInit {
         local: MirLocalId,
         elements: Vec<MirValueId>,
@@ -231,6 +322,7 @@ pub enum MirInstruction {
     },
     NewObject {
         output: MirValueId,
+        type_id: TypeId,
         arguments: Vec<MirValueId>,
         span: ByteSpan,
     },
@@ -312,6 +404,9 @@ impl MirInstruction {
             | Self::LoadLocal { span, .. }
             | Self::StoreLocal { span, .. }
             | Self::DirectCall { span, .. }
+            | Self::VirtualCall { span, .. }
+            | Self::InterfaceCall { span, .. }
+            | Self::StaticSuperCall { span, .. }
             | Self::ArrayInit { span, .. }
             | Self::ArrayValue { span, .. }
             | Self::ArrayAssign { span, .. }
@@ -711,16 +806,15 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     }
                 }
                 HirExpressionKind::DirectCall(call) => {
-                    instructions.push(MirInstruction::DirectCall {
+                    instructions.push(mir_call_instruction(
+                        call,
                         output,
-                        callee: MirFunctionId::from_raw(call.callee().index()),
-                        arguments: call
-                            .arguments()
+                        call.arguments()
                             .iter()
                             .map(|argument| mir_expression_value_id(function, *argument))
                             .collect(),
-                        span: expression.span(),
-                    })
+                        expression.span(),
+                    ));
                 }
                 HirExpressionKind::ArrayLiteral(elements) => {
                     let local = function
@@ -805,6 +899,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::NewObject { arguments, .. } => {
                     instructions.push(MirInstruction::NewObject {
                         output,
+                        type_id: expression.ty(),
                         arguments: arguments
                             .iter()
                             .map(|argument| mir_expression_value_id(function, *argument))
@@ -1223,16 +1318,15 @@ impl<'a> ShortCircuitLowerer<'a> {
                 }
             }
             HirExpressionKind::DirectCall(call) => {
-                self.push(MirInstruction::DirectCall {
+                self.push(mir_call_instruction(
+                    call,
                     output,
-                    callee: MirFunctionId::from_raw(call.callee().index()),
-                    arguments: call
-                        .arguments()
+                    call.arguments()
                         .iter()
                         .map(|argument| mir_expression_value_id(self.function, *argument))
                         .collect(),
-                    span: expression.span(),
-                });
+                    expression.span(),
+                ));
             }
             HirExpressionKind::ArrayLiteral(_)
             | HirExpressionKind::Index { .. }
@@ -1519,16 +1613,15 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
             }
             HirExpressionKind::DirectCall(call) => {
-                self.push(MirInstruction::DirectCall {
+                self.push(mir_call_instruction(
+                    call,
                     output,
-                    callee: MirFunctionId::from_raw(call.callee().index()),
-                    arguments: call
-                        .arguments()
+                    call.arguments()
                         .iter()
                         .map(|argument| mir_expression_value_id(self.function, *argument))
                         .collect(),
-                    span: expression.span(),
-                });
+                    expression.span(),
+                ));
             }
             HirExpressionKind::ArrayLiteral(_)
             | HirExpressionKind::Index { .. }

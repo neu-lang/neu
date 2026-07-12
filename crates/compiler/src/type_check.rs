@@ -440,6 +440,8 @@ pub struct FunctionSignature {
 pub struct ClassTypeRecord {
     declaration: AstNodeId,
     name: String,
+    is_final: bool,
+    interface: bool,
     type_id: TypeId,
     superclass: Option<String>,
     interfaces: Vec<String>,
@@ -449,6 +451,12 @@ pub struct ClassTypeRecord {
 impl ClassTypeRecord {
     pub fn name(&self) -> &str {
         &self.name
+    }
+    pub fn is_final(&self) -> bool {
+        self.is_final
+    }
+    pub fn is_interface(&self) -> bool {
+        self.interface
     }
     pub fn declaration(&self) -> AstNodeId {
         self.declaration
@@ -650,9 +658,14 @@ fn append_inherited_field_order(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DispatchDiagnosticKind {
     OverrideWithoutSuperclass,
+    OverrideWithoutTarget,
     MissingOverrideMarker,
     OpenAndFinalMethod,
+    FinalClassInheritance,
+    FinalMethodOverride,
+    InterfaceMethodFinal,
     MissingInterfaceMethod,
+    AmbiguousInterfaceMethod,
     IncompatibleOverride,
 }
 
@@ -674,56 +687,57 @@ impl DispatchDiagnostic {
 pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
     let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
-        if function.is_open
-            && function.is_final
+        if function.is_final
+            && function.owner.is_some_and(|owner| {
+                parsed
+                    .class_declarations
+                    .iter()
+                    .find(|class| class.declaration == owner)
+                    .is_some_and(|class| class.interface)
+            })
             && let Some(node) = parsed.arena.node(function.declaration)
         {
             diagnostics.push(DispatchDiagnostic {
-                kind: DispatchDiagnosticKind::OpenAndFinalMethod,
-                span: node.span,
-            });
-        }
-        if !function.is_override {
-            continue;
-        }
-        let Some(owner) = function.owner.and_then(|owner| {
-            parsed
-                .class_declarations
-                .iter()
-                .find(|class| class.declaration == owner)
-        }) else {
-            continue;
-        };
-        if owner.superclass.is_none()
-            && let Some(node) = parsed.arena.node(function.declaration)
-        {
-            diagnostics.push(DispatchDiagnostic {
-                kind: DispatchDiagnosticKind::OverrideWithoutSuperclass,
+                kind: DispatchDiagnosticKind::InterfaceMethodFinal,
                 span: node.span,
             });
         }
     }
     for child in &parsed.class_declarations {
-        let Some(super_name) = child.superclass.as_deref() else {
+        if child.interface {
             continue;
-        };
-        let Some(parent) = parsed
-            .class_declarations
-            .iter()
-            .find(|candidate| candidate.name == super_name)
-        else {
-            continue;
-        };
+        }
+        if let Some(super_name) = child.superclass.as_deref()
+            && let Some(parent) = parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == super_name)
+            && parent.is_final
+            && let Some(node) = parsed.arena.node(child.declaration)
+        {
+            diagnostics.push(DispatchDiagnostic {
+                kind: DispatchDiagnosticKind::FinalClassInheritance,
+                span: node.span,
+            });
+        }
         for method in parsed
             .function_declarations
             .iter()
             .filter(|method| method.owner == Some(child.declaration))
         {
-            let inherited = parsed.function_declarations.iter().any(|candidate| {
-                candidate.owner == Some(parent.declaration) && candidate.name == method.name
-            });
-            if inherited
-                && !method.is_override
+            let targets = inherited_method_targets(parsed, child, &method.name);
+            let Some(parent_method) = targets.first().copied() else {
+                if method.is_override
+                    && let Some(node) = parsed.arena.node(method.declaration)
+                {
+                    diagnostics.push(DispatchDiagnostic {
+                        kind: DispatchDiagnosticKind::OverrideWithoutTarget,
+                        span: node.span,
+                    });
+                }
+                continue;
+            };
+            if !method.is_override
                 && let Some(node) = parsed.arena.node(method.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
@@ -731,35 +745,37 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                     span: node.span,
                 });
             }
-            if inherited {
-                let Some(parent_method) = parsed.function_declarations.iter().find(|candidate| {
-                    candidate.owner == Some(parent.declaration) && candidate.name == method.name
-                }) else {
-                    continue;
-                };
-                let return_compatible = type_annotation_name(parsed, method.return_annotation)
-                    == type_annotation_name(parsed, parent_method.return_annotation);
-                let method_parameters = parsed
-                    .function_parameters
-                    .iter()
-                    .filter(|parameter| parameter.function == method.declaration)
-                    .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
-                    .collect::<Vec<_>>();
-                let parent_parameters = parsed
-                    .function_parameters
-                    .iter()
-                    .filter(|parameter| parameter.function == parent_method.declaration)
-                    .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
-                    .collect::<Vec<_>>();
-                if method.is_override
-                    && (!return_compatible || method_parameters != parent_parameters)
-                    && let Some(node) = parsed.arena.node(method.declaration)
-                {
-                    diagnostics.push(DispatchDiagnostic {
-                        kind: DispatchDiagnosticKind::IncompatibleOverride,
-                        span: node.span,
-                    });
-                }
+            if method.is_override
+                && parent_method.is_final
+                && let Some(node) = parsed.arena.node(method.declaration)
+            {
+                diagnostics.push(DispatchDiagnostic {
+                    kind: DispatchDiagnosticKind::FinalMethodOverride,
+                    span: node.span,
+                });
+            }
+            let return_compatible = type_annotation_name(parsed, method.return_annotation)
+                == type_annotation_name(parsed, parent_method.return_annotation);
+            let method_parameters = parsed
+                .function_parameters
+                .iter()
+                .filter(|parameter| parameter.function == method.declaration)
+                .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
+                .collect::<Vec<_>>();
+            let parent_parameters = parsed
+                .function_parameters
+                .iter()
+                .filter(|parameter| parameter.function == parent_method.declaration)
+                .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
+                .collect::<Vec<_>>();
+            if method.is_override
+                && (!return_compatible || method_parameters != parent_parameters)
+                && let Some(node) = parsed.arena.node(method.declaration)
+            {
+                diagnostics.push(DispatchDiagnostic {
+                    kind: DispatchDiagnosticKind::IncompatibleOverride,
+                    span: node.span,
+                });
             }
         }
     }
@@ -768,6 +784,61 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
         .iter()
         .filter(|class| !class.interface)
     {
+        let mut interface_methods = Vec::new();
+        for interface_name in &class.interfaces {
+            for method in parsed.function_declarations.iter().filter(|method| {
+                method.owner.is_some_and(|owner| {
+                    parsed
+                        .class_declarations
+                        .iter()
+                        .find(|candidate| candidate.declaration == owner)
+                        .is_some_and(|candidate| candidate.interface)
+                })
+            }) {
+                if method
+                    .owner
+                    .and_then(|owner| {
+                        parsed
+                            .class_declarations
+                            .iter()
+                            .find(|candidate| candidate.declaration == owner)
+                    })
+                    .is_some_and(|candidate| candidate.name == *interface_name)
+                {
+                    interface_methods.push(method);
+                }
+            }
+        }
+        for (index, method) in interface_methods.iter().enumerate() {
+            if interface_methods[index + 1..].iter().any(|other| {
+                other.name == method.name
+                    && (type_annotation_name(parsed, method.return_annotation)
+                        != type_annotation_name(parsed, other.return_annotation)
+                        || parsed
+                            .function_parameters
+                            .iter()
+                            .filter(|parameter| parameter.function == method.declaration)
+                            .map(|parameter| {
+                                type_annotation_name(parsed, Some(parameter.annotation))
+                            })
+                            .collect::<Vec<_>>()
+                            != parsed
+                                .function_parameters
+                                .iter()
+                                .filter(|parameter| parameter.function == other.declaration)
+                                .map(|parameter| {
+                                    type_annotation_name(parsed, Some(parameter.annotation))
+                                })
+                                .collect::<Vec<_>>())
+            }) && let Some(node) = parsed.arena.node(class.declaration)
+            {
+                diagnostics.push(DispatchDiagnostic {
+                    kind: DispatchDiagnosticKind::AmbiguousInterfaceMethod,
+                    span: node.span,
+                });
+                break;
+            }
+        }
         for interface_name in &class.interfaces {
             let Some(interface) = parsed
                 .class_declarations
@@ -794,6 +865,61 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
         }
     }
     diagnostics
+}
+
+fn inherited_method_targets<'a>(
+    parsed: &'a ParseOutput,
+    class: &ParsedClassDeclaration,
+    method_name: &str,
+) -> Vec<&'a ParsedFunctionDeclaration> {
+    let mut targets = Vec::new();
+    let mut superclass = class.superclass.as_deref();
+    while let Some(name) = superclass {
+        let Some(parent) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == name)
+        else {
+            break;
+        };
+        targets.extend(
+            parsed
+                .function_declarations
+                .iter()
+                .filter(|function| function.owner == Some(parent.declaration))
+                .filter(|function| function.name == method_name),
+        );
+        superclass = parent.superclass.as_deref();
+    }
+    for interface_name in &class.interfaces {
+        collect_interface_method_targets(parsed, interface_name, method_name, &mut targets);
+    }
+    targets
+}
+
+fn collect_interface_method_targets<'a>(
+    parsed: &'a ParseOutput,
+    interface_name: &str,
+    method_name: &str,
+    targets: &mut Vec<&'a ParsedFunctionDeclaration>,
+) {
+    let Some(interface) = parsed
+        .class_declarations
+        .iter()
+        .find(|candidate| candidate.interface && candidate.name == interface_name)
+    else {
+        return;
+    };
+    targets.extend(
+        parsed
+            .function_declarations
+            .iter()
+            .filter(|function| function.owner == Some(interface.declaration))
+            .filter(|function| function.name == method_name),
+    );
+    for parent in &interface.interfaces {
+        collect_interface_method_targets(parsed, parent, method_name, targets);
+    }
 }
 
 fn type_annotation_name(parsed: &ParseOutput, annotation: Option<AstNodeId>) -> Option<String> {
@@ -854,6 +980,8 @@ pub fn type_m0068_class_types_in(
         report.classes.push(ClassTypeRecord {
             declaration: declaration.declaration,
             name: declaration.name.clone(),
+            is_final: declaration.is_final,
+            interface: declaration.interface,
             type_id,
             superclass: declaration.superclass.clone(),
             interfaces: declaration.interfaces.clone(),

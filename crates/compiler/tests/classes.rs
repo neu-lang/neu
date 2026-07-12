@@ -180,11 +180,10 @@ fn associates_method_declarations_with_their_class() {
 fn preserves_method_dispatch_modifiers_and_visibility() {
     let parsed = parse_source(
         SourceFileId::from_raw(6805),
-        "class Base { open fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } }",
+        "class Base { fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } }",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert_eq!(parsed.function_declarations.len(), 2);
-    assert!(parsed.function_declarations[0].is_open);
     assert!(parsed.function_declarations[1].is_override);
     assert!(check_m0070_dispatch(&parsed).is_empty());
 
@@ -225,7 +224,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 
     let incompatible = parse_source(
         SourceFileId::from_raw(6822),
-        "class Base { open fun value(): Int { return 1; } } class Child: Base() { override fun value(): Bool { return true; } }",
+        "class Base { fun value(): Int { return 1; } } class Child: Base() { override fun value(): Bool { return true; } }",
     );
     assert!(
         check_m0070_dispatch(&incompatible)
@@ -288,7 +287,7 @@ fn dispatches_a_same_module_class_method() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Point(val value: Int) { open fun answer(): Int { return 9; } } public fun main(): Int { val point: Point = new Point(7); return point.answer(); }",
+        "class Point(val value: Int) { fun answer(): Int { return 9; } } public fun main(): Int { val point: Point = new Point(7); return point.answer(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6810),
             ModuleName::parse("classes").unwrap(),
@@ -453,13 +452,63 @@ fn class_method_reads_a_bare_inherited_field() {
 }
 
 #[test]
+fn open_method_declaration_is_rejected() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6830),
+        "class Base { open fun value(): Int { return 1; } }",
+    );
+    assert!(!parsed.diagnostics.is_empty());
+}
+
+#[test]
+fn default_overridable_method_dispatches_through_a_base_type() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-virtual-dispatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base { fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } } public fun main(): Int { val base: Base = new Child(); return base.value(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6831),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(2)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn final_class_is_accepted_and_final_method_cannot_be_overridden() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6832),
+        "final class Sealed { final fun value(): Int { return 7; } }",
+    );
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+
+    let invalid = parse_source(
+        SourceFileId::from_raw(6833),
+        "class Base { final fun value(): Int { return 1; } } class Child: Base() { override fun value(): Int { return 2; } }",
+    );
+    assert!(!check_m0070_dispatch(&invalid).is_empty());
+}
+
+#[test]
 fn class_method_can_call_immediate_super_method() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-super-method-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base { open fun value(): Int { return 2; } } class Child: Base() { override fun value(): Int { return super.value() + 1; } } public fun main(): Int { val child: Child = new Child(); return child.value(); }",
+        "class Base { fun value(): Int { return 2; } } class Child: Base() { override fun value(): Int { return super.value() + 1; } } public fun main(): Int { val child: Child = new Child(); return child.value(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6816),
             ModuleName::parse("classes").unwrap(),

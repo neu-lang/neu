@@ -1,7 +1,7 @@
 package examples.current
 
 class Counter(var value: Int) {
-    open fun increment(amount: Int): Int {
+    fun increment(amount: Int): Int {
         this.value = this.value + amount;
         return this.value;
     }

@@ -98,6 +98,7 @@ pub struct ParseOutput {
 pub struct ParsedClassDeclaration {
     pub declaration: AstNodeId,
     pub name: String,
+    pub is_final: bool,
     pub superclass: Option<String>,
     pub superclass_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
@@ -158,7 +159,6 @@ pub struct ParsedFunctionDeclaration {
     pub name: String,
     pub visibility: String,
     pub is_override: bool,
-    pub is_open: bool,
     pub is_final: bool,
     pub body: Option<AstNodeId>,
     pub return_annotation: Option<AstNodeId>,
@@ -556,7 +556,6 @@ struct Parser<'source> {
     current_class: Option<AstNodeId>,
     pending_method_visibility: String,
     pending_method_override: bool,
-    pending_method_open: bool,
     pending_method_final: bool,
 }
 
@@ -611,7 +610,6 @@ impl<'source> Parser<'source> {
             current_class: None,
             pending_method_visibility: "internal".to_owned(),
             pending_method_override: false,
-            pending_method_open: false,
             pending_method_final: false,
         }
     }
@@ -673,9 +671,19 @@ impl<'source> Parser<'source> {
         }
 
         let mut saw_visibility = false;
-        while self.is_visibility() || self.is_unsupported_modifier() {
+        let mut final_class = false;
+        while self.is_visibility()
+            || self.is_unsupported_modifier()
+            || self.current_kind() == Some(TokenKind::KwFinal)
+        {
             let token = self.current().expect("modifier token exists").clone();
-            if self.is_visibility() {
+            if token.kind == TokenKind::KwFinal {
+                if self.peek_kind() == Some(TokenKind::KwClass) {
+                    final_class = true;
+                } else {
+                    self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
+                }
+            } else if self.is_visibility() {
                 if saw_visibility {
                     self.diagnostic(DiagnosticKind::DuplicateVisibilityModifier, token.span);
                 }
@@ -688,17 +696,23 @@ impl<'source> Parser<'source> {
 
         match self.current_kind() {
             Some(TokenKind::KwFun) => self.parse_function(in_body),
-            Some(TokenKind::KwClass) => {
-                self.parse_named_body_declaration(AstNodeKind::ClassDeclaration, in_body)
-            }
+            Some(TokenKind::KwClass) => self.parse_named_body_declaration(
+                AstNodeKind::ClassDeclaration,
+                in_body,
+                final_class,
+            ),
             Some(TokenKind::KwStruct) => {
-                self.parse_named_body_declaration(AstNodeKind::StructDeclaration, in_body)
+                self.parse_named_body_declaration(AstNodeKind::StructDeclaration, in_body, false)
             }
             Some(TokenKind::KwEnum) => {
-                self.parse_named_body_declaration(AstNodeKind::EnumDeclaration, in_body)
+                self.parse_named_body_declaration(AstNodeKind::EnumDeclaration, in_body, false)
             }
             Some(TokenKind::KwInterface) => {
-                self.parse_named_body_declaration(AstNodeKind::InterfaceDeclaration, in_body);
+                self.parse_named_body_declaration(
+                    AstNodeKind::InterfaceDeclaration,
+                    in_body,
+                    false,
+                );
             }
             Some(TokenKind::KwPackage | TokenKind::KwImport) if in_body => {
                 let span = self.current().expect("member token exists").span;
@@ -784,7 +798,6 @@ impl<'source> Parser<'source> {
                     name: method_name.clone(),
                     visibility: self.pending_method_visibility.clone(),
                     is_override: self.pending_method_override,
-                    is_open: self.pending_method_open,
                     is_final: self.pending_method_final,
                     body: None,
                     return_annotation,
@@ -824,7 +837,6 @@ impl<'source> Parser<'source> {
                     name: method_name,
                     visibility: self.pending_method_visibility.clone(),
                     is_override: self.pending_method_override,
-                    is_open: self.pending_method_open,
                     is_final: self.pending_method_final,
                     body,
                     return_annotation,
@@ -984,7 +996,7 @@ impl<'source> Parser<'source> {
         false
     }
 
-    fn parse_named_body_declaration(&mut self, kind: AstNodeKind, in_body: bool) {
+    fn parse_named_body_declaration(&mut self, kind: AstNodeKind, in_body: bool, is_final: bool) {
         let start = self
             .current()
             .expect("declaration token exists")
@@ -1129,6 +1141,7 @@ impl<'source> Parser<'source> {
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
+                is_final,
                 superclass,
                 superclass_arguments,
                 interfaces,
@@ -1143,6 +1156,7 @@ impl<'source> Parser<'source> {
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
+                is_final: false,
                 superclass,
                 superclass_arguments: Vec::new(),
                 interfaces,
@@ -1177,7 +1191,6 @@ impl<'source> Parser<'source> {
             {
                 self.pending_method_visibility = "internal".to_owned();
                 self.pending_method_override = false;
-                self.pending_method_open = false;
                 self.pending_method_final = false;
                 while self.is_visibility()
                     || matches!(
@@ -1191,7 +1204,11 @@ impl<'source> Parser<'source> {
                     } else {
                         match self.current_kind() {
                             Some(TokenKind::KwOverride) => self.pending_method_override = true,
-                            Some(TokenKind::KwOpen) => self.pending_method_open = true,
+                            Some(TokenKind::KwOpen) => {
+                                self.diagnostic_current(
+                                    DiagnosticKind::UnsupportedDeclarationModifier,
+                                );
+                            }
                             Some(TokenKind::KwFinal) => self.pending_method_final = true,
                             _ => {}
                         }

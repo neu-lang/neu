@@ -333,7 +333,8 @@ pub fn compile_source_to_executable(
             true,
         )
         .with_byte_type(byte_type)
-        .with_effect_contracts(&effect_contracts),
+        .with_effect_contracts(&effect_contracts)
+        .with_class_types(&class_types),
     )
     .map_err(DriverError::Hir)?;
     let mir = lower_hir_to_mir(&hir, &types).map_err(DriverError::Mir)?;

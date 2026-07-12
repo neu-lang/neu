@@ -4,7 +4,7 @@ use crate::{
     ownership_effects::OwnershipEffectContract,
     parser::{ParseOutput, ParsedBinaryOperator, ParsedLiteralKind},
     source::ByteSpan,
-    type_check::{ExpressionType, FunctionSignature},
+    type_check::{ClassTypeReport, ExpressionType, FunctionSignature},
     types::TypeId,
 };
 
@@ -38,6 +38,7 @@ pub struct CheckedHirSource<'a> {
     clean: bool,
     byte_type: Option<TypeId>,
     effect_contracts: Option<&'a [OwnershipEffectContract]>,
+    class_types: Option<&'a ClassTypeReport>,
 }
 impl<'a> CheckedHirSource<'a> {
     pub fn new(
@@ -57,6 +58,7 @@ impl<'a> CheckedHirSource<'a> {
             clean,
             byte_type: None,
             effect_contracts: None,
+            class_types: None,
         }
     }
 
@@ -70,6 +72,11 @@ impl<'a> CheckedHirSource<'a> {
         effect_contracts: &'a [OwnershipEffectContract],
     ) -> Self {
         self.effect_contracts = Some(effect_contracts);
+        self
+    }
+
+    pub fn with_class_types(mut self, class_types: &'a ClassTypeReport) -> Self {
+        self.class_types = Some(class_types);
         self
     }
 }
@@ -804,12 +811,16 @@ fn lower_expression(
             .iter()
             .find(|name| name.reference == call.callee)
         {
-            source
-                .parsed
-                .function_declarations
-                .iter()
-                .position(|function| function.name == name.name)
-                .ok_or(HirLoweringError::UnsupportedExpression)?
+            hir_function_index(
+                source.parsed,
+                source
+                    .parsed
+                    .function_declarations
+                    .iter()
+                    .position(|function| function.name == name.name)
+                    .ok_or(HirLoweringError::UnsupportedExpression)?,
+            )
+            .ok_or(HirLoweringError::UnsupportedExpression)?
         } else {
             method_declaration_index(source, call.callee, call.function)
                 .ok_or(HirLoweringError::UnsupportedExpression)?
@@ -844,11 +855,14 @@ fn lower_expression(
                 .collect::<Result<Vec<_>, _>>()?,
         );
         let id = HirExpressionId::from_raw(output.len());
+        let (dispatch, targets) =
+            method_dispatch_facts(source, call.callee, function_declaration, declaration);
         output.push(HirExpression::direct_call(
             id,
             span,
             ty,
-            HirDirectCall::new(HirFunctionId::from_raw(declaration), arguments),
+            HirDirectCall::new(HirFunctionId::from_raw(declaration), arguments)
+                .with_dispatch(dispatch, targets),
         ));
         return Ok(id);
     }
@@ -1147,7 +1161,8 @@ fn method_declaration_index(
             .iter()
             .position(|function| {
                 function.owner == Some(class.declaration) && function.name == member.name
-            });
+            })
+            .and_then(|index| hir_function_index(source.parsed, index));
     }
     let binding = source
         .parsed
@@ -1172,13 +1187,273 @@ fn method_declaration_index(
         .class_declarations
         .iter()
         .find(|class| class.name == class_name)?;
-    source
+    let direct = source
         .parsed
         .function_declarations
         .iter()
         .position(|function| {
             function.owner == Some(class.declaration) && function.name == member.name
         })
+        .and_then(|index| hir_function_index(source.parsed, index));
+    direct.or_else(|| {
+        source
+            .class_types?
+            .classes()
+            .iter()
+            .find(|candidate| {
+                !candidate.is_interface()
+                    && candidate
+                        .interfaces()
+                        .iter()
+                        .any(|name| name == &class_name)
+            })
+            .and_then(|candidate| method_owner_declaration(source, candidate.name(), &member.name))
+            .and_then(|declaration| {
+                let index = source
+                    .parsed
+                    .function_declarations
+                    .iter()
+                    .position(|function| function.declaration == declaration)?;
+                hir_function_index(source.parsed, index)
+            })
+    })
+}
+
+fn hir_function_index(parsed: &ParseOutput, parsed_index: usize) -> Option<usize> {
+    parsed
+        .function_declarations
+        .iter()
+        .take(parsed_index + 1)
+        .filter(|function| function.body.is_some())
+        .count()
+        .checked_sub(1)
+}
+
+fn method_dispatch_facts(
+    source: &CheckedHirSource<'_>,
+    callee: crate::ast::AstNodeId,
+    function_declaration: crate::ast::AstNodeId,
+    static_callee: usize,
+) -> (HirDispatchKind, Vec<HirDispatchTarget>) {
+    let Some(member) = source
+        .parsed
+        .member_expressions
+        .iter()
+        .find(|member| member.expression == callee)
+    else {
+        return (HirDispatchKind::Direct, Vec::new());
+    };
+    let Some(classes) = source.class_types else {
+        return (HirDispatchKind::Direct, Vec::new());
+    };
+    let Some(receiver_class) = receiver_class_name(source, member.receiver, function_declaration)
+    else {
+        return (HirDispatchKind::Direct, Vec::new());
+    };
+    let Some(receiver_record) = classes
+        .classes()
+        .iter()
+        .find(|class| class.name() == receiver_class)
+    else {
+        return (HirDispatchKind::Direct, Vec::new());
+    };
+    let Some(static_function) = parsed_function_for_hir(source.parsed, static_callee) else {
+        return (HirDispatchKind::Direct, Vec::new());
+    };
+    let receiver_name = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == member.receiver)
+        .map(|name| name.name.as_str());
+    if receiver_name == Some("super") {
+        return (HirDispatchKind::StaticSuper, Vec::new());
+    }
+    if receiver_record.is_interface() {
+        return (
+            HirDispatchKind::Interface,
+            dispatch_targets_for_classes(source, classes, receiver_record.name(), &member.name),
+        );
+    }
+    if static_function.is_final || static_function.visibility == "private" {
+        return (HirDispatchKind::Direct, Vec::new());
+    }
+    let targets =
+        dispatch_targets_for_classes(source, classes, receiver_record.name(), &member.name);
+    if targets.is_empty() {
+        (HirDispatchKind::Direct, Vec::new())
+    } else {
+        (HirDispatchKind::VirtualClass, targets)
+    }
+}
+
+fn receiver_class_name<'a>(
+    source: &'a CheckedHirSource<'_>,
+    receiver: crate::ast::AstNodeId,
+    function_declaration: crate::ast::AstNodeId,
+) -> Option<&'a str> {
+    if let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == receiver)
+    {
+        if name.name == "this" {
+            let owner = source
+                .parsed
+                .function_declarations
+                .iter()
+                .find(|function| function.declaration == function_declaration)?
+                .owner?;
+            return source
+                .parsed
+                .class_declarations
+                .iter()
+                .find(|class| class.declaration == owner)
+                .map(|class| class.name.as_str());
+        }
+        if name.name == "super" {
+            let owner = source
+                .parsed
+                .function_declarations
+                .iter()
+                .find(|function| function.declaration == function_declaration)?
+                .owner?;
+            let class = source
+                .parsed
+                .class_declarations
+                .iter()
+                .find(|class| class.declaration == owner)?;
+            return class.superclass.as_deref();
+        }
+        let binding = source
+            .parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == name.name)?;
+        let declaration = source
+            .parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == binding.binding)?;
+        let annotation = declaration.annotation?;
+        return source
+            .parsed
+            .type_name_references
+            .iter()
+            .find(|reference| reference.reference == annotation)
+            .map(|reference| reference.name.as_str());
+    }
+    source
+        .parsed
+        .new_expressions
+        .iter()
+        .find(|new_expression| new_expression.expression == receiver)
+        .map(|new_expression| new_expression.type_name.as_str())
+}
+
+fn dispatch_targets_for_classes(
+    source: &CheckedHirSource<'_>,
+    classes: &ClassTypeReport,
+    receiver_name: &str,
+    method_name: &str,
+) -> Vec<HirDispatchTarget> {
+    classes
+        .classes()
+        .iter()
+        .filter(|candidate| {
+            (!candidate.is_interface())
+                && (candidate.name() == receiver_name
+                    || candidate.superclass() == Some(receiver_name)
+                    || is_subclass_of(classes, candidate.name(), receiver_name)
+                    || (classes
+                        .classes()
+                        .iter()
+                        .find(|base| base.name() == receiver_name)
+                        .is_some_and(|base| base.is_interface())
+                        && implements_interface(classes, candidate.name(), receiver_name)))
+        })
+        .filter_map(|candidate| {
+            let declaration = method_owner_declaration(source, candidate.name(), method_name)?;
+            let parsed_index = source
+                .parsed
+                .function_declarations
+                .iter()
+                .position(|function| function.declaration == declaration)?;
+            let hir_index = hir_function_index(source.parsed, parsed_index)?;
+            Some(HirDispatchTarget::new(
+                candidate.type_id(),
+                HirFunctionId::from_raw(hir_index),
+            ))
+        })
+        .collect()
+}
+
+fn method_owner_declaration(
+    source: &CheckedHirSource<'_>,
+    class_name: &str,
+    method_name: &str,
+) -> Option<crate::ast::AstNodeId> {
+    let class = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name)?;
+    if let Some(function) = source.parsed.function_declarations.iter().find(|function| {
+        function.owner == Some(class.declaration)
+            && function.name == method_name
+            && function.body.is_some()
+    }) {
+        return Some(function.declaration);
+    }
+    class
+        .superclass
+        .as_deref()
+        .and_then(|parent| method_owner_declaration(source, parent, method_name))
+}
+
+fn parsed_function_for_hir(
+    parsed: &ParseOutput,
+    hir_index: usize,
+) -> Option<&crate::parser::ParsedFunctionDeclaration> {
+    parsed
+        .function_declarations
+        .iter()
+        .filter(|function| function.body.is_some())
+        .nth(hir_index)
+}
+
+fn is_subclass_of(classes: &ClassTypeReport, candidate: &str, base: &str) -> bool {
+    let mut current = classes
+        .classes()
+        .iter()
+        .find(|class| class.name() == candidate);
+    while let Some(class) = current {
+        if class.superclass() == Some(base) {
+            return true;
+        }
+        current = class.superclass().and_then(|parent| {
+            classes
+                .classes()
+                .iter()
+                .find(|class| class.name() == parent)
+        });
+    }
+    false
+}
+
+fn implements_interface(classes: &ClassTypeReport, candidate: &str, interface: &str) -> bool {
+    let Some(class) = classes
+        .classes()
+        .iter()
+        .find(|class| class.name() == candidate)
+    else {
+        return false;
+    };
+    class.interfaces().iter().any(|name| name == interface)
+        || class
+            .superclass()
+            .is_some_and(|parent| implements_interface(classes, parent, interface))
 }
 
 fn lower_control_flow_block(
@@ -1612,6 +1887,37 @@ impl HirLocal {
 pub struct HirDirectCall {
     callee: HirFunctionId,
     arguments: Vec<HirExpressionId>,
+    dispatch: HirDispatchKind,
+    targets: Vec<HirDispatchTarget>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum HirDispatchKind {
+    Direct,
+    VirtualClass,
+    Interface,
+    StaticSuper,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HirDispatchTarget {
+    receiver_type: TypeId,
+    callee: HirFunctionId,
+}
+
+impl HirDispatchTarget {
+    pub fn new(receiver_type: TypeId, callee: HirFunctionId) -> Self {
+        Self {
+            receiver_type,
+            callee,
+        }
+    }
+    pub fn receiver_type(self) -> TypeId {
+        self.receiver_type
+    }
+    pub fn callee(self) -> HirFunctionId {
+        self.callee
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1688,13 +1994,33 @@ impl HirBinary {
 }
 impl HirDirectCall {
     pub fn new(callee: HirFunctionId, arguments: Vec<HirExpressionId>) -> Self {
-        Self { callee, arguments }
+        Self {
+            callee,
+            arguments,
+            dispatch: HirDispatchKind::Direct,
+            targets: Vec::new(),
+        }
+    }
+    pub fn with_dispatch(
+        mut self,
+        dispatch: HirDispatchKind,
+        targets: Vec<HirDispatchTarget>,
+    ) -> Self {
+        self.dispatch = dispatch;
+        self.targets = targets;
+        self
     }
     pub fn callee(&self) -> HirFunctionId {
         self.callee
     }
     pub fn arguments(&self) -> &[HirExpressionId] {
         &self.arguments
+    }
+    pub fn dispatch(&self) -> HirDispatchKind {
+        self.dispatch
+    }
+    pub fn targets(&self) -> &[HirDispatchTarget] {
+        &self.targets
     }
 }
 

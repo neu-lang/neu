@@ -41,6 +41,8 @@ struct LoweringContext<'a> {
     function: &'a MirFunction,
     type_arena: &'a TypeArena,
     function_return_types: &'a HashMap<crate::mir::MirFunctionId, TypeId>,
+    function_parameter_types: &'a HashMap<crate::mir::MirFunctionId, Vec<TypeId>>,
+    call_conv: CallConv,
     runtime: Option<&'a RuntimeFunctions>,
 }
 
@@ -125,6 +127,20 @@ pub fn lower_mir_module_to_cranelift(
         .iter()
         .map(|function| (function.id(), function.return_type()))
         .collect::<HashMap<_, _>>();
+    let function_parameter_types = module
+        .functions()
+        .iter()
+        .map(|function| {
+            (
+                function.id(),
+                function
+                    .parameters()
+                    .iter()
+                    .map(|(_, ty)| *ty)
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
     for function in module.functions() {
         let identity = function
             .symbol_identity()
@@ -145,6 +161,7 @@ pub fn lower_mir_module_to_cranelift(
             Some(&mut object_module),
             &function_ids,
             &function_return_types,
+            &function_parameter_types,
             Some(&runtime),
         )?;
         output.push(clif_function.display().to_string());
@@ -182,6 +199,20 @@ pub fn emit_mir_module_to_object_for_target(
         .iter()
         .map(|function| (function.id(), function.return_type()))
         .collect::<HashMap<_, _>>();
+    let function_parameter_types = module
+        .functions()
+        .iter()
+        .map(|function| {
+            (
+                function.id(),
+                function
+                    .parameters()
+                    .iter()
+                    .map(|(_, ty)| *ty)
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
     for function in module.functions() {
         let identity = function
             .symbol_identity()
@@ -214,6 +245,7 @@ pub fn emit_mir_module_to_object_for_target(
             Some(&mut object_module),
             &function_ids,
             &function_return_types,
+            &function_parameter_types,
             Some(&runtime),
         )?;
         let function_id = function_ids
@@ -328,10 +360,12 @@ fn lower_mir_function_with_runtime(
         None,
         &HashMap::new(),
         &HashMap::new(),
+        &HashMap::new(),
         runtime,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_mir_function_with_module(
     function: &MirFunction,
     type_arena: &TypeArena,
@@ -339,6 +373,7 @@ fn lower_mir_function_with_module(
     module: Option<&mut ObjectModule>,
     function_ids: &HashMap<crate::mir::MirFunctionId, FuncId>,
     function_return_types: &HashMap<crate::mir::MirFunctionId, TypeId>,
+    function_parameter_types: &HashMap<crate::mir::MirFunctionId, Vec<TypeId>>,
     runtime: Option<&RuntimeFunctions>,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_runtime_type(function.return_type(), type_arena)?;
@@ -362,6 +397,8 @@ fn lower_mir_function_with_module(
             function,
             type_arena,
             function_return_types,
+            function_parameter_types,
+            call_conv: CallConv::triple_default(target),
             runtime,
         };
         let mut clif_blocks = HashMap::new();
@@ -828,6 +865,137 @@ fn lower_instruction(
             }
             Ok(())
         }
+        MirInstruction::VirtualCall {
+            output,
+            arguments,
+            targets,
+            ..
+        }
+        | MirInstruction::InterfaceCall {
+            output,
+            arguments,
+            targets,
+            ..
+        } => {
+            let module = module
+                .as_deref_mut()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let receiver = arguments
+                .first()
+                .and_then(|value| values.get(value).copied())
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let first = targets
+                .first()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let parameter_types = context
+                .function_parameter_types
+                .get(&first.callee())
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let return_type = context
+                .function_return_types
+                .get(&first.callee())
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let mut signature = Signature::new(context.call_conv);
+            for parameter_type in parameter_types {
+                let mut parameter_types = Vec::new();
+                flattened_cranelift_types(
+                    *parameter_type,
+                    context.type_arena,
+                    &mut parameter_types,
+                )?;
+                signature
+                    .params
+                    .extend(parameter_types.into_iter().map(AbiParam::new));
+            }
+            let mut return_types = Vec::new();
+            flattened_cranelift_types(return_type, context.type_arena, &mut return_types)?;
+            signature
+                .returns
+                .extend(return_types.into_iter().map(AbiParam::new));
+            let signature_ref = builder.import_signature(signature);
+            let mut selected = None;
+            let mut matched = builder.ins().iconst(types::I8, 0);
+            let tag = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), receiver, -8);
+            for target in targets {
+                let function_id = function_ids
+                    .get(&target.callee())
+                    .copied()
+                    .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+                let function_ref = module.declare_func_in_func(function_id, builder.func);
+                let address = builder.ins().func_addr(types::I64, function_ref);
+                let expected = builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(target.receiver_type().index()).unwrap_or(0),
+                );
+                let condition = builder.ins().icmp(IntCC::Equal, tag, expected);
+                selected = Some(match selected {
+                    Some(previous) => builder.ins().select(condition, address, previous),
+                    None => address,
+                });
+                let one = builder.ins().iconst(types::I8, 1);
+                matched = builder.ins().select(condition, one, matched);
+            }
+            let selected = selected.ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            builder.ins().trapz(matched, TrapCode::unwrap_user(5));
+            let mut call_arguments = Vec::new();
+            for argument in arguments {
+                if let Some(aggregate) = aggregate_values.get(argument) {
+                    call_arguments.extend(aggregate.iter().copied());
+                } else if let Some(value) = values.get(argument).copied() {
+                    call_arguments.push(value);
+                }
+            }
+            let call = builder
+                .ins()
+                .call_indirect(signature_ref, selected, &call_arguments);
+            let results = builder.inst_results(call).to_vec();
+            if array_shape(return_type, context.type_arena).is_some() {
+                aggregate_values.insert(*output, results);
+            } else if let Some(value) = results.first().copied() {
+                values.insert(
+                    *output,
+                    normalize_bool_value(value, return_type, context.type_arena, builder),
+                );
+            }
+            Ok(())
+        }
+        MirInstruction::StaticSuperCall {
+            output,
+            callee,
+            arguments,
+            ..
+        } => {
+            let function_id = function_ids
+                .get(callee)
+                .copied()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let module = module
+                .as_deref_mut()
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let function_ref = module.declare_func_in_func(function_id, builder.func);
+            let mut call_arguments = Vec::new();
+            for argument in arguments {
+                if let Some(value) = values.get(argument).copied() {
+                    call_arguments.push(value);
+                }
+            }
+            let call = builder.ins().call(function_ref, &call_arguments);
+            if let Some(value) = builder.inst_results(call).first().copied() {
+                let ty = context
+                    .function_return_types
+                    .get(callee)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                values.insert(
+                    *output,
+                    normalize_bool_value(value, ty, context.type_arena, builder),
+                );
+            }
+            Ok(())
+        }
         MirInstruction::ArrayValue { output, local, .. } => {
             let (_, length) = context
                 .function
@@ -848,14 +1016,17 @@ fn lower_instruction(
             Ok(())
         }
         MirInstruction::NewObject {
-            output, arguments, ..
+            output,
+            type_id,
+            arguments,
+            ..
         } => {
             let runtime = context
                 .runtime
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
             let word_count = i64::try_from(arguments.len().max(1))
                 .map_err(|_| CraneliftLoweringError::UnsupportedInstruction)?;
-            let size = builder.ins().iconst(types::I64, (word_count + 1) * 8);
+            let size = builder.ins().iconst(types::I64, (word_count + 2) * 8);
             let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
             let allocation = builder.ins().call(malloc_ref, &[size]);
             let allocation = *builder
@@ -866,7 +1037,13 @@ fn lower_instruction(
             builder
                 .ins()
                 .store(MemFlagsData::new(), size, allocation, 0);
-            let pointer = builder.ins().iadd_imm(allocation, 8);
+            let type_tag = builder
+                .ins()
+                .iconst(types::I64, i64::try_from(type_id.index()).unwrap_or(0));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), type_tag, allocation, 8);
+            let pointer = builder.ins().iadd_imm(allocation, 16);
             for (index, argument) in arguments.iter().enumerate() {
                 let value = values
                     .get(argument)

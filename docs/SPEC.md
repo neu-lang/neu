@@ -779,11 +779,12 @@ deferred.
 
 ## ADR-0066: Inheritance And Dispatch
 
-Neu uses one direct superclass and multiple interfaces. Only explicitly `open`
-methods may be overridden; `final` is the default. Overrides require explicit
-`override` and compatible parameter types, return type, visibility, receiver
-effects, and capabilities. Private methods are not virtual. Field hiding is
-rejected, and there is no `protected` visibility.
+Neu uses one direct superclass and multiple interfaces. The `open`-gating and
+default-final wording in this historical section is superseded by ADR-0070;
+classes and methods are overridable by default and `final` opts out. Overrides
+require explicit `override` and compatible parameter types, return type,
+visibility, receiver effects, and capabilities. Private methods are not
+virtual. Field hiding is rejected, and there is no `protected` visibility.
 
 `super.method(...)` is valid only in a derived instance method or constructor,
 selects the immediate superclass implementation, and cannot be stored,
@@ -793,13 +794,14 @@ lookup. A class must satisfy every required interface method exactly once.
 Default-method conflict rules are deferred because default methods are
 deferred.
 
-Non-overridden or final methods use compiler-private direct dispatch. Open class
-methods use compiler-private virtual metadata and interface calls use
+Non-overridden or final methods use compiler-private direct dispatch.
+Overridable class methods use compiler-private virtual metadata and interface calls use
 compiler-private interface tables. No object, vtable, interface-table, method,
 or symbol layout is a stable public ABI or FFI contract. Separate compilation
 exports nominal method identity, visibility, signatures, override relationships,
 capabilities, and ownership-effect metadata, not target-specific table
-layouts. Downcasts, runtime type tests, nullable dispatch, reflection,
+layouts. Downcasts, runtime type tests, nullable dispatch beyond existing flow
+typing, reflection,
 multiple dispatch, dynamic loading, and FFI vtables are deferred.
 
 ## ADR-0067: Object Lifecycle And ABI
@@ -874,3 +876,27 @@ field name means `this.field`; explicit `this.field` disambiguates a shadowed
 field. Task-008 records nominal and field metadata and type-checks projections
 only where an accepted receiver context exists. `new`, constructor calls,
 allocation, initialization, and runtime object access are deferred to task-009.
+
+## ADR-0070: Final-Only Runtime Dispatch
+
+Classes and methods are overridable by default. `final class` prevents
+subclassing, `final fun` prevents overriding, and `override fun` remains
+required for inherited replacements. `open` is not accepted in declaration
+positions and is diagnosed rather than silently migrated. Interface methods and
+constructors cannot be `final` or `override`; private methods are non-virtual.
+
+Class calls preserve compiler-private direct, virtual-class, interface, and
+static-super dispatch facts. Base-typed and interface-typed receivers select
+the runtime object's most-derived implementation. `super.method(...)` always
+selects the immediate superclass implementation statically. Method identity,
+override target, dispatch slot, receiver ownership/effects, and source spans
+are preserved through HIR, MIR, Cranelift, object emission, and linking.
+
+Vtables and interface tables are compiler-generated, object-owned,
+target-specific metadata. Their layouts, pointers, slots, symbols, and ABI are
+not public, stable, or available to FFI. Separate compilation exchanges
+nominal method and dispatch metadata rather than raw table layouts. Nullable
+receivers must be flow-refined before dispatch under existing rules. Multiple
+class inheritance, default interface methods, reflection, dynamic loading,
+runtime type tests and downcasts, FFI tables, and new reference/move/lifetime
+syntax remain deferred.
