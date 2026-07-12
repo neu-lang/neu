@@ -1,0 +1,7 @@
+{
+  "name": "neu.bootstrap",
+  "description": "Neu bootstrap compiler smoke project",
+  "entrypoint": "examples/current/bootstrap_backend_smoke.neu",
+  "srcs": ["examples/current/bootstrap_backend_smoke.neu"],
+  "dependencies": []
+}

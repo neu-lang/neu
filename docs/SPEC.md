@@ -1295,3 +1295,15 @@ dependencies create or update `neu.lock.json` atomically after complete
 resolution; entries are sorted and record module, URL, type, requested tag, and
 resolved commit. Locked builds reject moved tags and offline misses. Registries,
 archives, binaries, branches, features, and automatic updates remain deferred.
+
+## Project Build Command
+
+The `neu` workspace binary exposes only `neu build` initially. It discovers
+`neu.json` from the current directory or an explicit project/manifest path,
+defaults the target to the host, and writes to
+`<manifest-root>/target/<safe-manifest-name>` unless `--output` is supplied.
+`--target` selects a bundled target pack. The command creates output
+directories, never executes the produced binary, and reports compiler,
+manifest, dependency, target-pack, linker, and I/O failures with a non-zero
+exit status. Raw-source APIs remain library interfaces; `run`, `check`, `test`,
+package-manager, registry, and dependency-update commands are deferred.
