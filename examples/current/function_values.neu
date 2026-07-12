@@ -1,0 +1,14 @@
+package examples.current
+
+func increment(value: Int): Int {
+    return value + 1;
+}
+
+func selected(): (Int) -> Int {
+    return increment;
+}
+
+public func main(): Int {
+    val operation: (Int) -> Int = selected();
+    return operation(6);
+}

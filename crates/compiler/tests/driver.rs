@@ -63,6 +63,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("static_class_functions", 7),
         ("abstract_classes", 7),
         ("move_only_captures", 7),
+        ("function_values", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -254,6 +255,38 @@ fn move_only_lambda_capture_consumes_source_binding() {
     )
     .unwrap_err();
     assert!(format!("{error:?}").contains("UseAfterMove"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn stores_returns_and_applies_named_function_value() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-function-value-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        func increment(value: Int): Int { return value + 1; }
+        func selected(): (Int) -> Int { return increment; }
+        public func main(): Int {
+            val operation: (Int) -> Int = selected();
+            return operation(6);
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9404),
+            ModuleName::parse("function_values").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(workspace);
 }
 
