@@ -572,6 +572,7 @@ fn require_bootstrap_runtime_type(
                 | PrimitiveType::String
                 | PrimitiveType::Unit
         )) | Some(TypeKind::Array(_))
+            | Some(TypeKind::DynamicArray(_))
             | Some(TypeKind::Nominal(_))
     )
     .then_some(())
@@ -586,6 +587,7 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
         Some(TypeKind::Primitive(PrimitiveType::String)) => Some(types::I64),
         Some(TypeKind::Nominal(_)) => Some(types::I64),
+        Some(TypeKind::DynamicArray(_)) => Some(types::I64),
         _ => None,
     }
 }
@@ -1068,6 +1070,240 @@ fn lower_instruction(
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             let free_ref = runtime.reference(builder.func, runtime.free, false);
             builder.ins().call(free_ref, &[pointer]);
+            Ok(())
+        }
+        MirInstruction::DestroyDynamicArray { value, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let free_ref = runtime.reference(builder.func, runtime.free, false);
+            builder.ins().call(free_ref, &[data]);
+            let header = builder.ins().iadd_imm(pointer, 8);
+            builder.ins().call(free_ref, &[header]);
+            Ok(())
+        }
+        MirInstruction::DynamicArrayNew { output, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let size = builder.ins().iconst(types::I64, 32);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let allocation = builder.ins().call(malloc_ref, &[size]);
+            let allocation = *builder
+                .inst_results(allocation)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(allocation, TrapCode::unwrap_user(6));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), size, allocation, 0);
+            let pointer = builder.ins().iadd_imm(allocation, 8);
+            let zero = builder.ins().iconst(types::I64, 0);
+            let capacity = builder.ins().iconst(types::I64, 4);
+            let data_size = builder.ins().iconst(types::I64, 48);
+            let data_alloc = builder.ins().call(malloc_ref, &[data_size]);
+            let data_alloc = *builder
+                .inst_results(data_alloc)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(data_alloc, TrapCode::unwrap_user(6));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), data_size, data_alloc, 0);
+            let data = builder.ins().iadd_imm(data_alloc, 16);
+            builder.ins().store(MemFlagsData::new(), zero, pointer, 0);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), capacity, pointer, 8);
+            builder.ins().store(MemFlagsData::new(), data, pointer, 16);
+            values.insert(*output, pointer);
+            Ok(())
+        }
+        MirInstruction::DynamicArraySize { output, array, .. } => {
+            let pointer = values
+                .get(array)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            values.insert(*output, length);
+            Ok(())
+        }
+        MirInstruction::DynamicArrayAdd {
+            array,
+            value,
+            index,
+            ..
+        } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let pointer = values
+                .get(array)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let value = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let capacity = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 8);
+            let position = if let Some(index) = index {
+                let index = values
+                    .get(index)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                let invalid = builder
+                    .ins()
+                    .icmp(IntCC::UnsignedGreaterThan, index, length);
+                builder.ins().trapnz(invalid, TrapCode::unwrap_user(7));
+                index
+            } else {
+                length
+            };
+            let old_data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let new_capacity = builder.ins().imul_imm(capacity, 2);
+            let new_data_size = builder.ins().imul_imm(new_capacity, 8);
+            let new_size = builder.ins().iadd_imm(new_data_size, 16);
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let allocation = builder.ins().call(malloc_ref, &[new_size]);
+            let allocation = *builder
+                .inst_results(allocation)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(allocation, TrapCode::unwrap_user(8));
+            builder
+                .ins()
+                .store(MemFlagsData::new(), new_size, allocation, 0);
+            let data = builder.ins().iadd_imm(allocation, 16);
+            let copy_size = builder.ins().imul_imm(length, 8);
+            let memcpy_ref = runtime.reference(builder.func, runtime.memcpy, true);
+            builder.ins().call(memcpy_ref, &[data, old_data, copy_size]);
+            let free_ref = runtime.reference(builder.func, runtime.free, false);
+            builder.ins().call(free_ref, &[old_data]);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), new_capacity, pointer, 8);
+            builder.ins().store(MemFlagsData::new(), data, pointer, 16);
+            if index.is_some() {
+                for destination_index in (1_i64..4).rev() {
+                    let source_index = destination_index - 1;
+                    let source = builder.ins().load(
+                        types::I64,
+                        MemFlagsData::new(),
+                        data,
+                        i32::try_from(source_index * 8).unwrap_or(0),
+                    );
+                    let current = builder.ins().load(
+                        types::I64,
+                        MemFlagsData::new(),
+                        data,
+                        i32::try_from(destination_index * 8).unwrap_or(0),
+                    );
+                    let destination = values
+                        .get(index.as_ref().expect("indexed add has index"))
+                        .copied()
+                        .ok_or(CraneliftLoweringError::MissingValue)?;
+                    let index_in_range = builder.ins().icmp_imm(
+                        IntCC::UnsignedGreaterThan,
+                        destination,
+                        source_index,
+                    );
+                    let length_in_range = builder.ins().icmp_imm(
+                        IntCC::UnsignedLessThanOrEqual,
+                        length,
+                        destination_index,
+                    );
+                    let should_shift = builder.ins().band(index_in_range, length_in_range);
+                    let selected = builder.ins().select(should_shift, source, current);
+                    builder.ins().store(
+                        MemFlagsData::new(),
+                        selected,
+                        data,
+                        i32::try_from(destination_index * 8).unwrap_or(0),
+                    );
+                }
+            }
+            let offset = builder.ins().imul_imm(position, 8);
+            let destination = builder.ins().iadd(data, offset);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), value, destination, 0);
+            let new_length = builder.ins().iadd_imm(length, 1);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), new_length, pointer, 0);
+            Ok(())
+        }
+        MirInstruction::DynamicArrayRemove { array, index, .. } => {
+            let pointer = values
+                .get(array)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let index = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let invalid = builder
+                .ins()
+                .icmp(IntCC::UnsignedGreaterThanOrEqual, index, length);
+            builder.ins().trapnz(invalid, TrapCode::unwrap_user(9));
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            for destination_index in 0_i64..3 {
+                let source = builder.ins().load(
+                    types::I64,
+                    MemFlagsData::new(),
+                    data,
+                    i32::try_from((destination_index + 1) * 8).unwrap_or(0),
+                );
+                let current = builder.ins().load(
+                    types::I64,
+                    MemFlagsData::new(),
+                    data,
+                    i32::try_from(destination_index * 8).unwrap_or(0),
+                );
+                let after_index = builder.ins().icmp_imm(
+                    IntCC::UnsignedGreaterThanOrEqual,
+                    index,
+                    destination_index,
+                );
+                let before_last = builder.ins().icmp_imm(
+                    IntCC::UnsignedGreaterThan,
+                    length,
+                    destination_index + 1,
+                );
+                let should_shift = builder.ins().band(after_index, before_last);
+                let selected = builder.ins().select(should_shift, source, current);
+                builder.ins().store(
+                    MemFlagsData::new(),
+                    selected,
+                    data,
+                    i32::try_from(destination_index * 8).unwrap_or(0),
+                );
+            }
+            let new_length = builder.ins().iadd_imm(length, -1);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), new_length, pointer, 0);
             Ok(())
         }
         MirInstruction::FieldLoad {

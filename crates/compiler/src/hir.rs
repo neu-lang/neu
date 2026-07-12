@@ -1,4 +1,5 @@
 use crate::{
+    ast::AstNodeKind,
     module::{FunctionSymbolIdentity, ModuleName, PackageNamespace},
     name_resolution::LocalBindingKind,
     ownership_effects::OwnershipEffectContract,
@@ -383,6 +384,49 @@ pub fn lower_checked_hir_source(
                     &mut expressions,
                 )?;
                 returns.push(HirReturn::new(statement.span, expression));
+                continue;
+            }
+            if source
+                .parsed
+                .arena
+                .node(statement.statement)
+                .is_some_and(|node| {
+                    matches!(
+                        node.kind,
+                        AstNodeKind::ExpressionStatement
+                            | AstNodeKind::CallExpression
+                            | AstNodeKind::MemberExpression
+                    )
+                })
+            {
+                let expression = source
+                    .parsed
+                    .call_expressions
+                    .iter()
+                    .find(|call| {
+                        source
+                            .parsed
+                            .arena
+                            .node(call.expression)
+                            .is_some_and(|node| node.span.start() == statement.span.start())
+                    })
+                    .map(|call| call.expression)
+                    .or_else(|| {
+                        source
+                            .parsed
+                            .member_expressions
+                            .iter()
+                            .find(|member| member.span.start() == statement.span.start())
+                            .map(|member| member.expression)
+                    })
+                    .ok_or(HirLoweringError::UnsupportedExpression)?;
+                lower_expression(
+                    &source,
+                    function.declaration,
+                    expression,
+                    &local_bindings,
+                    &mut expressions,
+                )?;
             }
         }
         let has_control_flow = source
@@ -599,6 +643,11 @@ fn lower_expression(
         .iter()
         .find(|new_expression| new_expression.expression == expression)
     {
+        if new_expression.dynamic_array {
+            let id = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::dynamic_array_new(id, span, ty));
+            return Ok(id);
+        }
         let mut argument_nodes = Vec::new();
         append_superclass_argument_nodes(
             source.parsed,
@@ -803,6 +852,64 @@ fn lower_expression(
             )?;
             let id = HirExpressionId::from_raw(output.len());
             output.push(HirExpression::string_clone(id, span, ty, argument));
+            return Ok(id);
+        }
+        if let Some(member) = source
+            .parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+            && matches!(member.name.as_str(), "size" | "add" | "remove")
+        {
+            let array = lower_expression(
+                source,
+                function_declaration,
+                member.receiver,
+                local_bindings,
+                output,
+            )?;
+            let arguments = call
+                .arguments
+                .iter()
+                .map(|argument| {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        *argument,
+                        local_bindings,
+                        output,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let id = HirExpressionId::from_raw(output.len());
+            match member.name.as_str() {
+                "size" => output.push(HirExpression {
+                    id,
+                    span,
+                    ty,
+                    kind: HirExpressionKind::DynamicArraySize(array),
+                }),
+                "add" => output.push(HirExpression {
+                    id,
+                    span,
+                    ty,
+                    kind: HirExpressionKind::DynamicArrayAdd {
+                        array,
+                        value: arguments[0],
+                        index: arguments.get(1).copied(),
+                    },
+                }),
+                "remove" => output.push(HirExpression {
+                    id,
+                    span,
+                    ty,
+                    kind: HirExpressionKind::DynamicArrayRemove {
+                        array,
+                        index: arguments[0],
+                    },
+                }),
+                _ => unreachable!(),
+            }
             return Ok(id);
         }
         let declaration = if let Some(name) = source
@@ -2053,6 +2160,17 @@ pub enum HirExpressionKind {
         type_name: String,
         arguments: Vec<HirExpressionId>,
     },
+    DynamicArrayNew,
+    DynamicArraySize(HirExpressionId),
+    DynamicArrayAdd {
+        array: HirExpressionId,
+        value: HirExpressionId,
+        index: Option<HirExpressionId>,
+    },
+    DynamicArrayRemove {
+        array: HirExpressionId,
+        index: HirExpressionId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2258,6 +2376,15 @@ impl HirExpression {
                 type_name,
                 arguments,
             },
+        }
+    }
+
+    pub fn dynamic_array_new(id: HirExpressionId, span: ByteSpan, ty: TypeId) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::DynamicArrayNew,
         }
     }
 

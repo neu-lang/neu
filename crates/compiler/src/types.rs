@@ -102,6 +102,20 @@ pub struct ArrayType {
     length: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct DynamicArrayType {
+    element: TypeId,
+}
+
+impl DynamicArrayType {
+    pub fn new(element: TypeId) -> Self {
+        Self { element }
+    }
+    pub fn element(self) -> TypeId {
+        self.element
+    }
+}
+
 impl ArrayType {
     pub fn new(element: TypeId, length: u64) -> Self {
         Self { element, length }
@@ -133,6 +147,7 @@ pub enum TypeKind {
     Primitive(PrimitiveType),
     Nullable(NullableType),
     Array(ArrayType),
+    DynamicArray(DynamicArrayType),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -230,6 +245,13 @@ impl TypeRecord {
         }
     }
 
+    pub fn dynamic_array(array: DynamicArrayType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::DynamicArray(array),
+        }
+    }
+
     pub fn id(&self) -> TypeId {
         self.id
     }
@@ -266,6 +288,14 @@ impl TypeArena {
             return record.id();
         }
         self.insert(TypeRecord::array(ArrayType::new(element, length)))
+    }
+
+    pub fn dynamic_array(&mut self, element: TypeId) -> TypeId {
+        let kind = TypeKind::DynamicArray(DynamicArrayType::new(element));
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::dynamic_array(DynamicArrayType::new(element)))
     }
 
     pub fn nominal(&mut self, identity: NominalTypeIdentity) -> TypeId {

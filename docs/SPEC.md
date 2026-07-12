@@ -920,3 +920,14 @@ Nested suffixes are written outer-to-inner, so `Int[2][3]` is two arrays of
 three integers each. Array literals, expression indexing, ownership, inline
 representation, parameter/return transport, and dynamic-array deferrals are
 unchanged. The old spelling is retained only in historical ADR text.
+
+## ADR-0073: Bootstrap Dynamic Arrays
+
+`Array<T>` is a compiler-managed dynamic array distinct from fixed `T[N]`.
+`new T[]` creates an empty array when `T` is determined by the declared type.
+The bootstrap scalar element set is `Bool`, `Int`, `Float`, and `Byte`.
+Mutable `var` bindings support `add`, indexed `add`, `remove`, and `size`; `val`
+rejects mutation. Dynamic arrays are move-only, opaque, compiler-managed
+values with target-pack allocation and deterministic traps. Strings, nominal
+elements, nested dynamic arrays, indexing, slices, iterators, public layout,
+FFI, and user allocation APIs remain deferred.

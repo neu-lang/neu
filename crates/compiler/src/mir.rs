@@ -326,6 +326,29 @@ pub enum MirInstruction {
         arguments: Vec<MirValueId>,
         span: ByteSpan,
     },
+    DynamicArrayNew {
+        output: MirValueId,
+        type_id: TypeId,
+        span: ByteSpan,
+    },
+    DynamicArraySize {
+        output: MirValueId,
+        array: MirValueId,
+        span: ByteSpan,
+    },
+    DynamicArrayAdd {
+        element_type: TypeId,
+        array: MirValueId,
+        value: MirValueId,
+        index: Option<MirValueId>,
+        span: ByteSpan,
+    },
+    DynamicArrayRemove {
+        element_type: TypeId,
+        array: MirValueId,
+        index: MirValueId,
+        span: ByteSpan,
+    },
     FieldLoad {
         output: MirValueId,
         receiver: MirValueId,
@@ -339,6 +362,10 @@ pub enum MirInstruction {
         span: ByteSpan,
     },
     DestroyObject {
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    DestroyDynamicArray {
         value: MirValueId,
         span: ByteSpan,
     },
@@ -419,9 +446,14 @@ impl MirInstruction {
             | Self::StringConcat { span, .. }
             | Self::StringCompare { span, .. } => *span,
             Self::NewObject { span, .. } => *span,
+            Self::DynamicArrayNew { span, .. } => *span,
+            Self::DynamicArraySize { span, .. }
+            | Self::DynamicArrayAdd { span, .. }
+            | Self::DynamicArrayRemove { span, .. } => *span,
             Self::FieldLoad { span, .. } => *span,
             Self::FieldStore { span, .. } => *span,
             Self::DestroyObject { span, .. } => *span,
+            Self::DestroyDynamicArray { span, .. } => *span,
         }
     }
 }
@@ -521,6 +553,7 @@ impl MirBasicBlock {
 pub struct MirCleanupBoundary {
     owned_locals: Vec<MirLocalId>,
     owned_objects: Vec<MirLocalId>,
+    owned_dynamic_arrays: Vec<MirLocalId>,
     owned_parameters: Vec<MirValueId>,
     returns_owned: bool,
 }
@@ -529,6 +562,7 @@ impl MirCleanupBoundary {
         Self {
             owned_locals: Vec::new(),
             owned_objects: Vec::new(),
+            owned_dynamic_arrays: Vec::new(),
             owned_parameters: Vec::new(),
             returns_owned: false,
         }
@@ -556,6 +590,16 @@ impl MirCleanupBoundary {
                 })
                 .map(|local| MirLocalId::from_raw(local.id().index()))
                 .collect(),
+            owned_dynamic_arrays: function
+                .locals()
+                .iter()
+                .filter(|local| {
+                    types
+                        .get(local.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::DynamicArray(_)))
+                })
+                .map(|local| MirLocalId::from_raw(local.id().index()))
+                .collect(),
             owned_parameters: function
                 .parameters()
                 .iter()
@@ -568,6 +612,7 @@ impl MirCleanupBoundary {
     pub fn is_empty(&self) -> bool {
         self.owned_locals.is_empty()
             && self.owned_objects.is_empty()
+            && self.owned_dynamic_arrays.is_empty()
             && self.owned_parameters.is_empty()
             && !self.returns_owned
     }
@@ -579,6 +624,9 @@ impl MirCleanupBoundary {
     }
     pub fn owned_objects(&self) -> &[MirLocalId] {
         &self.owned_objects
+    }
+    pub fn owned_dynamic_arrays(&self) -> &[MirLocalId] {
+        &self.owned_dynamic_arrays
     }
     pub fn returns_owned(&self) -> bool {
         self.returns_owned
@@ -907,6 +955,67 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     });
                 }
+                HirExpressionKind::DynamicArrayNew => {
+                    instructions.push(MirInstruction::DynamicArrayNew {
+                        output,
+                        type_id: expression.ty(),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::DynamicArraySize(array) => {
+                    instructions.push(MirInstruction::DynamicArraySize {
+                        output,
+                        array: mir_expression_value_id(function, *array),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::DynamicArrayAdd {
+                    array,
+                    value,
+                    index,
+                } => {
+                    instructions.push(MirInstruction::DynamicArrayAdd {
+                        element_type: types
+                            .get(
+                                function
+                                    .expressions()
+                                    .iter()
+                                    .find(|candidate| candidate.id() == *array)
+                                    .map(|array| array.ty())
+                                    .ok_or(MirLoweringError::UnsupportedExpression)?,
+                            )
+                            .and_then(|record| match record.kind() {
+                                TypeKind::DynamicArray(array) => Some(array.element()),
+                                _ => None,
+                            })
+                            .ok_or(MirLoweringError::UnsupportedExpression)?,
+                        array: mir_expression_value_id(function, *array),
+                        value: mir_expression_value_id(function, *value),
+                        index: index.map(|index| mir_expression_value_id(function, index)),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::DynamicArrayRemove { array, index } => {
+                    instructions.push(MirInstruction::DynamicArrayRemove {
+                        element_type: types
+                            .get(
+                                function
+                                    .expressions()
+                                    .iter()
+                                    .find(|candidate| candidate.id() == *array)
+                                    .map(|array| array.ty())
+                                    .ok_or(MirLoweringError::UnsupportedExpression)?,
+                            )
+                            .and_then(|record| match record.kind() {
+                                TypeKind::DynamicArray(array) => Some(array.element()),
+                                _ => None,
+                            })
+                            .ok_or(MirLoweringError::UnsupportedExpression)?,
+                        array: mir_expression_value_id(function, *array),
+                        index: mir_expression_value_id(function, *index),
+                        span: expression.span(),
+                    });
+                }
             }
             for local in function.locals() {
                 if local.initializer() == Some(expression.id()) {
@@ -990,6 +1099,22 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     span: local.span(),
                 });
                 instructions.push(MirInstruction::DestroyObject {
+                    value: cleanup_value,
+                    span: local.span(),
+                });
+            }
+            for local in function.locals().iter().filter(|local| {
+                matches!(
+                    types.get(local.ty()).map(|record| record.kind()),
+                    Some(TypeKind::DynamicArray(_))
+                )
+            }) {
+                instructions.push(MirInstruction::LoadLocal {
+                    output: cleanup_value,
+                    local: MirLocalId::from_raw(local.id().index()),
+                    span: local.span(),
+                });
+                instructions.push(MirInstruction::DestroyDynamicArray {
                     value: cleanup_value,
                     span: local.span(),
                 });
@@ -1334,7 +1459,11 @@ impl<'a> ShortCircuitLowerer<'a> {
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }
-            | HirExpressionKind::NewObject { .. } => {
+            | HirExpressionKind::NewObject { .. }
+            | HirExpressionKind::DynamicArrayNew
+            | HirExpressionKind::DynamicArraySize(_)
+            | HirExpressionKind::DynamicArrayAdd { .. }
+            | HirExpressionKind::DynamicArrayRemove { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -1629,7 +1758,11 @@ impl<'a> ControlFlowLowerer<'a> {
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }
-            | HirExpressionKind::NewObject { .. } => {
+            | HirExpressionKind::NewObject { .. }
+            | HirExpressionKind::DynamicArrayNew
+            | HirExpressionKind::DynamicArraySize(_)
+            | HirExpressionKind::DynamicArrayAdd { .. }
+            | HirExpressionKind::DynamicArrayRemove { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -1886,6 +2019,7 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
             | PrimitiveType::Unit,
         )) => Ok(()),
         Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
+        Some(TypeKind::DynamicArray(_)) => Ok(()),
         Some(TypeKind::Nominal(_)) => Ok(()),
         _ => Err(MirLoweringError::UnsupportedRuntimeType),
     }

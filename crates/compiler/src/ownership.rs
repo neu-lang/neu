@@ -26,6 +26,7 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
             Some(OwnershipCategory::MoveOnly)
         }
         TypeKind::Array(array) => classify_ownership_category(types, array.element()),
+        TypeKind::DynamicArray(_) => Some(OwnershipCategory::MoveOnly),
         TypeKind::GenericParameter(_) | TypeKind::Nullable(_) => None,
     }
 }

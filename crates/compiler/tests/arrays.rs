@@ -145,3 +145,53 @@ fn compiles_fixed_array_parameters_and_returns() {
     assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn compiles_empty_dynamic_array_and_reads_size() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-dynamic-array-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source =
+        "public func main(): Int { var values: Array<Int> = new Int[]; return values.size(); }";
+    let output = compiler::driver::compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6307),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn appends_and_removes_dynamic_array_elements() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-dynamic-array-mutate-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "public func main(): Int { var values: Array<Int> = new Int[]; values.add(9, 0); values.add(7); values.remove(0); return values.size(); }";
+    let output = compiler::driver::compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6310),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(1));
+    let _ = fs::remove_dir_all(workspace);
+}

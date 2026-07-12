@@ -541,6 +541,9 @@ pub fn check_m0069_constructor_calls(
 ) -> Vec<ConstructorDiagnostic> {
     let mut diagnostics = Vec::new();
     for expression in &parsed.new_expressions {
+        if expression.dynamic_array {
+            continue;
+        }
         let Some(class) = classes.classes.iter().find(|class| {
             parsed
                 .class_declarations
@@ -1138,6 +1141,7 @@ pub fn apply_m0068_class_type_facts(
                 .replace_expression_type(ExpressionType::new(expression.expression, class.type_id));
         }
     }
+
     for parameter in &parsed.function_parameters {
         let Some(reference) = parsed
             .type_name_references
@@ -1661,6 +1665,11 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 continue;
             };
             if member.is_none() && target_name == "clone" {
+                continue;
+            }
+            if member
+                .is_some_and(|member| matches!(member.name.as_str(), "size" | "add" | "remove"))
+            {
                 continue;
             }
             let targets: Vec<_> = sources
@@ -2729,14 +2738,19 @@ pub fn check_m0028_unsupported_executable_forms(
         .nodes()
         .iter()
         .filter(|node| {
-            matches!(
-                node.kind,
-                AstNodeKind::IfExpression
-                    | AstNodeKind::BinaryExpression
-                    | AstNodeKind::UnaryExpression
-                    | AstNodeKind::CallExpression
-                    | AstNodeKind::MemberExpression
-            )
+            let dynamic_generic = node.kind == AstNodeKind::GenericArgument
+                && parsed.type_name_references.iter().any(|reference| {
+                    reference.name == "Array" && reference.generic_arguments.contains(&node.id)
+                });
+            !dynamic_generic
+                && matches!(
+                    node.kind,
+                    AstNodeKind::IfExpression
+                        | AstNodeKind::BinaryExpression
+                        | AstNodeKind::UnaryExpression
+                        | AstNodeKind::CallExpression
+                        | AstNodeKind::MemberExpression
+                )
         })
         .map(|node| node.span)
         .collect();
@@ -2752,7 +2766,6 @@ pub fn check_m0028_unsupported_executable_forms(
                     | AstNodeKind::EnumDeclaration
                     | AstNodeKind::NullableType
                     | AstNodeKind::GenericParameter
-                    | AstNodeKind::GenericArgument
                     | AstNodeKind::CapabilityBound
                     | AstNodeKind::FunctionType
                     | AstNodeKind::GroupedType
@@ -2778,13 +2791,15 @@ pub fn check_m0028_unsupported_executable_forms(
             .type_name_references
             .iter()
             .filter(|reference| {
-                !matches!(
-                    reference.name.as_str(),
-                    "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte"
-                ) && !parsed
-                    .class_declarations
-                    .iter()
-                    .any(|class| class.name == reference.name)
+                reference.name != "Array"
+                    && !matches!(
+                        reference.name.as_str(),
+                        "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte"
+                    )
+                    && !parsed
+                        .class_declarations
+                        .iter()
+                        .any(|class| class.name == reference.name)
             })
             .map(|reference| reference.name_span),
     );
@@ -2962,6 +2977,18 @@ fn resolve_m0063_annotation_type(
         .iter()
         .find(|reference| reference.reference == annotation)
     {
+        if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
+            let element_name = &reference.generic_argument_names[0];
+            let element = primitives
+                .type_for_primitive_name(element_name)
+                .or_else(|| {
+                    classes
+                        .iter()
+                        .find(|class| class.name == *element_name)
+                        .map(|class| class.type_id)
+                })?;
+            return Some(arena.dynamic_array(element));
+        }
         return primitives
             .type_for_primitive_name(&reference.name)
             .or_else(|| {
@@ -3005,6 +3032,11 @@ pub fn type_m0063_array_expressions(
             .iter()
             .find(|reference| reference.reference == node)
         {
+            if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
+                let element =
+                    primitives.type_for_primitive_name(&reference.generic_argument_names[0])?;
+                return Some(types.dynamic_array(element));
+            }
             return primitives.type_for_primitive_name(&reference.name);
         }
         let array = parsed
@@ -3052,6 +3084,21 @@ pub fn type_m0063_array_expressions(
                     ));
                 }
             }
+        }
+    }
+
+    for expression in &parsed.new_expressions {
+        if !expression.dynamic_array {
+            continue;
+        }
+        if let Some(ty) = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.initializer == Some(expression.expression))
+            .and_then(|declaration| declaration.annotation)
+            .and_then(|annotation| resolve_type(annotation, types))
+        {
+            report.replace_expression_type(ExpressionType::new(expression.expression, ty));
         }
     }
 
@@ -3216,6 +3263,17 @@ pub fn type_m0064_string_operations(
     }
 
     for member in &parsed.member_expressions {
+        if report
+            .expression_type(member.receiver)
+            .is_some_and(|receiver| {
+                matches!(
+                    types.get(receiver).map(|record| record.kind()),
+                    Some(TypeKind::DynamicArray(_))
+                )
+            })
+        {
+            continue;
+        }
         if member.name == "length" && report.expression_type(member.receiver) == Some(string_type) {
             if let Some(int_type) = int_type {
                 report.replace_expression_type(ExpressionType::new(member.expression, int_type));
@@ -3378,6 +3436,94 @@ pub fn type_m0064_string_operations(
                 report.replace_expression_type(ExpressionType::new(binary.expression, string_type));
             }
             _ => {}
+        }
+    }
+}
+
+pub fn type_m0073_dynamic_array_operations(
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    let dynamic_declarations = parsed
+        .local_declarations
+        .iter()
+        .filter(|declaration| {
+            declaration
+                .annotation
+                .and_then(|annotation| {
+                    parsed
+                        .type_name_references
+                        .iter()
+                        .find(|reference| reference.reference == annotation)
+                })
+                .is_some_and(|reference| reference.name == "Array")
+        })
+        .map(|declaration| declaration.declaration)
+        .collect::<Vec<_>>();
+    report.retain_diagnostics(|diagnostic| {
+        !dynamic_declarations.contains(&diagnostic.node())
+            || diagnostic.rule() != TypeRuleDiagnostic::MissingAnnotationType
+    });
+    let int_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Int)).then_some(record.id())
+    });
+    let unit_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Unit)).then_some(record.id())
+    });
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        if !matches!(
+            types.get(receiver_type).map(|record| record.kind()),
+            Some(TypeKind::DynamicArray(_))
+        ) {
+            continue;
+        }
+        let (result, mutating, valid_arity) = match member.name.as_str() {
+            "size" => (int_type, false, call.arguments.is_empty()),
+            "add" => (unit_type, true, matches!(call.arguments.len(), 1 | 2)),
+            "remove" => (unit_type, true, call.arguments.len() == 1),
+            _ => (None, false, false),
+        };
+        if !valid_arity {
+            continue;
+        }
+        if mutating
+            && let Some(name) = parsed
+                .name_references
+                .iter()
+                .find(|name| name.reference == member.receiver)
+            && let Some(binding) = parsed
+                .local_binding_names
+                .iter()
+                .find(|binding| binding.name == name.name)
+            && binding.kind == LocalBindingKind::Immutable
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ImmutableArrayMutation,
+                member.expression,
+            ));
+            continue;
+        }
+        if let Some(result) = result {
+            report.replace_expression_type(ExpressionType::new(call.expression, result));
+            report.retain_diagnostics(|diagnostic| {
+                (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                    || !matches!(
+                        diagnostic.rule(),
+                        TypeRuleDiagnostic::DirectCallDeferred
+                            | TypeRuleDiagnostic::MemberExpressionDeferred
+                    )
+            });
         }
     }
 }

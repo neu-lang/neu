@@ -33,6 +33,10 @@ pub fn satisfies_thread_capability(
             satisfies_thread_capability(types, nullable.base(), capability)
         }
         TypeKind::Array(array) => satisfies_thread_capability(types, array.element(), capability),
+        TypeKind::DynamicArray(array) => {
+            capability == ThreadCapability::Send
+                && satisfies_thread_capability(types, array.element(), capability)
+        }
         TypeKind::Nominal(_) | TypeKind::GenericParameter(_) => false,
     }
 }

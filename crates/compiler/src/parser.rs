@@ -233,6 +233,7 @@ pub struct ParsedNewExpression {
     pub type_name: String,
     pub type_span: ByteSpan,
     pub arguments: Vec<AstNodeId>,
+    pub dynamic_array: bool,
     pub span: ByteSpan,
 }
 
@@ -298,6 +299,8 @@ pub struct ParsedTypeNameReference {
     pub reference: crate::ast::AstNodeId,
     pub name: String,
     pub name_span: ByteSpan,
+    pub generic_arguments: Vec<AstNodeId>,
+    pub generic_argument_names: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1530,9 +1533,10 @@ impl<'source> Parser<'source> {
                                 self.arena
                                     .add_assignment_statement(self.span(expression_start, end));
                             } else {
-                                self.arena.add_expression_statement(
+                                let statement = self.arena.add_expression_statement(
                                     self.span(expression_span.start(), end),
                                 );
+                                self.record_executable_body_statement(statement);
                             }
                         }
                         Some(TokenKind::Equal) => {
@@ -2270,6 +2274,24 @@ impl<'source> Parser<'source> {
         }
         let type_name = self.text[type_token.span.start()..type_token.span.end()].to_owned();
         self.advance();
+        if self.current_kind() == Some(TokenKind::LeftBracket)
+            && self.peek_kind() == Some(TokenKind::RightBracket)
+        {
+            self.advance();
+            let end = self.current()?.span.end();
+            self.advance();
+            let span = self.span(start, end);
+            let expression = self.arena.add_new_expression(span);
+            self.new_expressions.push(ParsedNewExpression {
+                expression,
+                type_name,
+                type_span: type_token.span,
+                arguments: Vec::new(),
+                dynamic_array: true,
+                span,
+            });
+            return Some(span);
+        }
         if self.current_kind() != Some(TokenKind::LeftParen) {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedCallExpression,
@@ -2303,6 +2325,7 @@ impl<'source> Parser<'source> {
             type_name,
             type_span: type_token.span,
             arguments,
+            dynamic_array: false,
             span,
         });
         Some(span)
@@ -3015,9 +3038,20 @@ impl<'source> Parser<'source> {
         let name_end = self.parse_qualified_name_for_type()?;
         let mut end = name_end;
         let reference_index = self.type_name_references.len();
+        let generic_start = self.arena.nodes().len();
         if self.current_kind() == Some(TokenKind::Less) {
             end = self.parse_generic_arguments().unwrap_or(end);
         }
+        let generic_end = self.arena.nodes().len();
+        let generic_arguments = self.arena.nodes()[generic_start..generic_end]
+            .iter()
+            .filter(|node| node.kind == AstNodeKind::GenericArgument)
+            .map(|node| node.id)
+            .collect();
+        let generic_argument_names = self.type_name_references[reference_index..]
+            .iter()
+            .map(|reference| reference.name.clone())
+            .collect();
         let span = self.span(start, end);
         let reference = self.arena.add_named_type(span);
         self.type_name_references.insert(
@@ -3026,6 +3060,8 @@ impl<'source> Parser<'source> {
                 reference,
                 name: self.text[start..name_end].to_owned(),
                 name_span: self.span(start, name_end),
+                generic_arguments,
+                generic_argument_names,
             },
         );
         Some(span)

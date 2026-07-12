@@ -31,7 +31,7 @@ use crate::{
         check_m0069_constructor_calls, type_m0028_executable_core_in, type_m0060_control_flow,
         type_m0063_array_expressions, type_m0063_function_signatures_in_with_classes,
         type_m0064_string_operations, type_m0068_class_types_in,
-        validate_m0061_compile_time_constants,
+        type_m0073_dynamic_array_operations, validate_m0061_compile_time_constants,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -178,6 +178,7 @@ pub fn compile_source_to_executable(
     );
     apply_m0068_class_type_facts(&parsed, &class_types, &mut report);
     type_m0063_array_expressions(&mut types, &parsed, &mut report);
+    type_m0073_dynamic_array_operations(&parsed, &mut report, &types);
     type_m0064_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
     apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_m0068_field_access_facts(&parsed, &class_types, &mut report);

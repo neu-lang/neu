@@ -1,0 +1,9 @@
+package examples.current
+
+public func main(): Int {
+    var values: Array<Int> = new Int[];
+    values.add(9, 0);
+    values.add(7);
+    values.remove(0);
+    return values.size();
+}
