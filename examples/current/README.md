@@ -22,6 +22,8 @@ an opaque channel handle.
 channel-backed implementation.
 `concurrency_binary.neu` exercises the host linker path for a compiler-owned
 channel runtime operation.
+`concurrency_complete.neu` combines nested scopes, multiple task results,
+cancellation, and channel transfer in one deterministic executable.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by

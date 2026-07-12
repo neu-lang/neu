@@ -1,5 +1,6 @@
 use std::{fs, path::PathBuf, process::Command};
 
+use object::{Object, ObjectSection, ObjectSymbol};
 use target_lexicon::Triple;
 
 use compiler::{
@@ -110,6 +111,8 @@ fn rejects_non_host_targets_before_compilation() {
         error,
         compiler::driver::DriverError::HostOnlyTarget(non_host)
     );
+    assert!(!output.exists());
+    assert!(!output.with_extension("o").exists());
 }
 
 #[test]
@@ -334,6 +337,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("producer_consumer", 8),
         ("concurrency_interfaces", 12),
         ("concurrency_binary", 21),
+        ("concurrency_complete", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -356,6 +360,46 @@ fn compiles_current_control_flow_and_primitive_examples() {
         assert_eq!(status.code(), Some(expected_status), "example {name}");
         let _ = fs::remove_dir_all(workspace);
     }
+}
+
+#[test]
+fn complete_concurrency_smoke_retains_entry_symbols_and_runtime_relocations() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source =
+        fs::read_to_string(repo_root.join("examples/current/concurrency_complete.neu")).unwrap();
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-concurrency-complete-object-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let output = compile_source_to_executable(
+        &source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1003),
+            ModuleName::parse("examples.current").unwrap(),
+            PackageNamespace::parse("examples.current").unwrap(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    assert_eq!(Command::new(&executable).status().unwrap().code(), Some(7));
+
+    let object_bytes = fs::read(executable.with_extension("o")).unwrap();
+    let object = object::File::parse(object_bytes.as_slice()).unwrap();
+    assert!(object.symbols().any(|symbol| {
+        symbol
+            .name()
+            .is_ok_and(|name| name.trim_start_matches('_') == "main")
+    }));
+    assert!(
+        object
+            .sections()
+            .any(|section| section.relocations().next().is_some())
+    );
+    let _ = fs::remove_dir_all(workspace);
 }
 
 #[test]
