@@ -14,6 +14,8 @@ child task. `spawn.neu`, `await.neu`, `task_results.neu`, and
 for diagnostic and adversarial regression coverage.
 `channels.neu` exercises bounded FIFO message transfer and typed closure
 matching.
+`channel_receive.neu` exercises the receive suspension boundary and message
+payload extraction.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by

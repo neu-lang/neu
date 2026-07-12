@@ -1381,10 +1381,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             _ => None,
                         })
                         .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    instructions.push(MirInstruction::Suspend {
+                        span: expression.span(),
+                    });
                     instructions.push(MirInstruction::ChannelReceive {
                         output,
                         channel: mir_expression_value_id(function, *channel),
                         element_type,
+                        span: expression.span(),
+                    });
+                    instructions.push(MirInstruction::Resume {
                         span: expression.span(),
                     });
                 }
@@ -2107,10 +2113,16 @@ impl<'a> ShortCircuitLowerer<'a> {
                         _ => None,
                     })
                     .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::Suspend {
+                    span: expression.span(),
+                });
                 self.push(MirInstruction::ChannelReceive {
                     output,
                     channel,
                     element_type,
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::Resume {
                     span: expression.span(),
                 });
             }
@@ -2746,10 +2758,16 @@ impl<'a> ControlFlowLowerer<'a> {
                         _ => None,
                     })
                     .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::Suspend {
+                    span: expression.span(),
+                });
                 self.push(MirInstruction::ChannelReceive {
                     output,
                     channel,
                     element_type,
+                    span: expression.span(),
+                });
+                self.push(MirInstruction::Resume {
                     span: expression.span(),
                 });
             }

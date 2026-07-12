@@ -308,6 +308,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("runtime_entry", 7),
         ("concurrency_diagnostics", 0),
         ("channels", 7),
+        ("channel_receive", 9),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();

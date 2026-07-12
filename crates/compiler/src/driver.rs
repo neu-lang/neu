@@ -453,7 +453,19 @@ pub fn compile_source_to_executable(
     apply_direct_call_results(&mut report, &parsed, &calls);
     let conditional_report = type_value_conditionals(&parsed, report.expression_types(), &types);
     apply_value_conditional_results(&mut report, &conditional_report);
-    type_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
+    let mut string_after_when = crate::type_check::TypeCheckReport::new();
+    for expression_type in report.expression_types() {
+        string_after_when.record_expression_type(*expression_type);
+    }
+    type_string_operations(
+        &parsed,
+        &mut string_after_when,
+        &mut types,
+        &parsed.array_types,
+    );
+    for expression_type in string_after_when.expression_types() {
+        report.replace_expression_type(*expression_type);
+    }
     let when_report = type_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
     merge_type_check_report(&mut report, when_report);
     let string_member_nodes = parsed

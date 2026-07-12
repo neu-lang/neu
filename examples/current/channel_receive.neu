@@ -1,0 +1,12 @@
+package examples.current
+
+public func main(): Int {
+    val queue = channel<Int>(1);
+    send(queue, 9);
+    val result = receive(queue);
+    close(queue);
+    return when (result) {
+        ChannelResult.Message(value) -> value;
+        ChannelResult.Closed -> 0;
+    };
+}

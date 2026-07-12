@@ -134,3 +134,25 @@ fn channel_rejects_non_integer_capacity() {
         "{error:?}"
     );
 }
+
+#[test]
+fn closed_channel_can_be_received_repeatedly_without_messages() {
+    let source = r#"
+        public func main(): Int {
+            val queue = channel<Int>(1);
+            close(queue);
+            val first = receive(queue);
+            val second = receive(queue);
+            val first_value: Int = when (first) {
+                ChannelResult.Message(value) -> value;
+                ChannelResult.Closed -> 2;
+            };
+            val second_value: Int = when (second) {
+                ChannelResult.Message(value) -> value;
+                ChannelResult.Closed -> 3;
+            };
+            return first_value + second_value;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "channel_repeated_closed"), 5);
+}
