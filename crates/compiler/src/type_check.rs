@@ -6372,6 +6372,7 @@ pub fn type_enum_whens(
                         }
                     }
                 }
+                type_string_operations(parsed, &mut report, type_arena, &parsed.array_types);
                 let Some(body_type) = report.expression_type(arm.body) else {
                     report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
                         TypeRuleDiagnostic::WhenMissingArmValue,

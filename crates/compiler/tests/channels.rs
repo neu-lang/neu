@@ -66,3 +66,71 @@ fn closed_channel_returns_closed_result_after_draining() {
     "#;
     assert_eq!(compile_and_run(source, "channel_closed"), 9);
 }
+
+#[test]
+fn sending_a_move_only_value_consumes_the_source_binding() {
+    let output = std::env::temp_dir().join(format!("neu-channel-send-move-{}", std::process::id()));
+    let error = compiler::driver::compile_source_to_executable(
+        r#"
+            public func main(): Int {
+                val queue = channel<String>(1);
+                val message: String = "payload";
+                send(queue, message);
+                return message.length;
+            }
+        "#,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(12001),
+            ModuleName::parse("channel_send_move").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("UseAfterMove"), "{error:?}");
+}
+
+#[test]
+fn sending_a_string_uses_the_opaque_channel_storage() {
+    let source = r#"
+        public func main(): Int {
+            val queue = channel<String>(1);
+            val message: String = "payload";
+            send(queue, message);
+            return 7;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "channel_string"), 7);
+}
+
+#[test]
+fn sending_a_copyable_value_leaves_the_source_usable() {
+    let source = r#"
+        public func main(): Int {
+            val queue = channel<Int>(1);
+            val value = 7;
+            send(queue, value);
+            return value;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "channel_copy"), 7);
+}
+
+#[test]
+fn channel_rejects_non_integer_capacity() {
+    let output = std::env::temp_dir().join(format!("neu-channel-capacity-{}", std::process::id()));
+    let error = compiler::driver::compile_source_to_executable(
+        "public func main(): Int { val queue = channel<Int>(true); return 0; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(12002),
+            ModuleName::parse("channel_capacity").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        format!("{error:?}").contains("InvalidChannelOperation"),
+        "{error:?}"
+    );
+}

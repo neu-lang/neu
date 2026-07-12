@@ -194,6 +194,17 @@ pub enum MirInstruction {
         value: MirValueId,
         span: ByteSpan,
     },
+    ChannelResultTag {
+        output: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    ChannelResultPayload {
+        output: MirValueId,
+        value: MirValueId,
+        element_type: TypeId,
+        span: ByteSpan,
+    },
     BoolConstant {
         output: MirValueId,
         value: bool,
@@ -515,6 +526,8 @@ impl MirInstruction {
             | Self::EnumConstruct { span, .. }
             | Self::EnumPayload { span, .. }
             | Self::EnumTag { span, .. }
+            | Self::ChannelResultTag { span, .. }
+            | Self::ChannelResultPayload { span, .. }
             | Self::BoolConstant { span, .. }
             | Self::FloatConstant { span, .. }
             | Self::ByteConstant { span, .. }
@@ -976,12 +989,32 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     });
                 }
                 HirExpressionKind::EnumPayload { subject, index } => {
-                    instructions.push(MirInstruction::EnumPayload {
-                        output,
-                        value: mir_expression_value_id(function, *subject),
-                        index: *index,
-                        span: expression.span(),
-                    });
+                    let value = mir_expression_value_id(function, *subject);
+                    let is_channel_result = function
+                        .expressions()
+                        .iter()
+                        .find(|candidate| candidate.id() == *subject)
+                        .and_then(|candidate| types.get(candidate.ty()))
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::ChannelResult(_)));
+                    if is_channel_result {
+                        let element_type = types
+                            .get(expression.ty())
+                            .map(|record| record.id())
+                            .ok_or(MirLoweringError::UnsupportedRuntimeType)?;
+                        instructions.push(MirInstruction::ChannelResultPayload {
+                            output,
+                            value,
+                            element_type,
+                            span: expression.span(),
+                        });
+                    } else {
+                        instructions.push(MirInstruction::EnumPayload {
+                            output,
+                            value,
+                            index: *index,
+                            span: expression.span(),
+                        });
+                    }
                 }
                 HirExpressionKind::BoolLiteral(value) => instructions.push(
                     MirInstruction::bool_constant(output, *value, expression.span()),
@@ -1710,12 +1743,28 @@ impl<'a> ShortCircuitLowerer<'a> {
             }
             HirExpressionKind::EnumPayload { subject, index } => {
                 let value = self.lower_expression(*subject)?;
-                self.push(MirInstruction::EnumPayload {
-                    output,
-                    value,
-                    index: *index,
-                    span: expression.span(),
-                });
+                let is_channel_result = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == *subject)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .is_some_and(|record| matches!(record.kind(), TypeKind::ChannelResult(_)));
+                if is_channel_result {
+                    self.push(MirInstruction::ChannelResultPayload {
+                        output,
+                        value,
+                        element_type: expression.ty(),
+                        span: expression.span(),
+                    });
+                } else {
+                    self.push(MirInstruction::EnumPayload {
+                        output,
+                        value,
+                        index: *index,
+                        span: expression.span(),
+                    });
+                }
             }
             HirExpressionKind::BoolLiteral(value) => {
                 self.push(MirInstruction::bool_constant(
@@ -2307,12 +2356,28 @@ impl<'a> ControlFlowLowerer<'a> {
             }
             HirExpressionKind::EnumPayload { subject, index } => {
                 let value = self.lower_expression(*subject)?;
-                self.push(MirInstruction::EnumPayload {
-                    output,
-                    value,
-                    index: *index,
-                    span: expression.span(),
-                });
+                let is_channel_result = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == *subject)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .is_some_and(|record| matches!(record.kind(), TypeKind::ChannelResult(_)));
+                if is_channel_result {
+                    self.push(MirInstruction::ChannelResultPayload {
+                        output,
+                        value,
+                        element_type: expression.ty(),
+                        span: expression.span(),
+                    });
+                } else {
+                    self.push(MirInstruction::EnumPayload {
+                        output,
+                        value,
+                        index: *index,
+                        span: expression.span(),
+                    });
+                }
             }
             HirExpressionKind::BoolLiteral(value) => {
                 self.push(MirInstruction::bool_constant(
@@ -2490,12 +2555,28 @@ impl<'a> ControlFlowLowerer<'a> {
             }
             HirExpressionKind::When { subject, arms } => {
                 let subject_value = self.lower_expression(*subject)?;
+                let subject_expression = *subject;
                 let subject = self.fresh_value();
-                self.push(MirInstruction::EnumTag {
-                    output: subject,
-                    value: subject_value,
-                    span: expression.span(),
-                });
+                let is_channel_result = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == subject_expression)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .is_some_and(|record| matches!(record.kind(), TypeKind::ChannelResult(_)));
+                if is_channel_result {
+                    self.push(MirInstruction::ChannelResultTag {
+                        output: subject,
+                        value: subject_value,
+                        span: expression.span(),
+                    });
+                } else {
+                    self.push(MirInstruction::EnumTag {
+                        output: subject,
+                        value: subject_value,
+                        span: expression.span(),
+                    });
+                }
                 let result_local = self.fresh_local(expression.ty(), expression.span());
                 let merge_block = self.new_block();
                 let mut test_block = self.current;

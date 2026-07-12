@@ -24,21 +24,21 @@ use crate::{
     parser,
     source::SourceFileId,
     type_check::{
-        ConstructorDiagnostic, DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic,
-        ExecutableSourceTypes, ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
-        TypeRuleDiagnostic, UnsupportedExecutableFormDiagnostic, apply_class_type_facts,
-        apply_control_flow_results, apply_direct_call_results, apply_enum_constructor_facts,
-        apply_enum_function_facts, apply_field_access_facts, apply_method_call_facts,
-        apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
-        check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
-        check_return_expression_types, check_straight_line_returns,
-        check_unsupported_executable_forms, diagnose_unresolved_types, infer_local_types,
-        merge_type_check_report, type_annotation_type, type_array_expressions_with_classes,
-        type_array_iterations, type_bind_function_values, type_class_types_in,
-        type_concurrency_operations, type_control_flow, type_dynamic_array_operations,
-        type_enum_whens, type_executable_core_in, type_executable_int_operators,
-        type_function_signatures_in_with_classes, type_lambda_expressions, type_string_operations,
-        type_value_conditionals, validate_compile_time_constants, validate_concurrency_structure,
+        ConstructorDiagnostic, DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes,
+        ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic, TypeRuleDiagnostic,
+        UnsupportedExecutableFormDiagnostic, apply_class_type_facts, apply_control_flow_results,
+        apply_direct_call_results, apply_enum_constructor_facts, apply_enum_function_facts,
+        apply_field_access_facts, apply_method_call_facts, apply_receiver_name_facts,
+        apply_receiver_signatures, apply_value_conditional_results, check_constructor_calls,
+        check_direct_calls, check_entry_point, check_indirect_calls, check_return_expression_types,
+        check_straight_line_returns, check_unsupported_executable_forms, diagnose_unresolved_types,
+        infer_local_types, merge_type_check_report, type_annotation_type,
+        type_array_expressions_with_classes, type_array_iterations, type_bind_function_values,
+        type_class_types_in, type_concurrency_operations, type_control_flow,
+        type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
+        type_executable_int_operators, type_function_signatures_in_with_classes,
+        type_lambda_expressions, type_string_operations, type_value_conditionals,
+        validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_task_member_cancellation_structure,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
@@ -453,8 +453,25 @@ pub fn compile_source_to_executable(
     apply_direct_call_results(&mut report, &parsed, &calls);
     let conditional_report = type_value_conditionals(&parsed, report.expression_types(), &types);
     apply_value_conditional_results(&mut report, &conditional_report);
+    type_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
     let when_report = type_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
     merge_type_check_report(&mut report, when_report);
+    let string_member_nodes = parsed
+        .member_expressions
+        .iter()
+        .filter(|member| {
+            report.expression_type(member.receiver).is_some_and(|ty| {
+                types.get(ty).is_some_and(|record| {
+                    record.kind() == &TypeKind::Primitive(PrimitiveType::String)
+                })
+            })
+        })
+        .map(|member| member.expression)
+        .collect::<Vec<_>>();
+    report.retain_diagnostics(|diagnostic| {
+        diagnostic.rule() != TypeRuleDiagnostic::MemberExpressionDeferred
+            || !string_member_nodes.contains(&diagnostic.node())
+    });
     let statement_conditionals = parsed
         .if_statements
         .iter()
@@ -534,19 +551,12 @@ pub fn compile_source_to_executable(
         local_index.index(),
         &mut interner,
     );
-    let local_signatures = parsed
-        .local_declarations
-        .iter()
-        .filter_map(|declaration| {
-            let annotation = declaration.annotation?;
-            let ty = type_annotation_type(&parsed, annotation, &mut types, class_types.classes())?;
-            Some(DeclarationSignature::new(declaration.declaration, ty))
-        })
-        .collect::<Vec<_>>();
+    let local_signatures = report.declaration_signatures().to_vec();
     let call_transfers = collect_ownership_call_transfers(
         &parsed,
         resolved_locals.resolved_local_bindings(),
         &signatures,
+        &local_signatures,
         &types,
     );
     let capture_transfers = collect_ownership_capture_transfers(

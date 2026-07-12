@@ -901,6 +901,39 @@ fn lower_instruction(
             values.insert(*output, builder.ins().band(value, mask));
             Ok(())
         }
+        MirInstruction::ChannelResultTag { output, value, .. } => {
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            values.insert(
+                *output,
+                builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::new(), pointer, 0),
+            );
+            Ok(())
+        }
+        MirInstruction::ChannelResultPayload {
+            output,
+            value,
+            element_type,
+            ..
+        } => {
+            let pointer = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let element_clif = cranelift_type(*element_type, context.type_arena)
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            values.insert(
+                *output,
+                builder
+                    .ins()
+                    .load(element_clif, MemFlagsData::new(), pointer, 8),
+            );
+            Ok(())
+        }
         MirInstruction::BoolConstant { output, value, .. } => {
             values.insert(*output, builder.ins().iconst(types::I8, i64::from(*value)));
             Ok(())
@@ -1118,6 +1151,7 @@ fn lower_instruction(
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             builder.ins().trapz(header, TrapCode::unwrap_user(11));
             let has_capacity = builder.ins().icmp(IntCC::NotEqual, capacity, zero);
+            let zero = builder.ins().iconst(types::I64, 0);
             let one = builder.ins().iconst(types::I64, 1);
             let data_count = builder.ins().select(has_capacity, capacity, one);
             let data_size = builder.ins().imul_imm(data_count, 8);
@@ -1232,19 +1266,22 @@ fn lower_instruction(
             let loaded = builder
                 .ins()
                 .load(element_clif, MemFlagsData::new(), address, 0);
-            let loaded = if element_clif == types::I8 {
-                builder.ins().uextend(types::I64, loaded)
-            } else if element_clif == types::I64 {
-                loaded
-            } else {
-                return Err(CraneliftLoweringError::UnsupportedRuntimeType);
-            };
+            let result_size = builder.ins().iconst(types::I64, 16);
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
+            let result_call = builder.ins().call(malloc_ref, &[result_size]);
+            let result = *builder
+                .inst_results(result_call)
+                .first()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            builder.ins().trapz(result, TrapCode::unwrap_user(15));
             let zero = builder.ins().iconst(types::I64, 0);
-            let payload = builder.ins().select(empty, zero, loaded);
             let one = builder.ins().iconst(types::I64, 1);
             let tag = builder.ins().select(empty, one, zero);
-            let shifted_payload = builder.ins().ishl_imm(payload, 8);
-            let result = builder.ins().iadd(shifted_payload, tag);
+            builder.ins().store(MemFlagsData::new(), tag, result, 0);
+            builder.ins().store(MemFlagsData::new(), loaded, result, 8);
             values.insert(*output, result);
             let next_raw = builder.ins().iadd_imm(head, 1);
             let capacity = builder

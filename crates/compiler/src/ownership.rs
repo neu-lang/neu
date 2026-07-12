@@ -134,6 +134,7 @@ pub fn collect_ownership_call_transfers(
     parsed: &ParseOutput,
     resolved_local_bindings: &[ResolvedLocalBinding],
     signatures: &[FunctionSignature],
+    local_signatures: &[DeclarationSignature],
     types: &TypeArena,
 ) -> Vec<OwnershipTransfer> {
     let mut transfers = Vec::new();
@@ -161,6 +162,22 @@ pub fn collect_ownership_call_transfers(
                 argument,
                 resolved.binding().clone(),
             ));
+            continue;
+        }
+        if callee.name == "send" {
+            let Some(argument) = call.arguments.get(1).copied() else {
+                continue;
+            };
+            if let Some(source_binding) =
+                move_only_source_binding(argument, resolved_local_bindings, local_signatures, types)
+            {
+                transfers.push(OwnershipTransfer::new(
+                    OwnershipTransferKind::ConsumingCallArgument,
+                    call.expression,
+                    argument,
+                    source_binding,
+                ));
+            }
             continue;
         }
         let Some(declaration) = parsed
