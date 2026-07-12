@@ -332,6 +332,59 @@ fn static_class_function_rejects_instance_receiver_access() {
 }
 
 #[test]
+fn abstract_class_requires_concrete_completion_before_construction() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-abstract-class-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "abstract class Base() { abstract func value(): Int; } class Child: Base() {} public func main(): Int { val value: Base = new Base(); return value.value(); }";
+    let error = compiler::driver::compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6722),
+            compiler::module::ModuleName::parse("classes").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap_err();
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains("AbstractClassConstruction")
+            || rendered.contains("AbstractClassIncomplete")
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn concrete_class_completes_abstract_function() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-abstract-class-valid-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "abstract class Base() { abstract func value(): Int; } class Child: Base() { override func value(): Int { return 7; } } public func main(): Int { val value: Base = new Child(); return value.value(); }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6723),
+            compiler::module::ModuleName::parse("classes").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn dispatches_a_same_module_class_method() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let workspace = std::env::temp_dir().join(format!("neu-class-method-{}", std::process::id()));

@@ -1,0 +1,16 @@
+package examples.current
+
+abstract class Base() {
+    abstract func value(): Int;
+}
+
+class Child: Base() {
+    override func value(): Int {
+        return 7;
+    }
+}
+
+public func main(): Int {
+    val value: Base = new Child();
+    return value.value();
+}

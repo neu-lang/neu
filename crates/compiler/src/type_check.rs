@@ -92,6 +92,7 @@ pub enum TypeRuleDiagnostic {
     InferredTypeUnavailable,
     StaticFunctionInstanceAccess,
     StaticFunctionOverride,
+    AbstractDeclarationInvalid,
     DuplicateField,
     FieldHiding,
     ImmutableFieldMutation,
@@ -463,6 +464,7 @@ pub struct ClassTypeRecord {
     declaration: AstNodeId,
     name: String,
     is_final: bool,
+    is_abstract: bool,
     interface: bool,
     type_id: TypeId,
     superclass: Option<String>,
@@ -476,6 +478,9 @@ impl ClassTypeRecord {
     }
     pub fn is_final(&self) -> bool {
         self.is_final
+    }
+    pub fn is_abstract(&self) -> bool {
+        self.is_abstract
     }
     pub fn is_interface(&self) -> bool {
         self.interface
@@ -540,6 +545,8 @@ pub enum ConstructorDiagnosticKind {
     UnknownClass,
     ArgumentCountMismatch,
     SuperclassArgumentCountMismatch,
+    AbstractClassConstruction,
+    AbstractClassIncomplete,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -579,6 +586,17 @@ pub fn check_m0069_constructor_calls(
             });
             continue;
         };
+        if class.is_abstract {
+            diagnostics.push(ConstructorDiagnostic {
+                kind: ConstructorDiagnosticKind::AbstractClassConstruction,
+                span: expression.type_span,
+            });
+        } else if class_has_unresolved_abstract_methods(parsed, class) {
+            diagnostics.push(ConstructorDiagnostic {
+                kind: ConstructorDiagnosticKind::AbstractClassIncomplete,
+                span: expression.type_span,
+            });
+        }
         if expression.arguments.len() != class.constructor_parameter_count {
             diagnostics.push(ConstructorDiagnostic {
                 kind: ConstructorDiagnosticKind::ArgumentCountMismatch,
@@ -611,6 +629,36 @@ pub fn check_m0069_constructor_calls(
         }
     }
     diagnostics
+}
+
+fn class_has_unresolved_abstract_methods(parsed: &ParseOutput, class: &ClassTypeRecord) -> bool {
+    let mut hierarchy = Vec::new();
+    let mut current = Some(class.name.clone());
+    while let Some(name) = current {
+        let Some(record) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == name)
+        else {
+            break;
+        };
+        hierarchy.push(record);
+        current = record.superclass.clone();
+    }
+    parsed.function_declarations.iter().any(|requirement| {
+        requirement.is_abstract
+            && requirement
+                .owner
+                .is_some_and(|owner| hierarchy.iter().any(|record| record.declaration == owner))
+            && !hierarchy.iter().any(|record| {
+                parsed.function_declarations.iter().any(|candidate| {
+                    candidate.owner == Some(record.declaration)
+                        && candidate.name == requirement.name
+                        && !candidate.is_abstract
+                        && same_function_parameter_types(parsed, candidate, requirement)
+                })
+            })
+    })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1016,6 +1064,7 @@ pub fn type_m0068_class_types_in(
             declaration: declaration.declaration,
             name: declaration.name.clone(),
             is_final: declaration.is_final,
+            is_abstract: declaration.is_abstract,
             interface: declaration.interface,
             type_id,
             superclass: declaration.superclass.clone(),
@@ -1125,6 +1174,33 @@ pub fn type_m0068_class_types_in(
                         field.declaration,
                     ));
             }
+        }
+    }
+    for class in &parsed.class_declarations {
+        if class.is_abstract && class.is_final {
+            report
+                .diagnostics
+                .push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::AbstractDeclarationInvalid,
+                    class.declaration,
+                ));
+        }
+    }
+    for function in &parsed.function_declarations {
+        if !function.is_abstract {
+            continue;
+        }
+        let invalid = function.owner.is_none()
+            || function.body.is_some()
+            || function.is_final
+            || function.is_static;
+        if invalid {
+            report
+                .diagnostics
+                .push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::AbstractDeclarationInvalid,
+                    function.declaration,
+                ));
         }
     }
     let _ = class_ids;

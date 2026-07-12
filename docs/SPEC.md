@@ -1038,6 +1038,23 @@ Static calls preserve class and function identity as direct calls through HIR,
 MIR, Cranelift, object emission, and linking. Class objects, static fields,
 reflection, dynamic lookup, public symbol/layout ABI, and FFI remain deferred.
 
+## ADR-0094: Abstract Classes And Functions
+
+`abstract class` declares a non-instantiable class. It may contain concrete
+fields, the primary constructor, concrete methods, and declaration-only
+`abstract func` instance methods. Abstract classes may inherit and implement
+interfaces, and may remain abstract through further subclasses. A concrete
+class is constructible only when every inherited abstract method identity has a
+compatible concrete `override`; incomplete classes and abstract construction
+are diagnosed before HIR lowering.
+
+Abstract methods have no bodies, no static form, and retain ordinary receiver,
+ownership, capability, overload, visibility, and dispatch rules. Abstract
+static methods and `abstract final` are rejected. Concrete completions preserve
+virtual/interface identity through HIR, MIR, Cranelift, object emission, and
+linking. Public abstract-object layouts, reflection, dynamic loading, and FFI
+remain deferred.
+
 ## ADR-0080: Zero-Payload Enum `when` Patterns
 
 `when` supports qualified zero-payload enum variant patterns and `_`. The

@@ -104,6 +104,7 @@ pub struct ParsedClassDeclaration {
     pub declaration: AstNodeId,
     pub name: String,
     pub is_final: bool,
+    pub is_abstract: bool,
     pub superclass: Option<String>,
     pub superclass_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
@@ -166,6 +167,7 @@ pub struct ParsedFunctionDeclaration {
     pub visibility: String,
     pub is_override: bool,
     pub is_final: bool,
+    pub is_abstract: bool,
     pub body: Option<AstNodeId>,
     pub return_annotation: Option<AstNodeId>,
     pub parameters: Vec<AstNodeId>,
@@ -607,6 +609,7 @@ struct Parser<'source> {
     pending_method_visibility: String,
     pending_method_override: bool,
     pending_method_final: bool,
+    pending_method_abstract: bool,
     pending_method_static: bool,
     pending_generic_parameters: Vec<AstNodeId>,
 }
@@ -666,6 +669,7 @@ impl<'source> Parser<'source> {
             pending_method_visibility: "internal".to_owned(),
             pending_method_override: false,
             pending_method_final: false,
+            pending_method_abstract: false,
             pending_method_static: false,
             pending_generic_parameters: Vec::new(),
         }
@@ -729,6 +733,7 @@ impl<'source> Parser<'source> {
 
         let mut saw_visibility = false;
         let mut final_class = false;
+        let mut abstract_class = false;
         while self.is_visibility()
             || self.is_unsupported_modifier()
             || self.current_kind() == Some(TokenKind::KwFinal)
@@ -745,6 +750,13 @@ impl<'source> Parser<'source> {
                     self.diagnostic(DiagnosticKind::DuplicateVisibilityModifier, token.span);
                 }
                 saw_visibility = true;
+            } else if token.kind == TokenKind::Identifier && self.current_text() == Some("abstract")
+            {
+                if self.peek_kind() == Some(TokenKind::KwClass) {
+                    abstract_class = true;
+                } else {
+                    self.pending_method_abstract = true;
+                }
             } else {
                 self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
             }
@@ -761,17 +773,25 @@ impl<'source> Parser<'source> {
                 AstNodeKind::ClassDeclaration,
                 in_body,
                 final_class,
+                abstract_class,
             ),
-            Some(TokenKind::KwStruct) => {
-                self.parse_named_body_declaration(AstNodeKind::StructDeclaration, in_body, false)
-            }
-            Some(TokenKind::KwEnum) => {
-                self.parse_named_body_declaration(AstNodeKind::EnumDeclaration, in_body, false)
-            }
+            Some(TokenKind::KwStruct) => self.parse_named_body_declaration(
+                AstNodeKind::StructDeclaration,
+                in_body,
+                false,
+                false,
+            ),
+            Some(TokenKind::KwEnum) => self.parse_named_body_declaration(
+                AstNodeKind::EnumDeclaration,
+                in_body,
+                false,
+                false,
+            ),
             Some(TokenKind::KwInterface) => {
                 self.parse_named_body_declaration(
                     AstNodeKind::InterfaceDeclaration,
                     in_body,
+                    false,
                     false,
                 );
             }
@@ -864,6 +884,7 @@ impl<'source> Parser<'source> {
                     visibility: self.pending_method_visibility.clone(),
                     is_override: self.pending_method_override,
                     is_final: self.pending_method_final,
+                    is_abstract: self.pending_method_abstract,
                     body: None,
                     return_annotation,
                     parameters: parameters
@@ -905,6 +926,7 @@ impl<'source> Parser<'source> {
                     visibility: self.pending_method_visibility.clone(),
                     is_override: self.pending_method_override,
                     is_final: self.pending_method_final,
+                    is_abstract: self.pending_method_abstract,
                     body,
                     return_annotation,
                     parameters: parameter_nodes,
@@ -921,6 +943,7 @@ impl<'source> Parser<'source> {
             }
         }
         self.pending_method_static = false;
+        self.pending_method_abstract = false;
     }
 
     fn function_parameter_list_is_typed(&self) -> bool {
@@ -1081,7 +1104,13 @@ impl<'source> Parser<'source> {
         false
     }
 
-    fn parse_named_body_declaration(&mut self, kind: AstNodeKind, in_body: bool, is_final: bool) {
+    fn parse_named_body_declaration(
+        &mut self,
+        kind: AstNodeKind,
+        in_body: bool,
+        is_final: bool,
+        is_abstract: bool,
+    ) {
         let start = self
             .current()
             .expect("declaration token exists")
@@ -1228,6 +1257,7 @@ impl<'source> Parser<'source> {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 is_final: true,
+                is_abstract: false,
                 superclass: None,
                 superclass_arguments: Vec::new(),
                 interfaces: Vec::new(),
@@ -1243,6 +1273,7 @@ impl<'source> Parser<'source> {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 is_final,
+                is_abstract,
                 superclass,
                 superclass_arguments,
                 interfaces,
@@ -1258,6 +1289,7 @@ impl<'source> Parser<'source> {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 is_final: false,
+                is_abstract: false,
                 superclass,
                 superclass_arguments: Vec::new(),
                 interfaces,
@@ -1275,7 +1307,7 @@ impl<'source> Parser<'source> {
         self.advance();
         while !self.is_eof() && self.current_kind() != Some(TokenKind::RightBrace) {
             let method_with_visibility = self.is_visibility()
-                && matches!(
+                && (matches!(
                     self.peek_kind(),
                     Some(
                         TokenKind::KwFunc
@@ -1283,9 +1315,9 @@ impl<'source> Parser<'source> {
                             | TokenKind::KwOverride
                             | TokenKind::KwOpen
                             | TokenKind::KwFinal
-                            | TokenKind::Identifier
                     )
-                );
+                ) || (self.peek_kind() == Some(TokenKind::Identifier)
+                    && matches!(self.peek_text(), Some("static" | "abstract"))));
             if self.current_kind() == Some(TokenKind::KwFunc)
                 || self.current_kind() == Some(TokenKind::KwFun)
                 || self.current_kind() == Some(TokenKind::KwOverride)
@@ -1293,11 +1325,14 @@ impl<'source> Parser<'source> {
                 || self.current_kind() == Some(TokenKind::KwFinal)
                 || (self.current_kind() == Some(TokenKind::Identifier)
                     && self.current_text() == Some("static"))
+                || (self.current_kind() == Some(TokenKind::Identifier)
+                    && self.current_text() == Some("abstract"))
                 || method_with_visibility
             {
                 self.pending_method_visibility = "internal".to_owned();
                 self.pending_method_override = false;
                 self.pending_method_final = false;
+                self.pending_method_abstract = false;
                 self.pending_method_static = false;
                 while self.is_visibility()
                     || matches!(
@@ -1305,7 +1340,7 @@ impl<'source> Parser<'source> {
                         Some(TokenKind::KwOverride | TokenKind::KwOpen | TokenKind::KwFinal)
                     )
                     || (self.current_kind() == Some(TokenKind::Identifier)
-                        && self.current_text() == Some("static"))
+                        && matches!(self.current_text(), Some("static" | "abstract")))
                 {
                     if self.is_visibility() {
                         self.pending_method_visibility =
@@ -1323,6 +1358,11 @@ impl<'source> Parser<'source> {
                                 if self.current_text() == Some("static") =>
                             {
                                 self.pending_method_static = true;
+                            }
+                            Some(TokenKind::Identifier)
+                                if self.current_text() == Some("abstract") =>
+                            {
+                                self.pending_method_abstract = true;
                             }
                             _ => {}
                         }
@@ -3965,6 +4005,11 @@ impl<'source> Parser<'source> {
 
     fn peek_kind(&self) -> Option<TokenKind> {
         self.tokens.get(self.index + 1).map(|token| token.kind)
+    }
+
+    fn peek_text(&self) -> Option<&str> {
+        let token = self.tokens.get(self.index + 1)?;
+        Some(&self.text[token.span.start()..token.span.end()])
     }
 
     fn lookahead_kind(&self, distance: usize) -> Option<TokenKind> {
