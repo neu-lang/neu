@@ -757,7 +757,9 @@ impl<'source> Parser<'source> {
 
         self.parse_generic_parameters();
 
-        let parameters = if self.function_parameter_list_has_body() {
+        let parameters = if self.current_kind() == Some(TokenKind::LeftParen)
+            && self.function_parameter_list_is_typed()
+        {
             let Some(parameters) = self.parse_typed_function_parameters() else {
                 self.diagnostic(
                     DiagnosticKind::MalformedDeclarationHeader,
@@ -800,6 +802,7 @@ impl<'source> Parser<'source> {
                     in_body,
                 );
                 self.saw_top_level_declaration |= !in_body;
+                self.record_function_parameters(declaration, parameters.clone());
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
@@ -860,6 +863,24 @@ impl<'source> Parser<'source> {
                 self.skip_to_declaration_boundary(in_body);
             }
         }
+    }
+
+    fn function_parameter_list_is_typed(&self) -> bool {
+        let mut depth = 0usize;
+        for token in self.tokens.iter().skip(self.index) {
+            match token.kind {
+                TokenKind::LeftParen => depth += 1,
+                TokenKind::RightParen => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return false;
+                    }
+                }
+                TokenKind::Colon if depth == 1 => return true,
+                _ => {}
+            }
+        }
+        false
     }
 
     fn parse_typed_function_parameters(&mut self) -> Option<Vec<ParsedFunctionParameter>> {
@@ -942,37 +963,6 @@ impl<'source> Parser<'source> {
                 parameter.function = function;
                 parameter
             }));
-    }
-
-    fn function_parameter_list_has_body(&self) -> bool {
-        let mut index = self.index;
-        let mut depth = 0usize;
-        while let Some(token) = self.tokens.get(index) {
-            match token.kind {
-                TokenKind::LeftParen => depth += 1,
-                TokenKind::RightParen => {
-                    depth -= 1;
-                    if depth == 0 {
-                        index += 1;
-                        break;
-                    }
-                }
-                _ => {}
-            }
-            index += 1;
-        }
-        let mut bracket_depth = 0usize;
-        while let Some(token) = self.tokens.get(index) {
-            match token.kind {
-                TokenKind::LeftBracket => bracket_depth += 1,
-                TokenKind::RightBracket => bracket_depth = bracket_depth.saturating_sub(1),
-                TokenKind::LeftBrace => return true,
-                TokenKind::Semicolon if bracket_depth == 0 => return false,
-                _ => {}
-            }
-            index += 1;
-        }
-        false
     }
 
     fn consume_balanced_parentheses(&mut self) -> bool {

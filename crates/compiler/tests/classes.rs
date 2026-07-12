@@ -539,6 +539,58 @@ fn interface_parameter_dispatches_to_the_implementing_class() {
 }
 
 #[test]
+fn resolves_overloaded_methods_before_virtual_dispatch() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-method-overload-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "class Base { func value(value: Int): Int { return 1; } func value(value: Bool): Int { return 8; } } public func main(): Int { val base: Base = new Base(); return base.value(true); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6838),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(8)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn resolves_overloaded_interface_methods_through_interface_dispatch() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-overload-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "interface Choice { func pick(value: Int): Int; func pick(value: Bool): Int; } class Impl: Choice { override func pick(value: Int): Int { return 1; } override func pick(value: Bool): Int { return 9; } } public func main(): Int { val choice: Choice = new Impl(); return choice.pick(true); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6839),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(9)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn final_class_rejects_subclassing_and_open_is_a_diagnostic() {
     let final_class = parse_source(
         SourceFileId::from_raw(6836),

@@ -48,6 +48,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("interfaces", 11),
         ("virtual_dispatch", 13),
         ("dispatch_parameters", 10),
+        ("overloads", 10),
         ("dynamic_arrays", 1),
         ("nominal_arrays", 4),
     ] {
@@ -112,6 +113,73 @@ fn compiles_primitive_parameter_and_return_matrix() {
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
     let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn resolves_exact_top_level_overloads_end_to_end() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-overload-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        func select(value: Int): Int { return 3; }
+        func select(value: Bool): Int { return 4; }
+        public func main(): Int { return select(true); }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(7600),
+            ModuleName::parse("overloads").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(4));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn rejects_ambiguous_and_missing_overloads_before_lowering() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (source, expected) in [
+        (
+            "func select(value: Int): Int { return 1; } public func main(): Int { return select(true); }",
+            "NoMatchingOverload",
+        ),
+        (
+            "class Base {} interface Answer {} class Child: Base(), Answer { } func select(value: Base): Int { return 1; } func select(value: Answer): Int { return 2; } public func main(): Int { return select(new Child()); }",
+            "AmbiguousOverload",
+        ),
+        (
+            "func select(value: Int): Int { return 1; } func select(value: Int): Int { return 2; } public func main(): Int { return select(1); }",
+            "DuplicateOverload",
+        ),
+    ] {
+        let workspace =
+            std::env::temp_dir().join(format!("neu-overload-negative-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&workspace);
+        fs::create_dir_all(&workspace).unwrap();
+        let error = compile_source_to_executable(
+            source,
+            SourceDriverOptions::new(
+                SourceFileId::from_raw(7601),
+                ModuleName::parse("overloads").unwrap(),
+                PackageNamespace::root(),
+                Triple::host(),
+                repo_root.join("target-packs"),
+                workspace.join("program"),
+            ),
+        )
+        .unwrap_err();
+        assert!(format!("{error:?}").contains(expected));
+        let _ = fs::remove_dir_all(workspace);
+    }
 }
 
 #[test]

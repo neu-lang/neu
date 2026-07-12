@@ -728,7 +728,10 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             .iter()
             .filter(|method| method.owner == Some(child.declaration))
         {
-            let targets = inherited_method_targets(parsed, child, &method.name);
+            let targets = inherited_method_targets(parsed, child, &method.name)
+                .into_iter()
+                .filter(|target| same_function_parameter_types(parsed, method, target))
+                .collect::<Vec<_>>();
             let Some(parent_method) = targets.first().copied() else {
                 if method.is_override
                     && let Some(node) = parsed.arena.node(method.declaration)
@@ -815,24 +818,9 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
         for (index, method) in interface_methods.iter().enumerate() {
             if interface_methods[index + 1..].iter().any(|other| {
                 other.name == method.name
-                    && (type_annotation_name(parsed, method.return_annotation)
+                    && same_function_parameter_types(parsed, method, other)
+                    && type_annotation_name(parsed, method.return_annotation)
                         != type_annotation_name(parsed, other.return_annotation)
-                        || parsed
-                            .function_parameters
-                            .iter()
-                            .filter(|parameter| parameter.function == method.declaration)
-                            .map(|parameter| {
-                                type_annotation_name(parsed, Some(parameter.annotation))
-                            })
-                            .collect::<Vec<_>>()
-                            != parsed
-                                .function_parameters
-                                .iter()
-                                .filter(|parameter| parameter.function == other.declaration)
-                                .map(|parameter| {
-                                    type_annotation_name(parsed, Some(parameter.annotation))
-                                })
-                                .collect::<Vec<_>>())
             }) && let Some(node) = parsed.arena.node(class.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
@@ -856,7 +844,9 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 .filter(|method| method.owner == Some(interface.declaration))
             {
                 let implemented = parsed.function_declarations.iter().any(|method| {
-                    method.owner == Some(class.declaration) && method.name == required.name
+                    method.owner == Some(class.declaration)
+                        && method.name == required.name
+                        && same_function_parameter_types(parsed, method, required)
                 });
                 if !implemented && let Some(node) = parsed.arena.node(class.declaration) {
                     diagnostics.push(DispatchDiagnostic {
@@ -868,6 +858,26 @@ pub fn check_m0070_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
         }
     }
     diagnostics
+}
+
+fn same_function_parameter_types(
+    parsed: &ParseOutput,
+    left: &ParsedFunctionDeclaration,
+    right: &ParsedFunctionDeclaration,
+) -> bool {
+    let left_types = parsed
+        .function_parameters
+        .iter()
+        .filter(|parameter| parameter.function == left.declaration)
+        .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
+        .collect::<Vec<_>>();
+    let right_types = parsed
+        .function_parameters
+        .iter()
+        .filter(|parameter| parameter.function == right.declaration)
+        .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
+        .collect::<Vec<_>>();
+    left_types == right_types
 }
 
 fn inherited_method_targets<'a>(
@@ -1576,6 +1586,9 @@ impl<'a> ExecutableSourceTypes<'a> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DirectCallDiagnosticKind {
     InvalidCallTarget,
+    NoMatchingOverload,
+    AmbiguousOverload,
+    DuplicateOverload,
     ArgumentCountMismatch,
     ArgumentTypeMismatch,
     RecursiveCallUnsupported,
@@ -1621,7 +1634,24 @@ impl DirectCallExpressionType {
 pub struct DirectCallReport {
     expression_types: Vec<ExpressionType>,
     source_expression_types: Vec<DirectCallExpressionType>,
+    resolved_declarations: Vec<ResolvedCallDeclaration>,
     diagnostics: Vec<DirectCallDiagnostic>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResolvedCallDeclaration {
+    call: AstNodeId,
+    declaration: AstNodeId,
+}
+
+impl ResolvedCallDeclaration {
+    pub fn call(self) -> AstNodeId {
+        self.call
+    }
+
+    pub fn declaration(self) -> AstNodeId {
+        self.declaration
+    }
 }
 
 impl DirectCallReport {
@@ -1631,6 +1661,10 @@ impl DirectCallReport {
 
     pub fn source_expression_types(&self) -> &[DirectCallExpressionType] {
         &self.source_expression_types
+    }
+
+    pub fn resolved_declarations(&self) -> &[ResolvedCallDeclaration] {
+        &self.resolved_declarations
     }
 
     pub fn diagnostics(&self) -> &[DirectCallDiagnostic] {
@@ -1644,6 +1678,22 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
     let mut call_edges: Vec<(ByteSpan, ByteSpan)> = Vec::new();
 
     for (source_index, source) in sources.iter().enumerate() {
+        for (index, function) in source.parsed.function_declarations.iter().enumerate() {
+            if source.parsed.function_declarations[index + 1..]
+                .iter()
+                .any(|other| {
+                    other.owner == function.owner
+                        && other.name == function.name
+                        && same_function_parameter_types(source.parsed, function, other)
+                })
+                && let Some(node) = source.parsed.arena.node(function.declaration)
+            {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::DuplicateOverload,
+                    node.span,
+                ));
+            }
+        }
         for (call_index, call) in source.parsed.call_expressions.iter().enumerate() {
             let callee_name = source
                 .parsed
@@ -1728,14 +1778,93 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                         })
                 })
                 .collect();
-            if targets.len() != 1 {
+            let mut arguments = call.arguments.clone();
+            if let Some(member) = member {
+                arguments.insert(0, member.receiver);
+            }
+            let Some(argument_types) = arguments
+                .iter()
+                .enumerate()
+                .map(|(index, argument)| {
+                    if index == 0
+                        && let Some(member) = member
+                        && let Some(class_name) =
+                            member_receiver_class_name(source, member.receiver, call.function)
+                        && let Some(class_type) = source.class_types.and_then(|classes| {
+                            classes
+                                .classes
+                                .iter()
+                                .find(|class| class.name == class_name)
+                        })
+                    {
+                        return Some(class_type.type_id);
+                    }
+                    source
+                        .expression_types
+                        .iter()
+                        .find(|typed| typed.expression == *argument)
+                        .map(|typed| typed.ty)
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
                 report.diagnostics.push(DirectCallDiagnostic::new(
                     DirectCallDiagnosticKind::InvalidCallTarget,
                     diagnostic_span,
                 ));
                 continue;
+            };
+            let arity_matches = targets
+                .into_iter()
+                .filter(|(candidate_index, signature_index)| {
+                    sources[*candidate_index].signatures[*signature_index]
+                        .parameter_types()
+                        .len()
+                        == argument_types.len()
+                })
+                .collect::<Vec<_>>();
+            let exact_matches = arity_matches
+                .iter()
+                .copied()
+                .filter(|(candidate_index, signature_index)| {
+                    sources[*candidate_index].signatures[*signature_index]
+                        .parameter_types()
+                        .iter()
+                        .zip(&argument_types)
+                        .all(|(expected, actual)| expected == actual)
+                })
+                .collect::<Vec<_>>();
+            let compatible_matches = if exact_matches.is_empty() {
+                arity_matches
+                    .iter()
+                    .copied()
+                    .filter(|(candidate_index, signature_index)| {
+                        sources[*candidate_index].signatures[*signature_index]
+                            .parameter_types()
+                            .iter()
+                            .zip(&argument_types)
+                            .all(|(expected, actual)| {
+                                overload_type_compatible(source, *actual, *expected)
+                            })
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                exact_matches
+            };
+            if compatible_matches.is_empty() {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::NoMatchingOverload,
+                    diagnostic_span,
+                ));
+                continue;
             }
-            let (target_source_index, target_signature_index) = targets[0];
+            if compatible_matches.len() > 1 {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::AmbiguousOverload,
+                    diagnostic_span,
+                ));
+                continue;
+            }
+            let (target_source_index, target_signature_index) = compatible_matches[0];
             let target_source = &sources[target_source_index];
             let target = &target_source.signatures[target_signature_index];
             let has_body = target_source
@@ -1847,12 +1976,13 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
             {
                 continue;
             }
-            if source
+            let actual_type = source
                 .expression_types
                 .iter()
                 .find(|typed| typed.expression == *argument)
-                .map(|typed| typed.ty)
-                != Some(*parameter)
+                .map(|typed| typed.ty);
+            if actual_type
+                .is_none_or(|actual| !overload_type_compatible(source, actual, *parameter))
             {
                 let span = source
                     .parsed
@@ -1883,6 +2013,10 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                     expression_span: call_span,
                     ty: target.return_type,
                 });
+            report.resolved_declarations.push(ResolvedCallDeclaration {
+                call: call.expression,
+                declaration: target.declaration,
+            });
         }
     }
     report
@@ -1989,6 +2123,50 @@ fn member_receiver_class_name(
                 .find(|class| class.type_id == typed.ty)
         })
         .map(|class| class.name.clone())
+}
+
+fn overload_type_compatible(
+    source: &ExecutableSourceTypes<'_>,
+    actual: TypeId,
+    expected: TypeId,
+) -> bool {
+    if actual == expected {
+        return true;
+    }
+    let Some(classes) = source.class_types else {
+        return false;
+    };
+    let Some(actual) = classes.classes.iter().find(|class| class.type_id == actual) else {
+        return false;
+    };
+    let Some(expected) = classes
+        .classes
+        .iter()
+        .find(|class| class.type_id == expected)
+    else {
+        return false;
+    };
+    if expected.interface {
+        return actual.interfaces.iter().any(|name| name == &expected.name)
+            || actual.superclass.as_deref().is_some_and(|parent| {
+                classes
+                    .classes
+                    .iter()
+                    .find(|class| class.name == parent)
+                    .is_some_and(|parent| {
+                        overload_type_compatible(source, parent.type_id, expected.type_id)
+                    })
+            });
+    }
+    actual.superclass.as_deref().is_some_and(|parent| {
+        classes
+            .classes
+            .iter()
+            .find(|class| class.name == parent)
+            .is_some_and(|parent| {
+                overload_type_compatible(source, parent.type_id, expected.type_id)
+            })
+    })
 }
 
 pub fn apply_m0028_direct_call_results(

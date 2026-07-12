@@ -949,3 +949,16 @@ Dynamic scalar arrays use opaque compiler-managed pointers; move-only ownership
 and return cleanup remain enforced. Dynamic arrays containing strings, nominal
 values, fixed arrays, nested dynamic arrays, or nullable values are rejected
 before lowering until their element ABI and destruction contracts are accepted.
+
+## ADR-0076: Function And Method Overloading
+
+Same-module top-level functions, class methods, and interface methods may form
+overload sets. Identity is owner, name, and ordered parameter type identity;
+return type is not part of identity. Exact matches are preferred, already
+accepted assignment compatibility may be used only for one unique candidate,
+and numeric conversions, defaults, named arguments, varargs, generic overloads,
+and cross-module lookup remain deferred. Ambiguous and missing matches are
+source-mapped diagnostics. Overload selection is compile-time; the selected
+method identity then preserves direct, virtual, interface, or static-super
+dispatch and existing ownership/effect facts through HIR, MIR, Cranelift, and
+the compiler-private ABI. Constructors remain single-primary-constructor only.

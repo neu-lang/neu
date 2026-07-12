@@ -147,7 +147,11 @@ pub fn lower_mir_module_to_cranelift(
             .ok_or(CraneliftLoweringError::MissingFunctionIdentity)?;
         let signature = mir_signature(function, type_arena, &target)?;
         let function_id = object_module
-            .declare_function(&bootstrap_symbol(identity), Linkage::Local, &signature)
+            .declare_function(
+                &bootstrap_symbol(identity, function.parameters().iter().map(|(_, ty)| *ty)),
+                Linkage::Local,
+                &signature,
+            )
             .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
         function_ids.insert(function.id(), function_id);
     }
@@ -224,7 +228,7 @@ pub fn emit_mir_module_to_object_for_target(
             }
             language_entry_symbol.to_owned()
         } else {
-            bootstrap_symbol(identity)
+            bootstrap_symbol(identity, function.parameters().iter().map(|(_, ty)| *ty))
         };
         let linkage = if function.is_entry() {
             Linkage::Export
@@ -319,7 +323,7 @@ fn emit_mir_function_to_object_impl(
             .ok_or(CraneliftLoweringError::MissingLanguageEntrySymbol)?;
         symbol.to_owned()
     } else {
-        bootstrap_symbol(identity)
+        bootstrap_symbol(identity, function.parameters().iter().map(|(_, ty)| *ty))
     };
     let linkage = if function.is_entry() {
         Linkage::Export
@@ -541,12 +545,21 @@ fn declare_runtime_functions(
     })
 }
 
-fn bootstrap_symbol(identity: &crate::module::FunctionSymbolIdentity) -> String {
+fn bootstrap_symbol(
+    identity: &crate::module::FunctionSymbolIdentity,
+    parameter_types: impl IntoIterator<Item = crate::types::TypeId>,
+) -> String {
+    let parameters = parameter_types
+        .into_iter()
+        .map(|ty| ty.index().to_string())
+        .collect::<Vec<_>>()
+        .join("_");
     format!(
-        "neu_fn_{}_{}_{}",
+        "neu_fn_{}_{}_{}_p{}",
         encode_symbol_component(identity.module().as_str()),
         encode_symbol_component(identity.package().as_str()),
         encode_symbol_component(identity.name()),
+        parameters,
     )
 }
 
