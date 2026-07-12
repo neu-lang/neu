@@ -115,6 +115,7 @@ pub struct ParsedImport {
 pub struct ParsedClassDeclaration {
     pub declaration: AstNodeId,
     pub name: String,
+    pub visibility: String,
     pub is_final: bool,
     pub is_abstract: bool,
     pub superclass: Option<String>,
@@ -1354,6 +1355,7 @@ impl<'source> Parser<'source> {
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
+                visibility: self.pending_method_visibility.clone(),
                 is_final: true,
                 is_abstract: false,
                 superclass: None,
@@ -1370,6 +1372,7 @@ impl<'source> Parser<'source> {
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
+                visibility: self.pending_method_visibility.clone(),
                 is_final,
                 is_abstract,
                 superclass,
@@ -1389,6 +1392,7 @@ impl<'source> Parser<'source> {
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
+                visibility: self.pending_method_visibility.clone(),
                 is_final: false,
                 is_abstract: false,
                 superclass,

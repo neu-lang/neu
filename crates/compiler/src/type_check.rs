@@ -468,6 +468,7 @@ pub struct FunctionSignature {
 pub struct ClassTypeRecord {
     declaration: AstNodeId,
     name: String,
+    visibility: String,
     is_final: bool,
     is_abstract: bool,
     interface: bool,
@@ -480,6 +481,9 @@ pub struct ClassTypeRecord {
 impl ClassTypeRecord {
     pub fn name(&self) -> &str {
         &self.name
+    }
+    pub fn visibility(&self) -> &str {
+        &self.visibility
     }
     pub fn is_final(&self) -> bool {
         self.is_final
@@ -1068,6 +1072,7 @@ pub fn type_class_types_in(
         report.classes.push(ClassTypeRecord {
             declaration: declaration.declaration,
             name: declaration.name.clone(),
+            visibility: declaration.visibility.clone(),
             is_final: declaration.is_final,
             is_abstract: declaration.is_abstract,
             interface: declaration.interface,
@@ -3517,7 +3522,7 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
                 reference.name != "Array"
                     && !matches!(
                         reference.name.as_str(),
-                        "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte"
+                        "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte" | "Channel" | "Task"
                     )
                     && !parsed
                         .class_declarations
@@ -4604,6 +4609,18 @@ fn resolve_annotation_type(
                         .map(|class| class.type_id)
                 })?;
             return Some(arena.channel(element));
+        }
+        if reference.name == "Task" && reference.generic_argument_names.len() == 1 {
+            let result_name = &reference.generic_argument_names[0];
+            let result = primitives
+                .type_for_primitive_name(result_name)
+                .or_else(|| {
+                    classes
+                        .iter()
+                        .find(|class| class.name == *result_name)
+                        .map(|class| class.type_id)
+                })?;
+            return Some(arena.task(result));
         }
         return primitives
             .type_for_primitive_name(&reference.name)

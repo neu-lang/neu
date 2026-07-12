@@ -1286,6 +1286,11 @@ symbols have no public layout or FFI ABI. Explicit cancellation, channels,
 timers, I/O, detached tasks, OS threads, parallel execution, and concurrency
 standard-library APIs remain deferred.
 
+`Task<T>` and `Channel<T>` may appear in public Neu interface method signatures
+when their source-level ownership and capability contracts are satisfied. Their
+runtime handles, frames, queue state, dispatch metadata, and layouts remain
+compiler-private and are never part of a public ABI or FFI contract.
+
 ## ADR-0104: Member Task Cancellation
 
 `task.cancel()` requests idempotent cancellation of an owned child task without

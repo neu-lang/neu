@@ -15,7 +15,7 @@ use std::{fs, process::Command};
 fn parses_class_interface_and_field_surface() {
     let parsed = parse_source(
         SourceFileId::from_raw(6800),
-        "class Child: Base(), Readable { private val count: Int; public var ready: Bool; } interface Readable {}",
+        "class Child: Base(), Readable { private val count: Int; public var ready: Bool; } public interface Readable {}",
     );
     assert!(
         parsed.lex_diagnostics.is_empty(),
@@ -30,6 +30,7 @@ fn parses_class_interface_and_field_surface() {
         &PackageNamespace::root(),
     );
     assert_eq!(types.classes().len(), 2);
+    assert_eq!(types.classes()[1].visibility(), "public");
     assert_eq!(types.fields().len(), 2);
     assert_eq!(types.fields()[1].name(), "ready");
 }
@@ -607,6 +608,31 @@ fn interface_parameter_dispatches_to_the_implementing_class() {
     assert_eq!(
         std::process::Command::new(output).status().unwrap().code(),
         Some(6)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn public_interface_dispatches_a_channel_operation_without_runtime_types() {
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-public-concurrency-interface-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let output = compiler::driver::compile_source_to_executable(
+        "public interface ChannelReader { func read(): Int; } class Reader: ChannelReader { override func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6850),
+            ModuleName::parse("public_concurrency_interface").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(output).status().unwrap().code(),
+        Some(12)
     );
     let _ = fs::remove_dir_all(workspace);
 }

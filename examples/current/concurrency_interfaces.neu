@@ -1,0 +1,17 @@
+public interface ChannelReader {
+    func read(): Int;
+}
+
+class Reader: ChannelReader {
+    override func read(): Int {
+        val queue = channel<Int>(1);
+        send(queue, 12);
+        receive(queue);
+        return 12;
+    }
+}
+
+public func main(): Int {
+    val reader: ChannelReader = new Reader();
+    return reader.read();
+}

@@ -18,6 +18,8 @@ matching.
 payload extraction.
 `producer_consumer.neu` exercises a spawned producer and parent consumer sharing
 an opaque channel handle.
+`concurrency_interfaces.neu` exercises public interface dispatch over a private
+channel-backed implementation.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by
