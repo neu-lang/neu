@@ -1117,6 +1117,16 @@ borrow-suspension, capability, and compiler-managed cleanup rules apply through
 completion and cancellation. No detached task, scheduler API, public closure
 layout, FFI ABI, or explicit transfer syntax is added.
 
+## ADR-0090: Implicit Local Type Inference
+
+Local `val` and `var` declarations may omit an annotation only when an
+initializer provides an already-resolved exact type. Inference is local-only,
+does not widen concrete classes or perform numeric conversion, and rejects a
+bare `null`. Inferred `var` bindings retain their type and use the existing
+assignment, ownership, nullability, capability, dispatch, cleanup, HIR, MIR,
+and ABI rules. Parameters, returns, fields, constructors, and public
+signatures remain explicitly typed.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

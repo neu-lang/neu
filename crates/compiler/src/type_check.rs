@@ -86,6 +86,8 @@ pub enum TypeRuleDiagnostic {
     StringIndexOutOfBounds,
     StringOperationUnsupported,
     LambdaCaptureUnsupported,
+    InferredInitializerRequired,
+    InferredTypeUnavailable,
     DuplicateField,
     FieldHiding,
     ImmutableFieldMutation,
@@ -3710,7 +3712,12 @@ pub fn type_m0088_bind_function_values(
             .filter(|parameter| parameter.function == function.declaration)
             .enumerate()
         {
-            let Some(parameter_type) = signature.parameter_types.get(index).copied() else {
+            let receiver_offset = usize::from(function.owner.is_some() && !function.is_static);
+            let Some(parameter_type) = signature
+                .parameter_types
+                .get(index + receiver_offset)
+                .copied()
+            else {
                 continue;
             };
             for reference in parsed
@@ -3778,6 +3785,119 @@ pub fn type_m0088_bind_function_values(
             .filter(|reference| reference.name == function.name)
         {
             report.replace_expression_type(ExpressionType::new(reference.reference, function_type));
+        }
+    }
+}
+
+pub fn infer_m0090_local_types(parsed: &ParseOutput, report: &mut TypeCheckReport) {
+    for declaration in &parsed.local_declarations {
+        if declaration.annotation.is_some()
+            || report
+                .declaration_signatures()
+                .iter()
+                .any(|signature| signature.declaration() == declaration.declaration)
+        {
+            continue;
+        }
+        let Some(initializer) = declaration.initializer else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::InferredInitializerRequired,
+                declaration.declaration,
+            ));
+            continue;
+        };
+        let Some(ty) = report.expression_type(initializer) else {
+            continue;
+        };
+        if report.expression_type(initializer).is_some_and(|_| {
+            parsed.literal_expressions.iter().any(|literal| {
+                literal.expression == initializer && literal.kind == ParsedLiteralKind::Null
+            })
+        }) {
+            continue;
+        }
+        report.record_declaration_signature(DeclarationSignature::new(declaration.declaration, ty));
+        report.record_assignment_check(AssignmentCheck::new(declaration.declaration, ty, ty));
+        if let Some(binding) = parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.binding == declaration.declaration)
+        {
+            let declaration_span = parsed.arena.node(binding.binding).map(|node| node.span);
+            for reference in parsed
+                .name_references
+                .iter()
+                .filter(|reference| reference.name == binding.name)
+            {
+                if declaration_span.is_some_and(|span| span.end() <= reference.name_span.start()) {
+                    report.replace_expression_type(ExpressionType::new(reference.reference, ty));
+                }
+            }
+        }
+    }
+}
+
+pub fn diagnose_m0090_unresolved_types(parsed: &ParseOutput, report: &mut TypeCheckReport) {
+    for declaration in &parsed.local_declarations {
+        if declaration.annotation.is_some()
+            || report
+                .declaration_signatures()
+                .iter()
+                .any(|signature| signature.declaration() == declaration.declaration)
+        {
+            continue;
+        }
+        if let Some(initializer) = declaration.initializer {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::InferredTypeUnavailable,
+                initializer,
+            ));
+        }
+    }
+}
+
+pub fn validate_m0090_inferred_assignments(
+    parsed: &ParseOutput,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    for assignment in &parsed.assignment_statements {
+        let Some(target_name) = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == assignment.target)
+        else {
+            continue;
+        };
+        let Some(binding) = parsed
+            .local_binding_names
+            .iter()
+            .find(|binding| binding.name == target_name.name)
+        else {
+            continue;
+        };
+        let Some(declaration) = parsed
+            .local_declarations
+            .iter()
+            .find(|declaration| declaration.declaration == binding.binding)
+        else {
+            continue;
+        };
+        if declaration.annotation.is_some() {
+            continue;
+        }
+        let Some(target_type) = report.expression_type(assignment.target) else {
+            continue;
+        };
+        let Some(value_type) = report.expression_type(assignment.value) else {
+            continue;
+        };
+        if !assignment_compatible(target_type, value_type, types) {
+            report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                assignment.value,
+                target_type,
+                value_type,
+            ));
         }
     }
 }
@@ -6179,9 +6299,6 @@ fn type_m0019_local_declaration_initializers_with_region_exit_invalidations(
     }
 
     for declaration in declarations {
-        if declaration.annotation.is_none() {
-            continue;
-        }
         let Some(target_type) = declaration_signatures
             .iter()
             .find(|signature| signature.declaration() == declaration.declaration)
@@ -6979,6 +7096,9 @@ fn type_core_with_arena(
     let mut report = TypeCheckReport::new();
 
     for declaration in declarations {
+        if declaration.annotation.is_none() {
+            continue;
+        }
         if declaration.annotation.is_some_and(|annotation| {
             arena
                 .node(annotation)

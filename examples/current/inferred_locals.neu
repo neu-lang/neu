@@ -1,0 +1,8 @@
+package examples.current
+
+public func main(): Int {
+    var count = 1;
+    count = 6;
+    val answer = count + 1;
+    return answer;
+}

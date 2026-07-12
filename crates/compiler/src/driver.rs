@@ -30,13 +30,14 @@ use crate::{
         apply_m0081_enum_function_facts, check_m0028_direct_calls, check_m0028_entry_point,
         check_m0028_return_expression_types, check_m0028_straight_line_returns,
         check_m0028_unsupported_executable_forms, check_m0069_constructor_calls,
-        check_m0087_indirect_calls, merge_type_check_report, type_m0028_executable_core_in,
-        type_m0060_control_flow, type_m0063_array_expressions_with_classes,
-        type_m0063_function_signatures_in_with_classes, type_m0064_string_operations,
-        type_m0068_class_types_in, type_m0073_dynamic_array_operations,
-        type_m0077_value_conditionals, type_m0080_enum_whens, type_m0086_annotation_type,
-        type_m0088_bind_function_values, type_m0088_lambda_expressions,
-        validate_m0061_compile_time_constants,
+        check_m0087_indirect_calls, diagnose_m0090_unresolved_types, infer_m0090_local_types,
+        merge_type_check_report, type_m0028_executable_core_in,
+        type_m0028_executable_int_operators, type_m0060_control_flow,
+        type_m0063_array_expressions_with_classes, type_m0063_function_signatures_in_with_classes,
+        type_m0064_string_operations, type_m0068_class_types_in,
+        type_m0073_dynamic_array_operations, type_m0077_value_conditionals, type_m0080_enum_whens,
+        type_m0086_annotation_type, type_m0088_bind_function_values, type_m0088_lambda_expressions,
+        validate_m0061_compile_time_constants, validate_m0090_inferred_assignments,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -231,8 +232,6 @@ pub fn compile_source_to_executable(
             ));
         }
     }
-    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    type_m0088_lambda_expressions(&parsed, &mut types, &mut report);
     type_m0063_array_expressions_with_classes(
         &mut types,
         &parsed,
@@ -246,6 +245,55 @@ pub fn compile_source_to_executable(
     apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
     apply_m0081_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
     apply_m0081_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
+    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    type_m0088_lambda_expressions(&parsed, &mut types, &mut report);
+    infer_m0090_local_types(&parsed, &mut report);
+    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    apply_m0070_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_m0068_field_access_facts(&parsed, &class_types, &mut report);
+    apply_m0070_method_call_facts(&parsed, &class_types, &mut report);
+    if let Some(int_type) = types
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
+        .map(|record| record.id())
+    {
+        let int_unary = parsed
+            .unary_expressions
+            .iter()
+            .filter(|expression| {
+                report
+                    .expression_type(expression.operand)
+                    .is_none_or(|ty| ty == int_type)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let int_binary = parsed
+            .binary_expressions
+            .iter()
+            .filter(|expression| {
+                report
+                    .expression_type(expression.left)
+                    .is_none_or(|ty| ty == int_type)
+                    || report
+                        .expression_type(expression.right)
+                        .is_none_or(|ty| ty == int_type)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let inferred_operators = type_m0028_executable_int_operators(
+            &int_unary,
+            &int_binary,
+            &parsed.grouped_expressions,
+            report.expression_types(),
+            int_type,
+        );
+        merge_type_check_report(&mut report, inferred_operators);
+    }
+    infer_m0090_local_types(&parsed, &mut report);
+    type_m0088_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+    diagnose_m0090_unresolved_types(&parsed, &mut report);
+    validate_m0090_inferred_assignments(&parsed, &mut report, &types);
     let indirect_calls = check_m0087_indirect_calls(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed

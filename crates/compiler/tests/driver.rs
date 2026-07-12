@@ -57,6 +57,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("enum_when", 3),
         ("enum_functions", 40),
         ("lambdas", 7),
+        ("inferred_locals", 7),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -175,6 +176,108 @@ fn compiles_and_runs_a_copy_capturing_lambda() {
         SourceDriverOptions::new(
             SourceFileId::from_raw(9401),
             ModuleName::parse("capture").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_an_inferred_primitive_local() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-inferred-local-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public func main(): Int {
+            val answer = 1 + 2 * 3;
+            return answer;
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9500),
+            ModuleName::parse("inferred").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn inferred_class_local_keeps_concrete_dispatch_type() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-inferred-class-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        class Answer {
+            func value(): Int { return 11; }
+        }
+        public func main(): Int {
+            val answer = new Answer();
+            return answer.value();
+        }
+    "#;
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9501),
+            ModuleName::parse("inferred_class").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(11));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn bare_null_local_inference_is_rejected() {
+    let source = "public func main(): Int { val value = null; return 0; }";
+    let result = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9502),
+            ModuleName::parse("inferred_null").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target-packs"),
+            std::env::temp_dir().join("neu-inferred-null-program"),
+        ),
+    );
+    assert!(result.is_err(), "{result:?}");
+}
+
+#[test]
+fn inferred_var_keeps_its_type_for_reassignment() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-inferred-var-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "public func main(): Int { var answer = 1; answer = 7; return answer; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(9503),
+            ModuleName::parse("inferred_var").unwrap(),
             PackageNamespace::root(),
             Triple::host(),
             repo_root.join("target-packs"),
