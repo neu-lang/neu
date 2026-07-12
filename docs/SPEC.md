@@ -911,3 +911,12 @@ alias and never declares a function. This spelling change does not alter
 function typing, ownership, dispatch, constructors, ABI, symbols, or runtime
 behavior. Active examples and fixtures use `func`; historical ADR text retains
 its original wording as evidence.
+
+## ADR-0072: Fixed-Array Type Suffixes
+
+Fixed-size arrays use `T[N]`; the historical `[T; N]` spelling is rejected.
+Lengths retain ADR-0063's literal and named compile-time `const Int` rules.
+Nested suffixes are written outer-to-inner, so `Int[2][3]` is two arrays of
+three integers each. Array literals, expression indexing, ownership, inline
+representation, parameter/return transport, and dynamic-array deferrals are
+unchanged. The old spelling is retained only in historical ADR text.

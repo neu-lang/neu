@@ -2901,6 +2901,53 @@ impl<'source> Parser<'source> {
         }
 
         let mut span = self.parse_primary_type()?;
+        let mut suffixes = Vec::new();
+        while self.current_kind() == Some(TokenKind::LeftBracket) {
+            let start = self.current()?.span.start();
+            self.advance();
+            let (length, length_name) = match self.current_kind() {
+                Some(TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex) => {
+                    let token = self.current()?.clone();
+                    let value = parsed_integer_value(
+                        token.kind,
+                        &self.text[token.span.start()..token.span.end()],
+                    );
+                    self.advance();
+                    (value, None)
+                }
+                Some(TokenKind::Identifier) => {
+                    let token = self.current()?.clone();
+                    let name = self.text[token.span.start()..token.span.end()].to_owned();
+                    self.advance();
+                    (None, Some(name))
+                }
+                _ => {
+                    self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+                    return None;
+                }
+            };
+            if self.current_kind() != Some(TokenKind::RightBracket) {
+                self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+                return None;
+            }
+            let end = self.current()?.span.end();
+            self.advance();
+            suffixes.push((start, end, length, length_name));
+        }
+        let full_end = suffixes.last().map(|suffix| suffix.1);
+        for (_start, _end, length, length_name) in suffixes.into_iter().rev() {
+            let element_type = self.latest_type_node_for_span(span)?;
+            let array_span = self.span(span.start(), full_end?);
+            let array = self.arena.add_array_type(array_span);
+            self.array_types.push(ParsedArrayType {
+                array,
+                element_type,
+                length,
+                length_name,
+                span: array_span,
+            });
+            span = array_span;
+        }
         if self.current_kind() == Some(TokenKind::Question) {
             let end = self.current().expect("question token exists").span.end();
             self.advance();
@@ -2916,7 +2963,7 @@ impl<'source> Parser<'source> {
 
     fn parse_primary_type(&mut self) -> Option<ByteSpan> {
         match self.current_kind() {
-            Some(TokenKind::LeftBracket) => self.parse_array_type(),
+            Some(TokenKind::LeftBracket) => self.reject_legacy_array_type(),
             Some(TokenKind::Identifier) => self.parse_named_type(),
             Some(TokenKind::LeftParen) if self.parenthesized_type_is_function_type() => {
                 self.parse_function_type()
@@ -2937,53 +2984,30 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn parse_array_type(&mut self) -> Option<ByteSpan> {
+    fn reject_legacy_array_type(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
-        self.advance();
-        let element_span = self.parse_type()?;
-        let element_type = self.latest_type_node_for_span(element_span)?;
-        if self.current_kind() != Some(TokenKind::Semicolon) {
-            self.diagnostic_current(DiagnosticKind::MalformedArrayType);
-            return None;
+        self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+        let mut depth = 0usize;
+        while let Some(kind) = self.current_kind() {
+            match kind {
+                TokenKind::LeftBracket => depth += 1,
+                TokenKind::RightBracket => {
+                    depth = depth.saturating_sub(1);
+                    self.advance();
+                    if depth == 0 {
+                        break;
+                    }
+                    continue;
+                }
+                TokenKind::Semicolon | TokenKind::Comma | TokenKind::RightParen if depth == 1 => {
+                    break;
+                }
+                _ => {}
+            }
+            self.advance();
         }
-        self.advance();
-        let (length, length_name) = match self.current_kind() {
-            Some(TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex) => {
-                let token = self.current()?.clone();
-                let value = parsed_integer_value(
-                    token.kind,
-                    &self.text[token.span.start()..token.span.end()],
-                );
-                self.advance();
-                (value, None)
-            }
-            Some(TokenKind::Identifier) => {
-                let token = self.current()?.clone();
-                let name = self.text[token.span.start()..token.span.end()].to_owned();
-                self.advance();
-                (None, Some(name))
-            }
-            _ => {
-                self.diagnostic_current(DiagnosticKind::MalformedArrayType);
-                return None;
-            }
-        };
-        if self.current_kind() != Some(TokenKind::RightBracket) {
-            self.diagnostic_current(DiagnosticKind::MalformedArrayType);
-            return None;
-        }
-        let end = self.current()?.span.end();
-        self.advance();
-        let span = self.span(start, end);
-        let array = self.arena.add_array_type(span);
-        self.array_types.push(ParsedArrayType {
-            array,
-            element_type,
-            length,
-            length_name,
-            span,
-        });
-        Some(span)
+        let end = self.previous_span().map(|span| span.end()).unwrap_or(start);
+        Some(self.span(start, end))
     }
 
     fn parse_named_type(&mut self) -> Option<ByteSpan> {
