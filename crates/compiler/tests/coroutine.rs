@@ -2,13 +2,29 @@ use compiler::{
     ast::AstNodeId,
     borrow::BorrowKind,
     coroutine::{
-        ChildTask, CoroutineDiagnostic, CoroutineDiagnosticKind, StructuredTaskScope,
-        SuspendedBorrow, SuspensionDiagnostic, SuspensionDiagnosticKind, SuspensionRejection,
-        analyze_structured_task_scopes, analyze_suspended_borrows,
+        ChildTask, ClosureCleanupEvent, CoroutineDiagnostic, CoroutineDiagnosticKind,
+        StructuredTaskScope, SuspendedBorrow, SuspensionDiagnostic, SuspensionDiagnosticKind,
+        SuspensionRejection, analyze_structured_task_scopes, analyze_suspended_borrows,
+        closure_cleanup_facts,
     },
     name_resolution::{LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId},
     symbol::SymbolId,
 };
+
+#[test]
+fn m0089_closure_cleanup_covers_completion_and_cancellation() {
+    let facts = closure_cleanup_facts(
+        AstNodeId::from_raw(8800),
+        &[AstNodeId::from_raw(8801), AstNodeId::from_raw(8802)],
+    );
+
+    assert_eq!(facts.len(), 4);
+    assert_eq!(facts[0].closure(), AstNodeId::from_raw(8800));
+    assert_eq!(facts[0].capture(), AstNodeId::from_raw(8801));
+    assert_eq!(facts[0].event(), ClosureCleanupEvent::Completion);
+    assert_eq!(facts[1].event(), ClosureCleanupEvent::Cancellation);
+    assert_eq!(facts[2].capture(), AstNodeId::from_raw(8802));
+}
 
 #[test]
 fn m0025_structured_scope_accepts_completed_children() {

@@ -1,5 +1,55 @@
 use crate::{ast::AstNodeId, borrow::BorrowKind, name_resolution::LocalBinding};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ClosureCleanupEvent {
+    Completion,
+    Cancellation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ClosureCleanupFact {
+    closure: AstNodeId,
+    capture: AstNodeId,
+    event: ClosureCleanupEvent,
+}
+
+impl ClosureCleanupFact {
+    pub fn new(closure: AstNodeId, capture: AstNodeId, event: ClosureCleanupEvent) -> Self {
+        Self {
+            closure,
+            capture,
+            event,
+        }
+    }
+
+    pub fn closure(self) -> AstNodeId {
+        self.closure
+    }
+
+    pub fn capture(self) -> AstNodeId {
+        self.capture
+    }
+
+    pub fn event(self) -> ClosureCleanupEvent {
+        self.event
+    }
+}
+
+pub fn closure_cleanup_facts(
+    closure: AstNodeId,
+    captures: &[AstNodeId],
+) -> Vec<ClosureCleanupFact> {
+    captures
+        .iter()
+        .flat_map(|capture| {
+            [
+                ClosureCleanupFact::new(closure, *capture, ClosureCleanupEvent::Completion),
+                ClosureCleanupFact::new(closure, *capture, ClosureCleanupEvent::Cancellation),
+            ]
+        })
+        .collect()
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChildTask {
     task: AstNodeId,

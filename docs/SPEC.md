@@ -1108,6 +1108,15 @@ non-comparable, and cleanup/capture facts remain source-mapped through HIR and
 MIR. Public closure ABI, FFI, reflection, detached execution, and coroutine
 suspension remain deferred.
 
+## ADR-0089: Concurrent Closure Captures
+
+Moved or mutable closure captures crossing an approved thread or structured-task
+boundary require `Send`; shared captures require `Share`. Borrowed captures and
+mutable shared captures are rejected at the boundary. Existing task-scope,
+borrow-suspension, capability, and compiler-managed cleanup rules apply through
+completion and cancellation. No detached task, scheduler API, public closure
+layout, FFI ABI, or explicit transfer syntax is added.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

@@ -4,7 +4,9 @@ use compiler::{
     name_resolution::{LocalBinding, LocalBindingKey, LocalBindingKind, LocalScopeId},
     symbol::SymbolId,
     thread::{
-        ThreadBoundary, ThreadCapability, ThreadCapture, ThreadDiagnostic, ThreadDiagnosticKind,
+        ClosureBoundary, ClosureCapture, ClosureCaptureKind, ClosureConcurrencyDiagnostic,
+        ClosureConcurrencyDiagnosticKind, ThreadBoundary, ThreadCapability, ThreadCapture,
+        ThreadDiagnostic, ThreadDiagnosticKind, analyze_closure_boundaries,
         analyze_thread_boundaries, satisfies_thread_capability,
     },
     types::{
@@ -45,6 +47,82 @@ fn m0024_primitives_follow_adr0037_capabilities() {
         string_ty,
         ThreadCapability::Share
     ));
+}
+
+#[test]
+fn m0089_closure_transfer_requires_send_and_shared_use_requires_share() {
+    let mut arena = TypeArena::new();
+    let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
+    let transfer = ClosureCapture::new(
+        AstNodeId::from_raw(9001),
+        local_binding(90, 900),
+        string_ty,
+        ClosureCaptureKind::Moved,
+    );
+    let shared = ClosureCapture::new(
+        AstNodeId::from_raw(9002),
+        local_binding(91, 901),
+        string_ty,
+        ClosureCaptureKind::Shared,
+    );
+
+    let diagnostics = analyze_closure_boundaries(
+        &[ClosureBoundary::new(
+            AstNodeId::from_raw(9000),
+            vec![transfer, shared],
+        )],
+        &arena,
+    );
+
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].capture(), AstNodeId::from_raw(9002));
+    assert_eq!(
+        diagnostics[0].kind(),
+        ClosureConcurrencyDiagnosticKind::MissingCapability
+    );
+    assert_eq!(diagnostics[0].required(), ThreadCapability::Share);
+}
+
+#[test]
+fn m0089_borrowed_and_mutably_shared_captures_are_rejected() {
+    let mut arena = TypeArena::new();
+    let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let boundary = AstNodeId::from_raw(9100);
+    let diagnostics = analyze_closure_boundaries(
+        &[ClosureBoundary::new(
+            boundary,
+            vec![
+                ClosureCapture::new(
+                    AstNodeId::from_raw(9101),
+                    local_binding(92, 902),
+                    int_ty,
+                    ClosureCaptureKind::Borrowed,
+                ),
+                ClosureCapture::new(
+                    AstNodeId::from_raw(9102),
+                    local_binding(93, 903),
+                    int_ty,
+                    ClosureCaptureKind::MutableShared,
+                ),
+            ],
+        )],
+        &arena,
+    );
+
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(
+        diagnostics[0],
+        ClosureConcurrencyDiagnostic::borrowed_capture(
+            AstNodeId::from_raw(9101),
+            boundary,
+            local_binding(92, 902),
+            int_ty,
+        )
+    );
+    assert_eq!(
+        diagnostics[1].kind(),
+        ClosureConcurrencyDiagnosticKind::MutableSharedCapture
+    );
 }
 
 #[test]
