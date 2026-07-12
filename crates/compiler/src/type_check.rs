@@ -4273,10 +4273,16 @@ pub fn validate_task_member_cancellation_structure(
         let Some(receiver_type) = report.expression_type(member.receiver) else {
             continue;
         };
-        if !types
-            .get(receiver_type)
-            .is_some_and(|record| matches!(record.kind(), TypeKind::Task(_)))
-        {
+        let Some(receiver_record) = types.get(receiver_type) else {
+            continue;
+        };
+        if !matches!(receiver_record.kind(), TypeKind::Task(_)) {
+            if !matches!(receiver_record.kind(), TypeKind::Nominal(_)) {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::InvalidTaskOperation,
+                    call.expression,
+                ));
+            }
             continue;
         }
         let in_scope = parsed.scope_statements.iter().any(|scope| {

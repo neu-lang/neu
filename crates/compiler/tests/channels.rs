@@ -136,6 +136,31 @@ fn channel_rejects_non_integer_capacity() {
 }
 
 #[test]
+fn channel_operations_reject_non_channel_receivers_before_lowering() {
+    let output = std::env::temp_dir().join(format!(
+        "neu-channel-invalid-receiver-{}",
+        std::process::id()
+    ));
+    let object = output.with_extension("o");
+    let _ = fs::remove_file(&output);
+    let _ = fs::remove_file(&object);
+    let error = compiler::driver::compile_source_to_executable(
+        "public func main(): Int { send(7, 1); return 0; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(12004),
+            ModuleName::parse("channel_invalid_receiver").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    let debug = format!("{error:?}");
+    assert!(debug.contains("InvalidChannelOperation"), "{debug}");
+    assert!(!output.exists());
+    assert!(!object.exists());
+}
+
+#[test]
 fn closed_channel_can_be_received_repeatedly_without_messages() {
     let source = r#"
         public func main(): Int {

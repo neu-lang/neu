@@ -244,6 +244,28 @@ fn member_cancellation_outside_scope_is_rejected_before_lowering() {
 }
 
 #[test]
+fn cancellation_on_a_non_task_is_rejected_before_lowering() {
+    let output = std::env::temp_dir().join(format!("neu-cancel-non-task-{}", std::process::id()));
+    let object = output.with_extension("o");
+    let _ = fs::remove_file(&output);
+    let _ = fs::remove_file(&object);
+    let error = compile_source_to_executable(
+        "suspend func main(): Int { scope { val value: Int = 7; value.cancel(); return 0; } return 0; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1012),
+            ModuleName::parse("cancel_non_task").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    let debug = format!("{error:?}");
+    assert!(debug.contains("InvalidTaskOperation"), "{debug}");
+    assert!(!output.exists());
+    assert!(!object.exists());
+}
+
+#[test]
 fn compiles_current_example_to_host_executable_with_exit_status_seven() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let source_path = repo_root.join("examples/current/bootstrap_backend_smoke.neu");
