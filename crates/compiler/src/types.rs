@@ -17,7 +17,7 @@ impl TypeId {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NominalTypeIdentity {
     module: ModuleName,
     package: PackageNamespace,
@@ -57,7 +57,7 @@ impl NominalTypeIdentity {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GenericParameterType {
     declaration: AstNodeId,
     symbol: SymbolId,
@@ -77,6 +77,29 @@ impl GenericParameterType {
 
     pub fn symbol(&self) -> SymbolId {
         self.symbol
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct GenericTypeIdentity {
+    declaration: NominalTypeIdentity,
+    arguments: Vec<TypeId>,
+}
+
+impl GenericTypeIdentity {
+    pub fn new(declaration: NominalTypeIdentity, arguments: Vec<TypeId>) -> Self {
+        Self {
+            declaration,
+            arguments,
+        }
+    }
+
+    pub fn declaration(&self) -> &NominalTypeIdentity {
+        &self.declaration
+    }
+
+    pub fn arguments(&self) -> &[TypeId] {
+        &self.arguments
     }
 }
 
@@ -144,6 +167,7 @@ impl NullableType {
 pub enum TypeKind {
     Nominal(NominalTypeIdentity),
     GenericParameter(GenericParameterType),
+    GenericInstance(GenericTypeIdentity),
     Primitive(PrimitiveType),
     Nullable(NullableType),
     Array(ArrayType),
@@ -224,6 +248,13 @@ impl TypeRecord {
         }
     }
 
+    pub fn generic_instance(generic: GenericTypeIdentity) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::GenericInstance(generic),
+        }
+    }
+
     pub fn primitive(primitive: PrimitiveType) -> Self {
         Self {
             id: TypeId::from_raw(usize::MAX),
@@ -290,6 +321,22 @@ impl TypeArena {
         self.insert(TypeRecord::array(ArrayType::new(element, length)))
     }
 
+    pub fn nullable(&mut self, base: TypeId) -> TypeId {
+        let kind = TypeKind::Nullable(NullableType::new(base));
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::nullable(NullableType::new(base)))
+    }
+
+    pub fn generic_instance(&mut self, identity: GenericTypeIdentity) -> TypeId {
+        let kind = TypeKind::GenericInstance(identity.clone());
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::generic_instance(identity))
+    }
+
     pub fn dynamic_array(&mut self, element: TypeId) -> TypeId {
         let kind = TypeKind::DynamicArray(DynamicArrayType::new(element));
         if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
@@ -312,5 +359,68 @@ impl TypeArena {
 
     pub fn records(&self) -> &[TypeRecord] {
         &self.records
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct GenericSubstitution {
+    mappings: Vec<(TypeId, TypeId)>,
+}
+
+impl GenericSubstitution {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert(&mut self, parameter: TypeId, replacement: TypeId) {
+        if let Some((_, existing)) = self
+            .mappings
+            .iter_mut()
+            .find(|(candidate, _)| *candidate == parameter)
+        {
+            *existing = replacement;
+        } else {
+            self.mappings.push((parameter, replacement));
+        }
+    }
+
+    pub fn get(&self, parameter: TypeId) -> Option<TypeId> {
+        self.mappings
+            .iter()
+            .find(|(candidate, _)| *candidate == parameter)
+            .map(|(_, replacement)| *replacement)
+    }
+
+    pub fn apply(&self, ty: TypeId, arena: &mut TypeArena) -> TypeId {
+        let Some(record) = arena.get(ty).cloned() else {
+            return ty;
+        };
+        match record.kind() {
+            TypeKind::GenericParameter(_) => self.get(ty).unwrap_or(ty),
+            TypeKind::Nullable(nullable) => {
+                let base = self.apply(nullable.base(), arena);
+                arena.nullable(base)
+            }
+            TypeKind::Array(array) => {
+                let element = self.apply(array.element(), arena);
+                arena.array(element, array.length())
+            }
+            TypeKind::DynamicArray(array) => {
+                let element = self.apply(array.element(), arena);
+                arena.dynamic_array(element)
+            }
+            TypeKind::GenericInstance(instance) => {
+                let arguments = instance
+                    .arguments()
+                    .iter()
+                    .map(|argument| self.apply(*argument, arena))
+                    .collect();
+                arena.generic_instance(GenericTypeIdentity::new(
+                    instance.declaration().clone(),
+                    arguments,
+                ))
+            }
+            TypeKind::Nominal(_) | TypeKind::Primitive(_) => ty,
+        }
     }
 }

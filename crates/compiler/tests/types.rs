@@ -3,8 +3,9 @@ use compiler::{
     module::{ModuleName, PackageNamespace},
     symbol::SymbolId,
     types::{
-        GenericParameterType, NominalTypeIdentity, NullableType, PrimitiveType, TypeArena,
-        TypeDiagnostic, TypeDiagnosticKind, TypeId, TypeKind, TypeRecord, UnsupportedTypeForm,
+        GenericParameterType, GenericSubstitution, GenericTypeIdentity, NominalTypeIdentity,
+        NullableType, PrimitiveType, TypeArena, TypeDiagnostic, TypeDiagnosticKind, TypeId,
+        TypeKind, TypeRecord, UnsupportedTypeForm,
     },
 };
 
@@ -75,6 +76,70 @@ fn generic_parameter_type_preserves_declaring_node_and_symbol() {
 
     assert_eq!(generic.declaration(), declaration);
     assert_eq!(generic.symbol(), symbol);
+}
+
+#[test]
+fn generic_instance_identity_is_nominal_and_ordered() {
+    let module = ModuleName::parse("collections").unwrap();
+    let package = PackageNamespace::root();
+    let declaration = AstNodeId::from_raw(80);
+    let identity = NominalTypeIdentity::new(module, package, declaration, SymbolId::from_raw(80));
+    let mut arena = TypeArena::new();
+    let int_type = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let byte_type = arena.insert(TypeRecord::primitive(PrimitiveType::Byte));
+    let first = arena.generic_instance(GenericTypeIdentity::new(
+        identity.clone(),
+        vec![int_type, byte_type],
+    ));
+    let same = arena.generic_instance(GenericTypeIdentity::new(
+        identity.clone(),
+        vec![int_type, byte_type],
+    ));
+    let reversed = arena.generic_instance(GenericTypeIdentity::new(
+        identity,
+        vec![byte_type, int_type],
+    ));
+
+    assert_eq!(first, same);
+    assert_ne!(first, reversed);
+}
+
+#[test]
+fn generic_substitution_recurses_through_nullable_array_and_instance_types() {
+    let module = ModuleName::parse("collections").unwrap();
+    let identity = NominalTypeIdentity::new(
+        module,
+        PackageNamespace::root(),
+        AstNodeId::from_raw(81),
+        SymbolId::from_raw(81),
+    );
+    let parameter = AstNodeId::from_raw(82);
+    let mut arena = TypeArena::new();
+    let generic = arena.insert(TypeRecord::generic_parameter(GenericParameterType::new(
+        parameter,
+        SymbolId::from_raw(82),
+    )));
+    let int_type = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let nullable = arena.nullable(generic);
+    let array = arena.array(nullable, 2);
+    let instance = arena.generic_instance(GenericTypeIdentity::new(identity, vec![array]));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(generic, int_type);
+
+    let substituted = substitution.apply(instance, &mut arena);
+    let TypeKind::GenericInstance(instance) = arena.get(substituted).unwrap().kind() else {
+        panic!("expected substituted generic instance");
+    };
+    let [argument] = instance.arguments() else {
+        panic!("expected one generic argument");
+    };
+    let TypeKind::Array(array) = arena.get(*argument).unwrap().kind() else {
+        panic!("expected substituted array");
+    };
+    let TypeKind::Nullable(nullable) = arena.get(array.element()).unwrap().kind() else {
+        panic!("expected substituted nullable element");
+    };
+    assert_eq!(nullable.base(), int_type);
 }
 
 #[test]

@@ -37,7 +37,9 @@ pub fn satisfies_thread_capability(
             capability == ThreadCapability::Send
                 && satisfies_thread_capability(types, array.element(), capability)
         }
-        TypeKind::Nominal(_) | TypeKind::GenericParameter(_) => false,
+        TypeKind::Nominal(_) | TypeKind::GenericParameter(_) | TypeKind::GenericInstance(_) => {
+            false
+        }
     }
 }
 

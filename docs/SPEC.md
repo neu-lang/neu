@@ -1034,3 +1034,19 @@ Comments and blank lines preserve line boundaries, while newlines in strings
 remain rejected. Recovery uses line boundaries, semicolons, braces, and
 declaration starters. This syntax decision changes no type, ownership, HIR,
 MIR, ABI, backend, or runtime semantics.
+
+## ADR-0082: Generic Type Identity And Substitution
+
+Generic arguments are explicit type-only arguments with exact arity and
+invariant identity. A generic parameter is identified by its declaring generic
+declaration and parameter node, not by its spelling. A generic instance is
+identified by the nominal declaration and ordered substituted type identities;
+nested generic, nullable, fixed-array, dynamic-array, and accepted nominal
+arguments retain their structural identities.
+
+The compiler performs explicit recursive substitution through accepted type
+constructors. It does not infer arguments, add conversions, support wildcards
+or variance, solve constraints, erase types, specialize code, or define a
+runtime generic layout. Generic metadata is source-mapped and compiler-private;
+generic declarations, constraints, specialization, and cross-module lookup
+remain governed by later accepted decisions.

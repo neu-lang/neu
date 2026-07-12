@@ -181,6 +181,29 @@ fn parses_type_and_generic_syntax() {
 }
 
 #[test]
+fn generic_argument_metadata_preserves_direct_nested_arguments() {
+    let output = parse_source(
+        SourceFileId::from_raw(211),
+        "func use(value: Box<Array<Int>>): Unit;",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    let reference = output
+        .type_name_references
+        .iter()
+        .find(|reference| reference.name == "Box")
+        .unwrap();
+    assert_eq!(reference.generic_arguments.len(), 1);
+    assert_eq!(reference.generic_argument_names, vec!["Array"]);
+    let nested = output
+        .type_name_references
+        .iter()
+        .find(|reference| reference.name == "Array")
+        .unwrap();
+    assert_eq!(nested.generic_argument_names, vec!["Int"]);
+}
+
+#[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);

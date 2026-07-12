@@ -3176,19 +3176,27 @@ impl<'source> Parser<'source> {
         let name_end = self.parse_qualified_name_for_type()?;
         let mut end = name_end;
         let reference_index = self.type_name_references.len();
-        let generic_start = self.arena.nodes().len();
-        if self.current_kind() == Some(TokenKind::Less) {
-            end = self.parse_generic_arguments().unwrap_or(end);
-        }
-        let generic_end = self.arena.nodes().len();
-        let generic_arguments = self.arena.nodes()[generic_start..generic_end]
+        let generic_arguments = if self.current_kind() == Some(TokenKind::Less) {
+            let (parsed_end, arguments) =
+                self.parse_generic_arguments().unwrap_or((end, Vec::new()));
+            end = parsed_end;
+            arguments
+        } else {
+            Vec::new()
+        };
+        let generic_argument_names = generic_arguments
             .iter()
-            .filter(|node| node.kind == AstNodeKind::GenericArgument)
-            .map(|node| node.id)
-            .collect();
-        let generic_argument_names = self.type_name_references[reference_index..]
-            .iter()
-            .map(|reference| reference.name.clone())
+            .filter_map(|argument| {
+                let span = self.arena.node(*argument)?.span;
+                self.type_name_references
+                    .iter()
+                    .find(|reference| {
+                        self.arena
+                            .node(reference.reference)
+                            .is_some_and(|node| node.span == span)
+                    })
+                    .map(|reference| reference.name.clone())
+            })
             .collect();
         let span = self.span(start, end);
         let reference = self.arena.add_named_type(span);
@@ -3225,7 +3233,7 @@ impl<'source> Parser<'source> {
         Some(end)
     }
 
-    fn parse_generic_arguments(&mut self) -> Option<usize> {
+    fn parse_generic_arguments(&mut self) -> Option<(usize, Vec<AstNodeId>)> {
         let start = self.current()?.span.start();
         self.advance();
 
@@ -3236,9 +3244,10 @@ impl<'source> Parser<'source> {
                 self.span(start, end),
             );
             self.advance();
-            return Some(end);
+            return Some((end, Vec::new()));
         }
 
+        let mut arguments = Vec::new();
         loop {
             let argument_start = self.current().map_or(start, |token| token.span.start());
             let Some(argument_span) = self.parse_type() else {
@@ -3247,9 +3256,9 @@ impl<'source> Parser<'source> {
                     self.span_at(argument_start),
                 );
                 self.skip_to_generic_argument_boundary();
-                return self.previous_span().map(|span| span.end());
+                return self.previous_span().map(|span| (span.end(), arguments));
             };
-            self.arena.add_generic_argument(argument_span);
+            arguments.push(self.arena.add_generic_argument(argument_span));
 
             match self.current_kind() {
                 Some(TokenKind::Comma) => {
@@ -3257,14 +3266,14 @@ impl<'source> Parser<'source> {
                     if self.current_kind() == Some(TokenKind::Greater) {
                         self.diagnostic_current(DiagnosticKind::MalformedGenericArgumentList);
                         self.advance();
-                        return self.previous_span().map(|span| span.end());
+                        return self.previous_span().map(|span| (span.end(), arguments));
                     }
                 }
                 Some(TokenKind::Greater | TokenKind::GreaterGreater) => {
                     let end = self
                         .consume_generic_greater()
                         .expect("generic greater token exists");
-                    return Some(end);
+                    return Some((end, arguments));
                 }
                 _ => {
                     self.diagnostic_current_or_span(
@@ -3272,7 +3281,7 @@ impl<'source> Parser<'source> {
                         self.span_at(start),
                     );
                     self.skip_to_generic_argument_boundary();
-                    return self.previous_span().map(|span| span.end());
+                    return self.previous_span().map(|span| (span.end(), arguments));
                 }
             }
         }

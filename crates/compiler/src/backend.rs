@@ -587,6 +587,7 @@ fn require_bootstrap_runtime_type(
         )) | Some(TypeKind::Array(_))
             | Some(TypeKind::DynamicArray(_))
             | Some(TypeKind::Nominal(_))
+            | Some(TypeKind::GenericInstance(_))
     )
     .then_some(())
     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)
@@ -599,7 +600,7 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Float)) => Some(types::F64),
         Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
         Some(TypeKind::Primitive(PrimitiveType::String)) => Some(types::I64),
-        Some(TypeKind::Nominal(_)) => Some(types::I64),
+        Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_)) => Some(types::I64),
         Some(TypeKind::DynamicArray(_)) => Some(types::I64),
         _ => None,
     }
