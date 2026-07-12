@@ -8,7 +8,7 @@ use target_lexicon::Triple;
 use crate::{
     backend::{CraneliftLoweringError, emit_mir_module_to_object_for_target},
     hir::{CheckedHirSource, HirLoweringError, lower_checked_hir_source},
-    linker::{LinkInvocation, LinkInvocationError},
+    linker::{LinkInvocationError, SystemLinkInvocation},
     mir::{MirLoweringError, lower_hir_to_mir},
     module::{
         ModuleName, PackageGraphDiagnostic, PackageNamespace, VirtualPackageGraph, VirtualSource,
@@ -23,7 +23,7 @@ use crate::{
     ownership_effects::infer_source_parameter_effects,
     parser,
     source::SourceFileId,
-    target_pack::{TargetPackRegistry, TargetPackRegistryError},
+    target_pack::TargetPackRegistryError,
     type_check::{
         ConstructorDiagnostic, DeclarationSignature, DirectCallDiagnostic, EntryPointDiagnostic,
         ExecutableSourceTypes, ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic,
@@ -118,6 +118,7 @@ pub enum DriverError {
     Mir(MirLoweringError),
     Backend(CraneliftLoweringError),
     TargetPack(TargetPackRegistryError),
+    HostOnlyTarget(Triple),
     Link(LinkInvocationError),
     PackageGraph(Vec<PackageGraphDiagnostic>),
     Manifest(crate::manifest::ManifestDiagnostic),
@@ -140,8 +141,6 @@ pub fn compile_virtual_project_to_executable(
 
 pub fn compile_manifest_to_executable(
     manifest_path: impl AsRef<std::path::Path>,
-    target_packs: impl Into<PathBuf>,
-    target: Triple,
     output: impl Into<PathBuf>,
 ) -> Result<PathBuf, DriverError> {
     let manifest_path = manifest_path.as_ref();
@@ -170,8 +169,8 @@ pub fn compile_manifest_to_executable(
             entry_file.id,
             module,
             PackageNamespace::root(),
-            target,
-            target_packs,
+            Triple::host(),
+            PathBuf::new(),
             output,
         ),
     )
@@ -202,9 +201,10 @@ pub fn compile_source_to_executable(
         ));
     }
 
-    let pack = TargetPackRegistry::new(options.target_packs())
-        .resolve(options.target())
-        .map_err(DriverError::TargetPack)?;
+    let target = options.target();
+    if target != Triple::host() {
+        return Err(DriverError::HostOnlyTarget(target));
+    }
     let mut types = TypeArena::new();
     let class_types = type_class_types_in(&mut types, &parsed, options.module(), options.package());
     if !class_types.diagnostics().is_empty() {
@@ -526,13 +526,8 @@ pub fn compile_source_to_executable(
     )
     .map_err(DriverError::Hir)?;
     let mir = lower_hir_to_mir(&hir, &types).map_err(DriverError::Mir)?;
-    let object = emit_mir_module_to_object_for_target(
-        &mir,
-        &types,
-        pack.language_entry_symbol(),
-        options.target(),
-    )
-    .map_err(DriverError::Backend)?;
+    let object = emit_mir_module_to_object_for_target(&mir, &types, "main", target)
+        .map_err(DriverError::Backend)?;
 
     let object_path = PathBuf::from(format!("{}.o", options.output().display()));
     fs::write(&object_path, object).map_err(|_| DriverError::Io {
@@ -540,7 +535,7 @@ pub fn compile_source_to_executable(
         path: object_path.clone(),
     })?;
     let invocation =
-        LinkInvocation::new(&pack, &object_path, options.output()).map_err(DriverError::Link)?;
+        SystemLinkInvocation::new(&object_path, options.output()).map_err(DriverError::Link)?;
     invocation.execute().map_err(DriverError::Link)?;
     Ok(options.output().to_owned())
 }

@@ -3,7 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use compiler::{linker::LinkInvocation, target_pack::TargetPackManifest};
+use compiler::{
+    linker::{LinkInvocation, SystemLinkInvocation},
+    target_pack::TargetPackManifest,
+};
 use cranelift_codegen::{
     ir::{AbiParam, Function, InstBuilder, UserFuncName, types},
     settings,
@@ -12,6 +15,28 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
+
+#[test]
+fn host_link_plan_uses_system_linker_and_main_entry() {
+    let root = std::env::temp_dir().join(format!("neu-system-link-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("program.o"), b"object").unwrap();
+    let plan = SystemLinkInvocation::new(root.join("program.o"), root.join("program"));
+    let plan = plan.unwrap();
+    assert_eq!(plan.program(), std::path::Path::new("cc"));
+    assert_eq!(plan.arguments()[0], "-o");
+    assert_eq!(
+        std::path::PathBuf::from(&plan.arguments()[1]),
+        root.join("program")
+    );
+    assert_eq!(
+        std::path::PathBuf::from(&plan.arguments()[2]),
+        root.join("program.o")
+    );
+    assert_eq!(plan.entry_symbol(), "main");
+    let _ = fs::remove_dir_all(root);
+}
 
 fn startup_shim_fixture() -> Vec<u8> {
     let triple = Triple::host();

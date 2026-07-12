@@ -635,9 +635,7 @@ impl MirCleanupBoundary {
                     types.get(local.ty()).is_some_and(|record| {
                         matches!(
                             record.kind(),
-                            TypeKind::Nominal(_)
-                                | TypeKind::GenericInstance(_)
-                                | TypeKind::Function(_)
+                            TypeKind::Nominal(_) | TypeKind::GenericInstance(_)
                         )
                     })
                 })
@@ -1205,21 +1203,14 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             types
                 .get(function.return_type())
                 .map(|record| record.kind()),
-            Some(
-                TypeKind::Nominal(_)
-                    | TypeKind::GenericInstance(_)
-                    | TypeKind::Function(_)
-                    | TypeKind::DynamicArray(_),
-            )
+            Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_),)
         ) {
             let cleanup_value =
                 MirValueId::from_raw(function.parameters().len() + function.expressions().len());
             for local in function.locals().iter().filter(|local| {
                 matches!(
                     types.get(local.ty()).map(|record| record.kind()),
-                    Some(
-                        TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_),
-                    )
+                    Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_),)
                 )
             }) {
                 instructions.push(MirInstruction::LoadLocal {

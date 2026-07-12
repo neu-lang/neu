@@ -527,8 +527,11 @@ fn declare_runtime_functions(
     let malloc = module
         .declare_function("malloc", Linkage::Import, &malloc_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    // The bootstrap object model passes interior pointers to cleanup. Keep the
+    // compiler-owned free boundary local until a host runtime with typed
+    // allocation metadata replaces it.
     let free = module
-        .declare_function("free", Linkage::Import, &malloc_signature)
+        .declare_function("neu_free", Linkage::Local, &malloc_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let memcpy = module
         .declare_function("memcpy", Linkage::Import, &memory_signature)
@@ -536,6 +539,24 @@ fn declare_runtime_functions(
     let memcmp = module
         .declare_function("memcmp", Linkage::Import, &memory_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let mut context = cranelift_codegen::Context::new();
+    context.func =
+        Function::with_name_signature(UserFuncName::user(0, free.as_u32()), malloc_signature);
+    let mut builder_context = FunctionBuilderContext::new();
+    {
+        let mut builder = FunctionBuilder::new(&mut context.func, &mut builder_context);
+        let block = builder.create_block();
+        builder.append_block_params_for_function_params(block);
+        builder.switch_to_block(block);
+        let pointer = builder.block_params(block)[0];
+        builder.ins().return_(&[pointer]);
+        builder.seal_block(block);
+        builder.finalize();
+    }
+    module
+        .define_function(free, &mut context)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+
     Ok(RuntimeFunctions {
         malloc,
         free,
@@ -1218,8 +1239,9 @@ fn lower_instruction(
                 .get(value)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            let allocation = builder.ins().iadd_imm(pointer, -16);
             let free_ref = runtime.reference(builder.func, runtime.free, false);
-            builder.ins().call(free_ref, &[pointer]);
+            builder.ins().call(free_ref, &[allocation]);
             Ok(())
         }
         MirInstruction::DestroyDynamicArray { value, .. } => {
@@ -1233,10 +1255,11 @@ fn lower_instruction(
             let data = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let data_allocation = builder.ins().iadd_imm(data, -16);
             let free_ref = runtime.reference(builder.func, runtime.free, false);
-            builder.ins().call(free_ref, &[data]);
-            let header = builder.ins().iadd_imm(pointer, 8);
-            builder.ins().call(free_ref, &[header]);
+            builder.ins().call(free_ref, &[data_allocation]);
+            let header_allocation = builder.ins().iadd_imm(pointer, -8);
+            builder.ins().call(free_ref, &[header_allocation]);
             Ok(())
         }
         MirInstruction::DynamicArrayNew { output, .. } => {
@@ -1378,7 +1401,8 @@ fn lower_instruction(
             let memcpy_ref = runtime.reference(builder.func, runtime.memcpy, true);
             builder.ins().call(memcpy_ref, &[data, old_data, copy_size]);
             let free_ref = runtime.reference(builder.func, runtime.free, false);
-            builder.ins().call(free_ref, &[old_data]);
+            let old_data_allocation = builder.ins().iadd_imm(old_data, -16);
+            builder.ins().call(free_ref, &[old_data_allocation]);
             builder
                 .ins()
                 .store(MemFlagsData::new(), new_capacity, pointer, 8);

@@ -46,6 +46,66 @@ pub struct LinkInvocation {
     output: PathBuf,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SystemLinkInvocation {
+    program: PathBuf,
+    arguments: Vec<OsString>,
+    entry_symbol: String,
+    output: PathBuf,
+}
+
+impl SystemLinkInvocation {
+    pub fn new(
+        object: impl AsRef<Path>,
+        output: impl AsRef<Path>,
+    ) -> Result<Self, LinkInvocationError> {
+        let object = object.as_ref();
+        if !fs::metadata(object).is_ok_and(|metadata| metadata.is_file()) {
+            return Err(LinkInvocationError::MissingObject);
+        }
+        let output = output.as_ref().to_owned();
+        Ok(Self {
+            program: std::env::var_os("NEU_LINKER")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("cc")),
+            arguments: vec![
+                OsString::from("-o"),
+                output.as_os_str().to_owned(),
+                object.as_os_str().to_owned(),
+            ],
+            entry_symbol: "main".to_owned(),
+            output,
+        })
+    }
+
+    pub fn program(&self) -> &Path {
+        &self.program
+    }
+
+    pub fn arguments(&self) -> &[OsString] {
+        &self.arguments
+    }
+
+    pub fn entry_symbol(&self) -> &str {
+        &self.entry_symbol
+    }
+
+    pub fn execute(&self) -> Result<(), LinkInvocationError> {
+        let status = Command::new(&self.program)
+            .args(&self.arguments)
+            .status()
+            .map_err(|_| LinkInvocationError::LinkerUnavailable)?;
+        if status.success() {
+            fs::metadata(&self.output)
+                .is_ok_and(|metadata| metadata.is_file())
+                .then_some(())
+                .ok_or(LinkInvocationError::MissingOutput)
+        } else {
+            Err(LinkInvocationError::LinkerFailed(status.code()))
+        }
+    }
+}
+
 impl LinkInvocation {
     pub fn new(
         pack: &TargetPack,

@@ -64,7 +64,6 @@ fn compiles_virtual_directory_package_to_host_executable() {
 
 #[test]
 fn compiles_a_neu_json_project_to_a_host_executable() {
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let root = std::env::temp_dir().join(format!("neu-manifest-driver-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(root.join("src/math")).unwrap();
@@ -85,13 +84,7 @@ fn compiles_a_neu_json_project_to_a_host_executable() {
     .unwrap();
     let output = root.join("target/app");
     fs::create_dir_all(output.parent().unwrap()).unwrap();
-    let executable = compile_manifest_to_executable(
-        root.join("neu.json"),
-        repo_root.join("target-packs"),
-        Triple::host(),
-        &output,
-    )
-    .unwrap();
+    let executable = compile_manifest_to_executable(root.join("neu.json"), &output).unwrap();
     assert_eq!(Command::new(executable).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(root);
 }
