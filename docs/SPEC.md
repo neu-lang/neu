@@ -1022,6 +1022,22 @@ contract. Generic enum behavior waits for the generic declaration and
 constraint decisions. Inheritance, reflection, serialization, dynamic
 loading, FFI, implicit conversions, and user allocation remain deferred.
 
+## ADR-0093: Static Class Functions
+
+Classes may declare associated functions with `static func`. They have no
+implicit receiver and are callable through a nominal class name only. Static
+functions cannot access `this`, `super`, instance fields, or instance methods;
+interfaces do not declare them. They use existing visibility, ownership,
+capability, generic, overload, and value ABI rules without a receiver
+parameter.
+
+Derived classes inherit an unhidden static function for class-name lookup, but
+a same-named declaration hides it and is not an override. `override` is
+rejected for static functions; `final` is accepted as redundant metadata.
+Static calls preserve class and function identity as direct calls through HIR,
+MIR, Cranelift, object emission, and linking. Class objects, static fields,
+reflection, dynamic lookup, public symbol/layout ABI, and FFI remain deferred.
+
 ## ADR-0080: Zero-Payload Enum `when` Patterns
 
 `when` supports qualified zero-payload enum variant patterns and `_`. The

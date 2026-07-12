@@ -1924,6 +1924,16 @@ fn method_declaration_index(
         .name_references
         .iter()
         .find(|name| name.reference == member.receiver)?;
+    if !source
+        .parsed
+        .local_binding_names
+        .iter()
+        .any(|binding| binding.name == receiver.name)
+        && let Some(index) =
+            static_class_function_index(source.parsed, &receiver.name, &member.name)
+    {
+        return hir_function_index(source.parsed, index);
+    }
     if let Some(class) = source.class_types.and_then(|classes| {
         classes.classes().iter().find(|class| {
             class.name() == receiver.name
@@ -2114,6 +2124,29 @@ fn hir_function_index(parsed: &ParseOutput, parsed_index: usize) -> Option<usize
         .checked_sub(1)
 }
 
+fn static_class_function_index(
+    parsed: &ParseOutput,
+    receiver_name: &str,
+    function_name: &str,
+) -> Option<usize> {
+    let mut current = Some(receiver_name.to_owned());
+    while let Some(name) = current {
+        let class = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == name)?;
+        if let Some(index) = parsed.function_declarations.iter().position(|function| {
+            function.owner == Some(class.declaration)
+                && function.name == function_name
+                && function.is_static
+        }) {
+            return Some(index);
+        }
+        current = class.superclass.clone();
+    }
+    None
+}
+
 fn method_dispatch_facts(
     source: &CheckedHirSource<'_>,
     callee: crate::ast::AstNodeId,
@@ -2168,6 +2201,9 @@ fn method_dispatch_facts(
         .map(|name| name.name.as_str());
     if receiver_name == Some("super") {
         return (HirDispatchKind::StaticSuper, Vec::new());
+    }
+    if static_function.is_static {
+        return (HirDispatchKind::Direct, Vec::new());
     }
     if receiver_record.is_interface() {
         return (

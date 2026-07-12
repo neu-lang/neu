@@ -1,5 +1,6 @@
 use compiler::{
     ast::AstNodeKind,
+    driver::{SourceDriverOptions, compile_source_to_executable},
     module::{ModuleName, PackageNamespace},
     parser::parse_source,
     source::SourceFileId,
@@ -9,7 +10,7 @@ use compiler::{
         type_m0068_class_types,
     },
 };
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, process::Command};
 use target_lexicon::Triple;
 
 #[test]
@@ -277,6 +278,56 @@ fn constructs_a_minimal_owned_class_through_the_target_pack() {
         std::process::Command::new(output).status().unwrap().code(),
         Some(7)
     );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn class_static_function_is_callable_through_class_name() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-static-class-function-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "class Math() { static func answer(): Int { return 7; } } public func main(): Int { return Math.answer(); }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6720),
+            compiler::module::ModuleName::parse("classes").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn static_class_function_rejects_instance_receiver_access() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-static-class-invalid-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "class Math() { static func bad(): Int { return this; } } public func main(): Int { return 0; }";
+    let error = compiler::driver::compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6721),
+            compiler::module::ModuleName::parse("classes").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            &executable,
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("StaticFunctionInstanceAccess"));
     let _ = fs::remove_dir_all(workspace);
 }
 

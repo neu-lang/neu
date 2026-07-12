@@ -90,6 +90,8 @@ pub enum TypeRuleDiagnostic {
     LambdaCaptureUnsupported,
     InferredInitializerRequired,
     InferredTypeUnavailable,
+    StaticFunctionInstanceAccess,
+    StaticFunctionOverride,
     DuplicateField,
     FieldHiding,
     ImmutableFieldMutation,
@@ -1515,6 +1517,39 @@ pub fn apply_m0070_receiver_name_facts(
         else {
             continue;
         };
+        if function.is_static {
+            if function.is_override {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::StaticFunctionOverride,
+                    function.declaration,
+                ));
+            }
+            for name in parsed.name_references.iter().filter(|name| {
+                matches!(name.name.as_str(), "this" | "super")
+                    && name.name_span.file() == body.file()
+                    && body.start() <= name.name_span.start()
+                    && name.name_span.end() <= body.end()
+            }) {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::StaticFunctionInstanceAccess,
+                    name.reference,
+                ));
+            }
+            for member in parsed.member_expressions.iter().filter(|member| {
+                parsed.name_references.iter().any(|name| {
+                    name.reference == member.receiver
+                        && matches!(name.name.as_str(), "this" | "super")
+                }) && member.span.file() == body.file()
+                    && body.start() <= member.span.start()
+                    && member.span.end() <= body.end()
+            }) {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::StaticFunctionInstanceAccess,
+                    member.expression,
+                ));
+            }
+            continue;
+        }
         for name in parsed.name_references.iter().filter(|name| {
             matches!(name.name.as_str(), "this" | "super")
                 && name.name_span.file() == body.file()
@@ -1807,6 +1842,8 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                             function.name == target_name
                                 && (member.is_none() || function.owner.is_some())
                                 && member.is_none_or(|member| {
+                                    let class_name_receiver =
+                                        is_class_name_receiver(source, member.receiver);
                                     member_receiver_class_name(
                                         source,
                                         member.receiver,
@@ -1814,15 +1851,24 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                                     )
                                     .and_then(|class_name| {
                                         function.owner.and_then(|owner| {
-                                            candidate
-                                                .parsed
-                                                .class_declarations
-                                                .iter()
-                                                .find(|class| class.declaration == owner)
-                                                .map(|class| class.name == class_name)
+                                            if class_name_receiver {
+                                                Some(class_static_owner_matches(
+                                                    candidate.parsed,
+                                                    owner,
+                                                    &class_name,
+                                                ))
+                                            } else {
+                                                candidate
+                                                    .parsed
+                                                    .class_declarations
+                                                    .iter()
+                                                    .find(|class| class.declaration == owner)
+                                                    .map(|class| class.name == class_name)
+                                            }
                                         })
                                     })
                                     .unwrap_or(true)
+                                        && function.is_static == class_name_receiver
                                 })
                         })
                         .filter_map(move |function| {
@@ -1835,7 +1881,9 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 })
                 .collect();
             let mut arguments = call.arguments.clone();
-            if let Some(member) = member {
+            if let Some(member) = member
+                && !is_class_name_receiver(source, member.receiver)
+            {
                 arguments.insert(0, member.receiver);
             }
             let Some(argument_types) = arguments
@@ -1844,6 +1892,7 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 .map(|(index, argument)| {
                     if index == 0
                         && let Some(member) = member
+                        && !is_class_name_receiver(source, member.receiver)
                         && let Some(class_name) =
                             member_receiver_class_name(source, member.receiver, call.function)
                         && let Some(class_type) = source.class_types.and_then(|classes| {
@@ -2021,6 +2070,7 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
             .member_expressions
             .iter()
             .find(|member| member.expression == call.callee)
+            && !is_class_name_receiver(source, member.receiver)
         {
             arguments.insert(0, member.receiver);
         }
@@ -2198,6 +2248,50 @@ fn is_enum_static_call(
             && function.is_static
             && function.parameters.len() == call.arguments.len()
     })
+}
+
+fn class_static_owner_matches(parsed: &ParseOutput, owner: AstNodeId, receiver_name: &str) -> bool {
+    let Some(owner_name) = parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.declaration == owner)
+        .map(|class| class.name.as_str())
+    else {
+        return false;
+    };
+    let mut current = Some(receiver_name.to_owned());
+    while let Some(name) = current {
+        if name == owner_name {
+            return true;
+        }
+        current = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == name)
+            .and_then(|class| class.superclass.clone());
+    }
+    false
+}
+
+fn is_class_name_receiver(source: &ExecutableSourceTypes<'_>, receiver: AstNodeId) -> bool {
+    let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|reference| reference.reference == receiver)
+    else {
+        return false;
+    };
+    !source
+        .parsed
+        .local_binding_names
+        .iter()
+        .any(|binding| binding.name == name.name)
+        && source
+            .parsed
+            .class_declarations
+            .iter()
+            .any(|class| class.name == name.name)
 }
 
 fn member_receiver_class_name(
@@ -4300,6 +4394,33 @@ pub fn type_m0064_string_operations(
 
     for member in &parsed.member_expressions {
         if report.expression_type(member.expression).is_some() {
+            continue;
+        }
+        let class_name_receiver = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == member.receiver)
+            .filter(|reference| {
+                !parsed
+                    .local_binding_names
+                    .iter()
+                    .any(|binding| binding.name == reference.name)
+            })
+            .map(|reference| reference.name.as_str());
+        if class_name_receiver.is_some_and(|class_name| {
+            parsed.class_declarations.iter().any(|class| {
+                class.name == class_name
+                    && parsed.function_declarations.iter().any(|function| {
+                        function.owner == Some(class.declaration)
+                            && function.name == member.name
+                            && function.is_static
+                    })
+            })
+        }) {
+            report.retain_diagnostics(|diagnostic| {
+                diagnostic.node() != member.expression
+                    || diagnostic.rule() != TypeRuleDiagnostic::MemberExpressionDeferred
+            });
             continue;
         }
         if report

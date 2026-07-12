@@ -920,6 +920,7 @@ impl<'source> Parser<'source> {
                 self.skip_to_declaration_boundary(in_body);
             }
         }
+        self.pending_method_static = false;
     }
 
     fn function_parameter_list_is_typed(&self) -> bool {
@@ -1282,6 +1283,7 @@ impl<'source> Parser<'source> {
                             | TokenKind::KwOverride
                             | TokenKind::KwOpen
                             | TokenKind::KwFinal
+                            | TokenKind::Identifier
                     )
                 );
             if self.current_kind() == Some(TokenKind::KwFunc)
@@ -1289,16 +1291,21 @@ impl<'source> Parser<'source> {
                 || self.current_kind() == Some(TokenKind::KwOverride)
                 || self.current_kind() == Some(TokenKind::KwOpen)
                 || self.current_kind() == Some(TokenKind::KwFinal)
+                || (self.current_kind() == Some(TokenKind::Identifier)
+                    && self.current_text() == Some("static"))
                 || method_with_visibility
             {
                 self.pending_method_visibility = "internal".to_owned();
                 self.pending_method_override = false;
                 self.pending_method_final = false;
+                self.pending_method_static = false;
                 while self.is_visibility()
                     || matches!(
                         self.current_kind(),
                         Some(TokenKind::KwOverride | TokenKind::KwOpen | TokenKind::KwFinal)
                     )
+                    || (self.current_kind() == Some(TokenKind::Identifier)
+                        && self.current_text() == Some("static"))
                 {
                     if self.is_visibility() {
                         self.pending_method_visibility =
@@ -1312,6 +1319,11 @@ impl<'source> Parser<'source> {
                                 );
                             }
                             Some(TokenKind::KwFinal) => self.pending_method_final = true,
+                            Some(TokenKind::Identifier)
+                                if self.current_text() == Some("static") =>
+                            {
+                                self.pending_method_static = true;
+                            }
                             _ => {}
                         }
                     }
