@@ -28,6 +28,7 @@ pub fn satisfies_thread_capability(
             | PrimitiveType::Byte,
         ) => true,
         TypeKind::Primitive(PrimitiveType::Null) => true,
+        TypeKind::Function(_) => true,
         TypeKind::Primitive(PrimitiveType::String) => capability == ThreadCapability::Send,
         TypeKind::Nullable(nullable) => {
             satisfies_thread_capability(types, nullable.base(), capability)

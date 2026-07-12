@@ -22,6 +22,7 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
             | PrimitiveType::Byte,
         ) => Some(OwnershipCategory::Copyable),
         TypeKind::Primitive(PrimitiveType::Null) => Some(OwnershipCategory::Copyable),
+        TypeKind::Function(_) => Some(OwnershipCategory::Copyable),
         TypeKind::Primitive(PrimitiveType::String)
         | TypeKind::Nominal(_)
         | TypeKind::GenericInstance(_) => Some(OwnershipCategory::MoveOnly),

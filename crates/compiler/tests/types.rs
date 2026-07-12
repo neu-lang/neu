@@ -5,10 +5,10 @@ use compiler::{
     symbol::{SymbolId, SymbolInterner},
     type_check::build_m0083_generic_declaration_records,
     types::{
-        GenericParameterType, GenericSpecializationIdentity, GenericSpecializationRegistry,
-        GenericSubstitution, GenericTypeIdentity, NominalTypeIdentity, NullableType, PrimitiveType,
-        TypeArena, TypeDiagnostic, TypeDiagnosticKind, TypeId, TypeKind, TypeRecord,
-        UnsupportedTypeForm,
+        FunctionType, GenericParameterType, GenericSpecializationIdentity,
+        GenericSpecializationRegistry, GenericSubstitution, GenericTypeIdentity,
+        NominalTypeIdentity, NullableType, PrimitiveType, TypeArena, TypeDiagnostic,
+        TypeDiagnosticKind, TypeId, TypeKind, TypeRecord, UnsupportedTypeForm,
     },
 };
 
@@ -219,6 +219,24 @@ fn generic_specialization_identity_is_deduplicated_and_ordered() {
         registry.request(first),
         compiler::types::SpecializationRequest::Existing(0)
     );
+}
+
+#[test]
+fn function_type_identity_is_structural_and_deduplicated() {
+    let mut arena = TypeArena::new();
+    let int_type = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let byte_type = arena.insert(TypeRecord::primitive(PrimitiveType::Byte));
+    let first = arena.function(FunctionType::new(vec![int_type, byte_type], int_type));
+    let same = arena.function(FunctionType::new(vec![int_type, byte_type], int_type));
+    let different = arena.function(FunctionType::new(vec![byte_type, int_type], int_type));
+
+    assert_eq!(first, same);
+    assert_ne!(first, different);
+    let TypeKind::Function(function) = arena.get(first).unwrap().kind() else {
+        panic!("expected function type");
+    };
+    assert_eq!(function.parameters(), &[int_type, byte_type]);
+    assert_eq!(function.return_type(), int_type);
 }
 
 #[test]

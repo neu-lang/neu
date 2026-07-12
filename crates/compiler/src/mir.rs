@@ -607,7 +607,9 @@ impl MirCleanupBoundary {
                     types.get(local.ty()).is_some_and(|record| {
                         matches!(
                             record.kind(),
-                            TypeKind::Nominal(_) | TypeKind::GenericInstance(_)
+                            TypeKind::Nominal(_)
+                                | TypeKind::GenericInstance(_)
+                                | TypeKind::Function(_)
                         )
                     })
                 })
@@ -1151,14 +1153,21 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
             types
                 .get(function.return_type())
                 .map(|record| record.kind()),
-            Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_))
+            Some(
+                TypeKind::Nominal(_)
+                    | TypeKind::GenericInstance(_)
+                    | TypeKind::Function(_)
+                    | TypeKind::DynamicArray(_),
+            )
         ) {
             let cleanup_value =
                 MirValueId::from_raw(function.parameters().len() + function.expressions().len());
             for local in function.locals().iter().filter(|local| {
                 matches!(
                     types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_))
+                    Some(
+                        TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_),
+                    )
                 )
             }) {
                 instructions.push(MirInstruction::LoadLocal {
@@ -2309,7 +2318,7 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
         )) => Ok(()),
         Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
         Some(TypeKind::DynamicArray(_)) => Ok(()),
-        Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_)) => Ok(()),
+        Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_)) => Ok(()),
         _ => Err(MirLoweringError::UnsupportedRuntimeType),
     }
 }

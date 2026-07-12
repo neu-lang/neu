@@ -34,9 +34,10 @@ use compiler::{
         type_m0028_executable_core, type_m0028_executable_core_in,
         type_m0028_executable_int_operators, type_m0028_function_signatures,
         type_m0028_function_signatures_in, type_m0028_static_integer_diagnostics,
-        type_m0035_primitive_operators, type_parser_literals, type_primitive_local_declarations,
-        type_primitive_local_initializer_declarations, type_resolved_name_expressions,
-        type_unsupported_m0018_expressions, validate_m0061_compile_time_constants,
+        type_m0035_primitive_operators, type_m0086_function_types, type_parser_literals,
+        type_primitive_local_declarations, type_primitive_local_initializer_declarations,
+        type_resolved_name_expressions, type_unsupported_m0018_expressions,
+        validate_m0061_compile_time_constants,
     },
     types::{
         GenericSubstitution, NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord,
@@ -425,6 +426,22 @@ fn m0084_capability_bounds_are_checked_after_substitution() {
     );
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].bound(), bounds[1].bound());
+}
+
+#[test]
+fn m0086_function_type_metadata_resolves_to_structural_type_identity() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(503),
+        "func apply(operation: (Int, Byte) -> Int): Int;",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = TypeArena::new();
+    let resolved = type_m0086_function_types(&parsed, &mut types);
+    assert_eq!(resolved.len(), 1);
+    let TypeKind::Function(function) = types.get(resolved[0].1).unwrap().kind() else {
+        panic!("expected function type");
+    };
+    assert_eq!(function.parameters().len(), 2);
 }
 
 #[test]

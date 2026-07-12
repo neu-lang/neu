@@ -209,6 +209,29 @@ pub struct DynamicArrayType {
     element: TypeId,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FunctionType {
+    parameters: Vec<TypeId>,
+    return_type: TypeId,
+}
+
+impl FunctionType {
+    pub fn new(parameters: Vec<TypeId>, return_type: TypeId) -> Self {
+        Self {
+            parameters,
+            return_type,
+        }
+    }
+
+    pub fn parameters(&self) -> &[TypeId] {
+        &self.parameters
+    }
+
+    pub fn return_type(&self) -> TypeId {
+        self.return_type
+    }
+}
+
 impl DynamicArrayType {
     pub fn new(element: TypeId) -> Self {
         Self { element }
@@ -247,6 +270,7 @@ pub enum TypeKind {
     Nominal(NominalTypeIdentity),
     GenericParameter(GenericParameterType),
     GenericInstance(GenericTypeIdentity),
+    Function(FunctionType),
     Primitive(PrimitiveType),
     Nullable(NullableType),
     Array(ArrayType),
@@ -334,6 +358,13 @@ impl TypeRecord {
         }
     }
 
+    pub fn function(function: FunctionType) -> Self {
+        Self {
+            id: TypeId::from_raw(usize::MAX),
+            kind: TypeKind::Function(function),
+        }
+    }
+
     pub fn primitive(primitive: PrimitiveType) -> Self {
         Self {
             id: TypeId::from_raw(usize::MAX),
@@ -414,6 +445,14 @@ impl TypeArena {
             return record.id();
         }
         self.insert(TypeRecord::generic_instance(identity))
+    }
+
+    pub fn function(&mut self, function: FunctionType) -> TypeId {
+        let kind = TypeKind::Function(function.clone());
+        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
+            return record.id();
+        }
+        self.insert(TypeRecord::function(function))
     }
 
     pub fn dynamic_array(&mut self, element: TypeId) -> TypeId {
@@ -498,6 +537,15 @@ impl GenericSubstitution {
                     instance.declaration().clone(),
                     arguments,
                 ))
+            }
+            TypeKind::Function(function) => {
+                let parameters = function
+                    .parameters()
+                    .iter()
+                    .map(|parameter| self.apply(*parameter, arena))
+                    .collect();
+                let return_type = self.apply(function.return_type(), arena);
+                arena.function(FunctionType::new(parameters, return_type))
             }
             TypeKind::Nominal(_) | TypeKind::Primitive(_) => ty,
         }

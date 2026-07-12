@@ -14,8 +14,8 @@ use crate::{
     symbol::{SymbolId, SymbolInterner},
     thread::{ThreadCapability, satisfies_thread_capability},
     types::{
-        GenericParameterType, GenericSubstitution, PrimitiveType, TypeArena, TypeId, TypeKind,
-        TypeRecord,
+        FunctionType, GenericParameterType, GenericSubstitution, PrimitiveType, TypeArena, TypeId,
+        TypeKind, TypeRecord,
     },
 };
 
@@ -3442,6 +3442,48 @@ pub fn type_m0063_function_signatures_in_with_classes(
     }
 
     signatures
+}
+
+pub fn type_m0086_function_types(
+    parsed: &ParseOutput,
+    types: &mut TypeArena,
+) -> Vec<(AstNodeId, TypeId)> {
+    let primitives = PrimitiveTypeIds::module_owned(types);
+    let mut resolved = Vec::new();
+    for function in &parsed.function_types {
+        let Some(parameters) = function
+            .parameters
+            .iter()
+            .map(|parameter| {
+                resolve_m0063_annotation_type(
+                    *parameter,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &primitives,
+                    &[],
+                    types,
+                )
+            })
+            .collect::<Option<Vec<_>>>()
+        else {
+            continue;
+        };
+        let Some(return_type) = resolve_m0063_annotation_type(
+            function.return_type,
+            &parsed.type_name_references,
+            &parsed.array_types,
+            &primitives,
+            &[],
+            types,
+        ) else {
+            continue;
+        };
+        resolved.push((
+            function.function_type,
+            types.function(FunctionType::new(parameters, return_type)),
+        ));
+    }
+    resolved
 }
 
 fn resolve_m0063_annotation_type(

@@ -1077,6 +1077,16 @@ bootstrap or target-pack representations are diagnosed before object emission.
 Erasure, inference, reflection, public generic ABI, and separate-compilation
 caches remain deferred.
 
+## ADR-0086: Top-Level Function Values
+
+Function types use structural `(T1, T2) -> R` identity. Named top-level
+functions with one unambiguous compatible signature may become non-null,
+non-capturing opaque compiler-managed values; they are copyable and satisfy
+`Send` and `Share`. Function values may be stored, passed, returned, and
+applied through compiler-private indirect-call facts. Overload ambiguity,
+closures, captures, bound methods, nullable function values, equality, public
+function-pointer layout, and FFI remain deferred.
+
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may

@@ -254,6 +254,26 @@ fn generic_call_metadata_preserves_explicit_type_arguments() {
 }
 
 #[test]
+fn function_type_metadata_preserves_parameter_and_return_types() {
+    let output = parse_source(
+        SourceFileId::from_raw(215),
+        "func apply(operation: (Int, Byte) -> Int): Int;",
+    );
+
+    assert!(output.diagnostics.is_empty());
+    assert_eq!(output.function_types.len(), 1);
+    assert_eq!(output.function_types[0].parameters.len(), 2);
+    assert_eq!(
+        output
+            .arena
+            .node(output.function_types[0].return_type)
+            .unwrap()
+            .kind,
+        AstNodeKind::NamedType
+    );
+}
+
+#[test]
 fn m0020_generic_parameter_metadata_preserves_parameters_and_capability_bounds() {
     let source = "struct Box<T: capability.Send & Share, U> {} func wrap<V: Send>() {}";
     let file = SourceFileId::from_raw(200);

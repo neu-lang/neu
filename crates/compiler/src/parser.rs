@@ -65,6 +65,7 @@ pub struct ParseOutput {
     pub name_references: Vec<ParsedNameReference>,
     pub type_name_references: Vec<ParsedTypeNameReference>,
     pub array_types: Vec<ParsedArrayType>,
+    pub function_types: Vec<ParsedFunctionType>,
     pub literal_expressions: Vec<ParsedLiteralExpression>,
     pub integer_literals: Vec<ParsedIntegerLiteral>,
     pub float_literals: Vec<ParsedFloatLiteral>,
@@ -327,6 +328,14 @@ pub struct ParsedArrayType {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParsedFunctionType {
+    pub function_type: AstNodeId,
+    pub parameters: Vec<AstNodeId>,
+    pub return_type: AstNodeId,
+    pub span: ByteSpan,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedArrayLiteral {
     pub expression: AstNodeId,
     pub elements: Vec<AstNodeId>,
@@ -493,6 +502,7 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         name_references: parser.name_references,
         type_name_references: parser.type_name_references,
         array_types: parser.array_types,
+        function_types: parser.function_types,
         literal_expressions: parser.literal_expressions,
         integer_literals: parser.integer_literals,
         float_literals: parser.float_literals,
@@ -539,6 +549,7 @@ struct Parser<'source> {
     name_references: Vec<ParsedNameReference>,
     type_name_references: Vec<ParsedTypeNameReference>,
     array_types: Vec<ParsedArrayType>,
+    function_types: Vec<ParsedFunctionType>,
     literal_expressions: Vec<ParsedLiteralExpression>,
     integer_literals: Vec<ParsedIntegerLiteral>,
     float_literals: Vec<ParsedFloatLiteral>,
@@ -614,6 +625,7 @@ impl<'source> Parser<'source> {
             name_references: Vec::new(),
             type_name_references: Vec::new(),
             array_types: Vec::new(),
+            function_types: Vec::new(),
             literal_expressions: Vec::new(),
             integer_literals: Vec::new(),
             float_literals: Vec::new(),
@@ -3421,16 +3433,19 @@ impl<'source> Parser<'source> {
         let start = self.current()?.span.start();
         self.advance();
 
+        let mut parameters = Vec::new();
         if self.current_kind() != Some(TokenKind::RightParen) {
             loop {
-                if self.parse_type().is_none() {
+                let Some(parameter_span) = self.parse_type() else {
                     self.diagnostic_current_or_span(
                         DiagnosticKind::MalformedFunctionType,
                         self.span_at(start),
                     );
                     self.skip_to_type_boundary();
                     return None;
-                }
+                };
+                let parameter = self.latest_type_node_for_span(parameter_span)?;
+                parameters.push(parameter);
                 match self.current_kind() {
                     Some(TokenKind::Comma) => self.advance(),
                     Some(TokenKind::RightParen) => break,
@@ -3464,15 +3479,22 @@ impl<'source> Parser<'source> {
         }
         self.advance();
 
-        let Some(return_type) = self.parse_type() else {
+        let Some(return_span) = self.parse_type() else {
             self.diagnostic_current_or_span(
                 DiagnosticKind::MalformedFunctionType,
                 self.span_at(start),
             );
             return None;
         };
-        let span = self.span(start, return_type.end());
-        self.arena.add_function_type(span);
+        let return_type = self.latest_type_node_for_span(return_span)?;
+        let span = self.span(start, return_span.end());
+        let function_type = self.arena.add_function_type(span);
+        self.function_types.push(ParsedFunctionType {
+            function_type,
+            parameters,
+            return_type,
+            span,
+        });
         Some(span)
     }
 
