@@ -758,7 +758,7 @@ impl<'source> Parser<'source> {
         self.parse_generic_parameters();
 
         let parameters = if self.current_kind() == Some(TokenKind::LeftParen)
-            && self.function_parameter_list_is_typed()
+            && (self.function_parameter_list_is_typed() || self.function_parameter_list_has_body())
         {
             let Some(parameters) = self.parse_typed_function_parameters() else {
                 self.diagnostic(
@@ -879,6 +879,35 @@ impl<'source> Parser<'source> {
                 TokenKind::Colon if depth == 1 => return true,
                 _ => {}
             }
+        }
+        false
+    }
+
+    fn function_parameter_list_has_body(&self) -> bool {
+        let mut index = self.index;
+        let mut depth = 0usize;
+        while let Some(token) = self.tokens.get(index) {
+            match token.kind {
+                TokenKind::LeftParen => depth += 1,
+                TokenKind::RightParen => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        index += 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            index += 1;
+        }
+        while let Some(token) = self.tokens.get(index) {
+            if token.kind == TokenKind::LeftBrace {
+                return true;
+            }
+            if token.kind == TokenKind::Semicolon {
+                return false;
+            }
+            index += 1;
         }
         false
     }

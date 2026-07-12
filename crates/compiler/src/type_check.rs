@@ -48,6 +48,10 @@ pub enum TypeRuleDiagnostic {
     BinaryExpressionDeferred,
     UnaryExpressionDeferred,
     IfValueDeferred,
+    ConditionalConditionNotBool,
+    ConditionalElseRequired,
+    ConditionalBranchTypeMismatch,
+    ConditionalMissingBranchValue,
     NullableValueWithoutRefinement,
     NullableAssignmentWithoutRefinement,
     AssignmentInvalidatedRefinement,
@@ -1813,6 +1817,7 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                 ));
                 continue;
             };
+            let target_count = targets.len();
             let arity_matches = targets
                 .into_iter()
                 .filter(|(candidate_index, signature_index)| {
@@ -1822,6 +1827,19 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
                         == argument_types.len()
                 })
                 .collect::<Vec<_>>();
+            if arity_matches.is_empty() {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    if target_count == 0 {
+                        DirectCallDiagnosticKind::InvalidCallTarget
+                    } else if target_count == 1 {
+                        DirectCallDiagnosticKind::ArgumentCountMismatch
+                    } else {
+                        DirectCallDiagnosticKind::NoMatchingOverload
+                    },
+                    diagnostic_span,
+                ));
+                continue;
+            }
             let exact_matches = arity_matches
                 .iter()
                 .copied()
@@ -1852,7 +1870,11 @@ pub fn check_m0028_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> Direct
             };
             if compatible_matches.is_empty() {
                 report.diagnostics.push(DirectCallDiagnostic::new(
-                    DirectCallDiagnosticKind::NoMatchingOverload,
+                    if target_count == 1 {
+                        DirectCallDiagnosticKind::ArgumentTypeMismatch
+                    } else {
+                        DirectCallDiagnosticKind::NoMatchingOverload
+                    },
                     diagnostic_span,
                 ));
                 continue;
@@ -2991,8 +3013,7 @@ pub fn check_m0028_unsupported_executable_forms(
             !dynamic_generic
                 && matches!(
                     node.kind,
-                    AstNodeKind::IfExpression
-                        | AstNodeKind::BinaryExpression
+                    AstNodeKind::BinaryExpression
                         | AstNodeKind::UnaryExpression
                         | AstNodeKind::CallExpression
                         | AstNodeKind::MemberExpression
@@ -3016,11 +3037,7 @@ pub fn check_m0028_unsupported_executable_forms(
                     | AstNodeKind::FunctionType
                     | AstNodeKind::GroupedType
                     | AstNodeKind::WhenExpression
-            ) || (node.kind == AstNodeKind::IfExpression
-                && !parsed
-                    .if_statements
-                    .iter()
-                    .any(|statement| statement.expression == node.id))
+            )
         })
         .map(|node| node.span)
         .collect();
@@ -4771,6 +4788,122 @@ pub fn type_m0060_control_flow(
         }
     }
     report
+}
+
+pub fn type_m0077_value_conditionals(
+    parsed: &ParseOutput,
+    known_expression_types: &[ExpressionType],
+    type_arena: &TypeArena,
+) -> TypeCheckReport {
+    let mut report = TypeCheckReport::new();
+    for expression_type in known_expression_types {
+        report.record_expression_type(*expression_type);
+    }
+    let statement_conditionals = parsed
+        .if_statements
+        .iter()
+        .map(|statement| statement.expression)
+        .collect::<Vec<_>>();
+    let bool_type = type_arena
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Bool))
+        .map(|record| record.id());
+    for conditional in &parsed.if_expressions {
+        if statement_conditionals.contains(&conditional.expression) {
+            continue;
+        }
+        let Some(bool_type) = bool_type else {
+            continue;
+        };
+        if report.expression_type(conditional.condition) != Some(bool_type) {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConditionalConditionNotBool,
+                conditional.condition,
+            ));
+        }
+        let Some(else_block) = conditional.else_block else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConditionalElseRequired,
+                conditional.expression,
+            ));
+            continue;
+        };
+        let then_value = conditional_branch_value(parsed, conditional.then_block);
+        let else_value = conditional_branch_value(parsed, else_block);
+        let (Some(then_value), Some(else_value)) = (then_value, else_value) else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConditionalMissingBranchValue,
+                conditional.expression,
+            ));
+            continue;
+        };
+        let (Some(then_type), Some(else_type)) = (
+            report.expression_type(then_value),
+            report.expression_type(else_value),
+        ) else {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConditionalMissingBranchValue,
+                conditional.expression,
+            ));
+            continue;
+        };
+        if then_type != else_type {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ConditionalBranchTypeMismatch,
+                conditional.expression,
+            ));
+            continue;
+        }
+        report.record_expression_type(ExpressionType::new(conditional.expression, then_type));
+    }
+    report
+}
+
+pub fn apply_m0077_value_conditional_results(
+    target: &mut TypeCheckReport,
+    source: &TypeCheckReport,
+) {
+    merge_type_check_report(target, source.clone());
+}
+
+fn conditional_branch_value(parsed: &ParseOutput, block: AstNodeId) -> Option<AstNodeId> {
+    let block_span = parsed.arena.node(block)?.span;
+    parsed
+        .executable_body_statements
+        .iter()
+        .filter(|statement| {
+            block_span.file() == statement.span.file()
+                && block_span.start() <= statement.span.start()
+                && statement.span.end() <= block_span.end()
+                && parsed
+                    .arena
+                    .node(statement.statement)
+                    .is_some_and(|node| node.kind == AstNodeKind::ExpressionStatement)
+        })
+        .filter_map(|statement| {
+            parsed
+                .arena
+                .nodes()
+                .iter()
+                .filter(|node| {
+                    node.span.file() == statement.span.file()
+                        && node.span.start() == statement.span.start()
+                        && node.span.end() <= statement.span.end()
+                        && !matches!(
+                            node.kind,
+                            AstNodeKind::ExpressionStatement | AstNodeKind::Block
+                        )
+                })
+                .max_by_key(|node| node.span.end())
+                .map(|node| node.id)
+        })
+        .max_by_key(|expression| {
+            parsed
+                .arena
+                .node(*expression)
+                .map_or(0, |node| node.span.end())
+        })
 }
 
 pub fn apply_m0060_control_flow_results(

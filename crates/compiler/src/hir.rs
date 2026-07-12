@@ -525,6 +525,55 @@ fn lower_expression(
         return Ok(existing.id());
     }
     let id = HirExpressionId::from_raw(output.len());
+    if let Some(if_expression) = source
+        .parsed
+        .if_expressions
+        .iter()
+        .find(|if_expression| if_expression.expression == expression)
+        && let Some(else_block) = if_expression.else_block
+        && !source
+            .parsed
+            .if_statements
+            .iter()
+            .any(|statement| statement.expression == expression)
+    {
+        let condition = lower_expression(
+            source,
+            function_declaration,
+            if_expression.condition,
+            local_bindings,
+            output,
+        )?;
+        let then_expression =
+            conditional_branch_expression(source.parsed, if_expression.then_block)
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+        let then_value = lower_expression(
+            source,
+            function_declaration,
+            then_expression,
+            local_bindings,
+            output,
+        )?;
+        let else_expression = conditional_branch_expression(source.parsed, else_block)
+            .ok_or(HirLoweringError::UnsupportedExpression)?;
+        let else_value = lower_expression(
+            source,
+            function_declaration,
+            else_expression,
+            local_bindings,
+            output,
+        )?;
+        let conditional_id = HirExpressionId::from_raw(output.len());
+        output.push(HirExpression::conditional(
+            conditional_id,
+            span,
+            ty,
+            condition,
+            then_value,
+            else_value,
+        ));
+        return Ok(conditional_id);
+    }
     if let Some(literal) = source
         .parsed
         .literal_expressions
@@ -997,6 +1046,48 @@ fn lower_expression(
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn conditional_branch_expression(
+    parsed: &ParseOutput,
+    block: crate::ast::AstNodeId,
+) -> Option<crate::ast::AstNodeId> {
+    let block_span = parsed.arena.node(block)?.span;
+    parsed
+        .executable_body_statements
+        .iter()
+        .filter(|statement| {
+            block_span.file() == statement.span.file()
+                && block_span.start() <= statement.span.start()
+                && statement.span.end() <= block_span.end()
+                && parsed
+                    .arena
+                    .node(statement.statement)
+                    .is_some_and(|node| node.kind == AstNodeKind::ExpressionStatement)
+        })
+        .filter_map(|statement| {
+            parsed
+                .arena
+                .nodes()
+                .iter()
+                .filter(|node| {
+                    node.span.file() == statement.span.file()
+                        && node.span.start() == statement.span.start()
+                        && node.span.end() <= statement.span.end()
+                        && !matches!(
+                            node.kind,
+                            AstNodeKind::ExpressionStatement | AstNodeKind::Block
+                        )
+                })
+                .max_by_key(|node| node.span.end())
+                .map(|node| node.id)
+        })
+        .max_by_key(|expression| {
+            parsed
+                .arena
+                .node(*expression)
+                .map_or(0, |node| node.span.end())
+        })
 }
 
 fn append_superclass_argument_nodes(
@@ -2437,6 +2528,11 @@ pub enum HirExpressionKind {
     LocalRead(HirLocalId),
     Unary(HirUnary),
     Binary(HirBinary),
+    Conditional {
+        condition: HirExpressionId,
+        then_value: HirExpressionId,
+        else_value: HirExpressionId,
+    },
     DirectCall(HirDirectCall),
     ArrayLiteral(Vec<HirExpressionId>),
     Index {
@@ -2581,6 +2677,26 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::DirectCall(call),
+        }
+    }
+
+    pub fn conditional(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        condition: HirExpressionId,
+        then_value: HirExpressionId,
+        else_value: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::Conditional {
+                condition,
+                then_value,
+                else_value,
+            },
         }
     }
 

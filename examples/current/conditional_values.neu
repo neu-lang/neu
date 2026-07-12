@@ -1,0 +1,14 @@
+package examples.current
+
+func fallback(): Int {
+    return 0;
+}
+
+public func main(): Int {
+    val result: Int = if (true) {
+        10;
+    } else {
+        fallback();
+    };
+    return result;
+}

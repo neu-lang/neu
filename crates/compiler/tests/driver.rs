@@ -49,6 +49,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("virtual_dispatch", 13),
         ("dispatch_parameters", 10),
         ("overloads", 10),
+        ("conditional_values", 10),
         ("dynamic_arrays", 1),
         ("nominal_arrays", 4),
     ] {
@@ -150,7 +151,7 @@ fn rejects_ambiguous_and_missing_overloads_before_lowering() {
     for (source, expected) in [
         (
             "func select(value: Int): Int { return 1; } public func main(): Int { return select(true); }",
-            "NoMatchingOverload",
+            "ArgumentTypeMismatch",
         ),
         (
             "class Base {} interface Answer {} class Child: Base(), Answer { } func select(value: Base): Int { return 1; } func select(value: Answer): Int { return 2; } public func main(): Int { return select(new Child()); }",
@@ -170,6 +171,91 @@ fn rejects_ambiguous_and_missing_overloads_before_lowering() {
             SourceDriverOptions::new(
                 SourceFileId::from_raw(7601),
                 ModuleName::parse("overloads").unwrap(),
+                PackageNamespace::root(),
+                Triple::host(),
+                repo_root.join("target-packs"),
+                workspace.join("program"),
+            ),
+        )
+        .unwrap_err();
+        assert!(format!("{error:?}").contains(expected));
+        let _ = fs::remove_dir_all(workspace);
+    }
+}
+
+#[test]
+fn compiles_value_producing_conditional_expression() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace = std::env::temp_dir().join(format!("neu-if-value-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = "public func main(): Int { val result: Int = if (true) { 10; } else { 20; }; return result; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(7700),
+            ModuleName::parse("conditionals").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(10));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn value_conditionals_short_circuit_and_nest() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let workspace =
+        std::env::temp_dir().join(format!("neu-if-value-nested-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = "func zero(): Int { return 0; } public func main(): Int { val result: Int = if (true) { 10; } else { zero(); }; return result; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(7701),
+            ModuleName::parse("conditionals").unwrap(),
+            PackageNamespace::root(),
+            Triple::host(),
+            repo_root.join("target-packs"),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(10));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn rejects_invalid_value_conditional_forms() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (source, expected) in [
+        (
+            "public func main(): Int { val result: Int = if (1) { 1; } else { 2; }; return result; }",
+            "ConditionalConditionNotBool",
+        ),
+        (
+            "public func main(): Int { val result: Int = if (true) { 1; }; return result; }",
+            "ConditionalElseRequired",
+        ),
+        (
+            "public func main(): Int { val result: Int = if (true) { 1; } else { false; }; return result; }",
+            "ConditionalBranchTypeMismatch",
+        ),
+    ] {
+        let workspace =
+            std::env::temp_dir().join(format!("neu-if-value-negative-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&workspace);
+        fs::create_dir_all(&workspace).unwrap();
+        let error = compile_source_to_executable(
+            source,
+            SourceDriverOptions::new(
+                SourceFileId::from_raw(7702),
+                ModuleName::parse("conditionals").unwrap(),
                 PackageNamespace::root(),
                 Triple::host(),
                 repo_root.join("target-packs"),

@@ -962,3 +962,15 @@ source-mapped diagnostics. Overload selection is compile-time; the selected
 method identity then preserves direct, virtual, interface, or static-super
 dispatch and existing ownership/effect facts through HIR, MIR, Cranelift, and
 the compiler-private ABI. Constructors remain single-primary-constructor only.
+
+## ADR-0077: Value-Producing Conditional Expressions
+
+An `if` in expression position requires an exact `Bool` condition and an
+`else` branch. Exactly one branch executes, and every reachable non-terminating
+branch must produce the same exact result type; `Unit` follows the same rule.
+No truthiness, common-supertype inference, numeric conversion, or nullable
+widening is added. Statement conditionals remain unchanged. Branch-local flow,
+ownership, initialization, cleanup, source mappings, and CFG joins are
+preserved through HIR, MIR, Cranelift, and the existing private ABI. Missing
+results, invalid conditions, incompatible branches, and branch-dependent
+consumption are diagnosed before lowering.

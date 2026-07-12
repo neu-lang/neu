@@ -722,7 +722,11 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
     let mut functions = Vec::new();
     for function in hir.functions() {
         require_bootstrap_runtime_type(function.return_type(), types)?;
-        if !function.control_flow().is_empty() {
+        if !function.control_flow().is_empty()
+            || function.expressions().iter().any(|expression| {
+                matches!(expression.kind(), HirExpressionKind::Conditional { .. })
+            })
+        {
             functions.push(lower_hir_function_with_control_flow(function, types)?);
             continue;
         }
@@ -1015,6 +1019,9 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         index: mir_expression_value_id(function, *index),
                         span: expression.span(),
                     });
+                }
+                HirExpressionKind::Conditional { .. } => {
+                    return Err(MirLoweringError::UnsupportedExpression);
                 }
             }
             for local in function.locals() {
@@ -1453,6 +1460,9 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::Conditional { .. } => {
+                return Err(MirLoweringError::UnsupportedExpression);
+            }
             HirExpressionKind::ArrayLiteral(_)
             | HirExpressionKind::Index { .. }
             | HirExpressionKind::StringLiteral(_)
@@ -1568,6 +1578,7 @@ struct ControlFlowLowerer<'a> {
     blocks: Vec<LowerBlock>,
     current: usize,
     locals: Vec<MirLocal>,
+    next_local: usize,
     next_block: usize,
     next_value: usize,
     lowered: Vec<HirExpressionId>,
@@ -1603,6 +1614,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     )
                 })
                 .collect(),
+            next_local: function.locals().len(),
             next_block: 1,
             next_value,
             lowered: Vec::new(),
@@ -1625,6 +1637,13 @@ impl<'a> ControlFlowLowerer<'a> {
         let value = MirValueId::from_raw(self.next_value);
         self.next_value += 1;
         value
+    }
+
+    fn fresh_local(&mut self, ty: TypeId, span: crate::source::ByteSpan) -> MirLocalId {
+        let local = MirLocalId::from_raw(self.next_local);
+        self.next_local += 1;
+        self.locals.push(MirLocal::new(local, ty, span));
+        local
     }
 
     fn push(&mut self, instruction: MirInstruction) {
@@ -1751,6 +1770,51 @@ impl<'a> ControlFlowLowerer<'a> {
                         .collect(),
                     expression.span(),
                 ));
+            }
+            HirExpressionKind::Conditional {
+                condition,
+                then_value,
+                else_value,
+            } => {
+                let condition = self.lower_expression(*condition)?;
+                let result_local = self.fresh_local(expression.ty(), expression.span());
+                let then_block = self.new_block();
+                let else_block = self.new_block();
+                let merge_block = self.new_block();
+                self.terminate(MirTerminator::branch_if(
+                    condition,
+                    self.blocks[then_block].id,
+                    self.blocks[else_block].id,
+                    expression.span(),
+                ));
+                self.current = then_block;
+                let then_value = self.lower_expression(*then_value)?;
+                self.push(MirInstruction::StoreLocal {
+                    local: result_local,
+                    value: then_value,
+                    span: expression.span(),
+                });
+                self.terminate(MirTerminator::Branch {
+                    target: self.blocks[merge_block].id,
+                    span: expression.span(),
+                });
+                self.current = else_block;
+                let else_value = self.lower_expression(*else_value)?;
+                self.push(MirInstruction::StoreLocal {
+                    local: result_local,
+                    value: else_value,
+                    span: expression.span(),
+                });
+                self.terminate(MirTerminator::Branch {
+                    target: self.blocks[merge_block].id,
+                    span: expression.span(),
+                });
+                self.current = merge_block;
+                self.push(MirInstruction::LoadLocal {
+                    output,
+                    local: result_local,
+                    span: expression.span(),
+                });
             }
             HirExpressionKind::ArrayLiteral(_)
             | HirExpressionKind::Index { .. }
@@ -1973,7 +2037,32 @@ fn lower_hir_function_with_control_flow(
     types: &TypeArena,
 ) -> Result<MirFunction, MirLoweringError> {
     let mut lowerer = ControlFlowLowerer::new(function, types);
-    lowerer.lower_sequence(function.control_flow())?;
+    if function.control_flow().is_empty() {
+        for local in function.locals() {
+            if let Some(initializer) = local.initializer() {
+                let value = lowerer.lower_expression(initializer)?;
+                if !lowerer.is_unit(local.ty()) {
+                    lowerer.push(MirInstruction::StoreLocal {
+                        local: MirLocalId::from_raw(local.id().index()),
+                        value,
+                        span: local.span(),
+                    });
+                }
+            }
+        }
+        let returned = function
+            .returns()
+            .first()
+            .ok_or(MirLoweringError::MissingReturn)?;
+        let value = lowerer.lower_expression(returned.expression())?;
+        if lowerer.is_unit(function.return_type()) {
+            lowerer.terminate(MirTerminator::return_unit(returned.span()));
+        } else {
+            lowerer.terminate(MirTerminator::return_value(value, returned.span()));
+        }
+    } else {
+        lowerer.lower_sequence(function.control_flow())?;
+    }
     let ControlFlowLowerer { blocks, locals, .. } = lowerer;
     let blocks = blocks
         .into_iter()
