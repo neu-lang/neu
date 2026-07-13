@@ -1,7 +1,9 @@
 package collections
 
+import "../core" as core
+
 // Initial iterator protocol; concrete adapters follow the accepted collection
 // borrowing and failure contracts.
 interface Iterator<T> {
-    func next(): T;
+    func next(): core.Option<T>;
 }
