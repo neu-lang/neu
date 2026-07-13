@@ -43,8 +43,7 @@ public func main(): Int { return 0 }
 
 #[test]
 fn compiles_core_numeric_utilities() {
-    let workspace =
-        std::env::temp_dir().join(format!("neu-core-numeric-{}", std::process::id()));
+    let workspace = std::env::temp_dir().join(format!("neu-core-numeric-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let source = r#"
@@ -89,6 +88,7 @@ fn compiles_core_numeric_utilities() {
     let _ = fs::remove_dir_all(workspace);
 }
 
+#[test]
 fn driver_validates_virtual_directory_project_before_compilation() {
     let graph = validate_virtual_project(
         "src/main.neu",
