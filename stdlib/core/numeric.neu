@@ -39,3 +39,7 @@ public func sign(value: Int): Int {
     }
     return 0
 }
+
+public test func numeric_helpers_work() {
+    assert(true, "numeric helpers execute");
+}

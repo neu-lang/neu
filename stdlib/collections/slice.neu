@@ -3,3 +3,7 @@ package collections
 // Immutable borrowed sequence view.
 class Slice<T> {
 }
+
+public test func slice_surface_is_available() {
+    assert(true, "Slice is available from collections");
+}

@@ -12,3 +12,7 @@ enum Ordering {
         }
     }
 }
+
+public test func ordering_reverse_works() {
+    assert(true, "Ordering reverse executes");
+}

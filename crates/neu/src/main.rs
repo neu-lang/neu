@@ -81,7 +81,7 @@ fn test(args: TestArgs) -> Result<(), String> {
     for (index, test) in project.tests().iter().enumerate() {
         let output = output_root.join(format!("test-{index}"));
         let executable = compile_source_to_test_executable(
-            project.source(),
+            test.source(),
             SourceDriverOptions::new(
                 project.source_file(),
                 project.module().clone(),

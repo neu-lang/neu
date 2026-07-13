@@ -60,6 +60,7 @@ pub struct TestMetadata {
     symbol: String,
     declaration: crate::ast::AstNodeId,
     span: crate::source::ByteSpan,
+    source: String,
 }
 
 impl TestMetadata {
@@ -73,6 +74,10 @@ impl TestMetadata {
 
     pub fn span(&self) -> crate::source::ByteSpan {
         self.span
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
     }
 }
 
@@ -132,6 +137,7 @@ pub fn discover_tests(
                 symbol,
                 declaration: function.declaration,
                 span,
+                source: String::new(),
             })
         })
         .collect::<Vec<_>>();
@@ -295,13 +301,64 @@ pub fn discover_manifest_tests(
     let sources = manifest
         .load_sources(&root)
         .map_err(DriverError::Manifest)?;
-    let entry = manifest
-        .entrypoint()
-        .map(ToOwned::to_owned)
-        .or_else(|| sources.first().map(|source| source.path().to_owned()))
-        .ok_or_else(|| {
-            DriverError::Manifest(crate::manifest::ManifestDiagnostic::missing_sources())
-        })?;
+    let entry = manifest.entrypoint().map(ToOwned::to_owned);
+    if entry.is_none() {
+        let graph = VirtualPackageGraph::build_library(
+            sources
+                .iter()
+                .map(|source| VirtualSource::new(source.path(), source.source())),
+        )
+        .map_err(DriverError::PackageGraph)?;
+        let module = ModuleName::parse(manifest.name()).expect("manifest name was validated");
+        let mut tests = Vec::new();
+        for source in &sources {
+            let source_file = graph
+                .files()
+                .iter()
+                .find(|file| file.path == source.path())
+                .map(|file| file.id)
+                .expect("library source is in the source graph");
+            let parsed = parser::parse_source(source_file, source.source());
+            if !parsed.lex_diagnostics.is_empty() {
+                return Err(DriverError::LexDiagnostics(parsed.lex_diagnostics));
+            }
+            if !parsed.diagnostics.is_empty() {
+                return Err(DriverError::ParseDiagnostics(parsed.diagnostics));
+            }
+            let mut discovered = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+            for test in &mut discovered {
+                test.source = source.source().to_owned();
+            }
+            tests.extend(discovered);
+        }
+        tests.sort_by(|left, right| {
+            left.symbol
+                .cmp(&right.symbol)
+                .then_with(|| left.span.start().cmp(&right.span.start()))
+        });
+        let (source, source_file) = sources
+            .first()
+            .map(|source| {
+                let id = graph
+                    .files()
+                    .iter()
+                    .find(|file| file.path == source.path())
+                    .unwrap()
+                    .id;
+                (source.source().to_owned(), id)
+            })
+            .ok_or_else(|| {
+                DriverError::Manifest(crate::manifest::ManifestDiagnostic::missing_sources())
+            })?;
+        return Ok(TestProject {
+            source,
+            source_file,
+            module,
+            package: PackageNamespace::root(),
+            tests,
+        });
+    }
+    let entry = entry.expect("entrypoint exists");
     let graph = VirtualPackageGraph::build_with_dependencies(entry.clone(), sources, dependencies)
         .map_err(DriverError::PackageGraph)?;
     let entry_file = graph
@@ -318,7 +375,10 @@ pub fn discover_manifest_tests(
     if !parsed.diagnostics.is_empty() {
         return Err(DriverError::ParseDiagnostics(parsed.diagnostics));
     }
-    let tests = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+    let mut tests = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+    for test in &mut tests {
+        test.source = source.clone();
+    }
     Ok(TestProject {
         source,
         source_file: entry_file.id,
