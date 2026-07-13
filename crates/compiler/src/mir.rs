@@ -1240,6 +1240,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             index: mir_expression_value_id(function, *index),
                             span: expression.span(),
                         });
+                    } else if types
+                        .get(array_expression.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::DynamicArray(_)))
+                    {
+                        instructions.push(MirInstruction::DynamicArrayLoad {
+                            output,
+                            array: mir_expression_value_id(function, *array),
+                            index: mir_expression_value_id(function, *index),
+                            span: expression.span(),
+                        });
                     } else {
                         let local = match array_expression.kind() {
                             HirExpressionKind::LocalRead(local) => *local,
