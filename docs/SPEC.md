@@ -1387,6 +1387,16 @@ protocol prerequisites and explicit failure results. None of these protocols
 implies `Copy`, `Send`, or `Share`, and protocol dispatch does not expose a
 public runtime or ABI representation.
 
+## Proposed ADR-0114: Collection Capacity And Allocation Failure
+
+Collection capacity is queried through ordinary APIs; allocators, pointers,
+layouts, and capacity tokens are not public. `reserve`, `shrink`, and
+growth-sensitive insertion have explicit `Result` contracts. Failed growth is
+atomic: it leaves logical contents and ownership unchanged, rather than
+partially mutating, discarding elements, or returning a nullable sentinel.
+Growth policy, relocation, alignment, and physical allocation remain
+compiler/runtime facts.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers
