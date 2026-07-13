@@ -2676,6 +2676,26 @@ impl FunctionSignature {
     }
 }
 
+pub fn specialize_function_signature_for_call(
+    signature: &FunctionSignature,
+    argument_types: &[TypeId],
+    arena: &mut TypeArena,
+) -> Option<FunctionSignature> {
+    if signature.generic_parameters().len() != argument_types.len() {
+        return None;
+    }
+    let mut substitution = GenericSubstitution::new();
+    for (parameter, argument) in signature
+        .generic_parameters()
+        .iter()
+        .copied()
+        .zip(argument_types.iter().copied())
+    {
+        substitution.insert(parameter, argument);
+    }
+    Some(signature.specialize(&substitution, arena))
+}
+
 impl ReturnPathReport {
     pub fn diagnostics(&self) -> &[ReturnPathDiagnostic] {
         &self.diagnostics

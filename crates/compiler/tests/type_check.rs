@@ -118,6 +118,21 @@ fn generic_function_signatures_resolve_type_parameters() {
     assert!(specialized.generic_parameters().is_empty());
     assert_eq!(specialized.parameter_types(), &[int_type]);
     assert_eq!(specialized.return_type(), int_type);
+    let specialized = compiler::type_check::specialize_function_signature_for_call(
+        &signatures[0],
+        &[int_type],
+        &mut types,
+    )
+    .unwrap();
+    assert_eq!(specialized.parameter_types(), &[int_type]);
+    assert!(
+        compiler::type_check::specialize_function_signature_for_call(
+            &signatures[0],
+            &[],
+            &mut types,
+        )
+        .is_none()
+    );
 }
 
 #[test]
