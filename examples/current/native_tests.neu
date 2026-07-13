@@ -1,0 +1,9 @@
+package examples.current
+
+public func main(): Int {
+    return 0;
+}
+
+public test func native_assertion_passes() {
+    assert(true, "the native assertion should pass");
+}
