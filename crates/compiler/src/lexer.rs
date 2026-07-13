@@ -82,7 +82,6 @@ pub enum TokenKind {
     RightBracket,
     Comma,
     Semicolon,
-    At,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -613,5 +612,4 @@ const OPERATORS_AND_DELIMITERS: &[(&str, TokenKind)] = &[
     ("]", TokenKind::RightBracket),
     (",", TokenKind::Comma),
     (";", TokenKind::Semicolon),
-    ("@", TokenKind::At),
 ];
