@@ -6,11 +6,13 @@ package collections
 enum Slice<T> {
     EmptySlice,
     OneSlice(T),
+    TwoSlice(T, T),
 
     func len(): Int {
         return when (this) {
             Slice.EmptySlice -> 0
             Slice.OneSlice(_) -> 1
+            Slice.TwoSlice(_, _) -> 2
         }
     }
 
@@ -20,6 +22,8 @@ enum Slice<T> {
 public test func slice_basics_work() {
     val empty: Slice<Int> = Slice.EmptySlice;
     val one: Slice<Int> = Slice.OneSlice(7);
+    val two: Slice<Int> = Slice.TwoSlice(7, 8);
     assert(empty.len() == 0, "empty slice has no elements");
     assert(one.len() == 1, "slice length counts the value");
+    assert(two.len() == 2, "slice length counts both values");
 }

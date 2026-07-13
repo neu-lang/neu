@@ -911,6 +911,19 @@ element type. Strings, nominal elements, nested dynamic arrays, indexing,
 slices, iterators, public layout, FFI, and user allocation APIs remain
 deferred.
 
+## ADR-0110: Pure-Neu Collection Foundation
+
+The first `neu.collections` surface is ordinary Neu code in the unified
+stdlib manifest. `Vector<T>` is an owning ordered sequence, `Slice<T>` is an
+immutable ordered view, and `Iterator<T>` is a single-pass protocol whose
+`next` operation returns `core.Option<T>`. Sequence order is deterministic and
+length operations do not depend on I/O or a compiler-provided collection ABI.
+The current algebraic implementations provide the accepted value-level
+representations; storage-backed views, borrow invalidation, checked indexing,
+removal results, and iterator adapters remain gated on the ownership and
+recoverable-error contracts in ADR-0110 and ADR-0111. Hash collections and
+specialized data structures are not part of this phase.
+
 ## ADR-0074: Nominal Fixed-Array Elements
 
 Fixed inline arrays may contain accepted class and interface values, including

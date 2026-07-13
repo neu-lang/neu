@@ -7,6 +7,8 @@ enum Vector<T> {
     Empty,
     One(T),
     Two(T, T),
+    Three(T, T, T),
+    Four(T, T, T, T),
     Storage(Array<T>),
 
     func len(): Int {
@@ -14,6 +16,8 @@ enum Vector<T> {
             Vector.Empty -> 0
             Vector.One(_) -> 1
             Vector.Two(_, _) -> 2
+            Vector.Three(_, _, _) -> 3
+            Vector.Four(_, _, _, _) -> 4
             Vector.Storage(values) -> values.size()
         }
     }
@@ -25,8 +29,12 @@ enum Vector<T> {
 public test func vector_basics_work() {
     val empty: Vector<Int> = Vector.Empty;
     val pair: Vector<Int> = Vector.Two(1, 2);
+    val triple: Vector<Int> = Vector.Three(1, 2, 3);
+    val quad: Vector<Int> = Vector.Four(1, 2, 3, 4);
     assert(empty.is_empty(), "empty vector has no elements");
     assert(pair.len() == 2, "vector length counts elements");
+    assert(triple.len() == 3, "three-element vector length counts elements");
+    assert(quad.len() == 4, "four-element vector length counts elements");
 }
 
 public test func vector_storage_operations_work() {

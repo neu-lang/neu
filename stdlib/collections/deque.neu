@@ -5,11 +5,15 @@ package collections
 enum Deque<T> {
     EmptyDeque,
     OneDeque(T),
+    TwoDeque(T, T),
+    ThreeDeque(T, T, T),
 
     func len(): Int {
         return when (this) {
             Deque.EmptyDeque -> 0
             Deque.OneDeque(_) -> 1
+            Deque.TwoDeque(_, _) -> 2
+            Deque.ThreeDeque(_, _, _) -> 3
         }
     }
 
@@ -19,6 +23,8 @@ enum Deque<T> {
 public test func deque_basics_work() {
     val empty: Deque<Int> = Deque.EmptyDeque;
     val one: Deque<Int> = Deque.OneDeque(3);
+    val three: Deque<Int> = Deque.ThreeDeque(1, 2, 3);
     assert(empty.is_empty(), "empty deque has no elements");
     assert(one.len() == 1, "deque length counts elements");
+    assert(three.len() == 3, "deque length counts all elements");
 }
