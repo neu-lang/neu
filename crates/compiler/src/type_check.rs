@@ -2999,6 +2999,7 @@ pub struct CapabilityBoundRecord {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GenericConstraintFailureKind {
     UnsatisfiedCapability,
+    UnsupportedCapability,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3135,7 +3136,14 @@ pub fn validate_capability_bounds(
             Some("Copy") => ThreadCapability::Copy,
             Some("Send") => ThreadCapability::Send,
             Some("Share") => ThreadCapability::Share,
-            Some(_) | None => continue,
+            Some(_) | None => {
+                diagnostics.push(GenericConstraintDiagnostic {
+                    parameter: bound.parameter(),
+                    bound: bound.bound(),
+                    kind: GenericConstraintFailureKind::UnsupportedCapability,
+                });
+                continue;
+            }
         };
         let Some(argument) = substitution.get(bound.ty()) else {
             continue;

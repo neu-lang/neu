@@ -439,6 +439,29 @@ fn copy_capability_bounds_reject_move_only_values() {
 }
 
 #[test]
+fn unsupported_capability_bounds_are_reported() {
+    let parsed = parse_source(SourceFileId::from_raw(505), "struct Box<T: Clone> {}");
+    assert!(parsed.diagnostics.is_empty());
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let parameter_types =
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds =
+        build_capability_bound_records(&parsed.generic_parameters, &parameter_types, &mut symbols);
+    let int_type = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(parameter_types[0].ty(), int_type);
+
+    let diagnostics =
+        compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].kind(),
+        GenericConstraintFailureKind::UnsupportedCapability
+    );
+}
+
+#[test]
 fn function_type_metadata_resolves_to_structural_type_identity() {
     let parsed = parse_source(
         SourceFileId::from_raw(503),
