@@ -106,6 +106,10 @@ pub fn lower_mir_function_to_cranelift(
         .to_string())
 }
 
+/// Render lowered MIR as formatted CLIF for explicit inspection and tests.
+///
+/// Executable compilation uses `emit_mir_module_to_object` instead, so normal
+/// builds do not allocate formatted CLIF strings.
 pub fn lower_mir_module_to_cranelift(
     module: &MirModule,
     type_arena: &TypeArena,
