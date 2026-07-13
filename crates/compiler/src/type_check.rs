@@ -463,6 +463,34 @@ pub struct FunctionSignature {
     parameter_types: Vec<TypeId>,
     return_type: TypeId,
     is_suspend: bool,
+    generic_parameters: Vec<TypeId>,
+    generic_bounds: Vec<GenericCapabilityBound>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenericCapabilityBound {
+    parameter_node: AstNodeId,
+    parameter: TypeId,
+    bound: AstNodeId,
+    name: String,
+}
+
+impl GenericCapabilityBound {
+    pub fn parameter_node(&self) -> AstNodeId {
+        self.parameter_node
+    }
+
+    pub fn parameter(&self) -> TypeId {
+        self.parameter
+    }
+
+    pub fn bound(&self) -> AstNodeId {
+        self.bound
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2622,6 +2650,8 @@ impl FunctionSignature {
             parameter_types,
             return_type,
             is_suspend: false,
+            generic_parameters: Vec::new(),
+            generic_bounds: Vec::new(),
         }
     }
 
@@ -2641,6 +2671,34 @@ impl FunctionSignature {
         self.is_suspend
     }
 
+    pub fn generic_parameters(&self) -> &[TypeId] {
+        &self.generic_parameters
+    }
+
+    pub fn generic_bounds(&self) -> &[GenericCapabilityBound] {
+        &self.generic_bounds
+    }
+
+    pub fn with_generic_parameters(mut self, parameters: Vec<TypeId>) -> Self {
+        self.generic_parameters = parameters;
+        self
+    }
+
+    pub fn specialize(&self, substitution: &GenericSubstitution, arena: &mut TypeArena) -> Self {
+        Self {
+            declaration: self.declaration,
+            parameter_types: self
+                .parameter_types
+                .iter()
+                .map(|ty| substitution.apply(*ty, arena))
+                .collect(),
+            return_type: substitution.apply(self.return_type, arena),
+            is_suspend: self.is_suspend,
+            generic_parameters: Vec::new(),
+            generic_bounds: Vec::new(),
+        }
+    }
+
     pub fn with_suspend(mut self, is_suspend: bool) -> Self {
         self.is_suspend = is_suspend;
         self
@@ -2649,6 +2707,89 @@ impl FunctionSignature {
     pub fn prepend_parameter_type(&mut self, parameter_type: TypeId) {
         self.parameter_types.insert(0, parameter_type);
     }
+}
+
+pub fn specialize_function_signature_for_call(
+    signature: &FunctionSignature,
+    argument_types: &[TypeId],
+    arena: &mut TypeArena,
+) -> Option<FunctionSignature> {
+    if signature.generic_parameters().len() != argument_types.len() {
+        return None;
+    }
+    let mut substitution = GenericSubstitution::new();
+    for (parameter, argument) in signature
+        .generic_parameters()
+        .iter()
+        .copied()
+        .zip(argument_types.iter().copied())
+    {
+        substitution.insert(parameter, argument);
+    }
+    Some(signature.specialize(&substitution, arena))
+}
+
+pub fn validate_function_signature_bounds(
+    signature: &FunctionSignature,
+    argument_types: &[TypeId],
+    types: &TypeArena,
+) -> Vec<GenericConstraintDiagnostic> {
+    if signature.generic_parameters().len() != argument_types.len() {
+        return Vec::new();
+    }
+    let mut substitution = GenericSubstitution::new();
+    for (parameter, argument) in signature
+        .generic_parameters()
+        .iter()
+        .copied()
+        .zip(argument_types.iter().copied())
+    {
+        substitution.insert(parameter, argument);
+    }
+    signature
+        .generic_bounds()
+        .iter()
+        .filter_map(|bound| {
+            let capability = match bound.name() {
+                "Copy" => ThreadCapability::Copy,
+                "Send" => ThreadCapability::Send,
+                "Share" => ThreadCapability::Share,
+                _ => {
+                    return Some(GenericConstraintDiagnostic {
+                        parameter: bound.parameter_node(),
+                        bound: bound.bound(),
+                        kind: GenericConstraintFailureKind::UnsupportedCapability,
+                    });
+                }
+            };
+            let argument = substitution.get(bound.parameter())?;
+            (!satisfies_thread_capability(types, argument, capability)).then_some(
+                GenericConstraintDiagnostic {
+                    parameter: bound.parameter_node(),
+                    bound: bound.bound(),
+                    kind: GenericConstraintFailureKind::UnsatisfiedCapability,
+                },
+            )
+        })
+        .collect()
+}
+
+pub fn specialize_function_signature_checked(
+    signature: &FunctionSignature,
+    argument_types: &[TypeId],
+    arena: &mut TypeArena,
+) -> Result<FunctionSignature, Vec<GenericConstraintDiagnostic>> {
+    let diagnostics = validate_function_signature_bounds(signature, argument_types, arena);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    specialize_function_signature_for_call(signature, argument_types, arena).ok_or_else(|| {
+        vec![GenericConstraintDiagnostic {
+            parameter: signature.declaration,
+            bound: signature.declaration,
+            kind: GenericConstraintFailureKind::ArgumentCountMismatch,
+        }]
+    })
 }
 
 impl ReturnPathReport {
@@ -2999,6 +3140,8 @@ pub struct CapabilityBoundRecord {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GenericConstraintFailureKind {
     UnsatisfiedCapability,
+    UnsupportedCapability,
+    ArgumentCountMismatch,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3132,9 +3275,17 @@ pub fn validate_capability_bounds(
     let mut diagnostics = Vec::new();
     for bound in bounds {
         let capability = match symbols.resolve(bound.symbol()) {
+            Some("Copy") => ThreadCapability::Copy,
             Some("Send") => ThreadCapability::Send,
             Some("Share") => ThreadCapability::Share,
-            Some(_) | None => continue,
+            Some(_) | None => {
+                diagnostics.push(GenericConstraintDiagnostic {
+                    parameter: bound.parameter(),
+                    bound: bound.bound(),
+                    kind: GenericConstraintFailureKind::UnsupportedCapability,
+                });
+                continue;
+            }
         };
         let Some(argument) = substitution.get(bound.ty()) else {
             continue;
@@ -3515,8 +3666,6 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
                 AstNodeKind::ImportDeclaration
                     | AstNodeKind::StructDeclaration
                     | AstNodeKind::NullableType
-                    | AstNodeKind::GenericParameter
-                    | AstNodeKind::CapabilityBound
                     | AstNodeKind::GroupedType
             )
         })
@@ -3540,6 +3689,10 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
                         reference.name.as_str(),
                         "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte" | "Channel" | "Task"
                     )
+                    && !parsed
+                        .generic_parameters
+                        .iter()
+                        .any(|parameter| parameter.name == reference.name)
                     && !parsed
                         .class_declarations
                         .iter()
@@ -3662,20 +3815,74 @@ pub fn type_function_signatures_in_with_classes(
     array_types: &[ParsedArrayType],
     classes: &[ClassTypeRecord],
 ) -> Vec<FunctionSignature> {
+    type_function_signatures_in_with_classes_and_generics(
+        arena,
+        functions,
+        parameters,
+        type_name_references,
+        array_types,
+        classes,
+        &[],
+    )
+}
+
+pub fn type_function_signatures_in_with_generics(
+    arena: &mut TypeArena,
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    classes: &[ClassTypeRecord],
+    generic_parameters: &[ParsedGenericParameter],
+) -> Vec<FunctionSignature> {
+    type_function_signatures_in_with_classes_and_generics(
+        arena,
+        functions,
+        parameters,
+        type_name_references,
+        array_types,
+        classes,
+        generic_parameters,
+    )
+}
+
+fn type_function_signatures_in_with_classes_and_generics(
+    arena: &mut TypeArena,
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    classes: &[ClassTypeRecord],
+    generic_parameters: &[ParsedGenericParameter],
+) -> Vec<FunctionSignature> {
     let primitives = PrimitiveTypeIds::module_owned(arena);
+    let mut symbols = SymbolInterner::new();
+    let generic_parameter_types =
+        build_generic_parameter_types(generic_parameters, &mut symbols, arena);
     let mut signatures = Vec::new();
 
     for function in functions {
+        let generic_types: Vec<_> = generic_parameters
+            .iter()
+            .filter(|parameter| parameter.owner == Some(function.declaration))
+            .filter_map(|parameter| {
+                generic_parameter_types
+                    .iter()
+                    .find(|record| record.parameter() == parameter.parameter)
+                    .map(|record| (parameter.name.as_str(), record.ty()))
+            })
+            .collect();
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        let Some(return_type) = resolve_annotation_type(
+        let Some(return_type) = resolve_annotation_type_with_generics(
             return_annotation,
             type_name_references,
             array_types,
             &primitives,
             classes,
             arena,
+            &generic_types,
         ) else {
             continue;
         };
@@ -3686,13 +3893,14 @@ pub fn type_function_signatures_in_with_classes(
         let Some(parameter_types) = function_parameters
             .iter()
             .map(|parameter| {
-                resolve_annotation_type(
+                resolve_annotation_type_with_generics(
                     parameter.annotation,
                     type_name_references,
                     array_types,
                     &primitives,
                     classes,
                     arena,
+                    &generic_types,
                 )
             })
             .collect::<Option<Vec<_>>>()
@@ -3704,6 +3912,30 @@ pub fn type_function_signatures_in_with_classes(
             parameter_types,
             return_type,
             is_suspend: function.is_suspend,
+            generic_parameters: generic_types.iter().map(|(_, ty)| *ty).collect(),
+            generic_bounds: generic_parameters
+                .iter()
+                .filter(|parameter| parameter.owner == Some(function.declaration))
+                .flat_map(|parameter| {
+                    let Some(ty) = generic_parameter_types
+                        .iter()
+                        .find(|record| record.parameter() == parameter.parameter)
+                        .map(|record| record.ty())
+                    else {
+                        return Vec::new();
+                    };
+                    parameter
+                        .capability_bounds
+                        .iter()
+                        .map(|bound| GenericCapabilityBound {
+                            parameter_node: parameter.parameter,
+                            parameter: ty,
+                            bound: bound.bound,
+                            name: bound.name.clone(),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect(),
         });
     }
 
@@ -4663,6 +4895,34 @@ fn resolve_annotation_type(
         arena,
     )?;
     Some(arena.array(element, array.length?))
+}
+
+fn resolve_annotation_type_with_generics(
+    annotation: AstNodeId,
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    primitives: &PrimitiveTypeIds,
+    classes: &[ClassTypeRecord],
+    arena: &mut TypeArena,
+    generic_types: &[(&str, TypeId)],
+) -> Option<TypeId> {
+    if let Some(reference) = type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)
+        && let Some((_, ty)) = generic_types
+            .iter()
+            .find(|(name, _)| *name == reference.name)
+    {
+        return Some(*ty);
+    }
+    resolve_annotation_type(
+        annotation,
+        type_name_references,
+        array_types,
+        primitives,
+        classes,
+        arena,
+    )
 }
 
 pub fn type_array_expressions(

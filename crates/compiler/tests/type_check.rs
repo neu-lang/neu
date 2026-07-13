@@ -17,9 +17,9 @@ use compiler::{
     type_check::{
         AmbiguousTypeRule, AssignmentCheck, CompileTimeValue, DeclarationSignature,
         DirectCallDiagnosticKind, EligibleNullTestRefinement, EntryPointDiagnosticKind,
-        EntryPointFile, ExecutableSourceTypes, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
-        RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
+        EntryPointFile, ExecutableSourceTypes, ExpressionType, GenericConstraintFailureKind,
+        KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
+        RecognizedNullTest, RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
         ReturnTypeDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
         TypeRuleDiagnostic, apply_direct_call_results, build_capability_bound_records,
         build_generic_parameter_types, check_direct_calls, check_entry_point,
@@ -76,6 +76,91 @@ fn const_expression_produces_a_typed_compile_time_fact() {
     assert_eq!(
         report.compile_time_constants()[0].value(),
         CompileTimeValue::Int(3)
+    );
+}
+
+#[test]
+fn generic_function_signatures_resolve_type_parameters() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(506),
+        "func identity<T: Copy>(value: T): T { return value; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = TypeArena::new();
+    let signatures = compiler::type_check::type_function_signatures_in_with_generics(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.array_types,
+        &[],
+        &parsed.generic_parameters,
+    );
+
+    assert_eq!(signatures.len(), 1);
+    assert_eq!(signatures[0].generic_parameters().len(), 1);
+    assert_eq!(signatures[0].generic_bounds().len(), 1);
+    assert_eq!(signatures[0].generic_bounds()[0].name(), "Copy");
+    assert_eq!(signatures[0].parameter_types().len(), 1);
+    assert!(matches!(
+        types
+            .get(signatures[0].parameter_types()[0])
+            .unwrap()
+            .kind(),
+        TypeKind::GenericParameter(_)
+    ));
+    assert!(matches!(
+        types.get(signatures[0].return_type()).unwrap().kind(),
+        TypeKind::GenericParameter(_)
+    ));
+    let int_type = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(signatures[0].generic_parameters()[0], int_type);
+    let specialized = signatures[0].specialize(&substitution, &mut types);
+    assert!(specialized.generic_parameters().is_empty());
+    assert_eq!(specialized.parameter_types(), &[int_type]);
+    assert_eq!(specialized.return_type(), int_type);
+    let specialized = compiler::type_check::specialize_function_signature_for_call(
+        &signatures[0],
+        &[int_type],
+        &mut types,
+    )
+    .unwrap();
+    assert_eq!(specialized.parameter_types(), &[int_type]);
+    assert!(
+        compiler::type_check::specialize_function_signature_for_call(
+            &signatures[0],
+            &[],
+            &mut types,
+        )
+        .is_none()
+    );
+    let string_type = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let diagnostics = compiler::type_check::validate_function_signature_bounds(
+        &signatures[0],
+        &[string_type],
+        &types,
+    );
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].kind(),
+        GenericConstraintFailureKind::UnsatisfiedCapability
+    );
+    assert!(
+        compiler::type_check::specialize_function_signature_checked(
+            &signatures[0],
+            &[string_type],
+            &mut types,
+        )
+        .is_err()
+    );
+    assert!(
+        compiler::type_check::specialize_function_signature_checked(
+            &signatures[0],
+            &[int_type],
+            &mut types,
+        )
+        .is_ok()
     );
 }
 
@@ -413,6 +498,52 @@ fn capability_bounds_are_checked_after_substitution() {
         compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].bound(), bounds[1].bound());
+}
+
+#[test]
+fn copy_capability_bounds_reject_move_only_values() {
+    let parsed = parse_source(SourceFileId::from_raw(504), "struct Box<T: Copy> {}");
+    assert!(parsed.diagnostics.is_empty());
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let parameter_types =
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds =
+        build_capability_bound_records(&parsed.generic_parameters, &parameter_types, &mut symbols);
+    let string_type = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(parameter_types[0].ty(), string_type);
+
+    let diagnostics =
+        compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].kind(),
+        GenericConstraintFailureKind::UnsatisfiedCapability
+    );
+}
+
+#[test]
+fn unsupported_capability_bounds_are_reported() {
+    let parsed = parse_source(SourceFileId::from_raw(505), "struct Box<T: Clone> {}");
+    assert!(parsed.diagnostics.is_empty());
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let parameter_types =
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds =
+        build_capability_bound_records(&parsed.generic_parameters, &parameter_types, &mut symbols);
+    let int_type = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(parameter_types[0].ty(), int_type);
+
+    let diagnostics =
+        compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].kind(),
+        GenericConstraintFailureKind::UnsupportedCapability
+    );
 }
 
 #[test]
@@ -4871,4 +5002,17 @@ fn unsupported_executable_forms_report_outermost_source_spans() {
             .unwrap()
             .span
     );
+}
+
+#[test]
+fn accepted_generic_declarations_are_not_marked_as_unsupported_forms() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(130),
+        "func identity<T: Copy>(value: T): T { return value; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let report = check_unsupported_executable_forms(&parsed);
+
+    assert!(report.diagnostics().is_empty());
 }

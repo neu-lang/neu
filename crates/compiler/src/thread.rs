@@ -6,6 +6,7 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ThreadCapability {
+    Copy,
     Send,
     Share,
 }
@@ -224,7 +225,11 @@ pub fn satisfies_thread_capability(
             | PrimitiveType::Byte,
         ) => true,
         TypeKind::Primitive(PrimitiveType::Null) => true,
-        TypeKind::Function(_) => true,
+        TypeKind::Function(_) => {
+            capability == ThreadCapability::Copy
+                || capability == ThreadCapability::Send
+                || capability == ThreadCapability::Share
+        }
         TypeKind::Primitive(PrimitiveType::String) => capability == ThreadCapability::Send,
         TypeKind::Nullable(nullable) => {
             satisfies_thread_capability(types, nullable.base(), capability)
@@ -238,7 +243,7 @@ pub fn satisfies_thread_capability(
             false
         }
         TypeKind::Task(_) => false,
-        TypeKind::Channel(_) => true,
+        TypeKind::Channel(_) => capability != ThreadCapability::Copy,
         TypeKind::ChannelResult(result) => {
             satisfies_thread_capability(types, result.element(), capability)
         }
