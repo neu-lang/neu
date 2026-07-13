@@ -99,6 +99,8 @@ fn generic_function_signatures_resolve_type_parameters() {
 
     assert_eq!(signatures.len(), 1);
     assert_eq!(signatures[0].generic_parameters().len(), 1);
+    assert_eq!(signatures[0].generic_bounds().len(), 1);
+    assert_eq!(signatures[0].generic_bounds()[0].name(), "Copy");
     assert_eq!(signatures[0].parameter_types().len(), 1);
     assert!(matches!(
         types

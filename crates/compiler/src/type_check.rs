@@ -464,6 +464,28 @@ pub struct FunctionSignature {
     return_type: TypeId,
     is_suspend: bool,
     generic_parameters: Vec<TypeId>,
+    generic_bounds: Vec<GenericCapabilityBound>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenericCapabilityBound {
+    parameter: TypeId,
+    bound: AstNodeId,
+    name: String,
+}
+
+impl GenericCapabilityBound {
+    pub fn parameter(&self) -> TypeId {
+        self.parameter
+    }
+
+    pub fn bound(&self) -> AstNodeId {
+        self.bound
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2624,6 +2646,7 @@ impl FunctionSignature {
             return_type,
             is_suspend: false,
             generic_parameters: Vec::new(),
+            generic_bounds: Vec::new(),
         }
     }
 
@@ -2647,6 +2670,10 @@ impl FunctionSignature {
         &self.generic_parameters
     }
 
+    pub fn generic_bounds(&self) -> &[GenericCapabilityBound] {
+        &self.generic_bounds
+    }
+
     pub fn with_generic_parameters(mut self, parameters: Vec<TypeId>) -> Self {
         self.generic_parameters = parameters;
         self
@@ -2663,6 +2690,7 @@ impl FunctionSignature {
             return_type: substitution.apply(self.return_type, arena),
             is_suspend: self.is_suspend,
             generic_parameters: Vec::new(),
+            generic_bounds: Vec::new(),
         }
     }
 
@@ -3816,6 +3844,28 @@ fn type_function_signatures_in_with_classes_and_generics(
             return_type,
             is_suspend: function.is_suspend,
             generic_parameters: generic_types.iter().map(|(_, ty)| *ty).collect(),
+            generic_bounds: generic_parameters
+                .iter()
+                .filter(|parameter| parameter.owner == Some(function.declaration))
+                .flat_map(|parameter| {
+                    let Some(ty) = generic_parameter_types
+                        .iter()
+                        .find(|record| record.parameter() == parameter.parameter)
+                        .map(|record| record.ty())
+                    else {
+                        return Vec::new();
+                    };
+                    parameter
+                        .capability_bounds
+                        .iter()
+                        .map(|bound| GenericCapabilityBound {
+                            parameter: ty,
+                            bound: bound.bound,
+                            name: bound.name.clone(),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect(),
         });
     }
 
