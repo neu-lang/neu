@@ -363,6 +363,21 @@ impl VirtualSource {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VirtualDependency {
+    url: String,
+    sources: Vec<VirtualSource>,
+}
+
+impl VirtualDependency {
+    pub fn new(url: impl Into<String>, sources: impl IntoIterator<Item = VirtualSource>) -> Self {
+        Self {
+            url: url.into(),
+            sources: sources.into_iter().collect(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PackageGraphDiagnosticKind {
     InvalidSourcePath,
@@ -425,9 +440,37 @@ impl VirtualPackageGraph {
         Self::build_with_entry(None, sources)
     }
 
+    pub fn build_with_dependencies(
+        entry: impl Into<PathBuf>,
+        sources: impl IntoIterator<Item = VirtualSource>,
+        dependencies: impl IntoIterator<Item = VirtualDependency>,
+    ) -> Result<Self, Vec<PackageGraphDiagnostic>> {
+        let mut all_sources: Vec<_> = sources.into_iter().collect();
+        let mut roots = BTreeMap::new();
+        for (index, dependency) in dependencies.into_iter().enumerate() {
+            let prefix = PathBuf::from(format!(".neu-deps/{index}"));
+            roots.insert(dependency.url, prefix.clone());
+            all_sources.extend(
+                dependency
+                    .sources
+                    .into_iter()
+                    .map(|source| VirtualSource::new(prefix.join(source.path()), source.source())),
+            );
+        }
+        Self::build_with_entry_and_dependencies(Some(entry.into()), all_sources, roots)
+    }
+
     fn build_with_entry(
         entry_input: Option<PathBuf>,
         sources: impl IntoIterator<Item = VirtualSource>,
+    ) -> Result<Self, Vec<PackageGraphDiagnostic>> {
+        Self::build_with_entry_and_dependencies(entry_input, sources, BTreeMap::new())
+    }
+
+    fn build_with_entry_and_dependencies(
+        entry_input: Option<PathBuf>,
+        sources: impl IntoIterator<Item = VirtualSource>,
+        dependency_roots: BTreeMap<String, PathBuf>,
     ) -> Result<Self, Vec<PackageGraphDiagnostic>> {
         let (entry, root) = match entry_input {
             Some(entry_input) => {
@@ -469,7 +512,12 @@ impl VirtualPackageGraph {
                     continue;
                 }
             };
-            if !path.starts_with(&root) && root != Path::new("") {
+            if !path.starts_with(&root)
+                && root != Path::new("")
+                && !dependency_roots
+                    .values()
+                    .any(|prefix| path.starts_with(prefix))
+            {
                 diagnostics.push(PackageGraphDiagnostic {
                     kind: PackageGraphDiagnosticKind::SourceOutsideRoot,
                     path,
@@ -601,16 +649,20 @@ impl VirtualPackageGraph {
                         detail: alias.clone(),
                     });
                 }
-                if !import.path.starts_with('.') {
-                    diagnostics.push(PackageGraphDiagnostic {
-                        kind: PackageGraphDiagnosticKind::FileImport,
-                        path: file_path.clone(),
-                        detail: import.path.clone(),
-                    });
-                    continue;
-                }
-                let Some(directory) = resolve_import_directory(&file_path, &import.path, &root)
-                else {
+                let directory = if import.path.starts_with('.') {
+                    resolve_import_directory(&file_path, &import.path, &root)
+                } else {
+                    dependency_roots.iter().find_map(|(url, prefix)| {
+                        let repository = url.strip_suffix(".git").unwrap_or(url);
+                        let repository = repository.strip_prefix("https://").unwrap_or(repository);
+                        let suffix = import
+                            .path
+                            .strip_prefix(repository)?
+                            .trim_start_matches('/');
+                        Some(prefix.join(suffix))
+                    })
+                };
+                let Some(directory) = directory else {
                     diagnostics.push(PackageGraphDiagnostic {
                         kind: PackageGraphDiagnosticKind::ImportPathTraversal,
                         path: file_path.clone(),

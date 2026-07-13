@@ -155,8 +155,8 @@ pub fn compile_manifest_to_executable_for_target(
     let manifest_path = manifest_path.as_ref();
     let resolver = crate::dependency::GitDependencyResolver::from_environment()
         .map_err(DriverError::Dependency)?;
-    resolver
-        .resolve_project(manifest_path)
+    let dependencies = resolver
+        .load_project_dependencies(manifest_path)
         .map_err(DriverError::Dependency)?;
     let (manifest, root) =
         crate::manifest::ProjectManifest::load(manifest_path).map_err(DriverError::Manifest)?;
@@ -167,7 +167,8 @@ pub fn compile_manifest_to_executable_for_target(
         .require_entrypoint()
         .map_err(DriverError::Manifest)?
         .to_path_buf();
-    let graph = validate_virtual_project(entry.clone(), sources)?;
+    let graph = VirtualPackageGraph::build_with_dependencies(entry.clone(), sources, dependencies)
+        .map_err(DriverError::PackageGraph)?;
     let entry_file = graph
         .files()
         .iter()

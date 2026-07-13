@@ -3,8 +3,8 @@ use std::path::Path;
 
 use compiler::module::{
     DeclarationVisibility, ModuleDiagnosticKind, ModuleMetadata, ModuleName,
-    PackageGraphDiagnosticKind, PackageNamespace, VirtualPackageGraph, VirtualSource,
-    VisibilityCategory, VisibilityOrigin,
+    PackageGraphDiagnosticKind, PackageNamespace, VirtualDependency, VirtualPackageGraph,
+    VirtualSource, VisibilityCategory, VisibilityOrigin,
 };
 use compiler::source::{SourceDatabase, SourceFileId};
 
@@ -226,6 +226,33 @@ fn library_package_graph_indexes_all_root_packages_without_an_entrypoint() {
     assert_eq!(graph.packages().len(), 1);
     assert_eq!(graph.packages()[0].identity, "core");
     assert_eq!(graph.packages()[0].files.len(), 2);
+}
+
+#[test]
+fn resolves_declared_url_dependency_imports() {
+    let graph = VirtualPackageGraph::build_with_dependencies(
+        "src/main.neu",
+        [VirtualSource::new(
+            "src/main.neu",
+            "import \"github.com/example/lib/core\" as core\nfunc main() { core.value(); }",
+        )],
+        [VirtualDependency::new(
+            "https://github.com/example/lib.git",
+            [VirtualSource::new(
+                "core/value.neu",
+                "package core\npublic func value();",
+            )],
+        )],
+    )
+    .unwrap();
+
+    assert_eq!(graph.packages().len(), 2);
+    assert!(
+        graph
+            .packages()
+            .iter()
+            .any(|package| package.identity == "core")
+    );
 }
 
 #[test]
