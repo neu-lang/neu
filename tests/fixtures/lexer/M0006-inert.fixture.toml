@@ -1,7 +1,0 @@
-kind = "inert-lexer-fixture"
-milestone = "M0006"
-compiler_behavior = "none"
-source = "docs/milestones/M0006-token-model-and-lexer-fixtures.md"
-lexical_grammar_status = "blocked"
-purpose = "Proves lexer fixture metadata exists without encoding source text, token categories, or expected token streams."
-
