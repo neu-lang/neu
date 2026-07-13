@@ -663,12 +663,6 @@ fn compile_source_with_entry(
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     diagnose_unresolved_types(&parsed, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
-    let intrinsic_diagnostics =
-        validate_intrinsic_calls(&parsed, report.expression_types(), &types);
-    if !intrinsic_diagnostics.is_empty() {
-        return Err(DriverError::IntrinsicDiagnostics(intrinsic_diagnostics));
-    }
-    apply_intrinsic_call_facts(&parsed, &mut report, &types);
     let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed
@@ -699,6 +693,12 @@ fn compile_source_with_entry(
         ));
     }
     apply_direct_call_results(&mut report, &parsed, &calls);
+    let intrinsic_diagnostics =
+        validate_intrinsic_calls(&parsed, report.expression_types(), &types);
+    if !intrinsic_diagnostics.is_empty() {
+        return Err(DriverError::IntrinsicDiagnostics(intrinsic_diagnostics));
+    }
+    apply_intrinsic_call_facts(&parsed, &mut report, &types);
     let conditional_report = type_value_conditionals(&parsed, report.expression_types(), &types);
     apply_value_conditional_results(&mut report, &conditional_report);
     let mut string_after_when = crate::type_check::TypeCheckReport::new();

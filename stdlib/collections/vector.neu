@@ -4,7 +4,3 @@ package collections
 // ownership, iterator, protocol, and allocation contracts.
 class Vector<T> {
 }
-
-public test func vector_surface_is_available() {
-    assert(true, "Vector is available from collections");
-}

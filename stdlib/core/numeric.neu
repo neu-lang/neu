@@ -41,5 +41,9 @@ public func sign(value: Int): Int {
 }
 
 public test func numeric_helpers_work() {
-    assert(true, "numeric helpers execute");
+    assert(min(3, 5) == 3, "min selects the lower value");
+    assert(max(3, 5) == 5, "max selects the higher value");
+    assert(clamp(9, 0, 5) == 5, "clamp applies the upper bound");
+    assert(abs(-7) == 7, "abs removes a negative sign");
+    assert(sign(-2) == -1, "sign reports negative values");
 }

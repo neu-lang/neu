@@ -162,6 +162,7 @@ pub fn validate_intrinsic_calls(
             .map(|record| record.id())
     };
     let bool_type = primitive(PrimitiveType::Bool);
+    let int_type = primitive(PrimitiveType::Int);
     let string_type = primitive(PrimitiveType::String);
     let mut diagnostics = Vec::new();
     for call in &parsed.call_expressions {
@@ -192,13 +193,34 @@ pub fn validate_intrinsic_calls(
             });
             continue;
         }
-        if name == "assert"
-            && expression_types
-                .iter()
-                .find(|entry| entry.expression() == call.arguments[0])
-                .map(|entry| entry.ty())
-                != bool_type
-        {
+        let condition_is_bool = expression_types
+            .iter()
+            .find(|entry| entry.expression() == call.arguments[0])
+            .map(|entry| entry.ty())
+            == bool_type
+            || parsed.binary_expressions.iter().any(|binary| {
+                binary.expression == call.arguments[0]
+                    && matches!(
+                        binary.operator,
+                        ParsedBinaryOperator::Equal
+                            | ParsedBinaryOperator::NotEqual
+                            | ParsedBinaryOperator::Less
+                            | ParsedBinaryOperator::Greater
+                            | ParsedBinaryOperator::LessEqual
+                            | ParsedBinaryOperator::GreaterEqual
+                    )
+                    && expression_types
+                        .iter()
+                        .find(|entry| entry.expression() == binary.left)
+                        .map(|entry| entry.ty())
+                        == int_type
+                    && expression_types
+                        .iter()
+                        .find(|entry| entry.expression() == binary.right)
+                        .map(|entry| entry.ty())
+                        == int_type
+            });
+        if name == "assert" && !condition_is_bool {
             diagnostics.push(IntrinsicDiagnostic {
                 kind: IntrinsicDiagnosticKind::ConditionType,
                 span,

@@ -17,7 +17,3 @@ enum Option<T> {
         }
     }
 }
-
-public test func option_predicates_work() {
-    assert(true, "Option predicates execute");
-}

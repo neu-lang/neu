@@ -17,7 +17,3 @@ enum Result<T, E> {
         }
     }
 }
-
-public test func result_predicates_work() {
-    assert(true, "Result predicates execute");
-}
