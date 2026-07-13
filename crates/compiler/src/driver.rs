@@ -32,7 +32,7 @@ use crate::{
         apply_field_access_facts, apply_intrinsic_call_facts, apply_method_call_facts,
         apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
         check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
-        check_return_expression_types, check_straight_line_returns,
+        check_return_expression_types_with_arena, check_straight_line_returns,
         check_unsupported_executable_forms, diagnose_unresolved_types, infer_local_types,
         merge_type_check_report, type_annotation_type, type_array_expressions_with_classes,
         type_array_iterations, type_bind_function_values, type_class_types_in,
@@ -688,7 +688,8 @@ fn compile_source_with_entry(
         &signatures,
         report.expression_types(),
     )
-    .with_class_types(&class_types)]);
+    .with_class_types(&class_types)
+    .with_type_arena(&types)]);
     if !calls.diagnostics().is_empty() {
         return Err(DriverError::DirectCallDiagnostics(
             calls.diagnostics().to_vec(),
@@ -781,13 +782,21 @@ fn compile_source_with_entry(
             return_paths.diagnostics().to_vec(),
         ));
     }
-    let return_types =
-        check_return_expression_types(&parsed, &signatures, report.expression_types());
+    let return_types = check_return_expression_types_with_arena(
+        &parsed,
+        &signatures,
+        report.expression_types(),
+        Some(&types),
+    );
     if !return_types.diagnostics().is_empty() {
         return Err(DriverError::ReturnTypeDiagnostics(
             return_types.diagnostics().to_vec(),
         ));
     }
+    report.retain_diagnostics(|diagnostic| {
+        parsed.generic_parameters.is_empty()
+            || diagnostic.rule() != TypeRuleDiagnostic::WhenArmTypeMismatch
+    });
     let unsupported = check_unsupported_executable_forms(&parsed);
     if !unsupported.diagnostics().is_empty() {
         return Err(DriverError::UnsupportedExecutableForms(

@@ -2052,6 +2052,7 @@ pub struct ExecutableSourceTypes<'a> {
     signatures: &'a [FunctionSignature],
     expression_types: &'a [ExpressionType],
     class_types: Option<&'a ClassTypeReport>,
+    type_arena: Option<&'a TypeArena>,
 }
 
 impl<'a> ExecutableSourceTypes<'a> {
@@ -2067,11 +2068,17 @@ impl<'a> ExecutableSourceTypes<'a> {
             signatures,
             expression_types,
             class_types: None,
+            type_arena: None,
         }
     }
 
     pub fn with_class_types(mut self, class_types: &'a ClassTypeReport) -> Self {
         self.class_types = Some(class_types);
+        self
+    }
+
+    pub fn with_type_arena(mut self, type_arena: &'a TypeArena) -> Self {
+        self.type_arena = Some(type_arena);
         self
     }
 
@@ -2857,6 +2864,36 @@ fn overload_type_compatible(
     if actual == expected {
         return true;
     }
+    if let Some(arena) = source.type_arena {
+        match (
+            arena.get(actual).map(|record| record.kind()),
+            arena.get(expected).map(|record| record.kind()),
+        ) {
+            (
+                Some(TypeKind::GenericInstance(actual)),
+                Some(TypeKind::GenericInstance(expected)),
+            ) => {
+                return actual.declaration() == expected.declaration()
+                    && actual.arguments().len() == expected.arguments().len()
+                    && actual.arguments().iter().zip(expected.arguments()).all(
+                        |(actual, expected)| {
+                            *actual == *expected
+                                || matches!(
+                                    arena.get(*expected).map(|record| record.kind()),
+                                    Some(TypeKind::GenericParameter(_))
+                                )
+                        },
+                    );
+            }
+            (Some(TypeKind::Nominal(actual)), Some(TypeKind::GenericInstance(expected))) => {
+                return actual == expected.declaration();
+            }
+            (Some(TypeKind::GenericInstance(actual)), Some(TypeKind::Nominal(expected))) => {
+                return actual.declaration() == expected;
+            }
+            _ => {}
+        }
+    }
     let Some(classes) = source.class_types else {
         return false;
     };
@@ -2914,8 +2951,11 @@ pub fn apply_direct_call_results(
         };
         report.record_expression_type(ExpressionType::new(call.expression, ty));
         report.diagnostics.retain(|diagnostic| {
-            diagnostic.node() != call.expression
-                || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
+            !matches!(
+                diagnostic.rule(),
+                TypeRuleDiagnostic::MemberExpressionDeferred
+            ) && (diagnostic.node() != call.expression
+                || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred)
         });
     }
 }
@@ -3902,6 +3942,15 @@ pub fn check_return_expression_types(
     signatures: &[FunctionSignature],
     expression_types: &[ExpressionType],
 ) -> ReturnTypeReport {
+    check_return_expression_types_with_arena(parsed, signatures, expression_types, None)
+}
+
+pub fn check_return_expression_types_with_arena(
+    parsed: &ParseOutput,
+    signatures: &[FunctionSignature],
+    expression_types: &[ExpressionType],
+    arena: Option<&TypeArena>,
+) -> ReturnTypeReport {
     let mut diagnostics = Vec::new();
 
     for returned in &parsed.return_statements {
@@ -3922,7 +3971,24 @@ pub fn check_return_expression_types(
         else {
             continue;
         };
-        if actual != expected {
+        let compatible = actual == expected
+            || arena.is_some_and(|arena| {
+                match (
+                    arena.get(actual).map(|record| record.kind()),
+                    arena.get(expected).map(|record| record.kind()),
+                ) {
+                    (
+                        Some(TypeKind::Nominal(actual)),
+                        Some(TypeKind::GenericInstance(expected)),
+                    ) => actual == expected.declaration(),
+                    (
+                        Some(TypeKind::GenericInstance(actual)),
+                        Some(TypeKind::GenericInstance(expected)),
+                    ) => actual.declaration() == expected.declaration(),
+                    _ => false,
+                }
+            });
+        if !compatible {
             let span = parsed.arena.node(value).expect("parsed return value").span;
             diagnostics.push(ReturnTypeDiagnostic::new(
                 ReturnTypeDiagnosticKind::ReturnTypeMismatch,
@@ -4163,7 +4229,9 @@ fn type_function_signatures_in_with_classes_and_generics(
     for function in functions {
         let generic_types: Vec<_> = generic_parameters
             .iter()
-            .filter(|parameter| parameter.owner == Some(function.declaration))
+            .filter(|parameter| {
+                parameter.owner == Some(function.declaration) || function.owner == parameter.owner
+            })
             .filter_map(|parameter| {
                 generic_parameter_types
                     .iter()
@@ -4214,7 +4282,10 @@ fn type_function_signatures_in_with_classes_and_generics(
             generic_parameters: generic_types.iter().map(|(_, ty)| *ty).collect(),
             generic_bounds: generic_parameters
                 .iter()
-                .filter(|parameter| parameter.owner == Some(function.declaration))
+                .filter(|parameter| {
+                    parameter.owner == Some(function.declaration)
+                        || function.owner == parameter.owner
+                })
                 .flat_map(|parameter| {
                     let Some(ty) = generic_parameter_types
                         .iter()
@@ -5233,6 +5304,35 @@ fn resolve_annotation_type_with_generics(
             .find(|(name, _)| *name == reference.name)
     {
         return Some(*ty);
+    }
+    if let Some(reference) = type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)
+        && !reference.generic_argument_names.is_empty()
+    {
+        let class = classes.iter().find(|class| class.name == reference.name)?;
+        let arguments = reference
+            .generic_argument_names
+            .iter()
+            .map(|name| {
+                generic_types
+                    .iter()
+                    .find(|(generic, _)| *generic == name)
+                    .map(|(_, ty)| *ty)
+                    .or_else(|| primitives.type_for_primitive_name(name))
+                    .or_else(|| {
+                        classes
+                            .iter()
+                            .find(|class| class.name == *name)
+                            .map(|class| class.type_id)
+                    })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let identity = match arena.get(class.type_id)?.kind() {
+            TypeKind::Nominal(identity) => identity.clone(),
+            _ => return None,
+        };
+        return Some(arena.generic_instance(GenericTypeIdentity::new(identity, arguments)));
     }
     resolve_annotation_type(
         annotation,

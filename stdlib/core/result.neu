@@ -16,6 +16,20 @@ enum Result<T, E> {
             Result.Err(_) -> true
         }
     }
+
+    func and(other: Result<T, E>): Result<T, E> {
+        return when (this) {
+            Result.Ok(_) -> other
+            Result.Err(_) -> this
+        }
+    }
+
+    func or(other: Result<T, E>): Result<T, E> {
+        return when (this) {
+            Result.Ok(_) -> this
+            Result.Err(_) -> other
+        }
+    }
 }
 
 public test func result_predicates_work() {
@@ -23,4 +37,13 @@ public test func result_predicates_work() {
     val err: Result<Int, Int> = Result.Err(2);
     assert(ok.is_ok(), "Ok is successful");
     assert(err.is_err(), "Err is an error");
+}
+
+public test func result_combinators_work() {
+    val ok: Result<Int, Int> = Result.Ok(1);
+    val err: Result<Int, Int> = Result.Err(2);
+    val and_result: Result<Int, Int> = ok.and(err);
+    val or_result: Result<Int, Int> = err.or(ok);
+    assert(and_result.is_err(), "and selects the error operand");
+    assert(or_result.is_ok(), "or selects the successful operand");
 }
