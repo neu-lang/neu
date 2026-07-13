@@ -13,6 +13,50 @@ use compiler::{
 };
 
 #[test]
+fn compiles_interface_backed_enum_annotation_with_literal_property() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-annotation-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+interface Test { func timeout(): Int; }
+@Test(timeout = 100) enum Signal { Red }
+public func main(): Int { return 0 }
+"#;
+    compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31001),
+            ModuleName::parse("annotation").unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .expect("valid annotation metadata should not affect executable lowering");
+}
+
+#[test]
+fn rejects_non_literal_annotation_properties_before_lowering() {
+    let source = r#"
+interface Test { func timeout(): Int; }
+@Test(timeout = 1 + 1) enum Signal { Red }
+public func main(): Int { return 0 }
+"#;
+    let error = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31002),
+            ModuleName::parse("annotation").unwrap(),
+            PackageNamespace::root(),
+            std::env::temp_dir().join("neu-annotation-invalid"),
+        ),
+    )
+    .expect_err("annotation property expressions must be metadata literals");
+    assert!(format!("{error:?}").contains("AnnotationPropertyNotLiteral"));
+}
+
+#[test]
 fn driver_validates_virtual_directory_project_before_compilation() {
     let graph = validate_virtual_project(
         "src/main.neu",

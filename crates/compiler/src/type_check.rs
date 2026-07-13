@@ -98,6 +98,13 @@ pub enum TypeRuleDiagnostic {
     StaticFunctionInstanceAccess,
     StaticFunctionOverride,
     AbstractDeclarationInvalid,
+    UnknownAnnotation,
+    DuplicateAnnotation,
+    AnnotationTargetInvalid,
+    UnknownAnnotationProperty,
+    DuplicateAnnotationProperty,
+    MissingAnnotationProperty,
+    AnnotationPropertyNotLiteral,
     DuplicateField,
     FieldHiding,
     ImmutableFieldMutation,
@@ -1259,6 +1266,94 @@ pub fn type_class_types_in(
     }
     let _ = class_ids;
     report
+}
+
+/// Validates declaration annotations before executable lowering. Annotation
+/// metadata is compiler-owned and never becomes a runtime value or ABI field.
+pub fn validate_annotations(parsed: &ParseOutput) -> Vec<TypeCheckDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for annotation in &parsed.annotations {
+        let target_kind = parsed.arena.node(annotation.target).map(|node| node.kind);
+        if target_kind != Some(AstNodeKind::EnumDeclaration) {
+            diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::AnnotationTargetInvalid,
+                annotation.annotation,
+            ));
+        }
+
+        if parsed.annotations.iter().any(|other| {
+            other.target == annotation.target
+                && other.annotation != annotation.annotation
+                && other.name == annotation.name
+        }) {
+            diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::DuplicateAnnotation,
+                annotation.annotation,
+            ));
+        }
+
+        let Some(definition) = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.interface && class.name == annotation.name)
+        else {
+            diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::UnknownAnnotation,
+                annotation.annotation,
+            ));
+            continue;
+        };
+
+        for property in &annotation.properties {
+            if annotation
+                .properties
+                .iter()
+                .any(|other| other.name == property.name && other.span != property.span)
+            {
+                diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::DuplicateAnnotationProperty,
+                    annotation.annotation,
+                ));
+            }
+            let declared = parsed.function_declarations.iter().any(|function| {
+                function.owner == Some(definition.declaration) && function.name == property.name
+            });
+            if !declared {
+                diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::UnknownAnnotationProperty,
+                    annotation.annotation,
+                ));
+            }
+            if !parsed
+                .literal_expressions
+                .iter()
+                .any(|literal| literal.expression == property.value)
+            {
+                diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::AnnotationPropertyNotLiteral,
+                    annotation.annotation,
+                ));
+            }
+        }
+
+        for property in parsed
+            .function_declarations
+            .iter()
+            .filter(|function| function.owner == Some(definition.declaration))
+        {
+            if !annotation
+                .properties
+                .iter()
+                .any(|value| value.name == property.name)
+            {
+                diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::MissingAnnotationProperty,
+                    annotation.annotation,
+                ));
+            }
+        }
+    }
+    diagnostics
 }
 
 pub fn apply_class_type_facts(

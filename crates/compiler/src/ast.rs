@@ -63,6 +63,7 @@ pub enum AstNodeKind {
     QualifiedCasePattern,
     GroupedPattern,
     MatchArm,
+    Annotation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -244,6 +245,10 @@ impl AstArena {
 
     pub fn add_continue_statement(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::ContinueStatement, span)
+    }
+
+    pub fn add_annotation(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::Annotation, span)
     }
 
     pub fn add_scope_statement(&mut self, span: ByteSpan) -> AstNodeId {
