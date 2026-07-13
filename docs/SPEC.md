@@ -1403,13 +1403,15 @@ Annotations are declaration metadata written as an `@Name` marker immediately
 before a nominal type declaration. The first target is an enum; classes,
 structs, interfaces, and other nominal targets require explicit enablement.
 Annotations do not change type identity, ownership, capabilities, layout,
-runtime representation, or public ABI. Annotation definitions are closed
-nominal library declarations; the initial `stdlib/test` package provides a
-zero-argument `Test` marker. Unknown, duplicate, malformed, and
-target-incompatible markers are diagnosed. The compiler preserves annotation
-identity, target, source span, and package provenance for validation and
-tooling, but ordinary Neu code has no reflection over annotations. Test
-discovery and execution are a separate contract.
+runtime representation, or public ABI. Annotation definitions are interfaces
+whose methods define typed metadata properties; use sites provide named
+literal values such as `@Test(timeout = 100)`. The initial `stdlib/test`
+package provides the `Test` annotation interface. Unknown, duplicate,
+malformed, missing, and target-incompatible markers are diagnosed. The
+compiler preserves annotation identity, target, source span, property values,
+and package provenance for validation and tooling, but ordinary Neu code has
+no reflection over annotations. Test discovery and execution are a separate
+contract.
 
 ## Project Build Command
 
