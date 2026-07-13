@@ -2,5 +2,13 @@
 enum Ordering {
     Less,
     Equal,
-    Greater
+    Greater,
+
+    func reverse(): Ordering {
+        return when (this) {
+            Ordering.Less -> Ordering.Greater
+            Ordering.Equal -> Ordering.Equal
+            Ordering.Greater -> Ordering.Less
+        }
+    }
 }

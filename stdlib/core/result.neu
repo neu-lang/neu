@@ -1,5 +1,19 @@
 // Foundational recoverable-result type for the pure-Neu standard library.
 enum Result<T, E> {
     Ok(T),
-    Err(E)
+    Err(E),
+
+    func is_ok(): Bool {
+        return when (this) {
+            Result.Ok(_) -> true
+            Result.Err(_) -> false
+        }
+    }
+
+    func is_err(): Bool {
+        return when (this) {
+            Result.Ok(_) -> false
+            Result.Err(_) -> true
+        }
+    }
 }

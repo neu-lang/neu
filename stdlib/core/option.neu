@@ -1,5 +1,19 @@
 // Foundational absence type for the pure-Neu standard library.
 enum Option<T> {
     Some(T),
-    None
+    None,
+
+    func is_some(): Bool {
+        return when (this) {
+            Option.Some(_) -> true
+            Option.None -> false
+        }
+    }
+
+    func is_none(): Bool {
+        return when (this) {
+            Option.Some(_) -> false
+            Option.None -> true
+        }
+    }
 }
