@@ -108,6 +108,7 @@ pub struct ParsedImport {
     pub declaration: AstNodeId,
     pub path: String,
     pub alias: Option<String>,
+    pub names: Vec<String>,
     pub span: ByteSpan,
 }
 
@@ -752,6 +753,45 @@ impl<'source> Parser<'source> {
         let declaration = self.arena.add_import_declaration(import.span);
         self.saw_package_or_import = true;
         self.advance();
+        let mut names = Vec::new();
+        if self.current_kind() == Some(TokenKind::LeftBrace) {
+            self.advance();
+            while self.current_kind() != Some(TokenKind::RightBrace)
+                && self.current_kind().is_some()
+            {
+                if let Some(TokenKind::Identifier) = self.current_kind() {
+                    if let Some(name) = self.current_text().map(str::to_owned) {
+                        names.push(name);
+                    }
+                    self.advance();
+                    if self.current_kind() == Some(TokenKind::Comma) {
+                        self.advance();
+                    } else if self.current_kind() != Some(TokenKind::RightBrace) {
+                        self.diagnostic_at_previous_or_current(
+                            DiagnosticKind::MalformedDeclarationHeader,
+                        );
+                        break;
+                    }
+                } else {
+                    self.diagnostic_at_previous_or_current(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                    );
+                    break;
+                }
+            }
+            if self.current_kind() == Some(TokenKind::RightBrace) {
+                self.advance();
+            } else {
+                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedDeclarationHeader);
+            }
+            if self.current_kind() == Some(TokenKind::Identifier)
+                && self.current_text() == Some("from")
+            {
+                self.advance();
+            } else {
+                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedImportPath);
+            }
+        }
         let path_start = self.current().map(|token| token.span.start());
         let path = match self.current_kind() {
             Some(TokenKind::String) => {
@@ -783,6 +823,9 @@ impl<'source> Parser<'source> {
         } else {
             None
         };
+        if !names.is_empty() && alias.is_some() {
+            self.diagnostic_at_previous_or_current(DiagnosticKind::UnsupportedDeclarationModifier);
+        }
         if let (Some(path), Some(start)) = (path, path_start) {
             let end = self
                 .previous_span()
@@ -791,6 +834,7 @@ impl<'source> Parser<'source> {
                 declaration,
                 path,
                 alias,
+                names,
                 span: self.span(start, end),
             });
         }

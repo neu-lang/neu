@@ -686,6 +686,7 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_)) => {
             Some(types::I64)
         }
+        Some(TypeKind::GenericParameter(_)) => Some(types::I64),
         Some(TypeKind::DynamicArray(_)) => Some(types::I64),
         Some(TypeKind::Task(_)) => Some(types::I64),
         Some(TypeKind::Channel(_)) | Some(TypeKind::ChannelResult(_)) => Some(types::I64),

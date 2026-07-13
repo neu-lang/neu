@@ -632,6 +632,9 @@ impl VirtualPackageGraph {
                 &parsed_sources,
             );
             for import in &parsed.imports {
+                if !import.names.is_empty() {
+                    continue;
+                }
                 let explicit_alias = import.alias.clone();
                 let alias = explicit_alias.clone().unwrap_or_default();
                 if alias.is_empty() || !is_identifier_segment(&alias) {
@@ -768,6 +771,74 @@ impl VirtualPackageGraph {
                     .push(directory.clone());
                 for member in members {
                     queue.push(member);
+                }
+            }
+            for import in &parsed.imports {
+                if import.names.is_empty() {
+                    continue;
+                }
+                let directory = if import.path.starts_with('.') {
+                    resolve_import_directory(&file_path, &import.path, &root)
+                } else {
+                    dependency_roots.iter().find_map(|(url, prefix)| {
+                        let repository = url.strip_suffix(".git").unwrap_or(url);
+                        let repository = repository.strip_prefix("https://").unwrap_or(repository);
+                        let suffix = import
+                            .path
+                            .strip_prefix(repository)?
+                            .trim_start_matches('/');
+                        Some(prefix.join(suffix))
+                    })
+                };
+                let Some(directory) = directory else {
+                    diagnostics.push(PackageGraphDiagnostic {
+                        kind: PackageGraphDiagnosticKind::ImportPathTraversal,
+                        path: file_path.clone(),
+                        detail: import.path.clone(),
+                    });
+                    continue;
+                };
+                let exported_names: BTreeSet<_> = package_members
+                    .get(&directory)
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|path| {
+                        let id = file_by_path[path];
+                        parsed_sources
+                            .get(&id)
+                            .into_iter()
+                            .flat_map(|parsed| parsed.function_declarations.iter())
+                            .filter(|function| {
+                                function.top_level && function.visibility == "public"
+                            })
+                            .map(|function| function.name.clone())
+                    })
+                    .collect();
+                let mut seen = BTreeSet::new();
+                for name in &import.names {
+                    if !seen.insert(name.clone())
+                        || parsed
+                            .declaration_names
+                            .iter()
+                            .any(|declaration| declaration.name == *name)
+                    {
+                        diagnostics.push(PackageGraphDiagnostic {
+                            kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                            path: file_path.clone(),
+                            detail: format!("named import {name} collides with another name"),
+                        });
+                    } else if !exported_names.contains(name) {
+                        diagnostics.push(PackageGraphDiagnostic {
+                            kind: PackageGraphDiagnosticKind::InaccessibleImport,
+                            path: file_path.clone(),
+                            detail: name.clone(),
+                        });
+                    }
+                }
+                if let Some(members) = package_members.get(&directory) {
+                    for member in members {
+                        queue.push(member.clone());
+                    }
                 }
             }
         }

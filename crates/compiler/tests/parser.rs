@@ -53,6 +53,18 @@ fn parses_quoted_directory_import_with_alias() {
 }
 
 #[test]
+fn parses_named_imports() {
+    let output = parse_source(
+        SourceFileId::from_raw(10006),
+        "import {add, sub} from \"./math\" public func main();",
+    );
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.imports[0].names, vec!["add", "sub"]);
+    assert!(output.imports[0].alias.is_none());
+}
+
+#[test]
 fn visibility_uses_public_default_and_rejects_internal() {
     let output = parse_source(
         SourceFileId::from_raw(10004),

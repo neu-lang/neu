@@ -182,6 +182,45 @@ fn virtual_package_graph_loads_direct_directory_members_and_aliases() {
 }
 
 #[test]
+fn virtual_package_graph_accepts_named_public_imports() {
+    let graph = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import {add, sub} from \"./math\"\nfunc main();",
+            ),
+            VirtualSource::new(
+                "src/math/math.neu",
+                "package math\npublic func add();\npublic func sub();",
+            ),
+        ],
+    )
+    .unwrap();
+    assert_eq!(graph.packages().len(), 2);
+}
+
+#[test]
+fn virtual_package_graph_rejects_missing_named_imports() {
+    let diagnostics = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import {missing} from \"./math\"\nfunc main();",
+            ),
+            VirtualSource::new("src/math/math.neu", "package math\npublic func add();"),
+        ],
+    )
+    .unwrap_err();
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == PackageGraphDiagnosticKind::InaccessibleImport
+        })
+    );
+}
+
+#[test]
 fn virtual_package_graph_rejects_file_imports_and_cycles() {
     let file_import = VirtualPackageGraph::build(
         "src/main.neu",

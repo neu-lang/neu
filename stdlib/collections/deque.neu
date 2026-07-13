@@ -1,0 +1,24 @@
+package collections
+
+// A bounded value deque shape. Storage-backed rotation and capacity management
+// remain deferred until the language has an accepted allocation contract.
+enum Deque<T> {
+    EmptyDeque,
+    OneDeque(T),
+
+    func len(): Int {
+        return when (this) {
+            Deque.EmptyDeque -> 0
+            Deque.OneDeque(_) -> 1
+        }
+    }
+
+    func is_empty(): Bool { return this.len() == 0 }
+}
+
+public test func deque_basics_work() {
+    val empty: Deque<Int> = Deque.EmptyDeque;
+    val one: Deque<Int> = Deque.OneDeque(3);
+    assert(empty.is_empty(), "empty deque has no elements");
+    assert(one.len() == 1, "deque length counts elements");
+}

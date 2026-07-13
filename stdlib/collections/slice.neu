@@ -1,5 +1,25 @@
 package collections
 
-// Immutable borrowed sequence view.
-class Slice<T> {
+
+// Immutable borrowed-view shape. Storage-backed slicing is deferred until
+// borrow and allocation contracts are available in the core language.
+enum Slice<T> {
+    EmptySlice,
+    OneSlice(T),
+
+    func len(): Int {
+        return when (this) {
+            Slice.EmptySlice -> 0
+            Slice.OneSlice(_) -> 1
+        }
+    }
+
+    func is_empty(): Bool { return this.len() == 0 }
+}
+
+public test func slice_basics_work() {
+    val empty: Slice<Int> = Slice.EmptySlice;
+    val one: Slice<Int> = Slice.OneSlice(7);
+    assert(empty.len() == 0, "empty slice has no elements");
+    assert(one.len() == 1, "slice length counts the value");
 }

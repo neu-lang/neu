@@ -1,6 +1,30 @@
 package collections
 
-// Initial nominal sequence surface. Operations are added with their accepted
-// ownership, iterator, protocol, and allocation contracts.
-class Vector<T> {
+
+// A small, ownership-safe value sequence. Compiler-managed Array<T> storage is
+// available for scalar and generic-function contexts; embedding that storage
+// in a generic collection awaits generic payload/field representation support.
+enum Vector<T> {
+    Empty,
+    One(T),
+    Two(T, T),
+
+    func len(): Int {
+        return when (this) {
+            Vector.Empty -> 0
+            Vector.One(_) -> 1
+            Vector.Two(_, _) -> 2
+        }
+    }
+
+    func is_empty(): Bool { return this.len() == 0 }
+
+
+}
+
+public test func vector_basics_work() {
+    val empty: Vector<Int> = Vector.Empty;
+    val pair: Vector<Int> = Vector.Two(1, 2);
+    assert(empty.is_empty(), "empty vector has no elements");
+    assert(pair.len() == 2, "vector length counts elements");
 }

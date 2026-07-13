@@ -83,6 +83,39 @@ public test func option_predicate() {
 }
 
 #[test]
+fn compiles_and_runs_named_import_call() {
+    let workspace = std::env::temp_dir().join(format!("neu-named-import-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let project = validate_virtual_project(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import {add} from \"./math\"\npublic func main(): Int { return add() }",
+            ),
+            VirtualSource::new(
+                "src/math/math.neu",
+                "package math\npublic func add(): Int { return 7 }",
+            ),
+        ],
+    )
+    .unwrap();
+    let executable = compile_virtual_project_to_executable(
+        &project,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31008),
+            ModuleName::parse("named.import").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(executable).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn compiles_and_runs_generic_enum_method_with_generic_parameter() {
     let workspace =
         std::env::temp_dir().join(format!("neu-generic-enum-method-{}", std::process::id()));

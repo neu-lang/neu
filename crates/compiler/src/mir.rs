@@ -3307,7 +3307,12 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
         Some(TypeKind::ChannelResult(result)) => {
             require_bootstrap_runtime_type(result.element(), types)
         }
-        Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_)) => Ok(()),
+        Some(
+            TypeKind::Nominal(_)
+            | TypeKind::GenericInstance(_)
+            | TypeKind::GenericParameter(_)
+            | TypeKind::Function(_),
+        ) => Ok(()),
         _ => Err(MirLoweringError::UnsupportedRuntimeType),
     }
 }
