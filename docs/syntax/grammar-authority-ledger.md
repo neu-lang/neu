@@ -1,6 +1,6 @@
 # Grammar Authority Ledger
 
-Status: M0008 authority ledger
+Status: authority ledger
 
 Source of truth: `docs/SPEC.md` and accepted ADRs under `docs/adr/`
 
@@ -10,11 +10,11 @@ This ledger records whether planned parser syntax has accepted grammar authority
 
 - `specified`: accepted source of truth defines enough syntax for parser fixtures or implementation.
 - `ambiguous`: accepted source of truth names a concept but does not define concrete grammar.
-- `deferred`: the construct is intentionally outside the current parser milestones.
+- `deferred`: the construct is intentionally outside the current parser scope.
 
 ## Parser Construct Classification
 
-| Construct | Classification | Authority | Owner | Blocking milestone | Notes |
+| Construct | Classification | Authority | Owner | Blocking work | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Token spellings | specified | ADR-0021, ADR-0029 | main task | none | Lexer token spellings are accepted, but parser grammar is not; ADR-0029 replaces reserved `val` with reserved `const`. |
 | Package declaration | specified | ADR-0022 | main task | none | Source-file position and qualified-name syntax are specified. |
@@ -36,7 +36,7 @@ This ledger records whether planned parser syntax has accepted grammar authority
 | Coroutine syntax | deferred | ADR-0024 | main task | future | Coroutine syntax is explicitly deferred. |
 | Unsafe block syntax | deferred | ADR-0024 | main task | future | Unsafe block syntax is explicitly deferred. |
 | Macro syntax | deferred | ADR-0019 | main task | future | Macros are deferred. |
-| Compile-time evaluation syntax | deferred | ADR-0019, ADR-0029 | main-task semantic design | future | Bounded compile-time evaluation exists semantically but is outside M0011-M0013 parser scope; local `const` is not compile-time-evaluation syntax and gains no such semantics from ADR-0029. |
+| Compile-time evaluation syntax | deferred | ADR-0019, ADR-0029 | main-task semantic design | future | Bounded compile-time evaluation exists semantically but is outside the parser scope; local `const` is not compile-time-evaluation syntax and gains no such semantics from ADR-0029. |
 
 ## Parser Unblock List
 
@@ -44,23 +44,23 @@ Only token-consuming parser infrastructure may proceed before syntax ADRs. This 
 
 Concrete parser fixtures may use ADR-0021 token spellings as superseded by ADR-0029 only when the expected behavior is token-stream handling rather than declaration, type, expression, statement, or pattern grammar.
 
-M0011 declaration parser may proceed only for ADR-0022 constructs. Type placeholders, function body placeholders, deferred declaration forms, and all later parser milestones must continue to follow their own authority rows.
+The declaration parser may proceed only for ADR-0022 constructs. Type placeholders, function body placeholders, deferred declaration forms, and all later parser future work must continue to follow their own authority rows.
 
-M0012 type and generic parser may proceed only for ADR-0023 constructs. Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain blocked until accepted source of truth defines them.
+The type and generic parser may proceed only for ADR-0023 constructs. Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain blocked until accepted source of truth defines them.
 
-M0013 expression, statement, and pattern parser may proceed only for ADR-0024 constructs as superseded by ADR-0029 for the immutable-local statement introducer and directly spelling-dependent dispatch and recovery. Coroutine syntax, unsafe block syntax, loops, match or `when`, and other ADR-0024 deferrals remain blocked until future accepted source of truth defines them.
+The expression, statement, and pattern parser may proceed only for ADR-0024 constructs as superseded by ADR-0029 for the immutable-local statement introducer and directly spelling-dependent dispatch and recovery. Coroutine syntax, unsafe block syntax, loops, match or `when`, and other ADR-0024 deferrals remain blocked until future accepted source of truth defines them.
 
 ## Parser Block List
 
-- M0011 declaration parser is unblocked only for ADR-0022 declaration syntax.
-- M0012 type and generic syntax parser is unblocked only for ADR-0023 type and generic syntax.
-- M0013 expression, statement, and pattern parser is unblocked only for ADR-0024 body syntax as superseded by ADR-0029 for immutable-local statement syntax.
+- The declaration parser is unblocked only for ADR-0022 declaration syntax.
+- The type and generic syntax parser is unblocked only for ADR-0023 type and generic syntax.
+- The expression, statement, and pattern parser is unblocked only for ADR-0024 body syntax as superseded by ADR-0029 for immutable-local statement syntax.
 
 ## Required Ambiguity Reports
 
-- `docs/ambiguities/M0008-declaration-syntax.md`
-- `docs/ambiguities/M0008-type-generic-syntax.md`
-- `docs/ambiguities/M0008-expression-statement-pattern-syntax.md`
+- declaration-syntax ambiguity report
+- type-and-generic-syntax ambiguity report
+- expression-statement-pattern-syntax ambiguity report
 
 ## Maintenance Rule
 

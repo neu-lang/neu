@@ -7,7 +7,7 @@ and a compiler implemented in Rust.
 
 > **Weekend-project disclaimer:** This project is largely vibe coded and began
 > as an attempt to make a boring weekend substantially less boring. Treat the
-> specification, compiler, and roadmap accordingly.
+> specification and compiler accordingly.
 
 The compiler currently uses a Cranelift backend and supports host-only system
 linking. It emits a host object and links it with `cc`; `NEU_LINKER` can override

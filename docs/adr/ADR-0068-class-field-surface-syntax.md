@@ -30,12 +30,12 @@ Member access is `receiver.field`. Within an instance method or constructor,
 when a local or parameter shadows a field. No alternate property syntax,
 reflection, extension-member syntax, or implicit global field lookup exists.
 
-Task-008 may parse and record class/interface and field metadata, nominal type
+The parser may parse and record class/interface and field metadata, nominal type
 identity, field visibility, mutability, and declared types. It may type-check
 field projections only where a receiver type is already available from an
 accepted method or constructor context. Object construction expressions,
 constructor calls, field initialization, allocation, and runtime field access
-are task-009 contracts and are not inferred by this ADR.
+are later lifecycle contracts and are not inferred by this ADR.
 
 ## Diagnostics
 

@@ -1,6 +1,6 @@
 # AST Data Model
 
-Status: M0013 expression statement and pattern AST shell
+Status: expression statement and pattern AST shell
 
 Source of truth:
 
@@ -18,8 +18,8 @@ ADR-0022 declaration node kinds, ADR-0023 type and generic node kinds, and ADR-0
 
 - AST nodes have stable `AstNodeId` values assigned in insertion order.
 - AST nodes retain a `ByteSpan` from the source model.
-- The accepted M0009 root node kind is `SourceFile`.
-- The accepted M0011 declaration shell node kinds are:
+- The accepted root node kind is `SourceFile`.
+- The accepted declaration shell node kinds are:
   - `PackageDeclaration`
   - `ImportDeclaration`
   - `FunctionDeclaration`
@@ -27,7 +27,7 @@ ADR-0022 declaration node kinds, ADR-0023 type and generic node kinds, and ADR-0
   - `EnumDeclaration`
   - `InterfaceDeclaration`
   - `DeclarationBody`
-- The accepted M0012 type and generic shell node kinds are:
+- The accepted type and generic shell node kinds are:
   - `NamedType`
   - `NullableType`
   - `GenericParameter`
@@ -35,7 +35,7 @@ ADR-0022 declaration node kinds, ADR-0023 type and generic node kinds, and ADR-0
   - `CapabilityBound`
   - `FunctionType`
   - `GroupedType`
-- The accepted M0013 expression, statement, block, and pattern shell node kinds are:
+- The accepted expression, statement, block, and pattern shell node kinds are:
   - `Block`
   - `LiteralExpression`
   - `NameExpression`
@@ -75,4 +75,4 @@ The following are intentionally absent until future accepted syntax authority ex
 
 The AST must not encode name resolution, type checking, ownership, borrowing, flow typing, exhaustiveness, capability analysis, coroutine analysis, unsafe analysis, HIR, MIR, or backend concepts.
 
-Future parser milestones may add concrete AST nodes only after the relevant ambiguity report is resolved by accepted source of truth.
+Future parser work may add concrete AST nodes only after the relevant ambiguity report is resolved by accepted source of truth.

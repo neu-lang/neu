@@ -72,7 +72,7 @@ follow-up visibility decision.
 This ADR supersedes the import-syntax-only and package-loading portions of
 ADR-0025 and depends on ADR-0017, ADR-0021, ADR-0022, and ADR-0025. It does not
 resolve the `internal` replacement or any other visibility question reserved
-for task 029.
+for the dependency-resolution implementation.
 
 ## Required Diagnostics
 

@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Question
 
-What bootstrap name-resolution subset, lookup order, scope boundaries, import semantics, duplicate-name behavior, unresolved-name diagnostics, and ambiguity handling should M0016 implement before type checking?
+What bootstrap name-resolution subset, lookup order, scope boundaries, import semantics, duplicate-name behavior, unresolved-name diagnostics, and ambiguity handling should the compiler implement before type checking?
 
 ## Competing Designs
 
@@ -17,7 +17,7 @@ What bootstrap name-resolution subset, lookup order, scope boundaries, import se
 
 Top-level-only resolution is simple and safe, but does not exercise local bindings from ADR-0024 and leaves expression name references mostly unresolved.
 
-Module package top-level resolution fits M0014 and M0015 infrastructure, but still defers local scope and import behavior.
+Module package top-level resolution fits the existing infrastructure, but still defers local scope and import behavior.
 
 Local lexical scope plus module top-level resolution supports the smallest useful frontend pipeline before type checking, but requires explicit shadowing, duplicate, and diagnostic rules.
 
@@ -25,7 +25,7 @@ Full resolution is closer to a real language implementation, but imports, depend
 
 ## Decision
 
-M0016 uses a bootstrap name-resolution policy with local lexical scope plus same-module package top-level declarations.
+The compiler uses a bootstrap name-resolution policy with local lexical scope plus same-module package top-level declarations.
 
 Imports remain syntax-only and do not participate in lookup. Cross-module dependency lookup, member lookup, overload resolution, extension method lookup, and type-directed lookup remain unsupported.
 
@@ -33,14 +33,14 @@ This ADR defines only the source-of-truth model needed by the near-term frontend
 
 ## Resolvable AST Node Kinds
 
-Included name-reference nodes for M0016 are:
+Included name-reference nodes for this implementation are:
 
 - simple identifier expression
 - qualified name expression when it is syntactically a package-qualified name
 - type name node in an accepted declaration, local binding, or explicit type annotation position
 - package-qualified name in an accepted type or expression name-reference position
 
-Excluded name-reference nodes for M0016 are:
+Excluded name-reference nodes for this implementation are:
 
 - member access names
 - method call names
@@ -56,14 +56,14 @@ Excluded name-reference nodes for M0016 are:
 
 ## Declaration And Binding Positions
 
-Included declaration and binding positions for M0016 are:
+Included declaration and binding positions for this implementation are:
 
 - function declaration name
 - type declaration name
 - local `val` statement
 - local `var` statement
 
-Excluded declaration and binding positions for M0016 are:
+Excluded declaration and binding positions for this implementation are:
 
 - function parameters are excluded until accepted parameter AST representation exists
 - pattern bindings are excluded until accepted pattern binding, ownership, and scope rules exist
@@ -125,7 +125,7 @@ type-directed lookup remains unsupported.
 
 ## Visibility Rule
 
-M0016 records the visibility metadata attached to resolved same-module top-level declarations, but visibility enforcement is deferred until cross-module lookup and API boundary rules are accepted.
+The compiler records the visibility metadata attached to resolved same-module top-level declarations, but visibility enforcement is deferred until cross-module lookup and API boundary rules are accepted.
 
 Same-module lookup does not reject declarations solely because they are `private`, `internal`, or `public`; those categories remain metadata during the bootstrap resolution pass.
 
@@ -155,9 +155,9 @@ Diagnostic: `ambiguous_name`
 Diagnostic: `unsupported_import_resolution`
 
 - Primary span: the import path or alias used as a lookup source.
-- Recovery action: ignore the import for M0016 lookup.
+- Recovery action: ignore the import for lookup.
 - Source-of-truth citation: ADR-0015 and ADR-0026.
-- Safe suggestion policy: state that import resolution is not part of M0016; do not suggest equivalent active-import syntax.
+- Safe suggestion policy: state that import resolution is not part of this implementation; do not suggest equivalent active-import syntax.
 
 Diagnostic: `unsupported_cross_module_lookup`
 
@@ -169,9 +169,9 @@ Diagnostic: `unsupported_cross_module_lookup`
 Diagnostic: `unsupported_member_resolution`
 
 - Primary span: the member, method, constructor, overload, extension, or type-directed name requiring unsupported lookup.
-- Recovery action: leave the referenced name unresolved for M0016.
+- Recovery action: leave the referenced name unresolved for this implementation.
 - Source-of-truth citation: ADR-0015 and ADR-0026.
-- Safe suggestion policy: state that the lookup form is outside M0016; do not infer candidate members.
+- Safe suggestion policy: state that the lookup form is outside this implementation; do not infer candidate members.
 
 ## Explicit Deferrals
 
@@ -199,10 +199,10 @@ This ADR does not define:
 
 ## Downstream Consequences
 
-- M0016 can implement only the accepted bootstrap subset in this ADR.
-- M0017 type representation depends on stable resolved type-name symbols.
-- M0018 type checking depends on resolved expression and declaration names.
-- M0022 ownership and M0023 borrowing depend on correct binding references.
+- The compiler can implement only the accepted bootstrap subset in this ADR.
+- Type representation depends on stable resolved type-name symbols.
+- Type checking depends on resolved expression and declaration names.
+- Ownership analysis and borrow analysis depend on correct binding references.
 - Diagnostics infrastructure must follow the accepted resolution diagnostic obligations in this ADR and ADR-0015.
 
 ## Dependencies

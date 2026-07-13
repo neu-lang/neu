@@ -41,7 +41,7 @@ define a stable public ABI or new language semantics.
 
 ## Downstream Consequences
 
-- M0030/M0032 implementation must preserve function identity across the HIR,
+- The compiler implementation must preserve function identity across the HIR,
   MIR, and object boundaries.
 - Object emission can reject incomplete identity instead of inventing a symbol.
 - Linker and runtime work may refer to the emitted internal symbol without

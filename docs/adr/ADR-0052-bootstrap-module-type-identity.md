@@ -24,7 +24,7 @@ remain explicit invocation/test-harness input under ADR-0025.
 
 ## Consequences
 
-- M0028 can compare same-module argument and parameter types safely.
+- The compiler can compare same-module argument and parameter types safely.
 - Later nominal, generic, HIR, and MIR typing extends this one module type
   domain instead of adding cross-arena conversion.
 - Cross-module calls remain deferred.

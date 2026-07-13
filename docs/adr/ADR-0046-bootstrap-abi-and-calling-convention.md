@@ -17,7 +17,7 @@ executable backend smoke?
 ## Trade-offs
 
 A single initial host-target ABI subset is enough to run the first executable
-while keeping M0033 responsible for cross-host linking.
+while keeping the compiler responsible for cross-host linking.
 
 A full ABI matrix belongs after host-linking work.
 
@@ -29,7 +29,7 @@ Backend-private ABI prevents honest object/link tests.
 ## Recommended Choice
 
 The bootstrap backend assumes the current host target as the initial smoke
-target. Cross-target behavior remains deferred to M0033.
+target. Cross-target behavior remains deferred to the compiler.
 
 Bootstrap primitive lowering:
 
@@ -58,9 +58,9 @@ language `main` and maps its `Int` result according to ADR-0047.
 
 ## Downstream Consequences
 
-- M0031 may emit host-target Cranelift functions for bootstrap `Int` calls and
+- The compiler may emit host-target Cranelift functions for bootstrap `Int` calls and
   returns.
-- M0032 must provide or select the executable entry path rather than treating
+- The compiler must provide or select the executable entry path rather than treating
   language `main` as a platform `_start`.
 - Stable public ABI, FFI ABI, host linking, and symbol export policy are
   deferred.

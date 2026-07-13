@@ -8,7 +8,7 @@ Diagnostic behavior must cite:
 
 - `docs/SPEC.md`
 - the relevant file under `docs/adr/`
-- the task or milestone that authorizes harness-only behavior
+- the task or implementation phase that authorizes harness-only behavior
 
 If the source of truth is ambiguous, main tasks must file an ambiguity report instead of creating a diagnostic expectation.
 
@@ -36,11 +36,11 @@ The initial severity model is:
 - warning
 - note
 
-Compiler stages may use only severities documented here unless a later milestone extends the contract.
+Compiler stages may use only severities documented here unless a later implementation phase extends the contract.
 
 ## User-Facing Wording
 
-Diagnostics must describe source-level concepts. They must not expose internal compiler jargon such as pass names, internal representation names, implementation IDs, or backend internals unless the user explicitly requested an internal diagnostic mode in a future milestone.
+Diagnostics must describe source-level concepts. They must not expose internal compiler jargon such as pass names, internal representation names, implementation IDs, or backend internals unless the user explicitly requested an internal diagnostic mode in a future implementation phase.
 
 ## Snapshot Expectations
 
@@ -55,4 +55,3 @@ Diagnostic snapshots must be stable enough for review. A snapshot should record:
 - source-of-truth citation
 
 Snapshots must not be used to encode guessed language behavior. If a compiler rule is not specified, the expected diagnostic is blocked until the specification or ADRs resolve it.
-

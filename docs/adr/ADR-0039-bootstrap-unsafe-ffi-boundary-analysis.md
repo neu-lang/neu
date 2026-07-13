@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Question
 
-What bootstrap unsafe and FFI boundary semantics are sufficient for M0026
+What bootstrap unsafe and FFI boundary semantics are sufficient for this implementation
 without defining unsafe source syntax, FFI declaration syntax, host linking,
 foreign binding generation, or ABI lowering?
 
@@ -13,8 +13,8 @@ foreign binding generation, or ABI lowering?
 1. Define concrete unsafe and FFI source syntax now.
 2. Implement host-linking and ABI validation before unsafe/FFI checks.
 3. Use metadata-only unsafe-context, unsafe-operation, and FFI-declaration
-   records for M0026.
-4. Defer M0026 entirely until unsafe syntax and host linking exist.
+   records for this implementation.
+4. Defer the compiler entirely until unsafe syntax and host linking exist.
 
 ## Trade-offs
 
@@ -23,9 +23,9 @@ explicitly defers unsafe block syntax and the current grammar does not accept
 FFI declarations.
 
 Host-linking-first validation would improve ABI precision, but it would push
-backend and packaging milestones ahead of core safe-code boundary checks.
+backend and packaging future work ahead of core safe-code boundary checks.
 
-Metadata-only records let M0026 validate the trust-boundary rules selected by
+Metadata-only records let the compiler validate the trust-boundary rules selected by
 ADR-0018 while keeping syntax, host linking, linking, and ABI lowering out of
 scope.
 
@@ -36,12 +36,12 @@ without an incremental unsafe/FFI boundary model.
 
 Use a metadata-only bootstrap unsafe and FFI boundary model.
 
-M0026 introduces no source-level unsafe block, unsafe function, extern block,
+The compiler introduces no source-level unsafe block, unsafe function, extern block,
 foreign declaration, ABI string, link attribute, target attribute, safe-wrapper
 syntax, or module audit syntax. Existing unsupported unsafe-like and FFI-like
 source forms remain rejected or unsupported.
 
-M0026 defines two safety bases:
+The compiler defines two safety bases:
 
 - `ProvenSafe`: the compiler's accepted analyses prove the operation safe, so
   no unsafe context is required.
@@ -50,7 +50,7 @@ M0026 defines two safety bases:
 
 Unsafe context records are compiler side-table facts. A context record has a
 context node and context kind: `block`, `function`, or `module_audit`. These
-kinds are semantic metadata only in M0026 and do not imply source syntax.
+kinds are semantic metadata only in this implementation and do not imply source syntax.
 
 Unsafe operation records are compiler side-table facts. An operation record has
 an operation node, operation kind, safety basis, and optional containing unsafe
@@ -58,7 +58,7 @@ context node. A `ProvenSafe` operation is accepted without an unsafe context. A
 `TrustedUnsafe` operation is accepted only when its containing context node
 matches one of the supplied unsafe context records.
 
-M0026 reports `unsafe_operation_outside_context` when a `TrustedUnsafe`
+The compiler reports `unsafe_operation_outside_context` when a `TrustedUnsafe`
 operation has no matching unsafe context. The primary diagnostic span is the
 operation node. When a non-matching context node is supplied, that context node
 is the secondary span; otherwise there is no secondary span. The diagnostic
@@ -76,21 +76,21 @@ metadata presence for these required categories:
 - lifetime validity;
 - thread-safety or send/share guarantees.
 
-M0026 validates metadata presence only. It does not validate concrete target
+The compiler validates metadata presence only. It does not validate concrete target
 triples, layout, calling convention compatibility, symbol names, linker inputs,
 header parsing, generated bindings, dynamic loading, platform APIs, or ABI
 lowering.
 
-M0026 reports `missing_ffi_safety_metadata` when an FFI declaration lacks one
+The compiler reports `missing_ffi_safety_metadata` when an FFI declaration lacks one
 or more required metadata categories. The primary diagnostic span is the FFI
 declaration node. The diagnostic must list the missing metadata categories.
 
-A safe wrapper is valid in M0026 only as metadata that marks whether ordinary
-safe use is intended to go through a wrapper. M0026 does not type-check wrapper
+A safe wrapper is valid in this implementation only as metadata that marks whether ordinary
+safe use is intended to go through a wrapper. The compiler does not type-check wrapper
 bodies, prove wrapper safety, lower wrapper calls, or expose FFI declarations
 to source-level name resolution.
 
-Safe-code guarantees remain intact because M0026 accepts trusted unsafe
+Safe-code guarantees remain intact because the compiler accepts trusted unsafe
 operations only inside supplied unsafe contexts and treats FFI declarations
 without required safety metadata as invalid. Existing ownership, borrowing,
 thread-capability, coroutine, and nullability analyses remain authoritative for
@@ -99,11 +99,11 @@ ordinary safe code.
 
 ## Downstream Consequences
 
-- M0026 can implement unsafe-context and FFI metadata checkers without source
+- The compiler can implement unsafe-context and FFI metadata checkers without source
   syntax.
 - Later unsafe syntax must map into the same context and operation categories
   or supersede this ADR.
-- Later host-linking milestones must replace metadata-presence checks with
+- Later host-linking future work must replace metadata-presence checks with
   target-specific validation.
 - Diagnostics can rely on stable identifiers
   `unsafe_operation_outside_context` and `missing_ffi_safety_metadata`.

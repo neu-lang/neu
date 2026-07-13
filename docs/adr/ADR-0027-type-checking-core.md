@@ -4,15 +4,15 @@ Status: Accepted
 
 ## Decision
 
-M0018 defines a small bootstrap type checker with primitive type-checking identities, literal typing, resolved name expression typing, explicit nullable wrappers, and exact assignment compatibility.
+The compiler defines a small bootstrap type checker with primitive type-checking identities, literal typing, resolved name expression typing, explicit nullable wrappers, and exact assignment compatibility.
 
-Direct function declaration calls and structural function type application are deferred for M0018 because accepted function signature metadata and function type representation are not yet sufficient implementation authority.
+Direct function declaration calls and structural function type application are deferred for this implementation because accepted function signature metadata and function type representation are not yet sufficient implementation authority.
 
 The type checker must not rely on Kotlin, Rust, Go, current parser behavior, current test behavior, or current type_check behavior as implicit authority.
 
 ## Question
 
-What bootstrap type-checking subset, typed output shape, primitive type identity model, literal typing model, assignment compatibility rule, and type diagnostic contract should M0018 implement before ownership and borrow analysis?
+What bootstrap type-checking subset, typed output shape, primitive type identity model, literal typing model, assignment compatibility rule, and type diagnostic contract should the compiler implement before ownership and borrow analysis?
 
 ## Competing Designs
 
@@ -23,36 +23,36 @@ What bootstrap type-checking subset, typed output shape, primitive type identity
 
 ## Trade-offs
 
-Full expression type checking exercises more frontend code but risks inventing overload behavior, conversions, function signatures, and primitive scalar semantics beyond M0018.
+Full expression type checking exercises more frontend code but risks inventing overload behavior, conversions, function signatures, and primitive scalar semantics beyond the compiler.
 
 Explicit-annotation-only nominal checking is safest but does not create useful well-typed and ill-typed expression fixtures.
 
-A small bootstrap checker gives M0018 testable behavior while keeping direct calls, structural function type application, overloads, numeric conversion, generic solving, and member lookup deferred.
+A small bootstrap checker gives the compiler testable behavior while keeping direct calls, structural function type application, overloads, numeric conversion, generic solving, and member lookup deferred.
 
 Constraint-based checking may scale later, but it adds complexity before accepted constraints, overloads, and inference behavior exist.
 
 ## Concrete Type Checking Model
 
-M0018 type checks only constructs whose input identities are already available from accepted earlier milestones:
+The type checker checks only constructs whose input identities are already available from accepted parser and frontend work:
 
-- parsed AST node identities from M0009 through M0013
-- module, package, and visibility metadata from M0014
-- symbol and name-resolution results from M0015 and M0016
-- type identities, nullable wrappers, and unsupported type-form diagnostics from M0017
+- parsed AST node identities from the parser
+- module, package, and visibility metadata from the frontend
+- symbol and name-resolution results from the frontend
+- type identities, nullable wrappers, and unsupported type-form diagnostics from accepted type metadata
 
-M0018 does not rewrite the AST, lower to HIR, infer missing declarations, resolve calls, or perform ownership analysis.
+The compiler does not rewrite the AST, lower to HIR, infer missing declarations, resolve calls, or perform ownership analysis.
 
 The concrete model includes:
 
 - literal expressions for `true`, `false`, accepted integer literals, accepted string literals, and `null`
-- name expressions whose M0016 resolution points to a local binding or declaration with a known type supplied by accepted explicit annotation or signature metadata
+- name expressions whose resolution points to a local binding or declaration with a known type supplied by accepted explicit annotation or signature metadata
 - assignment statements where both sides have known types
 - local declarations with known explicit annotation types when parser metadata provides those annotations
 - block expressions only as containers for checking contained expressions and statements, not as value-producing expressions
 
 ## Typed Output Shape
 
-M0018 produces a type-check report containing:
+The compiler produces a type-check report containing:
 
 - expression type table keyed by `AstNodeId`
 - declaration signature table keyed by `AstNodeId`
@@ -65,7 +65,7 @@ If a construct cannot be typed, the report records a diagnostic and no successfu
 
 ## Primitive Type Identity
 
-M0018 may introduce `PrimitiveType` identities for type checking only:
+The compiler may introduce `PrimitiveType` identities for type checking only:
 
 - `Bool`
 - `Int`
@@ -79,7 +79,7 @@ Primitive identities are represented in the type model as bootstrap type identit
 
 ## Included Expression Forms
 
-Included expression forms for M0018:
+Included expression forms for this implementation:
 
 - boolean literals type to `Bool`
 - accepted integer literals type to `Int`
@@ -88,7 +88,7 @@ Included expression forms for M0018:
 - name expressions type to the type of their resolved local binding or declaration when that type is known from accepted metadata
 - grouped expressions type to the inner expression type
 
-Excluded expression forms for M0018:
+Excluded expression forms for this implementation:
 
 - call expressions
 - member expressions
@@ -101,28 +101,28 @@ Excluded forms report `unsupported_type_rule` with a stable rule identifier rath
 
 ## Assignment Compatibility
 
-Assignment compatibility is exact type identity for M0018, with two nullable exceptions:
+Assignment compatibility is exact type identity for this implementation, with two nullable exceptions:
 
 - `Null` is assignment-compatible only with nullable target types.
 - Non-null base values are assignment-compatible with their nullable wrapper.
 
 `Null` is never assignment-compatible with non-nullable targets.
 
-No implicit numeric conversion, subtyping, protocol conformance, variance, ownership move rule, borrow rule, dereference rule, or user-defined conversion participates in M0018 assignment compatibility.
+No implicit numeric conversion, subtyping, protocol conformance, variance, ownership move rule, borrow rule, dereference rule, or user-defined conversion participates in this implementation assignment compatibility.
 
 ## Direct Call Deferral
 
-Direct function declaration calls are deferred for M0018.
+Direct function declaration calls are deferred for this implementation.
 
-Reason: accepted parser and declaration metadata do not yet provide complete parameter and return signature authority for a type checker, and M0016 explicitly does not implement overload resolution, member lookup, generic instantiation, constructor lookup, extension lookup, or type-directed lookup.
+Reason: accepted parser and declaration metadata do not yet provide complete parameter and return signature authority for a type checker, and the compiler explicitly does not implement overload resolution, member lookup, generic instantiation, constructor lookup, extension lookup, or type-directed lookup.
 
 Call expressions report `unsupported_type_rule` with stable rule identifier `direct_call_deferred`.
 
 ## Function Type Application Deferral
 
-Structural function type application is deferred for M0018.
+Structural function type application is deferred for this implementation.
 
-Reason: M0017 records nominal, generic placeholder, nullable, and unsupported type forms, but does not yet provide a first-class function type representation suitable for checking arity, argument types, result types, suspension, effects, or ownership behavior.
+Reason: the compiler records nominal, generic placeholder, nullable, and unsupported type forms, but does not yet provide a first-class function type representation suitable for checking arity, argument types, result types, suspension, effects, or ownership behavior.
 
 Function type application reports `unsupported_type_rule` with stable rule identifier `function_type_application_deferred`.
 
@@ -161,7 +161,7 @@ Diagnostic: `ambiguous_type_rule`
 
 ## Unsupported And Ambiguous Rules
 
-M0018 rejects unsupported or ambiguous type rules explicitly. It must not choose a behavior by source order, parser traversal order, external language precedent, or current test convenience.
+The compiler rejects unsupported or ambiguous type rules explicitly. It must not choose a behavior by source order, parser traversal order, external language precedent, or current test convenience.
 
 Unsupported and ambiguous diagnostics carry a stable rule identifier so fixtures can assert the exact blocked rule.
 
@@ -198,13 +198,13 @@ ADR-0027 defers:
 
 ## Downstream Consequences
 
-M0019 depends on M0018 distinguishing nullable from non-nullable types without implementing smart casts prematurely.
+The compiler depends on this implementation distinguishing nullable from non-nullable types without implementing smart casts prematurely.
 
-M0020 depends on generic placeholders being blocked where constraint solving is not accepted.
+The compiler depends on generic placeholders being blocked where constraint solving is not accepted.
 
-M0022 and M0023 depend on typed expressions being reliable enough that move and borrow diagnostics are not built on guessed types.
+Ownership and borrow diagnostics depend on typed expressions being reliable enough that they are not built on guessed types.
 
-Backend milestones must not rely on bootstrap primitive categories as ABI commitments unless a later ABI or layout ADR accepts that meaning.
+Backend future work must not rely on bootstrap primitive categories as ABI commitments unless a later ABI or layout ADR accepts that meaning.
 
 ## Dependencies
 

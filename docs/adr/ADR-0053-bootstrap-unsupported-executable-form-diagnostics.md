@@ -41,7 +41,7 @@ receive those forms. Unrelated sibling forms continue to be checked.
 
 ## Downstream Consequences
 
-- M0028 can reject deferred declarations, types, patterns, and runtime forms
+- The compiler can reject deferred declarations, types, patterns, and runtime forms
   deterministically before HIR.
 - HIR and later stages may require an executable-form-clean frontend report.
 - Diagnostics remain source-file-qualified without relying on arena-local IDs.

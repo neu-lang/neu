@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Question
 
-What smallest ownership and move-analysis subset can M0022 implement without
+What smallest ownership and move-analysis subset can the compiler implement without
 assuming full constructors, calls, destructors, copy traits, borrow checking, or
 runtime representation?
 
@@ -13,7 +13,7 @@ runtime representation?
 1. Define a complete value-category system now, including primitive layout,
    user-defined copy declarations, destructors, partial moves, calls, captures,
    and returns.
-2. Classify the existing M0018 primitive type identities into copyable trivial
+2. Classify the existing primitive type identities into copyable trivial
    identities and move-only resource-like identities, classify nominal
    user-defined type identities as move-only, then analyze local name uses and
    local initializer transfers only.
@@ -23,22 +23,22 @@ runtime representation?
 ## Trade-Offs
 
 Design 1 gives a more complete ownership story but would require decisions
-that M0022 does not need and that later borrow, destructor, coroutine, and FFI
-milestones must still refine.
+that the compiler does not need and that later borrow, destructor, coroutine, and FFI
+future work must still refine.
 
 Design 2 creates a testable bootstrap safety pass from existing typed and name
 metadata. It remains conservative, but it can diagnose accidental use after a
 local ownership transfer without deciding calls, destructors, or layout.
 
-Design 3 avoids premature choices but blocks the roadmap from validating the
+Design 3 avoids premature choices but blocks the project plan from validating the
 core no-GC/no-manual-memory-management discipline before borrow checking.
 
 Design 4 could produce user-visible errors, but without a move-state model it
-would not give later M0023-M0026 passes reliable safety inputs.
+would not give later analysis passes reliable safety inputs.
 
 ## Decision
 
-Choose design 2 for M0022.
+Choose design 2 for this implementation.
 
 The bootstrap ownership pass classifies values by accepted type identity:
 
@@ -55,7 +55,7 @@ runtime allocation are defined by ADR-0064.
 
 ## Move Sites
 
-M0022 recognizes only these ownership transfer sites:
+The compiler recognizes only these ownership transfer sites:
 
 - a local `val` or `var` initializer whose initializer expression is a bare
   resolved local name of move-only type;
@@ -71,7 +71,7 @@ Copyable values do not enter the moved state at these sites.
 
 ## Non-Move Sites And Deferrals
 
-M0022 does not treat these as move sites:
+The compiler does not treat these as move sites:
 
 - local initializer or assignment values that are literals, grouped
   expressions, `if` expressions, `when` expressions, block expressions, member
@@ -85,8 +85,8 @@ M0022 does not treat these as move sites:
 
 Unsupported or unanalyzable ownership forms are not accepted as safe move
 behavior. They either produce an ownership diagnostic only when an accepted
-diagnostic rule exists, or are ignored by M0022 and left to a later accepted
-milestone when no ownership rule exists.
+diagnostic rule exists, or are ignored by this implementation and left to a later accepted
+later accepted rule when no ownership rule exists.
 
 ## Move-State Model
 
@@ -134,16 +134,16 @@ Diagnostic: `unsupported_ownership_rule`
   - `return_move_deferred`
   - `when_subject_move_deferred`
 
-M0022 prefers no ownership diagnostic over an unsupported diagnostic when the
+The compiler prefers no ownership diagnostic over an unsupported diagnostic when the
 construct is outside the accepted ownership surface and no later use would
 otherwise be proven invalid.
 
 ## Consequences
 
-M0022 can implement a real ownership side table, copyability check, and
+The compiler can implement a real ownership side table, copyability check, and
 use-after-move diagnostic using existing local binding and type metadata.
 
-M0023 borrow checking can depend on the fact that a moved binding is not usable
+The compiler borrow checking can depend on the fact that a moved binding is not usable
 through later bare-name local expressions in the analyzed subset.
 
 `String` remains move-only, while its cloning, borrowing, cleanup, and opaque
@@ -155,5 +155,5 @@ ADR's string-storage deferral without changing the move-only classification.
 Depends on ADR-0001, ADR-0004, ADR-0005, ADR-0010, ADR-0015, ADR-0024,
 ADR-0026, ADR-0027, ADR-0029, ADR-0032, ADR-0033, and ADR-0034.
 
-This resolves `docs/ambiguities/M0022-ownership-value-categories.md`. It does
+This resolves the corresponding ambiguity report. It does
 not supersede generic copyability or capability-bound deferral in ADR-0032.

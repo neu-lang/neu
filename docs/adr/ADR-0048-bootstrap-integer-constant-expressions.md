@@ -33,7 +33,7 @@ might be inferred.
 
 ## Downstream Consequences
 
-- M0028 evaluates only literal, grouped, unary, and accepted binary metadata.
+- The compiler evaluates only literal, grouped, unary, and accepted binary metadata.
 - Runtime failures outside this boundary trap under ADR-0043.
 
 ## Dependencies

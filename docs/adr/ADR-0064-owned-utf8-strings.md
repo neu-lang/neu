@@ -10,7 +10,7 @@ deallocation, hidden copying, or a stable public runtime ABI?
 ## Decision
 
 Neu supports immutable owned UTF-8 strings. Existing double-quoted literals
-remain the only source spelling in this milestone and decode only the escape
+remain the only source spelling in this implementation phase and decode only the escape
 forms already accepted by ADR-0021. Raw strings, interpolation, character
 literals, Unicode escape syntax, and multiline strings remain deferred.
 

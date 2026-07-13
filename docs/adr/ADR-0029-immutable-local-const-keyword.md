@@ -237,9 +237,9 @@ ADR-0028's semantic rules require no behavioral change. Any edit is
 terminology-only unless needed to state that a `const` local denotes the same
 immutable-binding category.
 
-### Roadmap Hard Gate For M0019-014
+### Implementation Hard Gate
 
-Task `M0019-014` remains paused through all of these ordered gates:
+The associated task remains paused through all of these ordered gates:
 
 1. The complete ADR-0029 authority bundle becomes authoritative.
 2. main-task test work performs the lexical, parser, binding-category, diagnostic,
@@ -254,8 +254,8 @@ Task `M0019-014` remains paused through all of these ordered gates:
 5. Examples and related documentation migrate only after the semantic fixtures
    pass.
 
-After all five gates pass, main-task task planning and main-task roadmap planning must revalidate
-`M0019-014` against this authority before returning it to the main-task test work and
+After all five gates pass, project planning must revalidate
+The associated task must be checked against this authority before returning it to the main-task test work and
 main-task implementation workflow. Existing task text, implementation, fixtures, or examples
 are not semantic precedent.
 

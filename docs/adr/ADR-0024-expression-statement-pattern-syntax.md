@@ -12,7 +12,7 @@ What concrete expression grammar, statement grammar, block grammar, pattern gram
 2. Define a small Kotlin-like custom body grammar.
 3. Define a Rust-like expression-oriented block and pattern grammar with Kotlin-like declarations.
 4. Split expression, statement, and pattern syntax into separate ADRs.
-5. Continue deferring body syntax until after name resolution and type representation milestones.
+5. Continue deferring body syntax until after name resolution and type representation are ready.
 
 ## Trade-offs
 
@@ -22,7 +22,7 @@ A small Kotlin-like custom body grammar preserves the project syntax direction w
 
 A Rust-like expression-oriented grammar could align with ownership scopes and deterministic destruction, but it would conflict with the Kotlin-like syntax constraint unless heavily adapted.
 
-Splitting expression, statement, and pattern syntax into separate ADRs reduces review scope, but M0013 needs an integrated decision because block grammar, pattern grammar, smart casts, and diagnostics interact.
+Splitting expression, statement, and pattern syntax into separate ADRs reduces review scope, but the compiler needs an integrated decision because block grammar, pattern grammar, smart casts, and diagnostics interact.
 
 Continuing to defer avoids premature syntax decisions, but leaves executable bodies, pattern matching, flow typing, and later semantic passes blocked.
 
@@ -44,7 +44,7 @@ This ADR specifies only the body forms required by the near-term frontend pipeli
 - `when` or match syntax, if included
 - pattern grammar
 - unsafe block syntax
-- coroutine syntax, if any syntax is included in M0013
+- coroutine syntax, if included by a future accepted decision
 - parser recovery boundaries
 - parser diagnostic categories
 
@@ -269,14 +269,14 @@ The accepted grammar defers:
 
 ## Downstream Consequences
 
-- M0013 parser fixtures may be created for ADR-0024 constructs.
-- M0013 parser implementation may proceed only for ADR-0024 body constructs.
-- M0016 name resolution depends on accepted binding positions in statements and patterns.
-- M0018 type checking depends on expression precedence and block result rules.
-- M0019 flow typing depends on accepted conditional and pattern syntax.
-- M0021 exhaustiveness depends on accepted pattern forms.
-- M0022 ownership and move analysis depends on accepted block and statement ownership scope.
-- M0025 coroutine analysis depends on accepted coroutine syntax or explicit deferral.
+- The compiler parser fixtures may be created for ADR-0024 constructs.
+- The compiler parser implementation may proceed only for ADR-0024 body constructs.
+- Name resolution depends on accepted binding positions in statements and patterns.
+- Type checking depends on expression precedence and block result rules.
+- The compiler flow typing depends on accepted conditional and pattern syntax.
+- The compiler exhaustiveness depends on accepted pattern forms.
+- Ownership analysis and move analysis depends on accepted block and statement ownership scope.
+- The compiler coroutine analysis depends on accepted coroutine syntax or explicit deferral.
 - Unsafe and FFI checks depend on accepted unsafe block syntax or explicit deferral.
 
 ## Dependencies
@@ -290,7 +290,7 @@ The accepted grammar defers:
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - `docs/adr/ADR-0018-unsafe-ffi-and-trust-boundaries.md`
 - `docs/adr/ADR-0021-lexical-grammar.md`
-- `docs/ambiguities/M0008-expression-statement-pattern-syntax.md`
+- expression-statement-pattern-syntax ambiguity report
 - `docs/syntax/grammar-authority-ledger.md`
 - main-task language review audit
 - main-task adversarial check review

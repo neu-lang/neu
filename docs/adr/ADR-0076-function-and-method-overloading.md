@@ -90,7 +90,7 @@ deferred.
 - Overloading and overriding remain distinct and share one candidate/dispatch
   pipeline.
 - Exact overloads for currently accepted primitive, string, array, class, and
-  interface types can use the task-005 ABI without implicit conversions.
+  interface types can use the initial ABI without implicit conversions.
 - Ambiguity is explicit and source mapped, rather than dependent on source
   order or backend representation.
 - No public symbol mangling, object layout, vtable layout, or FFI contract is

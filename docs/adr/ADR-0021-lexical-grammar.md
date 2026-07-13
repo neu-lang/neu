@@ -234,14 +234,14 @@ The explicit deferrals are intentional. Later accepted ADRs may expand the lexic
 
 ## Consequences
 
-- M0007 may proceed to concrete lexer fixtures and lexer implementation tasks.
+- The compiler may proceed to concrete lexer fixtures and lexer implementation tasks.
 - Lexer tests must use only token forms accepted by this ADR unless they are negative tests for explicitly rejected forms.
-- Parser milestones may reference token spellings from this ADR, but this ADR does not define parser grammar.
+- Parser future work may reference token spellings from this ADR, but this ADR does not define parser grammar.
 - Unicode identifier support requires a future accepted ADR or spec update.
 - String interpolation, raw strings, and numeric suffixes require future accepted ADRs or spec updates.
 
 ## Dependencies
 
 - ADR-0015 diagnostics as semantics.
-- M0005 source database and byte span model.
-- M0006 token model and fixture metadata.
+- The compiler source database and byte span model.
+- The compiler token model and fixture metadata.

@@ -52,7 +52,7 @@ unsupported AST input rather than represent it as executable HIR.
 
 ## Downstream Consequences
 
-- M0029 acceptance criteria must include preservation of executable-subset
+- The compiler acceptance criteria must include preservation of executable-subset
   runtime facts.
 - MIR lowering can depend on typed callee, local, return, and source-mapping
   information.

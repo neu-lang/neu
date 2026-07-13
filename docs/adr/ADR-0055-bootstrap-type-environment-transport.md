@@ -49,9 +49,9 @@ The exact Rust ownership and API shape remain compiler implementation details.
 
 ## Downstream Consequences
 
-- M0030 must preserve and validate the module type environment at HIR-to-MIR
+- The compiler must preserve and validate the module type environment at HIR-to-MIR
   lowering boundaries.
-- M0031 can map `Int` to Cranelift `I64` without hardcoding `TypeId` values.
+- The compiler can map `Int` to Cranelift `I64` without hardcoding `TypeId` values.
 - Backend unsupported-type failures remain internal lowering diagnostics until
   user-facing runtime types are accepted.
 - This decision does not define additional language types, layouts, or ABI

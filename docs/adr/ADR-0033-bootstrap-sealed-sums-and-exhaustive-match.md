@@ -4,14 +4,14 @@ Status: Accepted
 
 ## Question
 
-What smallest sealed-sum and match subset can M0021 implement without assuming
+What smallest sealed-sum and match subset can the compiler implement without assuming
 Kotlin `when` semantics, payload destructuring, or open hierarchy behavior?
 
 ## Competing Designs
 
 1. Add closed no-payload `enum` variants and an expression-level `when` form
    with qualified case patterns.
-2. Add payload enum variants and destructuring patterns in the same milestone.
+2. Add payload enum variants and destructuring patterns in the same implementation phase.
 3. Use sealed interfaces with independently declared variants.
 4. Defer all algebraic-data and matching behavior.
 
@@ -61,7 +61,7 @@ Semantic diagnostics preserve independently valid arms and continue checking.
 
 ## Consequences And Deferrals
 
-This establishes a finite, module/package-scoped coverage set for M0021. It
+This establishes a finite, module/package-scoped coverage set for this implementation. It
 does not define payload variants, destructuring, enum methods, sealed
 interfaces, open hierarchies, generic enums, nullable match coverage, type
 unification across arm results, expression evaluation, ownership behavior, or
@@ -70,6 +70,6 @@ smart-cast behavior. Those need later accepted decisions.
 ## Dependencies And Supersession
 
 Depends on ADR-0006, ADR-0007, ADR-0011, ADR-0012, ADR-0015, ADR-0017,
-ADR-0022, ADR-0024, and M0021. This narrowly supersedes ADR-0022's enum
+ADR-0022 and ADR-0024. This narrowly supersedes ADR-0022's enum
 variant deferral and ADR-0024's match/`when` deferral for the exact bootstrap
-subset above. It resolves `docs/ambiguities/M0021-sealed-sum-exhaustiveness.md`.
+subset above. It resolves the corresponding ambiguity report.

@@ -66,7 +66,7 @@ ADR-0063. Owned UTF-8 strings are accepted only by ADR-0064; dynamic arrays,
 slices, and host-linking APIs remain deferred.
 
 This ADR extends the executable subset beyond ADR-0024 where needed for
-operators not previously parsed. M0028 must add parser and type-checker support
+operators not previously parsed. The compiler must add parser and type-checker support
 for `**`, `~`, `^`, `<<`, and `>>` before HIR lowering may consume executable
 fixtures. Operator precedence for the executable subset is, from highest to
 lowest: unary `+`, unary `-`, unary `~`; exponentiation `**` as
@@ -78,10 +78,10 @@ when one already applies.
 
 ## Downstream Consequences
 
-- M0029 through M0032 have an exact source-backed executable target.
+- The implementation has an exact source-backed executable target.
 - Backend work must not accept broader source semantics by accident.
 - Examples may show the first runnable shape only after implementation reaches
-  the matching milestone.
+  the matching implementation.
 
 ## Dependencies
 

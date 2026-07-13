@@ -60,7 +60,7 @@ If the compiler can prove overflow for a constant expression in the bootstrap
 subset, it reports `integer_overflow`. Division or modulo by a statically known
 zero reports `division_by_zero`. Runtime overflow, runtime division/modulo by
 zero, runtime negative exponent, or runtime invalid shift count traps. Trap
-presentation is backend/runtime-defined in M0031/M0032, but it must not
+presentation is backend/runtime-defined by the implementation, but it must not
 silently wrap or continue.
 
 The first executable smoke test must avoid overflow and division/modulo by
@@ -74,7 +74,7 @@ population-count or bit-scan intrinsics are deferred.
 - HIR and MIR may use a stable `Int64` runtime type for bootstrap `Int`.
 - Cranelift lowering must emit checked or trapping arithmetic, exponentiation,
   bitwise, and shift behavior for the executable subset.
-- M0032 can treat a small non-negative `Int` from `main` as the process exit
+- The compiler can treat a small non-negative `Int` from `main` as the process exit
   code through ADR-0047.
 
 ## Dependencies

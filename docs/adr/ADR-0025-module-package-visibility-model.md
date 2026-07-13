@@ -65,7 +65,7 @@ Multiple files in one module may declare the same package namespace. Their top-l
 
 The same package namespace may appear in multiple modules. Later name resolution distinguishes those declarations by module identity.
 
-Imports are syntax only for M0014 and do not define module dependencies.
+Imports are syntax only for this implementation and do not define module dependencies.
 
 ## Visibility Categories
 
@@ -99,7 +99,7 @@ If the declaration has an explicit ADR-0022 visibility modifier, metadata record
 
 If the declaration omits visibility, metadata records `internal` and marks it defaulted.
 
-Duplicate visibility modifiers are parser diagnostics from ADR-0022. M0014 metadata receives only the parser-accepted effective visibility if parsing succeeds.
+Duplicate visibility modifiers are parser diagnostics from ADR-0022. The metadata receives only the parser-accepted effective visibility if parsing succeeds.
 
 ## Module Metadata Record
 
@@ -153,11 +153,11 @@ This ADR does not define:
 
 ## Downstream Consequences
 
-- M0014 can add module metadata data structures only for the accepted model in this ADR.
-- M0015 symbol interning depends on stable module and package identity.
-- M0016 name resolution depends on visibility category semantics.
-- M0021 sealed or algebraic data behavior may depend on module scope.
-- M0031 needs module artifact compatibility rules later.
+- The compiler can add module metadata data structures only for the accepted model in this ADR.
+- The compiler symbol interning depends on stable module and package identity.
+- Name resolution depends on visibility category semantics.
+- The compiler sealed or algebraic data behavior may depend on module scope.
+- The compiler needs module artifact compatibility rules later.
 
 ## Dependencies
 

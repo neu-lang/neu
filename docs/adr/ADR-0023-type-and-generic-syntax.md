@@ -11,7 +11,7 @@ What concrete type, nullable type, generic parameter, generic argument, function
 1. Adopt Kotlin type and generic syntax directly.
 2. Define a small Kotlin-like custom type grammar.
 3. Define a Rust-like generic and bound grammar with Kotlin-like declarations.
-4. Continue deferring type and generic syntax until type representation and checking milestones.
+4. Continue deferring type and generic syntax until type representation and checking are ready.
 
 ## Trade-offs
 
@@ -21,7 +21,7 @@ A small Kotlin-like custom type grammar preserves ergonomic direction while requ
 
 A Rust-like generic and bound grammar could align with systems programming expectations and capability constraints, but it conflicts with the Kotlin-like syntax constraint and would create surface inconsistency with ADR-0022 declarations.
 
-Continuing to defer syntax avoids premature grammar decisions, but leaves M0012 blocked and prevents type representation, type checking, generic constraints, and capability analysis from making parser-backed progress.
+Continuing to defer syntax avoids premature grammar decisions, but prevents type representation, type checking, generic constraints, and capability analysis from making parser-backed progress.
 
 ## Decision
 
@@ -238,11 +238,11 @@ The bootstrap type grammar defers:
 
 ## Downstream Consequences
 
-- M0012 may add concrete type and generic parser fixtures for ADR-0023 constructs.
-- M0012 may add concrete type AST nodes only for ADR-0023 constructs.
-- M0017 type representation must align with the accepted type forms.
-- M0018 type checking must not infer syntax that the parser does not accept.
-- M0020 generic constraints and capability bounds depend on accepted bound syntax.
+- The compiler may add concrete type and generic parser fixtures for ADR-0023 constructs.
+- The compiler may add concrete type AST nodes only for ADR-0023 constructs.
+- Type representation must align with the accepted type forms.
+- Type checking must not infer syntax that the parser does not accept.
+- Generic constraints and capability bounds depend on accepted bound syntax.
 - Ownership, borrowing, thread safety, and coroutine analyses must treat capability-bound syntax as source-level commitments after acceptance.
 - Expression, statement, pattern, coroutine, unsafe, and deferred type forms remain outside this ADR.
 
@@ -254,7 +254,7 @@ The bootstrap type grammar defers:
 - `docs/adr/ADR-0015-diagnostics-as-semantics.md`
 - `docs/adr/ADR-0016-generics-and-parametric-polymorphism.md`
 - `docs/adr/ADR-0022-declaration-syntax.md`
-- `docs/ambiguities/M0008-type-generic-syntax.md`
+- type-and-generic-syntax ambiguity report
 - `docs/syntax/grammar-authority-ledger.md`
 - main-task language review audit
 - main-task adversarial check review

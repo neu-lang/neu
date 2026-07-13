@@ -10,7 +10,7 @@ What concrete declaration grammar should the language use for packages, imports,
 
 The language uses a small Kotlin-like custom declaration grammar for the bootstrap compiler.
 
-This ADR specifies only the declaration forms required to unblock M0011:
+This ADR specifies only the declaration forms required by the parser:
 
 - package declarations
 - import declarations
@@ -38,7 +38,7 @@ A small Kotlin-like custom declaration grammar preserves the ergonomic direction
 
 A Rust-like declaration grammar could align with ownership-oriented systems programming expectations, but conflicts with the Kotlin-like syntax constraint and risks creating an incoherent surface language.
 
-Continuing to defer syntax avoids premature decisions, but keeps M0011 blocked and delays name resolution, module modeling, and type checking milestones.
+Continuing to defer syntax avoids premature decisions, but delays name resolution, module modeling, and future type-checking work.
 
 ## Concrete Grammar
 
@@ -118,7 +118,7 @@ function-body-placeholder = declaration-body | `;`
 
 The parser may recognize the position of a parameter list but must not parse parameter declarations until type syntax is accepted.
 
-The parser may recognize the position of a return type after `:` but must treat the type contents as a placeholder until M0012 resolves type grammar.
+The parser may recognize the position of a return type after `:` but must treat the type contents as a placeholder until accepted type grammar exists.
 
 A function body may be a declaration body or semicolon placeholder. Statement and expression parsing remain out of scope.
 
@@ -214,12 +214,12 @@ The bootstrap declaration grammar defers:
 
 ## Downstream Consequences
 
-- M0011 may add concrete declaration parser fixtures and implementation tasks for only the constructs specified in this ADR.
-- M0011 must continue to reject or recover from deferred declaration forms instead of treating them as accepted syntax.
-- M0012 must align type annotations and generic declaration positions with this declaration grammar.
-- M0013 must align expression, statement, and pattern parsing with the body placeholders in this ADR.
-- M0014 module and package modeling depends on package and import syntax accepted here.
-- M0016 name resolution depends on declaration names and visibility placement accepted here.
+- The compiler may add concrete declaration parser fixtures and implementation tasks for only the constructs specified in this ADR.
+- The compiler must continue to reject or recover from deferred declaration forms instead of treating them as accepted syntax.
+- The compiler must align type annotations and generic declaration positions with this declaration grammar.
+- The compiler must align expression, statement, and pattern parsing with the body placeholders in this ADR.
+- Module and package modeling depends on package and import syntax accepted here.
+- Name resolution depends on declaration names and visibility placement accepted here.
 - Parser recovery diagnostics must cite ADR-0015 and this ADR.
 
 ## Dependencies

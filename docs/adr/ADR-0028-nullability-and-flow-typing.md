@@ -4,28 +4,28 @@ Status: Accepted
 
 ## Question
 
-What nullability checks, flow-sensitive smart-cast eligibility rules, mutation invalidation rules, and diagnostic obligations should M0019 implement before ownership and borrow analysis?
+What nullability checks, flow-sensitive smart-cast eligibility rules, mutation invalidation rules, and diagnostic obligations should the compiler implement before ownership and borrow analysis?
 
 ## Competing Designs
 
 1. Full Kotlin-like nullability and smart casts across locals, properties, calls, type tests, and boolean control flow.
 2. Nullability-only smart casts for immutable local bindings after explicit null comparisons.
 3. No smart casts; require explicit unwrap operations for nullable values.
-4. Diagnostic-only blocking for all M0019 behavior beyond ADR-0027 assignment compatibility.
+4. Diagnostic-only blocking for all behavior beyond ADR-0027 assignment compatibility.
 
 ## Trade-offs
 
 Full smart casts maximize ergonomics, but they require aliasing, property stability, call effects, suspension effects, and type-test semantics that are not yet accepted.
 
-Local immutable nullability-only refinements provide useful M0019 behavior while keeping mutation and alias invalidation small enough to specify before the borrow checker exists.
+Local immutable nullability-only refinements provide useful behavior while keeping mutation and alias invalidation small enough to specify before the borrow checker exists.
 
 Requiring explicit unwraps is simple, but it conflicts with ADR-0011 and the Kotlin-like ergonomics goal.
 
-Diagnostic-only blocking is safest, but it prevents M0019 from delivering its milestone goal once concrete rules are accepted.
+Diagnostic-only blocking is safest, but it prevents useful behavior once concrete rules are accepted.
 
 ## Decision
 
-Define a narrow M0019 nullability and flow-typing subset:
+Define a narrow nullability and flow-typing subset:
 
 - retain ADR-0027 nullable assignment compatibility
 - reject implicit `Null` in non-nullable targets
@@ -38,9 +38,9 @@ The language definition does not rely on Kotlin, Rust, current parser behavior, 
 
 ## Concrete Nullability And Flow Model
 
-M0019 extends the M0018 side-table type-check report with flow facts rather than rewriting the AST. The original AST remains the syntactic source.
+The compiler extends the side-table type-check report with flow facts rather than rewriting the AST. The original AST remains the syntactic source.
 
-The model starts with only local binding facts because M0016 already defines local binding identity and M0018 already records known local binding types.
+The model starts with only local binding facts because the compiler already defines local binding identity and the compiler already records known local binding types.
 
 Initial facts:
 
@@ -71,7 +71,7 @@ Excluded forms produce `unsupported_flow_rule` or preserve the existing unsuppor
 
 ## Null-Test Recognition
 
-M0019 recognizes only direct equality comparisons between one simple local name expression and the `null` literal as refinement conditions.
+The compiler recognizes only direct equality comparisons between one simple local name expression and the `null` literal as refinement conditions.
 
 Accepted null-test shapes:
 
@@ -99,7 +99,7 @@ Unsupported condition shapes do not create refinement facts. If a nullable value
 
 ## Branch Region Boundaries
 
-M0019 branch regions are syntactic regions from ADR-0024 `if` expressions.
+The compiler branch regions are syntactic regions from ADR-0024 `if` expressions.
 
 For `x != null`, the refinement is active only inside the then branch block.
 
@@ -121,7 +121,7 @@ Nested blocks inherit an active refinement only while they remain within the ref
 
 ## Refined Output Shape
 
-M0019 keeps the M0018 side-table model and adds flow output without rewriting the AST.
+The compiler keeps the side-table model and adds flow output without rewriting the AST.
 
 The flow output contains:
 
@@ -140,13 +140,13 @@ If refinement output is missing because the condition is unsupported, ambiguous,
 
 ## Shadowing And Nested Scope Rules
 
-M0019 identifies refinements by local binding identity, not by textual name alone.
+The compiler identifies refinements by local binding identity, not by textual name alone.
 
 Shadowing rules for shadowing declarations:
 
 - A nested declaration that introduces a new local binding with the same name hides the outer refinement for uses that resolve to the nested binding.
-- Uses before the nested declaration and still inside the refined branch keep the outer refinement when M0016 resolves them to the outer binding.
-- Uses after the nested declaration resolve according to M0016 local lookup and receive the refinement only if they still resolve to the original refined binding.
+- Uses before the nested declaration and still inside the refined branch keep the outer refinement when the compiler resolves them to the outer binding.
+- Uses after the nested declaration resolve according to the compiler local lookup and receive the refinement only if they still resolve to the original refined binding.
 
 Nested block rules:
 
@@ -156,13 +156,13 @@ Nested block rules:
 
 Duplicate local bindings and ambiguous local binding cases:
 
-- If M0016 reports duplicate local bindings in the same scope, M0019 must not create a refinement for the duplicate binding site.
-- If a name expression does not resolve to exactly one local binding, M0019 must not create a refinement.
-- If a condition references an ambiguous local binding, M0019 reports `ambiguous_flow_rule` with a stable rule identifier.
+- If the compiler reports duplicate local bindings in the same scope, the compiler must not create a refinement for the duplicate binding site.
+- If a name expression does not resolve to exactly one local binding, the compiler must not create a refinement.
+- If a condition references an ambiguous local binding, the compiler reports `ambiguous_flow_rule` with a stable rule identifier.
 
 ## Nullable Use Rules
 
-M0019 diagnoses nullable misuse only where a typed expression is required to be non-null under already accepted M0018 rules.
+The compiler diagnoses nullable misuse only where a typed expression is required to be non-null under already accepted rules.
 
 Included nullable-use checks:
 
@@ -183,12 +183,12 @@ Excluded nullable-use checks:
 
 ## Smart-Cast Eligibility
 
-A binding is eligible for M0019 smart-cast refinement only when all of the following are true:
+A binding is eligible for this implementation smart-cast refinement only when all of the following are true:
 
 - the expression is a simple unqualified local name
-- M0016 resolves the name to exactly one local binding
+- The compiler resolves the name to exactly one local binding
 - the local binding is immutable
-- M0018 knows the binding type
+- The compiler knows the binding type
 - the binding type is a nullable wrapper `T?`
 - the checked value is compared directly with `null`
 - the guarded region is a syntactic `if` branch accepted by ADR-0024
@@ -210,7 +210,7 @@ Ineligible values report `unsupported_flow_rule` if a refinement is requested, o
 
 ## Mutation Invalidation
 
-M0019 is conservative because the borrow checker has not yet accepted alias and lifetime rules.
+The compiler is conservative because the borrow checker has not yet accepted alias and lifetime rules.
 
 Refinements are invalidated by:
 
@@ -221,7 +221,7 @@ Refinements are invalidated by:
 
 Because the initial eligible subset is immutable local bindings only, ordinary assignment to the same binding is already illegal or ineligible. The accepted ADR must still define `invalidated_refinement` for future mutable or exclusive-borrow cases so diagnostics do not need to be redesigned later.
 
-M0019 must not preserve a refinement across function calls, coroutine suspension points, member mutation, aliasing operations, unsafe blocks, or FFI boundaries until accepted effect and borrow semantics define those cases.
+The compiler must not preserve a refinement across function calls, coroutine suspension points, member mutation, aliasing operations, unsafe blocks, or FFI boundaries until accepted effect and borrow semantics define those cases.
 
 ## Flow Diagnostics
 
@@ -304,11 +304,11 @@ ADR-0028 defers:
 
 ## Downstream Consequences
 
-M0020 depends on nullable generic constraints remaining explicit deferrals unless accepted before generic constraint solving.
+The compiler depends on nullable generic constraints remaining explicit deferrals unless accepted before generic constraint solving.
 
-M0022 and M0023 depend on flow facts being conservative so move and borrow checking cannot rely on guessed non-null states.
+Move and borrow checking depend on flow facts being conservative so they cannot rely on guessed non-null states.
 
-Coroutine milestones depend on refinements not crossing suspension points until suspension and borrow interactions are accepted.
+Future coroutine work depends on refinements not crossing suspension points until suspension and borrow interactions are accepted.
 
 Diagnostics infrastructure must support stable rule identifiers for unsupported and ambiguous flow rules.
 

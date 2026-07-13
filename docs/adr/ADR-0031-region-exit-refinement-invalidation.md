@@ -61,11 +61,11 @@ This ADR narrowly refines ADR-0028's **Mutation Invalidation** and **Flow
 Diagnostics** sections for the exact region-exit use above. It does not revise
 ADR-0030, whose initializer mapping remains controlling outside this ADR's
 precedence case. Dependencies: ADR-0027 diagnostic-span and recovery guidance,
-ADR-0028 branch regions and diagnostics, ADR-0030, and M0019-016.
+ADR-0028 branch regions and diagnostics, and ADR-0030.
 
 ## Acceptance Bundle
 
 This ADR and the conforming ADR-0028 summary in `docs/SPEC.md` are
 authoritative together. The resolved ambiguity report
-`docs/ambiguities/M0019-mutation-invalidation-trigger.md` records this
+The corresponding ambiguity report records this
 decision; no deferred mutation or effect trigger is accepted by implication.

@@ -34,7 +34,7 @@ ADR-0050 reachability checking.
 
 ## Downstream Consequences
 
-- M0028 can validate explicit `Int` returns without diagnostic cascades.
+- The compiler can validate explicit `Int` returns without diagnostic cascades.
 - HIR receives only typed bootstrap return facts.
 - Later return inference and broader result types require their own decisions.
 

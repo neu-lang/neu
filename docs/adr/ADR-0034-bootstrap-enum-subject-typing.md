@@ -50,11 +50,11 @@ nominal type checking.
 
 ## Consequences
 
-M0021 can derive a finite enum identity from an accepted source-level `when`
+The compiler can derive a finite enum identity from an accepted source-level `when`
 subject before resolving qualified arms and checking coverage.
 
 ## Dependencies And Supersession
 
 Depends on ADR-0010, ADR-0015, ADR-0022, ADR-0023, ADR-0026, ADR-0027, and
 ADR-0033. It narrowly supersedes ADR-0022's parameter-list placeholder for
-functions with bodies and resolves `docs/ambiguities/M0021-enum-subject-typing.md`.
+functions with bodies and resolves the corresponding ambiguity report.

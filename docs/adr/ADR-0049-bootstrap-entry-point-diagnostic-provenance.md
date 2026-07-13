@@ -40,7 +40,7 @@ accepted no-parameter `Int` signature with a body.
 
 ## Downstream Consequences
 
-- M0028 entry checking may aggregate candidates across source files in the
+- The compiler entry checking may aggregate candidates across source files in the
   selected package.
 - Later diagnostics may use the same source-or-external-input provenance
   contract where no source declaration exists.

@@ -42,7 +42,7 @@ The first executable subset accepts exactly one program entry point:
 The language-level result of `main` maps to the process exit code for the
 bootstrap executable. The first executable smoke test must use a non-negative
 `Int` in the host platform exit-code range `0..255`; behavior for other values
-is deferred to the ABI/runtime roadmap.
+is deferred to later ABI/runtime work.
 
 CLI arguments are deferred. Multiple candidate `main` declarations, missing
 `main`, parameterized `main`, non-`Int` `main`, declaration-only `main`, and
@@ -59,8 +59,8 @@ Diagnostics:
 
 ## Downstream Consequences
 
-- M0029 can validate executable result through process exit status.
-- M0030 does not need printing, CLI args, arrays, heap allocation, or a standard
+- The compiler can validate executable result through process exit status.
+- The compiler does not need printing, CLI args, arrays, heap allocation, or a standard
   library for the first runnable program.
 - Later user-facing entry forms must explicitly supersede or extend this ADR.
 

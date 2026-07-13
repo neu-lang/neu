@@ -24,7 +24,7 @@ analysis.
 Cranelift-shaped MIR leaks backend constraints into the compiler middle end.
 
 Direct HIR-to-Cranelift skips the architecture boundary selected by the
-roadmap.
+implementation plan.
 
 ## Recommended Choice
 
@@ -57,9 +57,9 @@ not invent cleanup semantics.
 
 ## Downstream Consequences
 
-- M0030 must validate values, locals, temporaries, blocks, calls, returns,
+- The compiler must validate values, locals, temporaries, blocks, calls, returns,
   checked arithmetic, and source mapping.
-- M0031 can lower the minimal MIR subset without accepting broader language
+- The compiler can lower the minimal MIR subset without accepting broader language
   features.
 - Future destructor, ownership, coroutine, and FFI lowering must supersede or
   extend the cleanup boundary.

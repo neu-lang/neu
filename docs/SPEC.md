@@ -179,7 +179,7 @@ one module per frontend invocation.
 
 Packages are namespaces inside modules. Package declarations use ADR-0022
 qualified names. Files without package declarations belong to the root package,
-represented by the empty package path. Imports remain syntax only for M0014 and
+represented by the empty package path. Imports remain syntax-only and
 do not create module dependencies.
 
 Visibility categories are `public`, `internal`, and `private`. Default visibility is `internal`. `public` means visible to other modules subject to
@@ -190,7 +190,7 @@ Package and import declarations have no visibility metadata.
 Each declaration with visibility scope has exactly one effective visibility
 category and records whether that category was explicit or defaulted.
 
-M0014 module metadata includes module name, ordered source file identities, package namespace per source file, and effective visibility metadata. It does
+Module metadata includes module name, ordered source file identities, package namespace per source file, and effective visibility metadata. It does
 not include module dependencies, target triples, package manager metadata,
 manifest paths, artifact hashes, resolved symbols, or imported names.
 
@@ -200,13 +200,13 @@ unsupported visibility categories, and duplicate visibility metadata.
 
 ## ADR-0026: Name Resolution Policy
 
-M0016 resolves a bootstrap subset using local lexical scope plus same-module package top-level declarations. Included name references are simple identifier expressions, package-qualified name expressions, and type name nodes in accepted declaration, local binding, or explicit annotation positions.
+The compiler resolves a bootstrap subset using local lexical scope plus same-module package top-level declarations. Included name references are simple identifier expressions, package-qualified name expressions, and type name nodes in accepted declaration, local binding, or explicit annotation positions.
 
 Function declaration names, type declaration names, local `val`, `const`, and
 `var` statements introduce names. Function parameters, pattern
 bindings, import aliases, member declarations, and fields remain excluded from
-M0016 name binding. ADR-0029 changes only the immutable-local binding-position
-spelling; binding identity, scope, declaration order, lookup, shadowing,
+Name binding follows ADR-0029 only in its immutable-local spelling; binding
+identity, scope, declaration order, lookup, shadowing,
 duplicate, and ambiguity rules remain unchanged.
 
 Declaration bodies and block expressions introduce lexical scopes. Top-level declarations in the same module and package namespace are visible throughout that module/package namespace regardless of source-file order. Local bindings are not visible before their declaration statement and remain visible through the end of their containing lexical block unless shadowed.
@@ -215,13 +215,13 @@ Unqualified lookup searches innermost local lexical scope outward, then the curr
 
 Duplicate local bindings in the same scope and duplicate top-level declarations with the same module, package namespace, declaration name, and declaration kind are rejected. Ambiguous lookup reports ambiguity instead of choosing by insertion order, source-file order, or parser traversal order.
 
-M0016 records same-module visibility metadata but does not enforce visibility. Cross-module lookup, member lookup, overload resolution, extension lookup, and type-directed lookup remain unsupported.
+The compiler records same-module visibility metadata but does not enforce visibility. Cross-module lookup, member lookup, overload resolution, extension lookup, and type-directed lookup remain unsupported.
 
 Resolution diagnostics include `unresolved_name`, `duplicate_name`, `ambiguous_name`, `unsupported_import_resolution`, `unsupported_cross_module_lookup`, and `unsupported_member_resolution`. Each diagnostic follows ADR-0015 and ADR-0026 primary span, recovery action, source-of-truth citation, and safe suggestion policy requirements.
 
 ## ADR-0027: Type Checking Core
 
-M0018 defines a small bootstrap type checker with primitive type-checking identities, literal typing, resolved name expression typing, explicit nullable wrappers, and exact assignment compatibility.
+The compiler defines a small bootstrap type checker with primitive type-checking identities, literal typing, resolved name expression typing, explicit nullable wrappers, and exact assignment compatibility.
 
 Typed output is side-table metadata: an expression type table, declaration signature table, assignment check table, and diagnostics list. The type checker does not rewrite the AST.
 
@@ -231,13 +231,13 @@ defined by ADR-0064; it has no stable public layout or FFI meaning.
 
 Assignment compatibility is exact type identity, except `Null` is assignment-compatible only with nullable target types and non-null base values are assignment-compatible with their nullable wrapper.
 
-Direct function declaration calls and structural function type application are deferred for M0018. Overload resolution, implicit numeric conversion, member lookup, generic constraint solving, ownership and move analysis, borrow checking, HIR lowering, MIR lowering, and backend behavior remain deferred.
+Direct function declaration calls and structural function type application are deferred for this implementation. Overload resolution, implicit numeric conversion, member lookup, generic constraint solving, ownership and move analysis, borrow checking, HIR lowering, MIR lowering, and backend behavior remain deferred.
 
 Type checking diagnostics include `type_mismatch`, `unresolved_type_rule`, `unsupported_type_rule`, and `ambiguous_type_rule`. Diagnostics define primary spans, recovery actions, source-of-truth citations, safe suggestion policies, and stable rule identifiers where required.
 
 ## ADR-0028: Nullability And Flow Typing
 
-M0019 defines a narrow nullability and flow-typing subset for local immutable null refinements.
+The compiler defines a narrow nullability and flow-typing subset for local immutable null refinements.
 
 Null-test recognition is a flow-specific condition recognizer for direct comparisons between one simple local name expression and `null`; it does not require general binary expression type checking, overload resolution, user-defined equality, implicit conversion, or Boolean operator typing.
 
@@ -245,7 +245,7 @@ Refinements apply only to eligible immutable local bindings with known nullable 
 
 Refined output remains side-table metadata. Declaration signatures and original local binding types preserve the original nullable type; refined expression type entries are per-use views inside guarded regions.
 
-M0019 diagnoses nullable use where a nullable expression is required to be non-null without an active refinement. A simple, unqualified name expression resolving to the same eligible immutable local whose refinement ended at the closing brace of its guarded `if` branch is a region-exit use only when it occurs in a later statement or trailing expression directly contained by that `if`'s enclosing block and is required to have base type `T`. That exact use reports `invalidated_refinement` with stable rule identifier `region_exit_invalidated_refinement`; its primary span is the later name expression, it has no secondary span, and recovery treats it as its original `T?`. Where it matches an annotated-local initializer shape, this region-exit mapping takes precedence over ADR-0030. Otherwise, for an annotated local whose initializer is exactly a bare resolved name of type `T?` and whose annotation is its base type `T`, `invalid_nullable_use` uses the stable rule identifier `nullable_assignment_without_refinement`; ADR-0027 keeps the initializer expression as the primary span. This mapping is limited to that case. Flow diagnostics include `invalid_nullable_use`, `invalidated_refinement`, `unsupported_flow_rule`, and `ambiguous_flow_rule`.
+The compiler diagnoses nullable use where a nullable expression is required to be non-null without an active refinement. A simple, unqualified name expression resolving to the same eligible immutable local whose refinement ended at the closing brace of its guarded `if` branch is a region-exit use only when it occurs in a later statement or trailing expression directly contained by that `if`'s enclosing block and is required to have base type `T`. That exact use reports `invalidated_refinement` with stable rule identifier `region_exit_invalidated_refinement`; its primary span is the later name expression, it has no secondary span, and recovery treats it as its original `T?`. Where it matches an annotated-local initializer shape, this region-exit mapping takes precedence over ADR-0030. Otherwise, for an annotated local whose initializer is exactly a bare resolved name of type `T?` and whose annotation is its base type `T`, `invalid_nullable_use` uses the stable rule identifier `nullable_assignment_without_refinement`; ADR-0027 keeps the initializer expression as the primary span. This mapping is limited to that case. Flow diagnostics include `invalid_nullable_use`, `invalidated_refinement`, `unsupported_flow_rule`, and `ambiguous_flow_rule`.
 
 Member nullable access, safe-call operators, force unwrap operators, boolean-combination refinement, negated-condition refinement, patterns, type-test smart casts, parameter refinements, top-level declaration refinements, mutable binding refinements, exclusive-borrow refinements, alias analysis, function call effects, member mutation effects, coroutine suspension effects, unsafe and FFI nullability, generic nullable constraints, HIR, MIR, and backend behavior remain deferred.
 
@@ -265,18 +265,18 @@ expressions and future fixed-array length expressions.
 
 ## ADR-0032: Generic Constraint Enforcement Sequencing
 
-M0020 represents generic parameter identity and explicit capability-bound
+The compiler represents generic parameter identity and explicit capability-bound
 occurrences, but does not enforce a bound. The language still selects
 constrained nominal generics; however, capability identity or resolution,
 satisfaction rules, generic substitution, and bound-violation diagnostics are
 deferred until ownership and thread-capability semantics provide their required
-inputs. M0021 depends only on the representation boundary. A later
-post-M0024 milestone must introduce enforcement through a separate accepted
+inputs. The implementation depends only on the representation boundary. A later
+later implementation must introduce enforcement through a separate accepted
 semantic decision.
 
 ## ADR-0033: Bootstrap Sealed Sums And Exhaustive Match
 
-M0021 accepts closed no-payload `enum` variants and expression-level `when`.
+The compiler accepts closed no-payload `enum` variants and expression-level `when`.
 Enum variants are identifier-only and scoped to their declaring module/package.
 `when (subject) { Enum.Variant -> expression; _ -> expression; }` uses only
 qualified variant patterns or a wildcard. A match is exhaustive only when it
@@ -288,7 +288,7 @@ coverage, implicit smart casts, and arm-result type unification remain deferred.
 ## ADR-0034: Bootstrap Enum Subject Typing
 
 For functions with bodies, parameters use `identifier : named-type` entries in
-a comma-separated parameter list. M0021 accepts an ADR-0033 `when` subject
+a comma-separated parameter list. The compiler accepts an ADR-0033 `when` subject
 only as a bare reference to one such parameter when its named annotation
 resolves in the declaring module/package to exactly one bootstrap enum. Other
 subject shapes, unresolved types, and non-enum types report
@@ -299,18 +299,18 @@ and cross-module lookup remain deferred.
 
 ## ADR-0035: Bootstrap Ownership And Move Analysis
 
-M0022 classifies `Bool`, `Int`, `Unit`, and `Null` as copyable primitive
+The compiler classifies `Bool`, `Int`, `Unit`, and `Null` as copyable primitive
 identities, `String` as move-only, and all current-module user-defined nominal
 identities, including bootstrap enums, as move-only. Explicitly copyable
 user-defined types remain deferred.
 
 Only a local `val`, `const`, or `var` initializer, or an assignment statement, whose
-value is a bare resolved local name of move-only type is an M0022 ownership
+value is a bare resolved local name of move-only type is an ownership
 transfer site. A later bare local-name expression using that moved binding
 reports `use_after_move` on the later use with the transfer expression as the
 move-origin secondary span. Copyable values do not enter the moved state.
 
-M0022 records ownership facts in side tables and does not rewrite the AST or
+The compiler records ownership facts in side tables and does not rewrite the AST or
 lower to HIR. Calls, returns, captures, `when` subject evaluation, branch move
 joins, destructuring, member or partial moves, destructors, borrowing,
 coroutine frames, FFI, layout, cloning, generic copyability, and user-declared
@@ -318,7 +318,7 @@ copy remain deferred.
 
 ## ADR-0036: Bootstrap Borrow And Lifetime Analysis
 
-M0023 uses a metadata-only bootstrap borrow model. It adds no source-level
+The compiler uses a metadata-only bootstrap borrow model. It adds no source-level
 borrow syntax, reference types, dereference operators, function parameter
 borrowing, method receivers, member borrows, closure captures, coroutine
 borrows, unsafe references, or FFI references.
@@ -327,7 +327,7 @@ Borrow input records contain a borrow node, borrowed local binding, borrow kind
 (`shared` or `exclusive`), and region node. Shared borrows may overlap other
 shared borrows of the same local in the same region. An exclusive borrow
 conflicts with any other shared or exclusive borrow of the same local in the
-same region. M0023 overlap is exact region-node equality only; nested, sibling,
+same region. Overlap is exact region-node equality only; nested, sibling,
 non-lexical, loop, path-sensitive, and control-flow-sensitive overlap rules are
 deferred.
 
@@ -340,33 +340,33 @@ as secondary span.
 
 ## ADR-0037: Bootstrap Thread Capability Analysis
 
-M0024 uses a metadata-only bootstrap thread-capability model. It adds no
+The compiler uses a metadata-only bootstrap thread-capability model. It adds no
 source-level task spawning, detached threads, async blocks, coroutine bodies,
 closures, synchronization primitives, atomics, locks, generic capability
 enforcement, user-declared capability implementations, or unsafe capability
 overrides.
 
-M0024 defines `Send` for values that may transfer across an approved concurrent
+The compiler defines `Send` for values that may transfer across an approved concurrent
 boundary and `Share` for values that may be shared across an approved
 concurrent boundary without exclusive transfer. `Bool`, `Int`, `Unit`, and
 `Null` satisfy both capabilities. `String` satisfies `Send` but not `Share`.
 Nullable types satisfy a capability only when their non-null base type satisfies
 that capability. Current-module nominal user-defined types, generic parameter
 types, unsupported types, unresolved types, and absent type information satisfy
-neither capability in M0024.
+neither capability in this implementation.
 
 Boundary input records contain a boundary node and ordered capture records.
 Capture records contain a capture node, captured local binding, captured type,
 and required capability. A `missing_thread_capability` diagnostic is reported
 when a capture's type does not satisfy the required capability. The capture node
-is primary and the boundary node is secondary. Because M0024 has no approved
+is primary and the boundary node is secondary. Because the compiler has no approved
 synchronization abstractions, shared mutable state is not accepted through a
 `Share` capture; mutable captures may only be modeled as `Send` transfers when
 the type satisfies `Send`.
 
 ## ADR-0038: Bootstrap Coroutine Scope And Suspension Analysis
 
-M0025 uses a metadata-only bootstrap coroutine scope and suspension model. It
+The compiler uses a metadata-only bootstrap coroutine scope and suspension model. It
 adds no source-level coroutine, `async`, `await`, task-spawn, detached-task,
 cancellation, pinned-frame, closure, channel, synchronization, or scheduler
 syntax. Existing unsupported concurrency-like source forms remain rejected or
@@ -378,7 +378,7 @@ the scope node in which the child is proven to complete or be cancelled. A child
 task is valid only when its completion-or-cancellation scope is the same scope
 as its containing structured scope. Other task escape rules are deferred.
 
-M0025 reports `task_scope_escape` when a child task is not proven to complete or
+The compiler reports `task_scope_escape` when a child task is not proven to complete or
 be cancelled in its containing structured scope. The child task node is primary,
 the containing scope node is secondary, and the diagnostic identifies that the
 child task would outlive its structured scope.
@@ -391,12 +391,12 @@ accessed. A borrow crossing suspension is valid only when the frame is not
 concurrently accessible and the suspended-frame scope is the same scope as the
 borrowed value's lifetime scope.
 
-M0025 reports `borrow_across_suspension` when a suspended borrow may be
+The compiler reports `borrow_across_suspension` when a suspended borrow may be
 concurrently accessed, may outlive the borrowed value, or both. The suspension
 node is primary, the borrow node is secondary, and the diagnostic identifies the
 borrowed local and rejection reason.
 
-Cancellation resource-safety in M0025 is limited to the structured-scope
+Cancellation resource-safety in this implementation is limited to the structured-scope
 completion-or-cancellation check. Runtime cancellation propagation, destructor
 execution during cancellation, cancellation handlers, cancellation masking, and
 async drop are deferred. ADR-0037 remains the authority for any supplied
@@ -404,13 +404,13 @@ thread-capability capture records.
 
 ## ADR-0039: Bootstrap Unsafe FFI Boundary Analysis
 
-M0026 uses a metadata-only bootstrap unsafe and FFI boundary model. It adds no
+The compiler uses a metadata-only bootstrap unsafe and FFI boundary model. It adds no
 source-level unsafe block, unsafe function, extern block, foreign declaration,
 ABI string, link attribute, target attribute, safe-wrapper syntax, or module
 audit syntax. Existing unsupported unsafe-like and FFI-like source forms remain
 rejected or unsupported.
 
-M0026 defines `ProvenSafe` for operations proven safe by accepted compiler
+The compiler defines `ProvenSafe` for operations proven safe by accepted compiler
 analyses and `TrustedUnsafe` for operations relying on explicit programmer or
 binding assertions. Unsafe context records contain a context node and context
 kind: `block`, `function`, or `module_audit`. Unsafe operation records contain
@@ -419,7 +419,7 @@ context node.
 
 A `ProvenSafe` operation is accepted without an unsafe context. A
 `TrustedUnsafe` operation is accepted only when its containing context node
-matches a supplied unsafe context record. M0026 reports
+matches a supplied unsafe context record. The compiler reports
 `unsafe_operation_outside_context` when a trusted unsafe operation has no
 matching unsafe context. The operation node is primary. A non-matching supplied
 context node is secondary when present. The diagnostic identifies trusted
@@ -428,15 +428,15 @@ assertion rather than compiler-proven safety.
 FFI declaration records contain a declaration node, declaration kind, safety
 basis, safe-wrapper status, and metadata presence for target contract, calling
 convention, nullability, ownership transfer, lifetime validity, and
-thread-safety or send/share guarantees. M0026 validates metadata presence only;
+thread-safety or send/share guarantees. The compiler validates metadata presence only;
 target triples, layout, calling convention compatibility, symbols, linker
 inputs, generated bindings, dynamic loading, platform APIs, and ABI lowering
 are deferred.
 
-M0026 reports `missing_ffi_safety_metadata` when an FFI declaration lacks one
+The compiler reports `missing_ffi_safety_metadata` when an FFI declaration lacks one
 or more required metadata categories. The FFI declaration node is primary, and
 the diagnostic lists the missing categories. Safe-wrapper status is metadata
-only in M0026 and does not affect source visibility, type checking, or call
+only in this implementation and does not affect source visibility, type checking, or call
 lowering.
 
 ## ADR-0040: Bootstrap Program Entry Point
@@ -496,7 +496,7 @@ Fixed-size inline arrays are accepted only as defined by ADR-0063. Owned UTF-8
 strings are accepted only as defined by ADR-0064. Dynamic arrays, slices, and
 cross-target APIs remain deferred. Unsupported parsed forms must fail before
 backend lowering with
-`unsupported_executable_form` or a more specific existing diagnostic. M0028
+`unsupported_executable_form` or a more specific existing diagnostic. The compiler
 must add parser and type-checker support for executable operators not already
 covered by ADR-0024 before HIR lowering consumes executable fixtures.
 
@@ -849,9 +849,10 @@ default methods and interface fields are deferred.
 
 Field access is `receiver.field`. In an instance method or constructor, a bare
 field name means `this.field`; explicit `this.field` disambiguates a shadowed
-field. Task-008 records nominal and field metadata and type-checks projections
+field. The compiler records nominal and field metadata and type-checks projections
 only where an accepted receiver context exists. `new`, constructor calls,
-allocation, initialization, and runtime object access are deferred to task-009.
+allocation, initialization, and runtime object access are deferred to later
+lifecycle work.
 
 ## ADR-0070: Final-Only Runtime Dispatch
 
