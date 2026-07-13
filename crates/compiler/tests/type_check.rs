@@ -17,9 +17,9 @@ use compiler::{
     type_check::{
         AmbiguousTypeRule, AssignmentCheck, CompileTimeValue, DeclarationSignature,
         DirectCallDiagnosticKind, EligibleNullTestRefinement, EntryPointDiagnosticKind,
-        EntryPointFile, ExecutableSourceTypes, ExpressionType, KnownSymbolType,
-        LiteralExpressionInput, LiteralKind, NullTestRefinedBranch, RecognizedNullTest,
-        RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
+        EntryPointFile, ExecutableSourceTypes, ExpressionType, GenericConstraintFailureKind,
+        KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
+        RecognizedNullTest, RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
         ReturnTypeDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
         TypeRuleDiagnostic, apply_direct_call_results, build_capability_bound_records,
         build_generic_parameter_types, check_direct_calls, check_entry_point,
@@ -413,6 +413,29 @@ fn capability_bounds_are_checked_after_substitution() {
         compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].bound(), bounds[1].bound());
+}
+
+#[test]
+fn copy_capability_bounds_reject_move_only_values() {
+    let parsed = parse_source(SourceFileId::from_raw(504), "struct Box<T: Copy> {}");
+    assert!(parsed.diagnostics.is_empty());
+    let mut symbols = SymbolInterner::new();
+    let mut types = TypeArena::new();
+    let parameter_types =
+        build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, &mut types);
+    let bounds =
+        build_capability_bound_records(&parsed.generic_parameters, &parameter_types, &mut symbols);
+    let string_type = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(parameter_types[0].ty(), string_type);
+
+    let diagnostics =
+        compiler::type_check::validate_capability_bounds(&bounds, &substitution, &types, &symbols);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].kind(),
+        GenericConstraintFailureKind::UnsatisfiedCapability
+    );
 }
 
 #[test]

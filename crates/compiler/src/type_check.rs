@@ -3132,6 +3132,7 @@ pub fn validate_capability_bounds(
     let mut diagnostics = Vec::new();
     for bound in bounds {
         let capability = match symbols.resolve(bound.symbol()) {
+            Some("Copy") => ThreadCapability::Copy,
             Some("Send") => ThreadCapability::Send,
             Some("Share") => ThreadCapability::Share,
             Some(_) | None => continue,
