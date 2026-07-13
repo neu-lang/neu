@@ -1,0 +1,6 @@
+// Deterministic ordering outcome for the pure-Neu standard library.
+enum Ordering {
+    Less,
+    Equal,
+    Greater
+}

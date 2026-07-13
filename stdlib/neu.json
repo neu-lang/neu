@@ -1,0 +1,6 @@
+{
+  "name": "neu.stdlib",
+  "description": "The dependency-free foundational Neu standard library",
+  "srcs": ["core/**/*.neu"],
+  "dependencies": []
+}

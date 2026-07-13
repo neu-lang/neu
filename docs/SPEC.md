@@ -1397,6 +1397,20 @@ partially mutating, discarding elements, or returning a nullable sentinel.
 Growth policy, relocation, alignment, and physical allocation remain
 compiler/runtime facts.
 
+## Proposed ADR-0115: Type Annotations And Test Markers
+
+Annotations are declaration metadata written as an `@Name` marker immediately
+before a nominal type declaration. The first target is an enum; classes,
+structs, interfaces, and other nominal targets require explicit enablement.
+Annotations do not change type identity, ownership, capabilities, layout,
+runtime representation, or public ABI. Annotation definitions are closed
+nominal library declarations; the initial `stdlib/test` package provides a
+zero-argument `Test` marker. Unknown, duplicate, malformed, and
+target-incompatible markers are diagnosed. The compiler preserves annotation
+identity, target, source span, and package provenance for validation and
+tooling, but ordinary Neu code has no reflection over annotations. Test
+discovery and execution are a separate contract.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers

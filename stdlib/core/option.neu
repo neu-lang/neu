@@ -1,0 +1,5 @@
+// Foundational absence type for the pure-Neu standard library.
+enum Option<T> {
+    Some(T),
+    None
+}
