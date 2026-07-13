@@ -105,29 +105,36 @@ fn expands_library_sources_from_project_root_without_an_entrypoint() {
 
 #[test]
 fn stdlib_manifest_includes_sibling_collections_sources() {
-    let manifest_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../stdlib/neu.json");
+    let manifest_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/neu.json");
     let (manifest, root) = ProjectManifest::load(&manifest_path).unwrap();
     let sources = manifest.load_sources(root).unwrap();
-    assert!(sources.iter().any(|source| {
-        source.path().to_string_lossy() == "collections/vector.neu"
-    }));
+    assert!(
+        sources
+            .iter()
+            .any(|source| { source.path().to_string_lossy() == "collections/vector.neu" })
+    );
 }
 
 #[test]
 fn unified_stdlib_sources_form_core_collections_and_test_packages() {
-    let manifest_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../stdlib/neu.json");
+    let manifest_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/neu.json");
     let (manifest, root) = ProjectManifest::load(&manifest_path).unwrap();
     let sources = manifest.load_sources(root).unwrap();
-    let graph = VirtualPackageGraph::build_library(sources.into_iter().map(|source| {
-        VirtualSource::new(source.path(), source.source())
-    }))
+    let graph = VirtualPackageGraph::build_library(
+        sources
+            .into_iter()
+            .map(|source| VirtualSource::new(source.path(), source.source())),
+    )
     .unwrap();
     let packages = graph
         .packages()
         .iter()
         .map(|package| package.identity.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(packages, ["collections", "core", "test"].into_iter().collect());
+    assert_eq!(
+        packages,
+        ["collections", "core", "test"].into_iter().collect()
+    );
 }
