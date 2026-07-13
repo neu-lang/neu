@@ -8,6 +8,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::manifest::{DependencyDescriptor, ManifestDiagnostic, ProjectManifest};
+use crate::module::{VirtualDependency, VirtualSource};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DependencyDiagnosticKind {
@@ -238,6 +239,28 @@ impl GitDependencyResolver {
             write_lockfile(&lock_path, &Self::lockfile(entries.clone()))?;
         }
         Ok(Self::lockfile(entries))
+    }
+
+    pub fn load_project_dependencies(
+        &self,
+        manifest_path: impl AsRef<Path>,
+    ) -> Result<Vec<VirtualDependency>, DependencyDiagnostic> {
+        let manifest_path = manifest_path.as_ref();
+        let lockfile = self.resolve_project(manifest_path)?;
+        let mut dependencies = Vec::new();
+        for entry in lockfile.entries {
+            let repository = self.cache_path(&entry.url)?;
+            let (manifest, root) =
+                ProjectManifest::load(repository.join("neu.json")).map_err(manifest_error)?;
+            let sources = manifest
+                .load_sources(&root)
+                .map_err(manifest_error)?
+                .into_iter()
+                .map(|source| VirtualSource::new(source.path(), source.source()))
+                .collect::<Vec<_>>();
+            dependencies.push(VirtualDependency::new(entry.url, sources));
+        }
+        Ok(dependencies)
     }
 
     fn resolve_dependency(

@@ -30,6 +30,14 @@ Offline resolution uses only cached repositories and locked commits; missing
 objects are errors. Cache identity is independent of host linking because
 source resolution is target-neutral.
 
+Source imports may name a declared dependency with its repository URL followed
+by a package subpath, for example `import "github.com/example/lib/core"`.
+The resolver maps that stable URL-qualified name to the locked checkout and
+selected package sources; cache paths never become package identity. Only
+declared dependencies are eligible, and missing, escaping, ambiguous, or
+otherwise inaccessible package paths are deterministic diagnostics. Explicit
+local aliases use the same qualifier-collision rules as relative imports.
+
 No registry, archive, binary artifact, submodule, branch dependency, feature
 solver, package manager, or automatic update command is introduced.
 
