@@ -38,7 +38,7 @@ use crate::{
         type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
         type_executable_int_operators, type_function_signatures_in_with_generics,
         type_lambda_expressions, type_string_operations, type_value_conditionals,
-        validate_compile_time_constants, validate_concurrency_structure,
+        validate_annotations, validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_task_member_cancellation_structure,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
@@ -223,6 +223,10 @@ pub fn compile_source_to_executable(
         return Err(DriverError::TypeDiagnostics(
             class_types.diagnostics().to_vec(),
         ));
+    }
+    let annotation_diagnostics = validate_annotations(&parsed);
+    if !annotation_diagnostics.is_empty() {
+        return Err(DriverError::TypeDiagnostics(annotation_diagnostics));
     }
     let constructor_diagnostics = check_constructor_calls(&parsed, &class_types);
     if !constructor_diagnostics.is_empty() {
