@@ -37,6 +37,31 @@ public func main(): Int { return 0 }
 }
 
 #[test]
+fn compiles_interface_backed_annotation_on_top_level_test_function() {
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-function-annotation-driver-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+interface Test { }
+@Test public func option_test(): Int { return 0 }
+public func main(): Int { return 0 }
+"#;
+    compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31003),
+            ModuleName::parse("annotation").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .expect("top-level test annotations should be accepted");
+}
+
+#[test]
 fn rejects_non_literal_annotation_properties_before_lowering() {
     let source = r#"
 interface Test { func timeout(): Int; }

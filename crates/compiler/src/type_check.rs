@@ -1274,7 +1274,16 @@ pub fn validate_annotations(parsed: &ParseOutput) -> Vec<TypeCheckDiagnostic> {
     let mut diagnostics = Vec::new();
     for annotation in &parsed.annotations {
         let target_kind = parsed.arena.node(annotation.target).map(|node| node.kind);
-        if target_kind != Some(AstNodeKind::EnumDeclaration) {
+        let function_target = parsed
+            .function_declarations
+            .iter()
+            .find(|function| function.declaration == annotation.target);
+        let valid_function_target = function_target.is_some_and(|function| {
+            function.top_level && function.parameters.is_empty() && function.body.is_some()
+        });
+        if target_kind != Some(AstNodeKind::EnumDeclaration)
+            && !(target_kind == Some(AstNodeKind::FunctionDeclaration) && valid_function_target)
+        {
             diagnostics.push(TypeCheckDiagnostic::unsupported_type_rule(
                 TypeRuleDiagnostic::AnnotationTargetInvalid,
                 annotation.annotation,
