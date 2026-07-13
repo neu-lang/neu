@@ -9,6 +9,7 @@ use crate::{
     source::ByteSpan,
     types::{GenericSpecializationIdentity, PrimitiveType, TypeArena, TypeId, TypeKind},
 };
+use std::collections::{HashMap, HashSet};
 
 macro_rules! mir_id {
     ($name:ident) => {
@@ -1628,7 +1629,8 @@ struct ShortCircuitLowerer<'a> {
     scratch_local: MirLocalId,
     next_block: usize,
     next_value: usize,
-    lowered: Vec<HirExpressionId>,
+    expression_index: HashMap<HirExpressionId, HirExpression>,
+    lowered: HashSet<HirExpressionId>,
 }
 
 impl<'a> ShortCircuitLowerer<'a> {
@@ -1681,7 +1683,13 @@ impl<'a> ShortCircuitLowerer<'a> {
             scratch_local,
             next_block: 1,
             next_value,
-            lowered: Vec::new(),
+            expression_index: function
+                .expressions()
+                .iter()
+                .cloned()
+                .map(|expression| (expression.id(), expression))
+                .collect(),
+            lowered: HashSet::new(),
         }
     }
 
@@ -1712,10 +1720,8 @@ impl<'a> ShortCircuitLowerer<'a> {
 
     fn lower_expression(&mut self, id: HirExpressionId) -> Result<MirValueId, MirLoweringError> {
         let expression = self
-            .function
-            .expressions()
-            .iter()
-            .find(|expression| expression.id() == id)
+            .expression_index
+            .get(&id)
             .cloned()
             .ok_or(MirLoweringError::UnsupportedExpression)?;
         require_hir_expression_type(&expression, self.types)?;
@@ -2185,7 +2191,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                 });
             }
         }
-        self.lowered.push(id);
+        self.lowered.insert(id);
         Ok(output)
     }
 
@@ -2258,7 +2264,8 @@ struct ControlFlowLowerer<'a> {
     next_local: usize,
     next_block: usize,
     next_value: usize,
-    lowered: Vec<HirExpressionId>,
+    expression_index: HashMap<HirExpressionId, HirExpression>,
+    lowered: HashSet<HirExpressionId>,
     loops: Vec<(MirBlockId, MirBlockId)>,
 }
 
@@ -2294,7 +2301,13 @@ impl<'a> ControlFlowLowerer<'a> {
             next_local: function.locals().len(),
             next_block: 1,
             next_value,
-            lowered: Vec::new(),
+            expression_index: function
+                .expressions()
+                .iter()
+                .cloned()
+                .map(|expression| (expression.id(), expression))
+                .collect(),
+            lowered: HashSet::new(),
             loops: Vec::new(),
         }
     }
@@ -2337,10 +2350,8 @@ impl<'a> ControlFlowLowerer<'a> {
 
     fn lower_expression(&mut self, id: HirExpressionId) -> Result<MirValueId, MirLoweringError> {
         let expression = self
-            .function
-            .expressions()
-            .iter()
-            .find(|expression| expression.id() == id)
+            .expression_index
+            .get(&id)
             .cloned()
             .ok_or(MirLoweringError::UnsupportedExpression)?;
         require_hir_expression_type(&expression, self.types)?;
@@ -2806,7 +2817,7 @@ impl<'a> ControlFlowLowerer<'a> {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
-        self.lowered.push(id);
+        self.lowered.insert(id);
         Ok(output)
     }
 
