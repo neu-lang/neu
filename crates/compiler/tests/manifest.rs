@@ -117,7 +117,7 @@ fn stdlib_manifest_includes_sibling_collections_sources() {
 }
 
 #[test]
-fn unified_stdlib_sources_form_core_collections_and_test_packages() {
+fn unified_stdlib_sources_form_core_and_collections_packages() {
     let manifest_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/neu.json");
     let (manifest, root) = ProjectManifest::load(&manifest_path).unwrap();
@@ -133,8 +133,5 @@ fn unified_stdlib_sources_form_core_collections_and_test_packages() {
         .iter()
         .map(|package| package.identity.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    assert_eq!(
-        packages,
-        ["collections", "core", "test"].into_iter().collect()
-    );
+    assert_eq!(packages, ["collections", "core"].into_iter().collect());
 }
