@@ -9,6 +9,7 @@ use crate::{
     type_check::{ClassTypeReport, ExpressionType, FunctionSignature, ResolvedCallDeclaration},
     types::{GenericSpecializationIdentity, PrimitiveType, TypeArena, TypeId, TypeKind},
 };
+use std::collections::HashMap;
 
 macro_rules! hir_id {
     ($name:ident) => {
@@ -43,6 +44,8 @@ pub struct CheckedHirSource<'a> {
     class_types: Option<&'a ClassTypeReport>,
     call_targets: Option<&'a [ResolvedCallDeclaration]>,
     type_arena: Option<&'a TypeArena>,
+    function_indices: HashMap<AstNodeId, usize>,
+    hir_function_indices: HashMap<usize, usize>,
 }
 impl<'a> CheckedHirSource<'a> {
     pub fn new(
@@ -65,6 +68,20 @@ impl<'a> CheckedHirSource<'a> {
             class_types: None,
             call_targets: None,
             type_arena: None,
+            function_indices: parsed
+                .function_declarations
+                .iter()
+                .enumerate()
+                .map(|(index, function)| (function.declaration, index))
+                .collect(),
+            hir_function_indices: parsed
+                .function_declarations
+                .iter()
+                .enumerate()
+                .filter(|(_, function)| function.body.is_some())
+                .enumerate()
+                .map(|(hir_index, (parsed_index, _))| (hir_index, parsed_index))
+                .collect(),
         }
     }
 
@@ -1702,13 +1719,14 @@ fn lower_expression(
                 .map(|target| target.declaration());
             hir_function_index(
                 source.parsed,
-                source
-                    .parsed
-                    .function_declarations
-                    .iter()
-                    .position(|function| {
-                        selected.is_some_and(|declaration| function.declaration == declaration)
-                            || (selected.is_none() && function.name == name.name)
+                selected
+                    .and_then(|declaration| source.function_indices.get(&declaration).copied())
+                    .or_else(|| {
+                        source
+                            .parsed
+                            .function_declarations
+                            .iter()
+                            .position(|function| function.name == name.name)
                     })
                     .ok_or(HirLoweringError::UnsupportedExpression)?,
             )
@@ -1725,21 +1743,9 @@ fn lower_expression(
             .find(|member| member.expression == call.callee)
         {
             let is_static = source
-                .parsed
-                .function_declarations
-                .iter()
-                .find(|function| {
-                    hir_function_index(
-                        source.parsed,
-                        source
-                            .parsed
-                            .function_declarations
-                            .iter()
-                            .position(|candidate| candidate.declaration == function.declaration)
-                            .unwrap_or(usize::MAX),
-                    )
-                    .is_some_and(|index| index == declaration)
-                })
+                .hir_function_indices
+                .get(&declaration)
+                .and_then(|index| source.parsed.function_declarations.get(*index))
                 .is_some_and(|function| function.is_static);
             if !is_static {
                 arguments.push(lower_expression(
