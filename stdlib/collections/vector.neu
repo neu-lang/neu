@@ -1,3 +1,5 @@
+package collections
+
 // Initial nominal sequence surface. Operations are added with their accepted
 // ownership, iterator, protocol, and allocation contracts.
 class Vector<T> {
