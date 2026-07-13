@@ -80,6 +80,39 @@ fn const_expression_produces_a_typed_compile_time_fact() {
 }
 
 #[test]
+fn generic_function_signatures_resolve_type_parameters() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(506),
+        "func identity<T: Copy>(value: T): T { return value; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+    let mut types = TypeArena::new();
+    let signatures = compiler::type_check::type_function_signatures_in_with_generics(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+        &parsed.array_types,
+        &[],
+        &parsed.generic_parameters,
+    );
+
+    assert_eq!(signatures.len(), 1);
+    assert_eq!(signatures[0].parameter_types().len(), 1);
+    assert!(matches!(
+        types
+            .get(signatures[0].parameter_types()[0])
+            .unwrap()
+            .kind(),
+        TypeKind::GenericParameter(_)
+    ));
+    assert!(matches!(
+        types.get(signatures[0].return_type()).unwrap().kind(),
+        TypeKind::GenericParameter(_)
+    ));
+}
+
+#[test]
 fn mutation_invalidation_classifies_only_exact_post_region_bare_name_initializer() {
     let mut types = TypeArena::new();
     let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));

@@ -36,7 +36,7 @@ use crate::{
         type_array_expressions_with_classes, type_array_iterations, type_bind_function_values,
         type_class_types_in, type_concurrency_operations, type_control_flow,
         type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
-        type_executable_int_operators, type_function_signatures_in_with_classes,
+        type_executable_int_operators, type_function_signatures_in_with_generics,
         type_lambda_expressions, type_string_operations, type_value_conditionals,
         validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_task_member_cancellation_structure,
@@ -228,13 +228,14 @@ pub fn compile_source_to_executable(
     if !constructor_diagnostics.is_empty() {
         return Err(DriverError::ConstructorDiagnostics(constructor_diagnostics));
     }
-    let mut signatures = type_function_signatures_in_with_classes(
+    let mut signatures = type_function_signatures_in_with_generics(
         &mut types,
         &parsed.function_declarations,
         &parsed.function_parameters,
         &parsed.type_name_references,
         &parsed.array_types,
         class_types.classes(),
+        &parsed.generic_parameters,
     );
     let missing_function_signatures = parsed
         .function_declarations

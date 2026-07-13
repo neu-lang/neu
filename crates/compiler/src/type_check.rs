@@ -3673,20 +3673,74 @@ pub fn type_function_signatures_in_with_classes(
     array_types: &[ParsedArrayType],
     classes: &[ClassTypeRecord],
 ) -> Vec<FunctionSignature> {
+    type_function_signatures_in_with_classes_and_generics(
+        arena,
+        functions,
+        parameters,
+        type_name_references,
+        array_types,
+        classes,
+        &[],
+    )
+}
+
+pub fn type_function_signatures_in_with_generics(
+    arena: &mut TypeArena,
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    classes: &[ClassTypeRecord],
+    generic_parameters: &[ParsedGenericParameter],
+) -> Vec<FunctionSignature> {
+    type_function_signatures_in_with_classes_and_generics(
+        arena,
+        functions,
+        parameters,
+        type_name_references,
+        array_types,
+        classes,
+        generic_parameters,
+    )
+}
+
+fn type_function_signatures_in_with_classes_and_generics(
+    arena: &mut TypeArena,
+    functions: &[ParsedFunctionDeclaration],
+    parameters: &[ParsedFunctionParameter],
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    classes: &[ClassTypeRecord],
+    generic_parameters: &[ParsedGenericParameter],
+) -> Vec<FunctionSignature> {
     let primitives = PrimitiveTypeIds::module_owned(arena);
+    let mut symbols = SymbolInterner::new();
+    let generic_parameter_types =
+        build_generic_parameter_types(generic_parameters, &mut symbols, arena);
     let mut signatures = Vec::new();
 
     for function in functions {
+        let generic_types: Vec<_> = generic_parameters
+            .iter()
+            .filter(|parameter| parameter.owner == Some(function.declaration))
+            .filter_map(|parameter| {
+                generic_parameter_types
+                    .iter()
+                    .find(|record| record.parameter() == parameter.parameter)
+                    .map(|record| (parameter.name.as_str(), record.ty()))
+            })
+            .collect();
         let Some(return_annotation) = function.return_annotation else {
             continue;
         };
-        let Some(return_type) = resolve_annotation_type(
+        let Some(return_type) = resolve_annotation_type_with_generics(
             return_annotation,
             type_name_references,
             array_types,
             &primitives,
             classes,
             arena,
+            &generic_types,
         ) else {
             continue;
         };
@@ -3697,13 +3751,14 @@ pub fn type_function_signatures_in_with_classes(
         let Some(parameter_types) = function_parameters
             .iter()
             .map(|parameter| {
-                resolve_annotation_type(
+                resolve_annotation_type_with_generics(
                     parameter.annotation,
                     type_name_references,
                     array_types,
                     &primitives,
                     classes,
                     arena,
+                    &generic_types,
                 )
             })
             .collect::<Option<Vec<_>>>()
@@ -4674,6 +4729,34 @@ fn resolve_annotation_type(
         arena,
     )?;
     Some(arena.array(element, array.length?))
+}
+
+fn resolve_annotation_type_with_generics(
+    annotation: AstNodeId,
+    type_name_references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
+    primitives: &PrimitiveTypeIds,
+    classes: &[ClassTypeRecord],
+    arena: &mut TypeArena,
+    generic_types: &[(&str, TypeId)],
+) -> Option<TypeId> {
+    if let Some(reference) = type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)
+        && let Some((_, ty)) = generic_types
+            .iter()
+            .find(|(name, _)| *name == reference.name)
+    {
+        return Some(*ty);
+    }
+    resolve_annotation_type(
+        annotation,
+        type_name_references,
+        array_types,
+        primitives,
+        classes,
+        arena,
+    )
 }
 
 pub fn type_array_expressions(
