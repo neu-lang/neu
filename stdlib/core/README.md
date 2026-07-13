@@ -10,6 +10,7 @@ ADR-0107 and ADR-0109:
 - `Option<T>`: `Some(T)` and `None`;
 - `Result<T, E>`: `Ok(T)` and `Err(E)`;
 - `Ordering`: `Less`, `Equal`, and `Greater`.
+- explicit `Int` utilities: `min`, `max`, `clamp`, `abs`, and `sign`.
 
 Operations are added only when their ownership, generic, error, and runtime
 contracts are accepted in `docs/SPEC.md` and the corresponding ADRs.

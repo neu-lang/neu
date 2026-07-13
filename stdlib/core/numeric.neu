@@ -1,0 +1,41 @@
+// Explicit Int utilities for the pure-Neu standard library.
+public func min(left: Int, right: Int): Int {
+    if left < right {
+        return left
+    }
+    return right
+}
+
+public func max(left: Int, right: Int): Int {
+    if left > right {
+        return left
+    }
+    return right
+}
+
+public func clamp(value: Int, lower: Int, upper: Int): Int {
+    if value < lower {
+        return lower
+    }
+    if value > upper {
+        return upper
+    }
+    return value
+}
+
+public func abs(value: Int): Int {
+    if value < 0 {
+        return 0 - value
+    }
+    return value
+}
+
+public func sign(value: Int): Int {
+    if value < 0 {
+        return -1
+    }
+    if value > 0 {
+        return 1
+    }
+    return 0
+}
