@@ -57,6 +57,34 @@ public func main(): Int { return 0 }
 }
 
 #[test]
+fn compiles_generic_enum_payload_patterns() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-generic-enum-pattern-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+enum Option<T> { Some(T), None }
+func classify(value: Option<Int>): Int {
+    return when (value) {
+        Option.Some(item) -> item
+        Option.None -> 0
+    }
+}
+public func main(): Int { return 0 }
+"#;
+    compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31003),
+            ModuleName::parse("generic.enum").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .expect("generic enum payload patterns should type-check and lower");
+}
+
+#[test]
 fn driver_validates_virtual_directory_project_before_compilation() {
     let graph = validate_virtual_project(
         "src/main.neu",
