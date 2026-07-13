@@ -1373,6 +1373,30 @@ invalid `clamp` range is a diagnosed programmer fault. Checked, saturating, and
 wrapping arithmetic, numeric casts, unsigned and floating-point types, and
 other numeric intrinsics require separate accepted contracts.
 
+## Proposed ADR-0113: Collection Protocol Contracts
+
+`Eq<T>`, `Ord<T>`, `Hash<T>`, `Clone<T>`, and `Default<T>` are ordinary
+library protocols, not compiler-recognized capabilities. Protocol use is
+explicit and nominal; there is no structural duck typing, reflection, blanket
+implementation, or representation-derived fallback. `Hash<T>` must preserve
+equal-value/equal-hash consistency. `HashMap<K, V>` and `HashSet<T>` require
+`Eq` and `Hash`; `BTreeMap<K, V>` and `BTreeSet<T>` require `Ord`.
+
+Sorting, search, deduplication, and lexicographic operations state their exact
+protocol prerequisites and explicit failure results. None of these protocols
+implies `Copy`, `Send`, or `Share`, and protocol dispatch does not expose a
+public runtime or ABI representation.
+
+## Proposed ADR-0114: Collection Capacity And Allocation Failure
+
+Collection capacity is queried through ordinary APIs; allocators, pointers,
+layouts, and capacity tokens are not public. `reserve`, `shrink`, and
+growth-sensitive insertion have explicit `Result` contracts. Failed growth is
+atomic: it leaves logical contents and ownership unchanged, rather than
+partially mutating, discarding elements, or returning a nullable sentinel.
+Growth policy, relocation, alignment, and physical allocation remain
+compiler/runtime facts.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers
