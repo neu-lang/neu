@@ -23,6 +23,7 @@ pub enum ManifestDiagnosticKind {
     InvalidGlob,
     EmptyGlob,
     EntrypointNotSelected,
+    EntrypointRequired,
     SymlinkEscape,
     InvalidDependency,
 }
@@ -55,7 +56,7 @@ struct RawManifest {
     name: String,
     #[serde(default)]
     description: Option<String>,
-    entrypoint: String,
+    entrypoint: Option<String>,
     srcs: Vec<String>,
     #[serde(default)]
     dependencies: Vec<RawDependency>,
@@ -93,7 +94,7 @@ impl DependencyDescriptor {
 pub struct ProjectManifest {
     name: String,
     description: Option<String>,
-    entrypoint: PathBuf,
+    entrypoint: Option<PathBuf>,
     srcs: Vec<String>,
     dependencies: Vec<DependencyDescriptor>,
 }
@@ -118,17 +119,23 @@ impl ProjectManifest {
         ModuleName::parse(&raw.name).map_err(|_| {
             ManifestDiagnostic::new(ManifestDiagnosticKind::InvalidName, raw.name.clone())
         })?;
-        let entrypoint = validate_relative_path(Path::new(&raw.entrypoint))?;
-        if entrypoint
-            .extension()
-            .and_then(|extension| extension.to_str())
-            != Some("neu")
-        {
-            return Err(ManifestDiagnostic::new(
-                ManifestDiagnosticKind::InvalidPath,
-                "entrypoint must have the .neu extension",
-            ));
-        }
+        let entrypoint = raw
+            .entrypoint
+            .map(|entrypoint| {
+                let entrypoint = validate_relative_path(Path::new(&entrypoint))?;
+                if entrypoint
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    != Some("neu")
+                {
+                    return Err(ManifestDiagnostic::new(
+                        ManifestDiagnosticKind::InvalidPath,
+                        "entrypoint must have the .neu extension",
+                    ));
+                }
+                Ok(entrypoint)
+            })
+            .transpose()?;
         if raw.srcs.is_empty() {
             return Err(ManifestDiagnostic::new(
                 ManifestDiagnosticKind::MissingField,
@@ -195,8 +202,19 @@ impl ProjectManifest {
     pub fn description(&self) -> Option<&str> {
         self.description.as_deref()
     }
-    pub fn entrypoint(&self) -> &Path {
-        &self.entrypoint
+    pub fn is_library(&self) -> bool {
+        self.entrypoint.is_none()
+    }
+    pub fn entrypoint(&self) -> Option<&Path> {
+        self.entrypoint.as_deref()
+    }
+    pub fn require_entrypoint(&self) -> Result<&Path, ManifestDiagnostic> {
+        self.entrypoint.as_deref().ok_or_else(|| {
+            ManifestDiagnostic::new(
+                ManifestDiagnosticKind::EntrypointRequired,
+                "an executable entrypoint is required for this operation",
+            )
+        })
     }
     pub fn srcs(&self) -> &[String] {
         &self.srcs
@@ -231,12 +249,14 @@ impl ProjectManifest {
                 ));
             }
         }
-        let entry = root.join(&self.entrypoint);
-        if !selected.contains(&entry) {
-            return Err(ManifestDiagnostic::new(
-                ManifestDiagnosticKind::EntrypointNotSelected,
-                self.entrypoint.display().to_string(),
-            ));
+        if let Some(entrypoint) = &self.entrypoint {
+            let entry = root.join(entrypoint);
+            if !selected.contains(&entry) {
+                return Err(ManifestDiagnostic::new(
+                    ManifestDiagnosticKind::EntrypointNotSelected,
+                    entrypoint.display().to_string(),
+                ));
+            }
         }
         Ok(selected.into_iter().collect())
     }
