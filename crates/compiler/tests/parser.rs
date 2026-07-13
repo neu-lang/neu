@@ -25,6 +25,21 @@ fn parses_package_import_and_function_declaration() {
 }
 
 #[test]
+fn parses_public_test_function_modifier() {
+    let output = parse_source(
+        SourceFileId::from_raw(20003),
+        "public test func option_some_is_some() { assert(true, \"expected Some\") }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.function_declarations.len(), 1);
+    assert!(output.function_declarations[0].is_test);
+    assert!(output.function_declarations[0].top_level);
+    assert_eq!(output.function_declarations[0].parameters.len(), 0);
+}
+
+#[test]
 fn parses_quoted_directory_import_with_alias() {
     let output = parse_source(
         SourceFileId::from_raw(10003),

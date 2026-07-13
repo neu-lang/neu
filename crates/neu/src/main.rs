@@ -1,7 +1,10 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{fs, path::PathBuf, process::ExitCode};
 
 use clap::{Args, Parser, Subcommand};
-use compiler::driver::compile_manifest_to_executable_for_target;
+use compiler::driver::{
+    SourceDriverOptions, compile_manifest_to_executable_for_target,
+    compile_source_to_test_executable, discover_manifest_tests,
+};
 use target_lexicon::Triple;
 
 #[derive(Debug, Parser)]
@@ -15,6 +18,8 @@ struct Cli {
 enum Command {
     #[command(about = "Build a Neu project")]
     Build(BuildArgs),
+    #[command(about = "Run Neu test functions")]
+    Test(TestArgs),
 }
 
 #[derive(Debug, Args)]
@@ -27,12 +32,17 @@ struct BuildArgs {
     target: Option<String>,
 }
 
+#[derive(Debug, Args)]
+struct TestArgs {
+    #[arg(value_name = "PROJECT_OR_MANIFEST")]
+    project: Option<PathBuf>,
+    #[arg(long)]
+    list: bool,
+}
+
 fn main() -> ExitCode {
     match run() {
-        Ok(output) => {
-            println!("{}", output.display());
-            ExitCode::SUCCESS
-        }
+        Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("neu: {error}");
             ExitCode::from(1)
@@ -40,24 +50,83 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<PathBuf, String> {
+fn run() -> Result<(), String> {
     let Cli { command } = Cli::parse();
     match command {
-        Command::Build(args) => build(args),
+        Command::Build(args) => {
+            println!("{}", build(args)?.display());
+            Ok(())
+        }
+        Command::Test(args) => test(args),
+    }
+}
+
+fn test(args: TestArgs) -> Result<(), String> {
+    let manifest_path = resolve_manifest_path(args.project)?;
+    let project = discover_manifest_tests(&manifest_path).map_err(|error| format!("{error:?}"))?;
+    if args.list {
+        for test in project.tests() {
+            println!("{}", test.symbol());
+        }
+        return Ok(());
+    }
+    let root = manifest_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let output_root = root
+        .join("target")
+        .join(format!("neu-tests-{}", std::process::id()));
+    fs::create_dir_all(&output_root).map_err(|error| error.to_string())?;
+    let mut failures = 0usize;
+    for (index, test) in project.tests().iter().enumerate() {
+        let output = output_root.join(format!("test-{index}"));
+        let executable = compile_source_to_test_executable(
+            project.source(),
+            SourceDriverOptions::new(
+                project.source_file(),
+                project.module().clone(),
+                project.package().clone(),
+                &output,
+            ),
+            test.declaration(),
+        )
+        .map_err(|error| format!("{error:?}"))?;
+        let result = std::process::Command::new(executable)
+            .output()
+            .map_err(|error| error.to_string())?;
+        if !result.status.success() {
+            failures += 1;
+            let detail = String::from_utf8_lossy(&result.stderr).trim().to_owned();
+            let detail = if detail.is_empty() {
+                "native runtime trap".to_owned()
+            } else {
+                detail
+            };
+            eprintln!("test {}: failed: {}", test.symbol(), detail);
+        }
+    }
+    let _ = fs::remove_dir_all(&output_root);
+    if failures != 0 {
+        return Err(format!("{failures} test(s) failed"));
+    }
+    Ok(())
+}
+
+fn resolve_manifest_path(project: Option<PathBuf>) -> Result<PathBuf, String> {
+    match project {
+        Some(path) if path.is_file() => Ok(path),
+        Some(path) if path.is_dir() => compiler::manifest::ProjectManifest::discover(path)
+            .map_err(|error| error.detail().to_owned()),
+        Some(path) => Err(format!("project path does not exist: {}", path.display())),
+        None => compiler::manifest::ProjectManifest::discover(
+            std::env::current_dir().map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| error.detail().to_owned()),
     }
 }
 
 fn build(args: BuildArgs) -> Result<PathBuf, String> {
-    let manifest_path = match args.project {
-        Some(path) if path.is_file() => path,
-        Some(path) if path.is_dir() => compiler::manifest::ProjectManifest::discover(path)
-            .map_err(|error| error.detail().to_owned())?,
-        Some(path) => return Err(format!("project path does not exist: {}", path.display())),
-        None => compiler::manifest::ProjectManifest::discover(
-            std::env::current_dir().map_err(|error| error.to_string())?,
-        )
-        .map_err(|error| error.detail().to_owned())?,
-    };
+    let manifest_path = resolve_manifest_path(args.project)?;
     let (manifest, root) = compiler::manifest::ProjectManifest::load(&manifest_path)
         .map_err(|error| error.detail().to_owned())?;
     let output = args.output.unwrap_or_else(|| {

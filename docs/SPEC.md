@@ -1409,3 +1409,17 @@ directories, never executes the produced binary, and reports compiler,
 manifest, dependency, target, linker, and I/O failures with a non-zero
 exit status. Raw-source APIs remain library interfaces; `run`, `check`, `test`,
 package-manager, registry, and dependency-update commands are deferred.
+
+## Native tests
+
+Top-level tests use the compiler declaration modifier `public test func name() { ... }`.
+The modifier is valid only in that order on public, non-generic, non-suspend
+functions with zero parameters and no explicit return annotation. Test
+declarations are discovered across the project graph and ordered by fully
+qualified symbol (then source span). `assert(condition, message)` and
+`fail(message)` are compiler intrinsics available in any function; they require
+`Bool`/`String` and `String` respectively and do not depend on stdlib or I/O.
+Normal return passes. Failures and native traps are isolated per test process,
+reported by the CLI, and make `neu test` exit 1. `neu test --list` prints the
+ordered symbols without executing them. Test-only projects do not require a
+`main`; ordinary `neu build` entry-point rules are unchanged.

@@ -35,6 +35,13 @@ pub struct ManifestDiagnostic {
 }
 
 impl ManifestDiagnostic {
+    pub fn missing_sources() -> Self {
+        Self::new(
+            ManifestDiagnosticKind::MissingField,
+            "manifest contains no source files",
+        )
+    }
+
     fn new(kind: ManifestDiagnosticKind, detail: impl Into<String>) -> Self {
         Self {
             kind,

@@ -25,10 +25,11 @@ use crate::{
     source::SourceFileId,
     type_check::{
         ConstructorDiagnostic, DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes,
-        ReturnPathDiagnostic, ReturnTypeDiagnostic, TypeCheckDiagnostic, TypeRuleDiagnostic,
-        UnsupportedExecutableFormDiagnostic, apply_class_type_facts, apply_control_flow_results,
-        apply_direct_call_results, apply_enum_constructor_facts, apply_enum_function_facts,
-        apply_field_access_facts, apply_method_call_facts, apply_receiver_name_facts,
+        IntrinsicDiagnostic, ReturnPathDiagnostic, ReturnTypeDiagnostic, TestDiagnostic,
+        TypeCheckDiagnostic, TypeRuleDiagnostic, UnsupportedExecutableFormDiagnostic,
+        apply_class_type_facts, apply_control_flow_results, apply_direct_call_results,
+        apply_enum_constructor_facts, apply_enum_function_facts, apply_field_access_facts,
+        apply_intrinsic_call_facts, apply_method_call_facts, apply_receiver_name_facts,
         apply_receiver_signatures, apply_value_conditional_results, check_constructor_calls,
         check_direct_calls, check_entry_point, check_indirect_calls, check_return_expression_types,
         check_straight_line_returns, check_unsupported_executable_forms, diagnose_unresolved_types,
@@ -39,7 +40,8 @@ use crate::{
         type_executable_int_operators, type_function_signatures_in_with_generics,
         type_lambda_expressions, type_string_operations, type_value_conditionals,
         validate_compile_time_constants, validate_concurrency_structure,
-        validate_inferred_assignments, validate_task_member_cancellation_structure,
+        validate_inferred_assignments, validate_intrinsic_calls,
+        validate_task_member_cancellation_structure, validate_test_declarations,
     },
     types::{PrimitiveType, TypeArena, TypeKind},
 };
@@ -51,6 +53,95 @@ pub struct SourceDriverOptions {
     package: PackageNamespace,
     target: Triple,
     output: PathBuf,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TestMetadata {
+    symbol: String,
+    declaration: crate::ast::AstNodeId,
+    span: crate::source::ByteSpan,
+}
+
+impl TestMetadata {
+    pub fn symbol(&self) -> &str {
+        &self.symbol
+    }
+
+    pub fn declaration(&self) -> crate::ast::AstNodeId {
+        self.declaration
+    }
+
+    pub fn span(&self) -> crate::source::ByteSpan {
+        self.span
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TestProject {
+    source: String,
+    source_file: SourceFileId,
+    module: ModuleName,
+    package: PackageNamespace,
+    tests: Vec<TestMetadata>,
+}
+
+impl TestProject {
+    pub fn tests(&self) -> &[TestMetadata] {
+        &self.tests
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    pub fn source_file(&self) -> SourceFileId {
+        self.source_file
+    }
+
+    pub fn module(&self) -> &ModuleName {
+        &self.module
+    }
+
+    pub fn package(&self) -> &PackageNamespace {
+        &self.package
+    }
+}
+
+pub fn discover_tests(
+    parsed: &parser::ParseOutput,
+    module: &ModuleName,
+    package: &PackageNamespace,
+) -> Result<Vec<TestMetadata>, DriverError> {
+    let diagnostics = validate_test_declarations(parsed);
+    if !diagnostics.is_empty() {
+        return Err(DriverError::TestDiagnostics(diagnostics));
+    }
+    let mut tests = parsed
+        .function_declarations
+        .iter()
+        .filter(|function| function.is_test)
+        .filter_map(|function| {
+            let span = parsed.arena.node(function.declaration)?.span;
+            let package_name = package.as_str();
+            let symbol = if package_name.is_empty() {
+                format!("{}::{}", module.as_str(), function.name)
+            } else {
+                format!("{}::{}::{}", module.as_str(), package_name, function.name)
+            };
+            Some(TestMetadata {
+                symbol,
+                declaration: function.declaration,
+                span,
+            })
+        })
+        .collect::<Vec<_>>();
+    tests.sort_by(|left, right| {
+        left.symbol
+            .cmp(&right.symbol)
+            .then_with(|| left.span.file().cmp(&right.span.file()))
+            .then_with(|| left.span.start().cmp(&right.span.start()))
+    });
+    Ok(tests)
 }
 
 impl SourceDriverOptions {
@@ -113,6 +204,8 @@ pub enum DriverError {
     ReturnTypeDiagnostics(Vec<ReturnTypeDiagnostic>),
     UnsupportedExecutableForms(Vec<UnsupportedExecutableFormDiagnostic>),
     TypeDiagnostics(Vec<TypeCheckDiagnostic>),
+    TestDiagnostics(Vec<TestDiagnostic>),
+    IntrinsicDiagnostics(Vec<IntrinsicDiagnostic>),
     ConstructorDiagnostics(Vec<ConstructorDiagnostic>),
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
     OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
@@ -188,9 +281,72 @@ pub fn compile_manifest_to_executable_for_target(
     )
 }
 
+pub fn discover_manifest_tests(
+    manifest_path: impl AsRef<std::path::Path>,
+) -> Result<TestProject, DriverError> {
+    let manifest_path = manifest_path.as_ref();
+    let resolver = crate::dependency::GitDependencyResolver::from_environment()
+        .map_err(DriverError::Dependency)?;
+    let dependencies = resolver
+        .load_project_dependencies(manifest_path)
+        .map_err(DriverError::Dependency)?;
+    let (manifest, root) =
+        crate::manifest::ProjectManifest::load(manifest_path).map_err(DriverError::Manifest)?;
+    let sources = manifest
+        .load_sources(&root)
+        .map_err(DriverError::Manifest)?;
+    let entry = manifest
+        .entrypoint()
+        .map(ToOwned::to_owned)
+        .or_else(|| sources.first().map(|source| source.path().to_owned()))
+        .ok_or_else(|| {
+            DriverError::Manifest(crate::manifest::ManifestDiagnostic::missing_sources())
+        })?;
+    let graph = VirtualPackageGraph::build_with_dependencies(entry.clone(), sources, dependencies)
+        .map_err(DriverError::PackageGraph)?;
+    let entry_file = graph
+        .files()
+        .iter()
+        .find(|file| file.path == entry)
+        .expect("test project entry source is in the source graph");
+    let module = ModuleName::parse(manifest.name()).expect("manifest name was validated");
+    let source = graph.bootstrap_source();
+    let parsed = parser::parse_source(entry_file.id, &source);
+    if !parsed.lex_diagnostics.is_empty() {
+        return Err(DriverError::LexDiagnostics(parsed.lex_diagnostics));
+    }
+    if !parsed.diagnostics.is_empty() {
+        return Err(DriverError::ParseDiagnostics(parsed.diagnostics));
+    }
+    let tests = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+    Ok(TestProject {
+        source,
+        source_file: entry_file.id,
+        module,
+        package: PackageNamespace::root(),
+        tests,
+    })
+}
+
 pub fn compile_source_to_executable(
     source: &str,
     options: SourceDriverOptions,
+) -> Result<PathBuf, DriverError> {
+    compile_source_with_entry(source, options, None)
+}
+
+pub fn compile_source_to_test_executable(
+    source: &str,
+    options: SourceDriverOptions,
+    test_declaration: crate::ast::AstNodeId,
+) -> Result<PathBuf, DriverError> {
+    compile_source_with_entry(source, options, Some(test_declaration))
+}
+
+fn compile_source_with_entry(
+    source: &str,
+    options: SourceDriverOptions,
+    selected_entry: Option<crate::ast::AstNodeId>,
 ) -> Result<PathBuf, DriverError> {
     let parsed = parser::parse_source(options.source_file(), source);
     if !parsed.lex_diagnostics.is_empty() {
@@ -200,17 +356,24 @@ pub fn compile_source_to_executable(
         return Err(DriverError::ParseDiagnostics(parsed.diagnostics.clone()));
     }
 
-    let entry = check_entry_point(
-        options.package(),
-        &[crate::type_check::EntryPointFile::new(
+    if selected_entry.is_none() {
+        let entry = check_entry_point(
             options.package(),
-            &parsed,
-        )],
-    );
-    if !entry.diagnostics().is_empty() {
-        return Err(DriverError::EntryPointDiagnostics(
-            entry.diagnostics().to_vec(),
-        ));
+            &[crate::type_check::EntryPointFile::new(
+                options.package(),
+                &parsed,
+            )],
+        );
+        if !entry.diagnostics().is_empty() {
+            return Err(DriverError::EntryPointDiagnostics(
+                entry.diagnostics().to_vec(),
+            ));
+        }
+    } else {
+        let test_diagnostics = validate_test_declarations(&parsed);
+        if !test_diagnostics.is_empty() {
+            return Err(DriverError::TestDiagnostics(test_diagnostics));
+        }
     }
 
     let target = options.target();
@@ -259,12 +422,24 @@ pub fn compile_source_to_executable(
                     )
                 })
                 .collect::<Option<Vec<_>>>()?;
-            let return_type = type_annotation_type(
-                &parsed,
-                function.return_annotation?,
-                &mut types,
-                class_types.classes(),
-            )?;
+            let return_type = function
+                .is_test
+                .then(|| {
+                    types
+                        .records()
+                        .iter()
+                        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Unit))
+                        .map(|record| record.id())
+                })
+                .flatten()
+                .or_else(|| {
+                    type_annotation_type(
+                        &parsed,
+                        function.return_annotation?,
+                        &mut types,
+                        class_types.classes(),
+                    )
+                })?;
             Some(crate::type_check::FunctionSignature::new(
                 function.declaration,
                 parameters,
@@ -428,6 +603,12 @@ pub fn compile_source_to_executable(
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     diagnose_unresolved_types(&parsed, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
+    let intrinsic_diagnostics =
+        validate_intrinsic_calls(&parsed, report.expression_types(), &types);
+    if !intrinsic_diagnostics.is_empty() {
+        return Err(DriverError::IntrinsicDiagnostics(intrinsic_diagnostics));
+    }
+    apply_intrinsic_call_facts(&parsed, &mut report, &types);
     let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed
@@ -611,8 +792,8 @@ pub fn compile_source_to_executable(
         .iter()
         .map(|function| infer_source_parameter_effects(&parsed, function.declaration))
         .collect::<Vec<_>>();
-    let hir = lower_checked_hir_source(
-        CheckedHirSource::new(
+    let hir = lower_checked_hir_source({
+        let source = CheckedHirSource::new(
             options.module().clone(),
             options.package().clone(),
             &parsed,
@@ -624,8 +805,12 @@ pub fn compile_source_to_executable(
         .with_type_arena(&types)
         .with_effect_contracts(&effect_contracts)
         .with_class_types(&class_types)
-        .with_call_targets(calls.resolved_declarations()),
-    )
+        .with_call_targets(calls.resolved_declarations());
+        match selected_entry {
+            Some(entry) => source.with_entry_declaration(entry),
+            None => source,
+        }
+    })
     .map_err(DriverError::Hir)?;
     let mir = lower_hir_to_mir(&hir, &types).map_err(DriverError::Mir)?;
     let object = emit_mir_module_to_object(&mir, &types, "main").map_err(DriverError::Backend)?;

@@ -20,10 +20,10 @@ use compiler::{
         EntryPointFile, ExecutableSourceTypes, ExpressionType, GenericConstraintFailureKind,
         KnownSymbolType, LiteralExpressionInput, LiteralKind, NullTestRefinedBranch,
         RecognizedNullTest, RefinedExpressionType, RefinementRecord, ReturnPathDiagnosticKind,
-        ReturnTypeDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind, TypeCheckReport,
-        TypeRuleDiagnostic, apply_direct_call_results, build_capability_bound_records,
-        build_generic_parameter_types, check_direct_calls, check_entry_point,
-        check_return_expression_types, check_straight_line_returns,
+        ReturnTypeDiagnosticKind, TestDiagnosticKind, TypeCheckDiagnostic, TypeCheckDiagnosticKind,
+        TypeCheckReport, TypeRuleDiagnostic, apply_direct_call_results,
+        build_capability_bound_records, build_generic_parameter_types, check_direct_calls,
+        check_entry_point, check_return_expression_types, check_straight_line_returns,
         check_unsupported_executable_forms, known_local_symbol_types, recognize_null_tests,
         record_branch_refinements, record_refined_expression_types, select_eligible_null_tests,
         type_accepted_expressions, type_assignment_statements,
@@ -41,6 +41,21 @@ use compiler::{
         GenericSubstitution, NullableType, PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord,
     },
 };
+
+#[test]
+fn validates_test_function_restrictions() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(42000),
+        "public test func with_parameter(value: Int) {} public test suspend func suspended() {} public test func typed(): Int { return 1 }",
+    );
+    let kinds: Vec<_> = compiler::type_check::validate_test_declarations(&parsed)
+        .iter()
+        .map(|diagnostic| diagnostic.kind())
+        .collect();
+    assert!(kinds.contains(&TestDiagnosticKind::ParametersNotAllowed));
+    assert!(kinds.contains(&TestDiagnosticKind::SuspendNotAllowed));
+    assert!(kinds.contains(&TestDiagnosticKind::ReturnTypeNotAllowed));
+}
 
 #[test]
 fn const_expression_produces_a_typed_compile_time_fact() {
