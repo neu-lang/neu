@@ -15,8 +15,8 @@ use crate::{
     symbol::{SymbolId, SymbolInterner},
     thread::{ThreadCapability, satisfies_thread_capability},
     types::{
-        FunctionType, GenericParameterType, GenericSubstitution, PrimitiveType, TypeArena, TypeId,
-        TypeKind, TypeRecord,
+        FunctionType, GenericParameterType, GenericSubstitution, GenericTypeIdentity,
+        PrimitiveType, TypeArena, TypeId, TypeKind, TypeRecord,
     },
 };
 use std::collections::HashMap;
@@ -4971,6 +4971,26 @@ fn resolve_annotation_type(
                 })?;
             return Some(arena.task(result));
         }
+        if !reference.generic_argument_names.is_empty() {
+            let class = classes.iter().find(|class| class.name == reference.name)?;
+            let arguments = reference
+                .generic_argument_names
+                .iter()
+                .map(|name| {
+                    primitives.type_for_primitive_name(name).or_else(|| {
+                        classes
+                            .iter()
+                            .find(|class| class.name == *name)
+                            .map(|class| class.type_id)
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?;
+            let identity = match arena.get(class.type_id)?.kind() {
+                TypeKind::Nominal(identity) => identity.clone(),
+                _ => return None,
+            };
+            return Some(arena.generic_instance(GenericTypeIdentity::new(identity, arguments)));
+        }
         return primitives
             .type_for_primitive_name(&reference.name)
             .or_else(|| {
@@ -5018,6 +5038,57 @@ fn resolve_annotation_type_with_generics(
         classes,
         arena,
     )
+}
+
+fn generic_enum_bindings<'a>(
+    parsed: &'a ParseOutput,
+    subject_type: TypeId,
+    enum_class: &'a ClassTypeRecord,
+    arena: &TypeArena,
+) -> Vec<(&'a str, TypeId)> {
+    let Some(TypeKind::GenericInstance(identity)) =
+        arena.get(subject_type).map(|record| record.kind())
+    else {
+        return Vec::new();
+    };
+    let parameters = parsed
+        .generic_parameters
+        .iter()
+        .filter(|parameter| parameter.owner == Some(enum_class.declaration()))
+        .map(|parameter| parameter.name.as_str());
+    parameters
+        .zip(identity.arguments().iter().copied())
+        .collect()
+}
+
+fn resolve_enum_payload_type(
+    argument: AstNodeId,
+    parsed: &ParseOutput,
+    primitives: &PrimitiveTypeIds,
+    classes: &[ClassTypeRecord],
+    arena: &mut TypeArena,
+    generic_bindings: &[(&str, TypeId)],
+) -> Option<TypeId> {
+    resolve_annotation_type_with_generics(
+        argument,
+        &parsed.type_name_references,
+        &parsed.array_types,
+        primitives,
+        classes,
+        arena,
+        generic_bindings,
+    )
+    .or_else(|| {
+        let name = parsed
+            .name_references
+            .iter()
+            .find(|reference| reference.reference == argument)
+            .map(|reference| reference.name.as_str())?;
+        generic_bindings
+            .iter()
+            .find(|(parameter, _)| *parameter == name)
+            .map(|(_, ty)| *ty)
+    })
 }
 
 pub fn type_array_expressions(
@@ -6811,8 +6882,13 @@ pub fn type_enum_whens(
             }
             continue;
         }
+        let enum_declaration = match type_arena.get(subject_type).map(|record| record.kind()) {
+            Some(TypeKind::Nominal(identity)) => Some(identity.declaration()),
+            Some(TypeKind::GenericInstance(identity)) => Some(identity.declaration().declaration()),
+            _ => None,
+        };
         let Some(enum_class) = classes.classes().iter().find(|class| {
-            class.type_id == subject_type
+            Some(class.declaration()) == enum_declaration
                 && parsed
                     .enum_variants
                     .iter()
@@ -6829,6 +6905,7 @@ pub fn type_enum_whens(
             .iter()
             .filter(|variant| variant.enum_declaration == enum_class.declaration())
             .collect::<Vec<_>>();
+        let generic_bindings = generic_enum_bindings(parsed, subject_type, enum_class, type_arena);
         let mut covered = std::collections::HashSet::new();
         let mut wildcard = false;
         let mut arm_type = None;
@@ -6864,6 +6941,12 @@ pub fn type_enum_whens(
                     .iter()
                     .find(|pattern| pattern.pattern == arm.pattern)
                 {
+                    if variant.arguments.len() != pattern.payloads.len() {
+                        report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                            TypeRuleDiagnostic::WhenPatternInvalid,
+                            arm.pattern,
+                        ));
+                    }
                     let fields = parsed
                         .class_declarations
                         .iter()
@@ -6876,13 +6959,7 @@ pub fn type_enum_whens(
                                 .collect::<Vec<_>>()
                         })
                         .unwrap_or_default();
-                    if fields.len() != pattern.payloads.len() {
-                        report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
-                            TypeRuleDiagnostic::WhenPatternInvalid,
-                            arm.pattern,
-                        ));
-                    }
-                    for (binding, field) in pattern.payloads.iter().zip(fields) {
+                    for (index, binding) in pattern.payloads.iter().enumerate() {
                         let Some(binding_name) = parsed
                             .pattern_bindings
                             .iter()
@@ -6890,14 +6967,33 @@ pub fn type_enum_whens(
                         else {
                             continue;
                         };
-                        let Some(field_type) = resolve_annotation_type(
-                            field.annotation,
-                            &parsed.type_name_references,
-                            &parsed.array_types,
-                            &primitives,
-                            classes.classes(),
-                            type_arena,
-                        ) else {
+                        let field_type = variant
+                            .arguments
+                            .get(index)
+                            .and_then(|argument| {
+                                resolve_enum_payload_type(
+                                    *argument,
+                                    parsed,
+                                    &primitives,
+                                    classes.classes(),
+                                    type_arena,
+                                    &generic_bindings,
+                                )
+                            })
+                            .or_else(|| {
+                                fields.get(index).and_then(|field| {
+                                    resolve_annotation_type_with_generics(
+                                        field.annotation,
+                                        &parsed.type_name_references,
+                                        &parsed.array_types,
+                                        &primitives,
+                                        classes.classes(),
+                                        type_arena,
+                                        &generic_bindings,
+                                    )
+                                })
+                            });
+                        let Some(field_type) = field_type else {
                             continue;
                         };
                         for reference in parsed
