@@ -1,6 +1,0 @@
-severity = "error"
-message = "unexpected token in synthetic parser input"
-primary_span = "3..4"
-source_of_truth = "docs/milestones/M0010-parser-recovery-architecture.md"
-recovery_action = "skip-to-synchronization-token"
-notes = ["synthetic parser diagnostic fixture; no concrete grammar is accepted"]
