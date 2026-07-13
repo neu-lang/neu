@@ -98,6 +98,7 @@ fn generic_function_signatures_resolve_type_parameters() {
     );
 
     assert_eq!(signatures.len(), 1);
+    assert_eq!(signatures[0].generic_parameters().len(), 1);
     assert_eq!(signatures[0].parameter_types().len(), 1);
     assert!(matches!(
         types
@@ -110,6 +111,13 @@ fn generic_function_signatures_resolve_type_parameters() {
         types.get(signatures[0].return_type()).unwrap().kind(),
         TypeKind::GenericParameter(_)
     ));
+    let int_type = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let mut substitution = GenericSubstitution::new();
+    substitution.insert(signatures[0].generic_parameters()[0], int_type);
+    let specialized = signatures[0].specialize(&substitution, &mut types);
+    assert!(specialized.generic_parameters().is_empty());
+    assert_eq!(specialized.parameter_types(), &[int_type]);
+    assert_eq!(specialized.return_type(), int_type);
 }
 
 #[test]

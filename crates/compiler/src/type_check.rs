@@ -463,6 +463,7 @@ pub struct FunctionSignature {
     parameter_types: Vec<TypeId>,
     return_type: TypeId,
     is_suspend: bool,
+    generic_parameters: Vec<TypeId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2622,6 +2623,7 @@ impl FunctionSignature {
             parameter_types,
             return_type,
             is_suspend: false,
+            generic_parameters: Vec::new(),
         }
     }
 
@@ -2639,6 +2641,29 @@ impl FunctionSignature {
 
     pub fn is_suspend(&self) -> bool {
         self.is_suspend
+    }
+
+    pub fn generic_parameters(&self) -> &[TypeId] {
+        &self.generic_parameters
+    }
+
+    pub fn with_generic_parameters(mut self, parameters: Vec<TypeId>) -> Self {
+        self.generic_parameters = parameters;
+        self
+    }
+
+    pub fn specialize(&self, substitution: &GenericSubstitution, arena: &mut TypeArena) -> Self {
+        Self {
+            declaration: self.declaration,
+            parameter_types: self
+                .parameter_types
+                .iter()
+                .map(|ty| substitution.apply(*ty, arena))
+                .collect(),
+            return_type: substitution.apply(self.return_type, arena),
+            is_suspend: self.is_suspend,
+            generic_parameters: Vec::new(),
+        }
     }
 
     pub fn with_suspend(mut self, is_suspend: bool) -> Self {
@@ -3770,6 +3795,7 @@ fn type_function_signatures_in_with_classes_and_generics(
             parameter_types,
             return_type,
             is_suspend: function.is_suspend,
+            generic_parameters: generic_types.iter().map(|(_, ty)| *ty).collect(),
         });
     }
 
