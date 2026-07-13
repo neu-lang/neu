@@ -47,7 +47,6 @@ pub enum DiagnosticKind {
     MalformedArrayLiteral,
     MalformedIndexExpression,
     MalformedImportPath,
-    MalformedAnnotation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,7 +98,6 @@ pub struct ParseOutput {
     pub qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
     pub pattern_bindings: Vec<ParsedPatternBinding>,
     pub class_declarations: Vec<ParsedClassDeclaration>,
-    pub annotations: Vec<ParsedAnnotation>,
     pub field_declarations: Vec<ParsedFieldDeclaration>,
     pub imports: Vec<ParsedImport>,
     pub package_name: Option<String>,
@@ -126,33 +124,6 @@ pub struct ParsedClassDeclaration {
     pub fields: Vec<AstNodeId>,
     pub constructor_parameters: Vec<ParsedConstructorParameter>,
     pub interface: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParsedAnnotationProperty {
-    pub name: String,
-    pub name_span: ByteSpan,
-    pub value: AstNodeId,
-    pub span: ByteSpan,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParsedAnnotation {
-    pub annotation: AstNodeId,
-    pub target: AstNodeId,
-    pub name: String,
-    pub name_span: ByteSpan,
-    pub properties: Vec<ParsedAnnotationProperty>,
-    pub span: ByteSpan,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct PendingAnnotation {
-    annotation: AstNodeId,
-    name: String,
-    name_span: ByteSpan,
-    properties: Vec<ParsedAnnotationProperty>,
-    span: ByteSpan,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -604,7 +575,6 @@ pub fn parse_source(file: SourceFileId, text: &str) -> ParseOutput {
         match_arms: parser.match_arms,
         qualified_case_patterns: parser.qualified_case_patterns,
         class_declarations: parser.class_declarations,
-        annotations: parser.annotations,
         field_declarations: parser.field_declarations,
         imports: parser.imports,
         package_name: parser.package_name,
@@ -656,7 +626,6 @@ struct Parser<'source> {
     qualified_case_patterns: Vec<ParsedQualifiedCasePattern>,
     pattern_bindings: Vec<ParsedPatternBinding>,
     class_declarations: Vec<ParsedClassDeclaration>,
-    annotations: Vec<ParsedAnnotation>,
     field_declarations: Vec<ParsedFieldDeclaration>,
     imports: Vec<ParsedImport>,
     package_name: Option<String>,
@@ -673,7 +642,6 @@ struct Parser<'source> {
     pending_method_static: bool,
     pending_method_suspend: bool,
     pending_generic_parameters: Vec<AstNodeId>,
-    pending_annotations: Vec<PendingAnnotation>,
 }
 
 impl<'source> Parser<'source> {
@@ -705,7 +673,6 @@ impl<'source> Parser<'source> {
             qualified_case_patterns: Vec::new(),
             pattern_bindings: Vec::new(),
             class_declarations: Vec::new(),
-            annotations: Vec::new(),
             field_declarations: Vec::new(),
             imports: Vec::new(),
             package_name: None,
@@ -740,7 +707,6 @@ impl<'source> Parser<'source> {
             pending_method_static: false,
             pending_method_suspend: false,
             pending_generic_parameters: Vec::new(),
-            pending_annotations: Vec::new(),
         }
     }
 
@@ -847,7 +813,6 @@ impl<'source> Parser<'source> {
         if in_body && self.current_kind() == Some(TokenKind::RightBrace) {
             return;
         }
-        self.parse_annotations();
         self.pending_method_visibility = "public".to_owned();
 
         let mut saw_visibility = false;
@@ -946,129 +911,6 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn parse_annotations(&mut self) {
-        self.pending_annotations.clear();
-        while self.current_kind() == Some(TokenKind::At) {
-            let start = self
-                .current()
-                .expect("annotation marker exists")
-                .span
-                .start();
-            self.advance();
-            let Some(name_token) = self.current().cloned() else {
-                self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedAnnotation);
-                break;
-            };
-            if name_token.kind != TokenKind::Identifier {
-                self.diagnostic(DiagnosticKind::MalformedAnnotation, name_token.span);
-                self.advance();
-                continue;
-            }
-            let name = self.text[name_token.span.start()..name_token.span.end()].to_owned();
-            self.advance();
-            let annotation = self.arena.add_annotation(name_token.span);
-            let mut properties = Vec::new();
-            if self.current_kind() == Some(TokenKind::LeftParen) {
-                self.advance();
-                while !self.is_eof() && self.current_kind() != Some(TokenKind::RightParen) {
-                    let Some(property_token) = self.current().cloned() else {
-                        break;
-                    };
-                    if property_token.kind != TokenKind::Identifier {
-                        self.diagnostic(DiagnosticKind::MalformedAnnotation, property_token.span);
-                        self.skip_to_annotation_boundary();
-                        break;
-                    }
-                    let property_name = self.text
-                        [property_token.span.start()..property_token.span.end()]
-                        .to_owned();
-                    self.advance();
-                    if self.current_kind() != Some(TokenKind::Equal) {
-                        self.diagnostic_current_or_span(
-                            DiagnosticKind::MalformedAnnotation,
-                            property_token.span,
-                        );
-                        self.skip_to_annotation_boundary();
-                        break;
-                    }
-                    self.advance();
-                    let value_start = self
-                        .current()
-                        .map_or(property_token.span.end(), |token| token.span.start());
-                    let Some(value_span) = self.parse_expression() else {
-                        self.diagnostic_current_or_span(
-                            DiagnosticKind::MalformedAnnotation,
-                            property_token.span,
-                        );
-                        self.skip_to_annotation_boundary();
-                        break;
-                    };
-                    let Some(value) = self.latest_expression_node_for_span(value_span) else {
-                        self.diagnostic(
-                            DiagnosticKind::MalformedAnnotation,
-                            self.span(value_start, value_span.end()),
-                        );
-                        self.skip_to_annotation_boundary();
-                        break;
-                    };
-                    properties.push(ParsedAnnotationProperty {
-                        name: property_name,
-                        name_span: property_token.span,
-                        value,
-                        span: self.span(property_token.span.start(), value_span.end()),
-                    });
-                    if self.current_kind() == Some(TokenKind::Comma) {
-                        self.advance();
-                    } else if self.current_kind() != Some(TokenKind::RightParen) {
-                        self.diagnostic_current(DiagnosticKind::MalformedAnnotation);
-                        self.skip_to_annotation_boundary();
-                        break;
-                    }
-                }
-                if self.current_kind() == Some(TokenKind::RightParen) {
-                    self.advance();
-                } else {
-                    self.diagnostic_current_or_span(
-                        DiagnosticKind::MalformedAnnotation,
-                        name_token.span,
-                    );
-                }
-            }
-            let end = self
-                .previous_span()
-                .map_or(name_token.span.end(), ByteSpan::end);
-            self.pending_annotations.push(PendingAnnotation {
-                annotation,
-                name,
-                name_span: name_token.span,
-                properties,
-                span: self.span(start, end),
-            });
-        }
-    }
-
-    fn skip_to_annotation_boundary(&mut self) {
-        while !self.is_eof()
-            && !matches!(
-                self.current_kind(),
-                Some(
-                    TokenKind::RightParen
-                        | TokenKind::At
-                        | TokenKind::KwClass
-                        | TokenKind::KwStruct
-                        | TokenKind::KwEnum
-                        | TokenKind::KwInterface
-                        | TokenKind::KwFunc
-                )
-            )
-        {
-            self.advance();
-        }
-        if self.current_kind() == Some(TokenKind::RightParen) {
-            self.advance();
-        }
-    }
-
     fn parse_function(&mut self, in_body: bool) {
         let keyword = self.current().expect("function token exists").clone();
         let start = keyword.span.start();
@@ -1131,19 +973,6 @@ impl<'source> Parser<'source> {
                 );
                 self.saw_top_level_declaration |= !in_body;
                 self.record_function_parameters(declaration, parameters.clone());
-                self.annotations
-                    .extend(
-                        self.pending_annotations
-                            .drain(..)
-                            .map(|pending| ParsedAnnotation {
-                                annotation: pending.annotation,
-                                target: declaration,
-                                name: pending.name,
-                                name_span: pending.name_span,
-                                properties: pending.properties,
-                                span: pending.span,
-                            }),
-                    );
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
@@ -1187,19 +1016,6 @@ impl<'source> Parser<'source> {
                     .parse_body_block()
                     .and_then(|span| self.latest_node_for_span(span, AstNodeKind::Block));
                 self.current_function = previous_function;
-                self.annotations
-                    .extend(
-                        self.pending_annotations
-                            .drain(..)
-                            .map(|pending| ParsedAnnotation {
-                                annotation: pending.annotation,
-                                target: declaration,
-                                name: pending.name,
-                                name_span: pending.name_span,
-                                properties: pending.properties,
-                                span: pending.span,
-                            }),
-                    );
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
@@ -1530,19 +1346,6 @@ impl<'source> Parser<'source> {
             _ => unreachable!("only named body declarations are parsed here"),
         };
         self.assign_pending_generic_owner(declaration);
-        self.annotations
-            .extend(
-                self.pending_annotations
-                    .drain(..)
-                    .map(|pending| ParsedAnnotation {
-                        annotation: pending.annotation,
-                        target: declaration,
-                        name: pending.name,
-                        name_span: pending.name_span,
-                        properties: pending.properties,
-                        span: pending.span,
-                    }),
-            );
         self.record_declaration_name(declaration, DeclarationKind::Type, &name, in_body);
         self.saw_top_level_declaration |= !in_body;
         if kind == AstNodeKind::EnumDeclaration {

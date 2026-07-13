@@ -5,50 +5,6 @@ use compiler::parser::{ParsedBinaryOperator, ParsedUnaryOperator};
 use compiler::source::{ByteSpan, SourceFileId};
 
 #[test]
-fn parses_interface_backed_annotation_properties_on_enum_types() {
-    let output = parse_source(
-        SourceFileId::from_raw(20001),
-        "@Test(timeout = 100) enum Signal { Red }",
-    );
-
-    assert!(output.lex_diagnostics.is_empty());
-    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
-    assert_eq!(output.annotations.len(), 1);
-    let annotation = &output.annotations[0];
-    assert_eq!(annotation.name, "Test");
-    assert_eq!(annotation.properties.len(), 1);
-    assert_eq!(annotation.properties[0].name, "timeout");
-    assert_eq!(
-        output.arena.node(annotation.target).unwrap().kind,
-        AstNodeKind::EnumDeclaration
-    );
-}
-
-#[test]
-fn parses_test_annotation_on_top_level_function() {
-    let output = parse_source(
-        SourceFileId::from_raw(20002),
-        "@Test func option_test(): Option<Err> { return Option.None }",
-    );
-
-    assert!(output.lex_diagnostics.is_empty());
-    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
-    assert_eq!(output.annotations.len(), 1);
-    let annotation = &output.annotations[0];
-    assert_eq!(annotation.name, "Test");
-    assert_eq!(
-        output.arena.node(annotation.target).unwrap().kind,
-        AstNodeKind::FunctionDeclaration
-    );
-    assert!(
-        output
-            .function_declarations
-            .iter()
-            .any(|function| function.declaration == annotation.target && function.top_level)
-    );
-}
-
-#[test]
 fn parses_package_import_and_function_declaration() {
     let output = parse_source(
         SourceFileId::from_raw(1),

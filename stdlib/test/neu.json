@@ -1,6 +1,0 @@
-{
-  "name": "neu.test",
-  "description": "Annotation definitions for Neu library tests",
-  "srcs": ["src/**/*.neu"],
-  "dependencies": []
-}

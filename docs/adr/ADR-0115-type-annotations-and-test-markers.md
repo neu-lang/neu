@@ -10,10 +10,9 @@ annotations separate from runtime values and ordinary enum semantics?
 ## Decision
 
 Annotations are declaration metadata written immediately before a nominal type
-declaration or function with an `@Name` marker. The initial targets are enum
-declarations and zero-argument, executable top-level functions; the same
-metadata model is reserved for classes, structs, interfaces, and other
-nominal types once each target is explicitly enabled. An annotation is
+declaration with an `@Name` marker. The first target is an enum declaration;
+the same metadata model is reserved for classes, structs, interfaces, and
+other nominal types once each target is explicitly enabled. An annotation is
 not a value expression, constructor call, or inheritance relationship, and it
 does not change the annotated type's ownership, layout, capabilities, or
 runtime representation.
@@ -36,12 +35,11 @@ discriminants. A library can inspect a marker only through an explicitly
 accepted compiler/tooling operation; ordinary Neu code cannot reflect over
 annotations in this phase.
 
-`stdlib/test` may use `@Test` on zero-argument top-level functions as its
-initial executable test target. Each such function must return the test
-runner's `Option<E>` failure contract. Test discovery, fixture construction,
-assertion reporting, property defaults, ordering, isolation, and process exit
-behavior require a separate test-runner contract; this ADR only defines the
-interface-backed metadata and its type-target validation.
+`stdlib/test` may use `@Test` on enum declarations as its initial executable
+test target. Test discovery, fixture construction, assertion reporting,
+property defaults, ordering, isolation, and process exit behavior require a
+separate test-runner contract; this ADR only defines the interface-backed
+metadata and its type-target validation.
 
 ## Non-goals
 

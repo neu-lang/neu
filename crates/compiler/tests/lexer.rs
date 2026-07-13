@@ -240,7 +240,8 @@ fn reports_lexical_errors_with_precise_spans() {
         diagnostic_texts("42u32"),
         vec![(DiagnosticKind::UnsupportedIntegerLiteralSuffix, "42u32")]
     );
-    let output = lex(SourceFileId::from_raw(10014), "@Test");
-    assert!(output.diagnostics.is_empty());
-    assert_eq!(output.tokens[0].kind, TokenKind::At);
+    assert_eq!(
+        diagnostic_texts("@"),
+        vec![(DiagnosticKind::UnknownCharacter, "@")]
+    );
 }
