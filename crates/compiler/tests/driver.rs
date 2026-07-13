@@ -70,6 +70,7 @@ func classify(value: Option<Int>): Int {
         Option.None -> 0
     }
 }
+
 public func main(): Int { return 0 }
 "#;
     compile_source_to_executable(
@@ -82,6 +83,54 @@ public func main(): Int { return 0 }
         ),
     )
     .expect("generic enum payload patterns should type-check and lower");
+}
+
+#[test]
+fn compiles_core_numeric_utilities() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-core-numeric-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+        public func min(left: Int, right: Int): Int {
+            if left < right { return left }
+            return right
+        }
+        public func max(left: Int, right: Int): Int {
+            if left > right { return left }
+            return right
+        }
+        public func clamp(value: Int, lower: Int, upper: Int): Int {
+            if value < lower { return lower }
+            if value > upper { return upper }
+            return value
+        }
+        public func abs(value: Int): Int {
+            if value < 0 { return 0 - value }
+            return value
+        }
+        public func sign(value: Int): Int {
+            if value < 0 { return -1 }
+            if value > 0 { return 1 }
+            return 0
+        }
+        public func main(): Int {
+            return min(3, max(abs(-7), clamp(20, 0, 10))) + sign(-1)
+        }
+    "#;
+    let executable = workspace.join("program");
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31004),
+            ModuleName::parse("core.numeric").unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(2));
+    let _ = fs::remove_dir_all(workspace);
 }
 
 #[test]
