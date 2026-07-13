@@ -4918,3 +4918,16 @@ fn unsupported_executable_forms_report_outermost_source_spans() {
             .span
     );
 }
+
+#[test]
+fn accepted_generic_declarations_are_not_marked_as_unsupported_forms() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(130),
+        "func identity<T: Copy>(value: T): T { return value; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let report = check_unsupported_executable_forms(&parsed);
+
+    assert!(report.diagnostics().is_empty());
+}

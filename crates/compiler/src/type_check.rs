@@ -3524,8 +3524,6 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
                 AstNodeKind::ImportDeclaration
                     | AstNodeKind::StructDeclaration
                     | AstNodeKind::NullableType
-                    | AstNodeKind::GenericParameter
-                    | AstNodeKind::CapabilityBound
                     | AstNodeKind::GroupedType
             )
         })
@@ -3549,6 +3547,10 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
                         reference.name.as_str(),
                         "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte" | "Channel" | "Task"
                     )
+                    && !parsed
+                        .generic_parameters
+                        .iter()
+                        .any(|parameter| parameter.name == reference.name)
                     && !parsed
                         .class_declarations
                         .iter()
