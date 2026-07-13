@@ -2774,6 +2774,24 @@ pub fn validate_function_signature_bounds(
         .collect()
 }
 
+pub fn specialize_function_signature_checked(
+    signature: &FunctionSignature,
+    argument_types: &[TypeId],
+    arena: &mut TypeArena,
+) -> Result<FunctionSignature, Vec<GenericConstraintDiagnostic>> {
+    let diagnostics = validate_function_signature_bounds(signature, argument_types, arena);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    specialize_function_signature_for_call(signature, argument_types, arena).ok_or_else(|| {
+        vec![GenericConstraintDiagnostic {
+            parameter: signature.declaration,
+            bound: signature.declaration,
+            kind: GenericConstraintFailureKind::ArgumentCountMismatch,
+        }]
+    })
+}
+
 impl ReturnPathReport {
     pub fn diagnostics(&self) -> &[ReturnPathDiagnostic] {
         &self.diagnostics
@@ -3123,6 +3141,7 @@ pub struct CapabilityBoundRecord {
 pub enum GenericConstraintFailureKind {
     UnsatisfiedCapability,
     UnsupportedCapability,
+    ArgumentCountMismatch,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

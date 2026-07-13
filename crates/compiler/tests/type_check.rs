@@ -146,6 +146,22 @@ fn generic_function_signatures_resolve_type_parameters() {
         diagnostics[0].kind(),
         GenericConstraintFailureKind::UnsatisfiedCapability
     );
+    assert!(
+        compiler::type_check::specialize_function_signature_checked(
+            &signatures[0],
+            &[string_type],
+            &mut types,
+        )
+        .is_err()
+    );
+    assert!(
+        compiler::type_check::specialize_function_signature_checked(
+            &signatures[0],
+            &[int_type],
+            &mut types,
+        )
+        .is_ok()
+    );
 }
 
 #[test]
