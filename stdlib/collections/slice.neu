@@ -7,12 +7,14 @@ enum Slice<T> {
     EmptySlice,
     OneSlice(T),
     TwoSlice(T, T),
+    Storage(Array<T>),
 
     func len(): Int {
         return when (this) {
             Slice.EmptySlice -> 0
             Slice.OneSlice(_) -> 1
             Slice.TwoSlice(_, _) -> 2
+            Slice.Storage(values) -> values.size()
         }
     }
 
@@ -26,4 +28,12 @@ public test func slice_basics_work() {
     assert(empty.len() == 0, "empty slice has no elements");
     assert(one.len() == 1, "slice length counts the value");
     assert(two.len() == 2, "slice length counts both values");
+}
+
+public test func slice_storage_length_is_preserved() {
+    var values: Array<Int> = new Int[];
+    values.add(9);
+    values.add(10);
+    val slice: Slice<Int> = Slice.Storage(values);
+    assert(slice.len() == 2, "storage-backed slice length counts values");
 }

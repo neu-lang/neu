@@ -7,6 +7,7 @@ enum Deque<T> {
     OneDeque(T),
     TwoDeque(T, T),
     ThreeDeque(T, T, T),
+    Storage(Array<T>),
 
     func len(): Int {
         return when (this) {
@@ -14,6 +15,7 @@ enum Deque<T> {
             Deque.OneDeque(_) -> 1
             Deque.TwoDeque(_, _) -> 2
             Deque.ThreeDeque(_, _, _) -> 3
+            Deque.Storage(values) -> values.size()
         }
     }
 
@@ -27,4 +29,13 @@ public test func deque_basics_work() {
     assert(empty.is_empty(), "empty deque has no elements");
     assert(one.len() == 1, "deque length counts elements");
     assert(three.len() == 3, "deque length counts all elements");
+}
+
+public test func deque_storage_length_is_preserved() {
+    var values: Array<Int> = new Int[];
+    values.add(1);
+    values.add(2);
+    values.add(3);
+    val deque: Deque<Int> = Deque.Storage(values);
+    assert(deque.len() == 3, "storage-backed deque length counts values");
 }
