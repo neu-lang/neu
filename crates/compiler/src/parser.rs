@@ -1131,6 +1131,19 @@ impl<'source> Parser<'source> {
                 );
                 self.saw_top_level_declaration |= !in_body;
                 self.record_function_parameters(declaration, parameters.clone());
+                self.annotations
+                    .extend(
+                        self.pending_annotations
+                            .drain(..)
+                            .map(|pending| ParsedAnnotation {
+                                annotation: pending.annotation,
+                                target: declaration,
+                                name: pending.name,
+                                name_span: pending.name_span,
+                                properties: pending.properties,
+                                span: pending.span,
+                            }),
+                    );
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
@@ -1174,6 +1187,19 @@ impl<'source> Parser<'source> {
                     .parse_body_block()
                     .and_then(|span| self.latest_node_for_span(span, AstNodeKind::Block));
                 self.current_function = previous_function;
+                self.annotations
+                    .extend(
+                        self.pending_annotations
+                            .drain(..)
+                            .map(|pending| ParsedAnnotation {
+                                annotation: pending.annotation,
+                                target: declaration,
+                                name: pending.name,
+                                name_span: pending.name_span,
+                                properties: pending.properties,
+                                span: pending.span,
+                            }),
+                    );
                 self.function_declarations.push(ParsedFunctionDeclaration {
                     declaration,
                     owner: self.current_class,
