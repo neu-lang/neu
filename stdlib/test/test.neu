@@ -1,3 +1,5 @@
+package test
+
 // Marker annotation for declarations exercised by the Neu test runner.
 interface Test {
 }

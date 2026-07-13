@@ -1,3 +1,5 @@
+package collections
+
 // Immutable borrowed sequence view.
 class Slice<T> {
 }
