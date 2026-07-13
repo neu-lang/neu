@@ -6,7 +6,8 @@ use target_lexicon::Triple;
 use compiler::{
     driver::{
         SourceDriverOptions, compile_manifest_to_executable, compile_source_to_executable,
-        compile_virtual_project_to_executable, validate_virtual_project,
+        compile_source_to_test_executable, compile_virtual_project_to_executable,
+        validate_virtual_project,
     },
     module::{ModuleName, PackageNamespace, VirtualSource},
     source::SourceFileId,
@@ -85,6 +86,94 @@ fn compiles_core_numeric_utilities() {
     )
     .unwrap();
     assert_eq!(Command::new(output).status().unwrap().code(), Some(2));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_a_native_test_without_main() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-native-test-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+public test func option_some_is_some() {
+    assert(true, "expected Some")
+}
+"#;
+    let parsed = compiler::parser::parse_source(SourceFileId::from_raw(31005), source);
+    let declaration = parsed.function_declarations[0].declaration;
+    let output = compile_source_to_test_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31005),
+            ModuleName::parse("native.tests").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("test"),
+        ),
+        declaration,
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn native_test_assertion_failure_reaches_runtime() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-native-test-failure-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+public test func fails() {
+    assert(false, "expected Some")
+}
+"#;
+    let parsed = compiler::parser::parse_source(SourceFileId::from_raw(31006), source);
+    let declaration = parsed.function_declarations[0].declaration;
+    let output = compile_source_to_test_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31006),
+            ModuleName::parse("native.tests").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("test"),
+        ),
+        declaration,
+    )
+    .unwrap();
+    let result = Command::new(output).output().unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("expected Some"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn native_test_fail_reaches_runtime() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-native-test-fail-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+public test func fails() {
+    fail("explicit failure")
+}
+"#;
+    let parsed = compiler::parser::parse_source(SourceFileId::from_raw(31007), source);
+    let declaration = parsed.function_declarations[0].declaration;
+    let output = compile_source_to_test_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31007),
+            ModuleName::parse("native.tests").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("test"),
+        ),
+        declaration,
+    )
+    .unwrap();
+    let result = Command::new(output).output().unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("explicit failure"));
     let _ = fs::remove_dir_all(workspace);
 }
 

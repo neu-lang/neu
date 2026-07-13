@@ -52,6 +52,7 @@ struct RuntimeFunctions {
     free: FuncId,
     memcpy: FuncId,
     memcmp: FuncId,
+    write: FuncId,
     call_conv: CallConv,
 }
 
@@ -70,6 +71,25 @@ impl RuntimeFunctions {
         let user_name = function.declare_imported_user_function(UserExternalName {
             namespace: 0,
             index: id.as_u32(),
+        });
+        function.import_function(ExtFuncData {
+            name: ExternalName::user(user_name),
+            signature,
+            colocated: true,
+            patchable: false,
+        })
+    }
+
+    fn reference_write(&self, function: &mut Function) -> FuncRef {
+        let mut signature = Signature::new(self.call_conv);
+        signature.params.push(AbiParam::new(types::I64));
+        signature.params.push(AbiParam::new(types::I64));
+        signature.params.push(AbiParam::new(types::I64));
+        signature.returns.push(AbiParam::new(types::I64));
+        let signature = function.import_signature(signature);
+        let user_name = function.declare_imported_user_function(UserExternalName {
+            namespace: 0,
+            index: self.write.as_u32(),
         });
         function.import_function(ExtFuncData {
             name: ExternalName::user(user_name),
@@ -461,6 +481,7 @@ fn lower_mir_function_with_module(
                 .get(&mir_block.id())
                 .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
             builder.switch_to_block(clif_block);
+            let mut test_terminated = false;
             for instruction in mir_block.instructions() {
                 lower_instruction(
                     instruction,
@@ -477,14 +498,23 @@ fn lower_mir_function_with_module(
                     function_ids,
                     &lowering_context,
                 )?;
+                if matches!(
+                    instruction,
+                    MirInstruction::TestAssert { .. } | MirInstruction::TestFail { .. }
+                ) {
+                    test_terminated = true;
+                    break;
+                }
             }
-            lower_terminator(
-                mir_block.terminator(),
-                &clif_blocks,
-                &mut builder,
-                &values,
-                &aggregate_values,
-            )?;
+            if !test_terminated {
+                lower_terminator(
+                    mir_block.terminator(),
+                    &clif_blocks,
+                    &mut builder,
+                    &values,
+                    &aggregate_values,
+                )?;
+            }
         }
         for clif_block in clif_blocks.values().copied() {
             builder.seal_block(clif_block);
@@ -531,6 +561,11 @@ fn declare_runtime_functions(
     memory_signature.params.push(AbiParam::new(types::I64));
     memory_signature.params.push(AbiParam::new(types::I64));
     memory_signature.returns.push(AbiParam::new(types::I64));
+    let mut write_signature = Signature::new(CallConv::triple_default(target));
+    write_signature.params.push(AbiParam::new(types::I64));
+    write_signature.params.push(AbiParam::new(types::I64));
+    write_signature.params.push(AbiParam::new(types::I64));
+    write_signature.returns.push(AbiParam::new(types::I64));
     let malloc = module
         .declare_function("malloc", Linkage::Import, &malloc_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
@@ -545,6 +580,9 @@ fn declare_runtime_functions(
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let memcmp = module
         .declare_function("memcmp", Linkage::Import, &memory_signature)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let write = module
+        .declare_function("write", Linkage::Import, &write_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let mut context = cranelift_codegen::Context::new();
     context.func =
@@ -569,6 +607,7 @@ fn declare_runtime_functions(
         free,
         memcpy,
         memcmp,
+        write,
         call_conv: CallConv::triple_default(target),
     })
 }
@@ -1037,6 +1076,61 @@ fn lower_instruction(
                     normalize_bool_value(value, ty, context.type_arena, builder),
                 );
             }
+            Ok(())
+        }
+        MirInstruction::TestAssert {
+            condition, message, ..
+        } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let condition = values
+                .get(condition)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let message = values
+                .get(message)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let failure = builder.ins().icmp_imm(IntCC::Equal, condition, 0);
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), message, 0);
+            let zero = builder.ins().iconst(types::I64, 0);
+            let output_length = builder.ins().select(failure, length, zero);
+            let bytes = builder.ins().iadd_imm(message, 8);
+            let write = runtime.reference_write(builder.func);
+            let stderr = builder.ins().iconst(types::I64, 2);
+            builder.ins().call(write, &[stderr, bytes, output_length]);
+            let fail_block = builder.create_block();
+            let pass_block = builder.create_block();
+            builder
+                .ins()
+                .brif(failure, fail_block, &[], pass_block, &[]);
+            builder.switch_to_block(fail_block);
+            builder.ins().trap(TrapCode::unwrap_user(16));
+            builder.switch_to_block(pass_block);
+            builder.ins().return_(&[]);
+            builder.seal_block(fail_block);
+            builder.seal_block(pass_block);
+            Ok(())
+        }
+        MirInstruction::TestFail { message, .. } => {
+            let runtime = context
+                .runtime
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let message = values
+                .get(message)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), message, 0);
+            let bytes = builder.ins().iadd_imm(message, 8);
+            let write = runtime.reference_write(builder.func);
+            let stderr = builder.ins().iconst(types::I64, 2);
+            builder.ins().call(write, &[stderr, bytes, length]);
+            builder.ins().trap(TrapCode::unwrap_user(17));
             Ok(())
         }
         MirInstruction::TaskSpawn {

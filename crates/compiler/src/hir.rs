@@ -44,6 +44,7 @@ pub struct CheckedHirSource<'a> {
     class_types: Option<&'a ClassTypeReport>,
     call_targets: Option<&'a [ResolvedCallDeclaration]>,
     type_arena: Option<&'a TypeArena>,
+    entry_declaration: Option<AstNodeId>,
     function_indices: HashMap<AstNodeId, usize>,
     hir_function_indices: HashMap<usize, usize>,
 }
@@ -68,6 +69,7 @@ impl<'a> CheckedHirSource<'a> {
             class_types: None,
             call_targets: None,
             type_arena: None,
+            entry_declaration: None,
             function_indices: parsed
                 .function_declarations
                 .iter()
@@ -110,6 +112,11 @@ impl<'a> CheckedHirSource<'a> {
 
     pub fn with_type_arena(mut self, type_arena: &'a TypeArena) -> Self {
         self.type_arena = Some(type_arena);
+        self
+    }
+
+    pub fn with_entry_declaration(mut self, declaration: AstNodeId) -> Self {
+        self.entry_declaration = Some(declaration);
         self
     }
 }
@@ -487,6 +494,20 @@ pub fn lower_checked_hir_source(
                 )?;
             }
         }
+        if function.is_test && returns.is_empty() {
+            let span = function
+                .body
+                .and_then(|body| source.parsed.arena.node(body))
+                .map(|node| node.span)
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
+            let unit = HirExpressionId::from_raw(expressions.len());
+            expressions.push(HirExpression::unit_literal(
+                unit,
+                span,
+                signature.return_type(),
+            ));
+            returns.push(HirReturn::new(span, unit));
+        }
         let has_control_flow = source
             .parsed
             .if_statements
@@ -536,7 +557,10 @@ pub fn lower_checked_hir_source(
             source.module.clone(),
             source.package.clone(),
             span,
-            declaration_is_main(source.parsed, function.declaration),
+            source.entry_declaration.map_or_else(
+                || declaration_is_main(source.parsed, function.declaration),
+                |entry| entry == function.declaration,
+            ),
             signature.return_type(),
             parameters,
             locals,
@@ -1482,6 +1506,48 @@ fn lower_expression(
             .iter()
             .find(|name| name.reference == call.callee)
             .map(|name| name.name.as_str());
+        if matches!(builtin_name, Some("assert" | "fail")) {
+            let arguments = call
+                .arguments
+                .iter()
+                .map(|argument| {
+                    lower_expression(
+                        source,
+                        function_declaration,
+                        *argument,
+                        local_bindings,
+                        output,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let operation_id = HirExpressionId::from_raw(output.len());
+            if builtin_name == Some("assert") {
+                output.push(HirExpression::test_assert(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                    arguments
+                        .get(1)
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                ));
+            } else {
+                output.push(HirExpression::test_fail(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                ));
+            }
+            return Ok(operation_id);
+        }
         if matches!(builtin_name, Some("spawn" | "await")) {
             let argument = *call
                 .arguments
@@ -3556,6 +3622,13 @@ pub enum HirExpressionKind {
     },
     FunctionReference(HirFunctionId),
     DirectCall(HirDirectCall),
+    TestAssert {
+        condition: HirExpressionId,
+        message: HirExpressionId,
+    },
+    TestFail {
+        message: HirExpressionId,
+    },
     IndirectCall {
         callee: HirExpressionId,
         arguments: Vec<HirExpressionId>,
@@ -3819,6 +3892,35 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::IndirectCall { callee, arguments },
+        }
+    }
+
+    pub fn test_assert(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        condition: HirExpressionId,
+        message: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::TestAssert { condition, message },
+        }
+    }
+
+    pub fn test_fail(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        message: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::TestFail { message },
         }
     }
 

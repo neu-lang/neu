@@ -187,6 +187,7 @@ pub struct ParsedFunctionDeclaration {
     pub top_level: bool,
     pub is_static: bool,
     pub is_suspend: bool,
+    pub is_test: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -641,6 +642,7 @@ struct Parser<'source> {
     pending_method_abstract: bool,
     pending_method_static: bool,
     pending_method_suspend: bool,
+    pending_method_test: bool,
     pending_generic_parameters: Vec<AstNodeId>,
 }
 
@@ -706,6 +708,7 @@ impl<'source> Parser<'source> {
             pending_method_abstract: false,
             pending_method_static: false,
             pending_method_suspend: false,
+            pending_method_test: false,
             pending_generic_parameters: Vec::new(),
         }
     }
@@ -821,6 +824,7 @@ impl<'source> Parser<'source> {
         while self.is_visibility()
             || self.is_unsupported_modifier()
             || self.current_kind() == Some(TokenKind::KwFinal)
+            || self.current_kind() == Some(TokenKind::KwTest)
         {
             let token = self.current().expect("modifier token exists").clone();
             if token.kind == TokenKind::KwFinal {
@@ -853,6 +857,11 @@ impl<'source> Parser<'source> {
             } else if token.kind == TokenKind::Identifier && self.current_text() == Some("suspend")
             {
                 self.pending_method_suspend = true;
+            } else if token.kind == TokenKind::KwTest {
+                if !saw_visibility {
+                    self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
+                }
+                self.pending_method_test = true;
             } else {
                 self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
             }
@@ -865,25 +874,35 @@ impl<'source> Parser<'source> {
                 self.diagnostic_current(DiagnosticKind::ObsoleteFunctionKeyword);
                 self.parse_function(in_body);
             }
-            Some(TokenKind::KwClass) => self.parse_named_body_declaration(
-                AstNodeKind::ClassDeclaration,
-                in_body,
-                final_class,
-                abstract_class,
-            ),
-            Some(TokenKind::KwStruct) => self.parse_named_body_declaration(
-                AstNodeKind::StructDeclaration,
-                in_body,
-                false,
-                false,
-            ),
-            Some(TokenKind::KwEnum) => self.parse_named_body_declaration(
-                AstNodeKind::EnumDeclaration,
-                in_body,
-                false,
-                false,
-            ),
+            Some(TokenKind::KwClass) => {
+                self.reject_test_modifier_on_non_function();
+                self.parse_named_body_declaration(
+                    AstNodeKind::ClassDeclaration,
+                    in_body,
+                    final_class,
+                    abstract_class,
+                );
+            }
+            Some(TokenKind::KwStruct) => {
+                self.reject_test_modifier_on_non_function();
+                self.parse_named_body_declaration(
+                    AstNodeKind::StructDeclaration,
+                    in_body,
+                    false,
+                    false,
+                );
+            }
+            Some(TokenKind::KwEnum) => {
+                self.reject_test_modifier_on_non_function();
+                self.parse_named_body_declaration(
+                    AstNodeKind::EnumDeclaration,
+                    in_body,
+                    false,
+                    false,
+                );
+            }
             Some(TokenKind::KwInterface) => {
+                self.reject_test_modifier_on_non_function();
                 self.parse_named_body_declaration(
                     AstNodeKind::InterfaceDeclaration,
                     in_body,
@@ -908,6 +927,14 @@ impl<'source> Parser<'source> {
                 self.skip_to_declaration_boundary(in_body);
             }
             None => {}
+        }
+    }
+
+    fn reject_test_modifier_on_non_function(&mut self) {
+        if self.pending_method_test
+            && let Some(token) = self.current()
+        {
+            self.diagnostic(DiagnosticKind::UnsupportedDeclarationModifier, token.span);
         }
     }
 
@@ -990,6 +1017,7 @@ impl<'source> Parser<'source> {
                     top_level: !in_body,
                     is_static: self.pending_method_static,
                     is_suspend: self.pending_method_suspend,
+                    is_test: self.pending_method_test,
                 });
                 self.advance();
             }
@@ -1030,6 +1058,7 @@ impl<'source> Parser<'source> {
                     top_level: !in_body,
                     is_static: self.pending_method_static,
                     is_suspend: self.pending_method_suspend,
+                    is_test: self.pending_method_test,
                 });
             }
             _ => {
@@ -1043,6 +1072,7 @@ impl<'source> Parser<'source> {
         self.pending_method_static = false;
         self.pending_method_abstract = false;
         self.pending_method_suspend = false;
+        self.pending_method_test = false;
     }
 
     fn function_parameter_list_is_typed(&self) -> bool {

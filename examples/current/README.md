@@ -24,6 +24,8 @@ channel-backed implementation.
 channel runtime operation.
 `concurrency_complete.neu` combines nested scopes, multiple task results,
 cancellation, and channel transfer in one deterministic executable.
+`native_tests.neu` demonstrates a compiler-owned `public test func` and the
+`assert` intrinsic; run it through a manifest with `neu test`.
 
 Parser-only, type-checker-only, ownership, pattern, nullable, and unsupported
 syntax examples are intentionally omitted until those forms are accepted by

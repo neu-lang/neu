@@ -319,6 +319,15 @@ pub enum MirInstruction {
         arguments: Vec<MirValueId>,
         span: ByteSpan,
     },
+    TestAssert {
+        condition: MirValueId,
+        message: MirValueId,
+        span: ByteSpan,
+    },
+    TestFail {
+        message: MirValueId,
+        span: ByteSpan,
+    },
     FunctionReference {
         output: MirValueId,
         callee: MirFunctionId,
@@ -553,6 +562,8 @@ impl MirInstruction {
             | Self::ChannelReceive { span, .. }
             | Self::ChannelClose { span, .. }
             | Self::DirectCall { span, .. }
+            | Self::TestAssert { span, .. }
+            | Self::TestFail { span, .. }
             | Self::FunctionReference { span, .. }
             | Self::IndirectCall { span, .. }
             | Self::VirtualCall { span, .. }
@@ -1134,6 +1145,19 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             .collect(),
                         expression.span(),
                     ));
+                }
+                HirExpressionKind::TestAssert { condition, message } => {
+                    instructions.push(MirInstruction::TestAssert {
+                        condition: mir_expression_value_id(function, *condition),
+                        message: mir_expression_value_id(function, *message),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::TestFail { message } => {
+                    instructions.push(MirInstruction::TestFail {
+                        message: mir_expression_value_id(function, *message),
+                        span: expression.span(),
+                    });
                 }
                 HirExpressionKind::FunctionReference(callee) => {
                     instructions.push(MirInstruction::FunctionReference {
@@ -1946,6 +1970,19 @@ impl<'a> ShortCircuitLowerer<'a> {
                     expression.span(),
                 ));
             }
+            HirExpressionKind::TestAssert { condition, message } => {
+                self.push(MirInstruction::TestAssert {
+                    condition: mir_expression_value_id(self.function, *condition),
+                    message: mir_expression_value_id(self.function, *message),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::TestFail { message } => {
+                self.push(MirInstruction::TestFail {
+                    message: mir_expression_value_id(self.function, *message),
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::FunctionReference(callee) => {
                 self.push(MirInstruction::FunctionReference {
                     output,
@@ -2512,6 +2549,19 @@ impl<'a> ControlFlowLowerer<'a> {
                         .collect(),
                     expression.span(),
                 ));
+            }
+            HirExpressionKind::TestAssert { condition, message } => {
+                self.push(MirInstruction::TestAssert {
+                    condition: mir_expression_value_id(self.function, *condition),
+                    message: mir_expression_value_id(self.function, *message),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::TestFail { message } => {
+                self.push(MirInstruction::TestFail {
+                    message: mir_expression_value_id(self.function, *message),
+                    span: expression.span(),
+                });
             }
             HirExpressionKind::FunctionReference(callee) => {
                 self.push(MirInstruction::FunctionReference {
