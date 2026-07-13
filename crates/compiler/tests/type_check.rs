@@ -135,6 +135,17 @@ fn generic_function_signatures_resolve_type_parameters() {
         )
         .is_none()
     );
+    let string_type = types.insert(TypeRecord::primitive(PrimitiveType::String));
+    let diagnostics = compiler::type_check::validate_function_signature_bounds(
+        &signatures[0],
+        &[string_type],
+        &types,
+    );
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].kind(),
+        GenericConstraintFailureKind::UnsatisfiedCapability
+    );
 }
 
 #[test]

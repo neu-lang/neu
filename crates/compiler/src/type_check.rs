@@ -469,12 +469,17 @@ pub struct FunctionSignature {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenericCapabilityBound {
+    parameter_node: AstNodeId,
     parameter: TypeId,
     bound: AstNodeId,
     name: String,
 }
 
 impl GenericCapabilityBound {
+    pub fn parameter_node(&self) -> AstNodeId {
+        self.parameter_node
+    }
+
     pub fn parameter(&self) -> TypeId {
         self.parameter
     }
@@ -2724,6 +2729,51 @@ pub fn specialize_function_signature_for_call(
     Some(signature.specialize(&substitution, arena))
 }
 
+pub fn validate_function_signature_bounds(
+    signature: &FunctionSignature,
+    argument_types: &[TypeId],
+    types: &TypeArena,
+) -> Vec<GenericConstraintDiagnostic> {
+    if signature.generic_parameters().len() != argument_types.len() {
+        return Vec::new();
+    }
+    let mut substitution = GenericSubstitution::new();
+    for (parameter, argument) in signature
+        .generic_parameters()
+        .iter()
+        .copied()
+        .zip(argument_types.iter().copied())
+    {
+        substitution.insert(parameter, argument);
+    }
+    signature
+        .generic_bounds()
+        .iter()
+        .filter_map(|bound| {
+            let capability = match bound.name() {
+                "Copy" => ThreadCapability::Copy,
+                "Send" => ThreadCapability::Send,
+                "Share" => ThreadCapability::Share,
+                _ => {
+                    return Some(GenericConstraintDiagnostic {
+                        parameter: bound.parameter_node(),
+                        bound: bound.bound(),
+                        kind: GenericConstraintFailureKind::UnsupportedCapability,
+                    });
+                }
+            };
+            let argument = substitution.get(bound.parameter())?;
+            (!satisfies_thread_capability(types, argument, capability)).then_some(
+                GenericConstraintDiagnostic {
+                    parameter: bound.parameter_node(),
+                    bound: bound.bound(),
+                    kind: GenericConstraintFailureKind::UnsatisfiedCapability,
+                },
+            )
+        })
+        .collect()
+}
+
 impl ReturnPathReport {
     pub fn diagnostics(&self) -> &[ReturnPathDiagnostic] {
         &self.diagnostics
@@ -3859,6 +3909,7 @@ fn type_function_signatures_in_with_classes_and_generics(
                         .capability_bounds
                         .iter()
                         .map(|bound| GenericCapabilityBound {
+                            parameter_node: parameter.parameter,
                             parameter: ty,
                             bound: bound.bound,
                             name: bound.name.clone(),
