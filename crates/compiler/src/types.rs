@@ -3,6 +3,7 @@ use crate::{
     module::{ModuleName, PackageNamespace},
     symbol::SymbolId,
 };
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(usize);
@@ -182,7 +183,7 @@ impl GenericTypeIdentity {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PrimitiveType {
     Bool,
     Int,
@@ -193,7 +194,7 @@ pub enum PrimitiveType {
     Byte,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NullableType {
     base: TypeId,
 }
@@ -310,7 +311,7 @@ impl NullableType {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeKind {
     Nominal(NominalTypeIdentity),
     GenericParameter(GenericParameterType),
@@ -479,6 +480,7 @@ impl TypeRecord {
 #[derive(Debug, Default)]
 pub struct TypeArena {
     records: Vec<TypeRecord>,
+    index: HashMap<TypeKind, TypeId>,
 }
 
 impl TypeArena {
@@ -487,80 +489,48 @@ impl TypeArena {
     }
 
     pub fn insert(&mut self, record: TypeRecord) -> TypeId {
+        if let Some(id) = self.index.get(record.kind()).copied() {
+            return id;
+        }
         let id = TypeId::from_raw(self.records.len());
+        self.index.insert(record.kind.clone(), id);
         self.records.push(record.with_id(id));
         id
     }
 
     pub fn array(&mut self, element: TypeId, length: u64) -> TypeId {
-        let kind = TypeKind::Array(ArrayType::new(element, length));
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::array(ArrayType::new(element, length)))
     }
 
     pub fn nullable(&mut self, base: TypeId) -> TypeId {
-        let kind = TypeKind::Nullable(NullableType::new(base));
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::nullable(NullableType::new(base)))
     }
 
     pub fn generic_instance(&mut self, identity: GenericTypeIdentity) -> TypeId {
-        let kind = TypeKind::GenericInstance(identity.clone());
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::generic_instance(identity))
     }
 
     pub fn function(&mut self, function: FunctionType) -> TypeId {
-        let kind = TypeKind::Function(function.clone());
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::function(function))
     }
 
     pub fn dynamic_array(&mut self, element: TypeId) -> TypeId {
-        let kind = TypeKind::DynamicArray(DynamicArrayType::new(element));
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::dynamic_array(DynamicArrayType::new(element)))
     }
 
     pub fn task(&mut self, result: TypeId) -> TypeId {
-        let kind = TypeKind::Task(TaskType::new(result));
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::task(TaskType::new(result)))
     }
 
     pub fn channel(&mut self, element: TypeId) -> TypeId {
-        let kind = TypeKind::Channel(ChannelType::new(element));
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::channel(ChannelType::new(element)))
     }
 
     pub fn channel_result(&mut self, element: TypeId) -> TypeId {
-        let kind = TypeKind::ChannelResult(ChannelResultType::new(element));
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::channel_result(ChannelResultType::new(element)))
     }
 
     pub fn nominal(&mut self, identity: NominalTypeIdentity) -> TypeId {
-        let kind = TypeKind::Nominal(identity.clone());
-        if let Some(record) = self.records.iter().find(|record| record.kind() == &kind) {
-            return record.id();
-        }
         self.insert(TypeRecord::nominal(identity))
     }
 
