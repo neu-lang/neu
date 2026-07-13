@@ -2218,8 +2218,29 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::Index { .. }
-            | HirExpressionKind::StringLiteral(_)
+            HirExpressionKind::Index { array, index } => {
+                let array_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == *array)
+                    .map(|candidate| candidate.ty())
+                    .and_then(|ty| self.types.get(ty))
+                    .map(|record| record.kind());
+                if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
+                    let array = self.lower_expression(*array)?;
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::DynamicArrayLoad {
+                        output,
+                        array,
+                        index,
+                        span: expression.span(),
+                    });
+                } else {
+                    return Err(MirLoweringError::UnsupportedExpression);
+                }
+            }
+            HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }
@@ -2952,8 +2973,29 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::Index { .. }
-            | HirExpressionKind::StringLiteral(_)
+            HirExpressionKind::Index { array, index } => {
+                let array_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == *array)
+                    .map(|candidate| candidate.ty())
+                    .and_then(|ty| self.types.get(ty))
+                    .map(|record| record.kind());
+                if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
+                    let array = self.lower_expression(*array)?;
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::DynamicArrayLoad {
+                        output,
+                        array,
+                        index,
+                        span: expression.span(),
+                    });
+                } else {
+                    return Err(MirLoweringError::UnsupportedExpression);
+                }
+            }
+            HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }

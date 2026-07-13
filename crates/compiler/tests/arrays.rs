@@ -147,6 +147,30 @@ fn loads_dynamic_array_elements_by_index() {
 }
 
 #[test]
+fn loads_dynamic_array_elements_inside_control_flow() {
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-dynamic-array-index-flow-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); var result: Int = 0; if (true) { result = values[1]; } return result; }";
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6323),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn rejects_dynamic_array_structural_mutation_during_iteration() {
     let workspace = std::env::temp_dir().join(format!(
         "neu-array-iteration-negative-{}",
