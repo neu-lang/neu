@@ -19,6 +19,7 @@ use crate::{
         TypeKind, TypeRecord,
     },
 };
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AmbiguousTypeRule {
@@ -767,6 +768,33 @@ impl DispatchDiagnostic {
 }
 
 pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
+    let methods_by_owner: HashMap<AstNodeId, Vec<&ParsedFunctionDeclaration>> = parsed
+        .function_declarations
+        .iter()
+        .filter_map(|function| function.owner.map(|owner| (owner, function)))
+        .fold(HashMap::new(), |mut index, (owner, function)| {
+            index.entry(owner).or_default().push(function);
+            index
+        });
+    let parameter_types_by_function: HashMap<AstNodeId, Vec<_>> = parsed
+        .function_declarations
+        .iter()
+        .map(|function| {
+            (
+                function.declaration,
+                parsed
+                    .function_parameters
+                    .iter()
+                    .filter(|parameter| parameter.function == function.declaration)
+                    .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
+                    .collect(),
+            )
+        })
+        .collect();
+    let same_parameters = |left: &ParsedFunctionDeclaration, right: &ParsedFunctionDeclaration| {
+        parameter_types_by_function.get(&left.declaration)
+            == parameter_types_by_function.get(&right.declaration)
+    };
     let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
         if function.is_final
@@ -802,14 +830,14 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 span: node.span,
             });
         }
-        for method in parsed
-            .function_declarations
-            .iter()
-            .filter(|method| method.owner == Some(child.declaration))
+        for method in methods_by_owner
+            .get(&child.declaration)
+            .into_iter()
+            .flatten()
         {
             let targets = inherited_method_targets(parsed, child, &method.name)
                 .into_iter()
-                .filter(|target| same_function_parameter_types(parsed, method, target))
+                .filter(|target| same_parameters(method, target))
                 .collect::<Vec<_>>();
             let Some(parent_method) = targets.first().copied() else {
                 if method.is_override
@@ -841,20 +869,8 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             }
             let return_compatible = type_annotation_name(parsed, method.return_annotation)
                 == type_annotation_name(parsed, parent_method.return_annotation);
-            let method_parameters = parsed
-                .function_parameters
-                .iter()
-                .filter(|parameter| parameter.function == method.declaration)
-                .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
-                .collect::<Vec<_>>();
-            let parent_parameters = parsed
-                .function_parameters
-                .iter()
-                .filter(|parameter| parameter.function == parent_method.declaration)
-                .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
-                .collect::<Vec<_>>();
             if method.is_override
-                && (!return_compatible || method_parameters != parent_parameters)
+                && (!return_compatible || !same_parameters(method, parent_method))
                 && let Some(node) = parsed.arena.node(method.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
