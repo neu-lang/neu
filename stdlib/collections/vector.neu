@@ -1,24 +1,24 @@
 package collections
 
 
-// A small, ownership-safe value sequence. Compiler-managed Array<T> storage is
-// available for scalar and generic-function contexts; embedding that storage
-// in a generic collection awaits generic payload/field representation support.
+// A value sequence with compact representations for short vectors and
+// compiler-managed storage for larger sequences.
 enum Vector<T> {
     Empty,
     One(T),
     Two(T, T),
+    Storage(Array<T>),
 
     func len(): Int {
         return when (this) {
             Vector.Empty -> 0
             Vector.One(_) -> 1
             Vector.Two(_, _) -> 2
+            Vector.Storage(values) -> values.size()
         }
     }
 
     func is_empty(): Bool { return this.len() == 0 }
-
 
 }
 
@@ -27,4 +27,12 @@ public test func vector_basics_work() {
     val pair: Vector<Int> = Vector.Two(1, 2);
     assert(empty.is_empty(), "empty vector has no elements");
     assert(pair.len() == 2, "vector length counts elements");
+}
+
+public test func vector_storage_operations_work() {
+    var values: Array<Int> = new Int[];
+    values.add(4);
+    values.add(5);
+    val vector: Vector<Int> = Vector.Storage(values);
+    assert(vector.len() == 2, "vector storage length tracks pushes");
 }

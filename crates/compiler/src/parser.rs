@@ -1777,8 +1777,12 @@ impl<'source> Parser<'source> {
                     let name = self.current().expect("enum variant name exists").clone();
                     self.advance();
                     let arguments = if self.current_kind() == Some(TokenKind::LeftParen) {
-                        self.parse_argument_list()
-                            .and_then(|(_, arguments)| arguments)
+                        if self.lookahead_kind(2) == Some(TokenKind::Less) {
+                            self.parse_enum_variant_type_arguments()
+                        } else {
+                            self.parse_argument_list()
+                                .and_then(|(_, arguments)| arguments)
+                        }
                     } else {
                         Some(Vec::new())
                     };
@@ -1820,6 +1824,30 @@ impl<'source> Parser<'source> {
                 None => return,
             }
         }
+    }
+
+    fn parse_enum_variant_type_arguments(&mut self) -> Option<Vec<AstNodeId>> {
+        self.advance();
+        let mut arguments = Vec::new();
+        while self.current_kind() != Some(TokenKind::RightParen) && !self.is_eof() {
+            let span = self.parse_type()?;
+            arguments.push(self.latest_type_node_for_span(span)?);
+            if self.current_kind() == Some(TokenKind::Comma) {
+                self.advance();
+            } else if self.current_kind() != Some(TokenKind::RightParen) {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::UnexpectedTokenInDeclarationBody,
+                    span,
+                );
+                return None;
+            }
+        }
+        if self.current_kind() != Some(TokenKind::RightParen) {
+            self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
+            return None;
+        }
+        self.advance();
+        Some(arguments)
     }
 
     fn parse_body_block(&mut self) -> Option<ByteSpan> {

@@ -1296,6 +1296,29 @@ fn lower_expression(
         .name_references
         .iter()
         .find(|name| name.reference == expression)
+        && let Some((subject_expression, payload_index)) = pattern_payload_source(source, name)
+    {
+        let subject = lower_expression(
+            source,
+            function_declaration,
+            subject_expression,
+            local_bindings,
+            output,
+        )?;
+        output.push(HirExpression::enum_payload(
+            id,
+            span,
+            ty,
+            subject,
+            payload_index,
+        ));
+        return Ok(id);
+    }
+    if let Some(name) = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == expression)
         && let Some(parameter_index) = source
             .parsed
             .function_parameters
@@ -1850,6 +1873,39 @@ fn lower_expression(
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
+}
+
+fn pattern_payload_source(
+    source: &CheckedHirSource<'_>,
+    name: &crate::parser::ParsedNameReference,
+) -> Option<(crate::ast::AstNodeId, usize)> {
+    let expression_span = source.parsed.arena.node(name.reference)?.span;
+    for arm in &source.parsed.match_arms {
+        let body_span = source.parsed.arena.node(arm.body)?.span;
+        if !span_contains(body_span, expression_span) {
+            continue;
+        }
+        let pattern = source
+            .parsed
+            .qualified_case_patterns
+            .iter()
+            .find(|pattern| pattern.pattern == arm.pattern)?;
+        let binding = source.parsed.pattern_bindings.iter().find(|binding| {
+            binding.name == name.name && pattern.payloads.contains(&binding.pattern)
+        })?;
+        let payload_index = pattern
+            .payloads
+            .iter()
+            .position(|payload| *payload == binding.pattern)?;
+        let subject = source
+            .parsed
+            .when_expressions
+            .iter()
+            .find(|when| when.arms.contains(&arm.arm))?
+            .subject;
+        return Some((subject, payload_index));
+    }
+    None
 }
 
 fn enum_variant_tag(

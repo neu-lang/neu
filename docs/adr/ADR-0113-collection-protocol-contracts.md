@@ -1,6 +1,6 @@
 # ADR-0113: Collection Protocol Contracts
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

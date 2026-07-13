@@ -1,6 +1,6 @@
 # ADR-0111: Recoverable Errors and Panic Boundaries
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

@@ -2869,6 +2869,14 @@ fn overload_type_compatible(
             arena.get(actual).map(|record| record.kind()),
             arena.get(expected).map(|record| record.kind()),
         ) {
+            (Some(TypeKind::DynamicArray(actual)), Some(TypeKind::DynamicArray(expected))) => {
+                return actual.element() == expected.element()
+                    || matches!(
+                        arena.get(expected.element()).map(|record| record.kind()),
+                        Some(TypeKind::GenericParameter(_))
+                    );
+            }
+            (_, Some(TypeKind::GenericParameter(_))) => return true,
             (
                 Some(TypeKind::GenericInstance(actual)),
                 Some(TypeKind::GenericInstance(expected)),
@@ -3985,6 +3993,16 @@ pub fn check_return_expression_types_with_arena(
                         Some(TypeKind::GenericInstance(actual)),
                         Some(TypeKind::GenericInstance(expected)),
                     ) => actual.declaration() == expected.declaration(),
+                    (
+                        Some(TypeKind::DynamicArray(actual)),
+                        Some(TypeKind::DynamicArray(expected)),
+                    ) => {
+                        actual.element() == expected.element()
+                            || matches!(
+                                arena.get(expected.element()).map(|record| record.kind()),
+                                Some(TypeKind::GenericParameter(_))
+                            )
+                    }
                     _ => false,
                 }
             });
@@ -5569,20 +5587,32 @@ pub fn type_array_expressions_with_classes(
             ));
             continue;
         }
-        if let Some(TypeKind::Array(array)) = types.get(array_ty).map(|record| record.kind()) {
-            report.replace_expression_type(ExpressionType::new(index.expression, array.element()));
-            if let Some(value) = parsed
-                .integer_literals
-                .iter()
-                .find(|literal| literal.expression == index.index)
-                .and_then(|literal| literal.value)
-                && value >= array.length()
-            {
-                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
-                    TypeRuleDiagnostic::ArrayIndexOutOfBounds,
-                    index.index,
+        match types.get(array_ty).map(|record| record.kind()) {
+            Some(TypeKind::Array(array)) => {
+                report.replace_expression_type(ExpressionType::new(
+                    index.expression,
+                    array.element(),
+                ));
+                if let Some(value) = parsed
+                    .integer_literals
+                    .iter()
+                    .find(|literal| literal.expression == index.index)
+                    .and_then(|literal| literal.value)
+                    && value >= array.length()
+                {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::ArrayIndexOutOfBounds,
+                        index.index,
+                    ));
+                }
+            }
+            Some(TypeKind::DynamicArray(array)) => {
+                report.replace_expression_type(ExpressionType::new(
+                    index.expression,
+                    array.element(),
                 ));
             }
+            _ => {}
         }
     }
 
@@ -7440,6 +7470,19 @@ pub fn apply_enum_constructor_facts(
                         .position(|parameter| parameter.name == reference.name)
                 {
                     generic_arguments[index] = Some(actual);
+                } else if let Some(reference) = parsed
+                    .type_name_references
+                    .iter()
+                    .find(|reference| reference.reference == *annotation)
+                    && reference.name == "Array"
+                    && reference.generic_argument_names.len() == 1
+                    && let Some(index) = generic_parameters
+                        .iter()
+                        .position(|parameter| parameter.name == reference.generic_argument_names[0])
+                    && let Some(TypeKind::DynamicArray(array)) =
+                        types.get(actual).map(|record| record.kind())
+                {
+                    generic_arguments[index] = Some(array.element());
                 }
             }
             if generic_arguments.iter().any(Option::is_none)
@@ -8303,6 +8346,14 @@ fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bo
     match (target_record.kind(), value_record.kind()) {
         (TypeKind::Nullable(_), TypeKind::Primitive(PrimitiveType::Null)) => true,
         (TypeKind::Nullable(nullable), _) => nullable.base() == value,
+        (TypeKind::DynamicArray(target), TypeKind::DynamicArray(value)) => {
+            target.element() == value.element()
+                || matches!(
+                    arena.get(target.element()).map(|record| record.kind()),
+                    Some(TypeKind::GenericParameter(_))
+                )
+        }
+        (_, TypeKind::GenericParameter(_)) => true,
         _ => false,
     }
 }

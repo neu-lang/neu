@@ -1,6 +1,6 @@
 # ADR-0114: Collection Capacity and Allocation Failure
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 
