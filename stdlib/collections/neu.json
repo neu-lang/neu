@@ -1,0 +1,6 @@
+{
+  "name": "neu.collections",
+  "description": "Ownership-safe generic sequence and iterator collections",
+  "srcs": ["src/**/*.neu"],
+  "dependencies": []
+}
