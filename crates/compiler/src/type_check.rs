@@ -5310,6 +5310,15 @@ fn resolve_annotation_type_with_generics(
         .find(|reference| reference.reference == annotation)
         && !reference.generic_argument_names.is_empty()
     {
+        if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
+            let name = &reference.generic_argument_names[0];
+            let element = generic_types
+                .iter()
+                .find(|(generic, _)| *generic == name)
+                .map(|(_, ty)| *ty)
+                .or_else(|| primitives.type_for_primitive_name(name))?;
+            return Some(arena.dynamic_array(element));
+        }
         let class = classes.iter().find(|class| class.name == reference.name)?;
         let arguments = reference
             .generic_argument_names
@@ -5427,8 +5436,25 @@ pub fn type_array_expressions_with_classes(
             .find(|reference| reference.reference == node)
         {
             if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
-                let element =
-                    primitives.type_for_primitive_name(&reference.generic_argument_names[0])?;
+                let element_name = &reference.generic_argument_names[0];
+                let element = primitives
+                    .type_for_primitive_name(element_name)
+                    .or_else(|| {
+                        parsed
+                            .generic_parameters
+                            .iter()
+                            .find(|parameter| parameter.name == *element_name)
+                            .and_then(|parameter| {
+                                types.records().iter().find_map(|record| {
+                                    matches!(
+                                        record.kind(),
+                                        TypeKind::GenericParameter(generic)
+                                            if generic.declaration() == parameter.parameter
+                                    )
+                                    .then_some(record.id())
+                                })
+                            })
+                    })?;
                 return Some(types.dynamic_array(element));
             }
             return primitives.type_for_primitive_name(&reference.name);
