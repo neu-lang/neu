@@ -1,5 +1,5 @@
 use crate::ast::{AstNodeId, AstNodeKind};
-use crate::parser::parse_source;
+use crate::parser::{ParseOutput, parse_source};
 use crate::source::SourceFileId;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
@@ -491,6 +491,17 @@ impl VirtualPackageGraph {
             file_by_path.insert(path.clone(), id);
             files.push((path.clone(), source.clone(), id));
         }
+        let parsed_sources = files
+            .iter()
+            .map(|(_, source, id)| (*id, parse_source(*id, source.source())))
+            .collect::<BTreeMap<_, _>>();
+        let mut package_members = BTreeMap::<PathBuf, Vec<PathBuf>>::new();
+        for (path, _, _) in &files {
+            package_members
+                .entry(path.parent().unwrap_or_else(|| Path::new("")).to_path_buf())
+                .or_default()
+                .push(path.clone());
+        }
 
         let mut package_dirs = BTreeSet::new();
         package_dirs.insert(root.clone());
@@ -501,8 +512,9 @@ impl VirtualPackageGraph {
             if !visited.insert(file_path.clone()) {
                 continue;
             }
-            let source = input.get(&file_path).expect("queued source exists");
-            let parsed = parse_source(file_by_path[&file_path], source.source());
+            let parsed = parsed_sources
+                .get(&file_by_path[&file_path])
+                .expect("source was parsed during graph initialization");
             if !parsed.lex_diagnostics.is_empty() || !parsed.diagnostics.is_empty() {
                 diagnostics.push(PackageGraphDiagnostic {
                     kind: PackageGraphDiagnosticKind::SourceParseDiagnostics,
@@ -516,16 +528,20 @@ impl VirtualPackageGraph {
                 .unwrap_or_else(|| Path::new(""))
                 .to_path_buf();
             package_dirs.insert(package_dir.clone());
-            let same_package_private: BTreeSet<_> = input
-                .keys()
-                .filter(|path| path.parent() == Some(package_dir.as_path()) && *path != &file_path)
+            let same_package_private: BTreeSet<_> = package_members
+                .get(&package_dir)
+                .into_iter()
+                .flatten()
+                .filter(|path| *path != &file_path)
                 .flat_map(|path| {
-                    let parsed = parse_source(file_by_path[path], input[path].source());
+                    let parsed = parsed_sources
+                        .get(&file_by_path[path])
+                        .expect("source was parsed during graph initialization");
                     parsed
                         .function_declarations
-                        .into_iter()
+                        .iter()
                         .filter(|function| function.top_level && function.visibility == "private")
-                        .map(|function| function.name)
+                        .map(|function| function.name.clone())
                 })
                 .collect();
             for reference in &parsed.name_references {
@@ -539,9 +555,13 @@ impl VirtualPackageGraph {
             }
             let mut aliases = BTreeSet::new();
             let mut qualifiers = BTreeMap::<String, PathBuf>::new();
-            let current_qualifier =
-                package_identity_for_directory(&package_dir, &input, &file_by_path);
-            for import in parsed.imports {
+            let current_qualifier = package_identity_for_directory(
+                &package_dir,
+                &package_members,
+                &file_by_path,
+                &parsed_sources,
+            );
+            for import in &parsed.imports {
                 let explicit_alias = import.alias.clone();
                 let alias = explicit_alias.clone().unwrap_or_default();
                 if alias.is_empty() || !is_identifier_segment(&alias) {
@@ -563,7 +583,7 @@ impl VirtualPackageGraph {
                     diagnostics.push(PackageGraphDiagnostic {
                         kind: PackageGraphDiagnosticKind::FileImport,
                         path: file_path.clone(),
-                        detail: import.path,
+                        detail: import.path.clone(),
                     });
                     continue;
                 }
@@ -572,12 +592,17 @@ impl VirtualPackageGraph {
                     diagnostics.push(PackageGraphDiagnostic {
                         kind: PackageGraphDiagnosticKind::ImportPathTraversal,
                         path: file_path.clone(),
-                        detail: import.path,
+                        detail: import.path.clone(),
                     });
                     continue;
                 };
                 let qualifier = explicit_alias.unwrap_or_else(|| {
-                    package_qualifier_for_directory(&directory, &input, &file_by_path)
+                    package_qualifier_for_directory(
+                        &directory,
+                        &package_members,
+                        &file_by_path,
+                        &parsed_sources,
+                    )
                 });
                 if aliases.contains(&qualifier) && qualifier != alias {
                     diagnostics.push(PackageGraphDiagnostic {
@@ -609,19 +634,22 @@ impl VirtualPackageGraph {
                         ),
                     });
                 }
-                let imported_names: BTreeSet<_> = input
-                    .keys()
-                    .filter(|path| path.parent() == Some(directory.as_path()))
+                let imported_names: BTreeSet<_> = package_members
+                    .get(&directory)
+                    .into_iter()
+                    .flatten()
                     .flat_map(|path| {
                         let id = file_by_path[path];
-                        let parsed = parse_source(id, input[path].source());
+                        let parsed = parsed_sources
+                            .get(&id)
+                            .expect("source was parsed during graph initialization");
                         parsed
                             .function_declarations
-                            .into_iter()
+                            .iter()
                             .filter(|function| {
                                 function.top_level && function.visibility != "public"
                             })
-                            .map(|function| function.name)
+                            .map(|function| function.name.clone())
                     })
                     .collect();
                 let aliases_to_check = [alias.as_str()];
@@ -643,11 +671,7 @@ impl VirtualPackageGraph {
                         });
                     }
                 }
-                let members: Vec<_> = input
-                    .keys()
-                    .filter(|path| path.parent() == Some(directory.as_path()))
-                    .cloned()
-                    .collect();
+                let members = package_members.get(&directory).cloned().unwrap_or_default();
                 if members.is_empty() {
                     let kind = if input.keys().any(|path| path == &directory) {
                         PackageGraphDiagnosticKind::FileImport
@@ -677,10 +701,11 @@ impl VirtualPackageGraph {
         let mut packages = Vec::new();
         let mut identities = BTreeMap::new();
         for directory in package_dirs {
-            let members: Vec<_> = files
-                .iter()
-                .filter(|(path, _, _)| path.parent() == Some(directory.as_path()))
-                .map(|(path, source, id)| (path.clone(), source.clone(), *id))
+            let members: Vec<_> = package_members
+                .get(&directory)
+                .into_iter()
+                .flatten()
+                .map(|path| (path.clone(), input[path].clone(), file_by_path[path]))
                 .collect();
             if members.is_empty() {
                 diagnostics.push(PackageGraphDiagnostic {
@@ -691,10 +716,12 @@ impl VirtualPackageGraph {
                 continue;
             }
             let mut headers = BTreeSet::new();
-            for (_, source, id) in &members {
-                let parsed = parse_source(*id, source.source());
-                if let Some(header) = parsed.package_name {
-                    headers.insert(header);
+            for (_, _, id) in &members {
+                let parsed = parsed_sources
+                    .get(id)
+                    .expect("source was parsed during graph initialization");
+                if let Some(header) = &parsed.package_name {
+                    headers.insert(header.clone());
                 }
             }
             if headers.len() > 1 {
@@ -868,14 +895,17 @@ fn normalize_relative_path(path: &Path) -> Result<PathBuf, PackageGraphDiagnosti
 
 fn package_identity_for_directory(
     directory: &Path,
-    input: &BTreeMap<PathBuf, VirtualSource>,
+    package_members: &BTreeMap<PathBuf, Vec<PathBuf>>,
     file_by_path: &BTreeMap<PathBuf, SourceFileId>,
+    parsed_sources: &BTreeMap<SourceFileId, ParseOutput>,
 ) -> String {
     let mut header = None;
-    for path in input.keys().filter(|path| path.parent() == Some(directory)) {
-        let parsed = parse_source(file_by_path[path], input[path].source());
-        if let Some(package) = parsed.package_name {
-            header = Some(package);
+    for path in package_members.get(directory).into_iter().flatten() {
+        let parsed = parsed_sources
+            .get(&file_by_path[path])
+            .expect("source was parsed during graph initialization");
+        if let Some(package) = &parsed.package_name {
+            header = Some(package.clone());
             break;
         }
     }
@@ -890,14 +920,17 @@ fn package_identity_for_directory(
 
 fn package_qualifier_for_directory(
     directory: &Path,
-    input: &BTreeMap<PathBuf, VirtualSource>,
+    package_members: &BTreeMap<PathBuf, Vec<PathBuf>>,
     file_by_path: &BTreeMap<PathBuf, SourceFileId>,
+    parsed_sources: &BTreeMap<SourceFileId, ParseOutput>,
 ) -> String {
     let mut header = None;
-    for path in input.keys().filter(|path| path.parent() == Some(directory)) {
-        let parsed = parse_source(file_by_path[path], input[path].source());
-        if let Some(package) = parsed.package_name {
-            header = Some(package);
+    for path in package_members.get(directory).into_iter().flatten() {
+        let parsed = parsed_sources
+            .get(&file_by_path[path])
+            .expect("source was parsed during graph initialization");
+        if let Some(package) = &parsed.package_name {
+            header = Some(package.clone());
             break;
         }
     }
