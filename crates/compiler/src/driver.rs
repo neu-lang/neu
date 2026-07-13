@@ -309,19 +309,16 @@ pub fn compile_source_to_executable(
     type_lambda_expressions(&parsed, &mut types, &mut report);
     let array_iterations = type_array_iterations(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, array_iterations);
-    infer_local_types(&parsed, &mut report);
-    type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    type_concurrency_operations(&parsed, &mut types, &mut report);
+    // These facts form a small dependency cycle. A bounded fixed point keeps
+    // the pass order explicit while avoiding repeated whole-program rescans.
+    for _ in 0..3 {
+        infer_local_types(&parsed, &mut report);
+        type_lambda_expressions(&parsed, &mut types, &mut report);
+        type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+        type_concurrency_operations(&parsed, &mut types, &mut report);
+    }
     validate_concurrency_structure(&parsed, &mut report, &types);
-    infer_local_types(&parsed, &mut report);
-    type_lambda_expressions(&parsed, &mut types, &mut report);
-    type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    type_concurrency_operations(&parsed, &mut types, &mut report);
     validate_task_member_cancellation_structure(&parsed, &mut report, &types);
-    infer_local_types(&parsed, &mut report);
-    type_lambda_expressions(&parsed, &mut types, &mut report);
-    type_concurrency_operations(&parsed, &mut types, &mut report);
-    infer_local_types(&parsed, &mut report);
     let mut concurrency_calls = parsed
         .call_expressions
         .iter()
