@@ -1338,6 +1338,41 @@ Channel handles satisfy the accepted `Send` and `Share` capability checks.
 Private state lifetime, queue storage, and cleanup are compiler/runtime facts,
 not source-visible layout or allocation APIs.
 
+## Proposed ADR-0109: Generic Calls And Enum Runtime
+
+Generic calls use explicit type arguments in declaration order. The argument
+count must match exactly; generic parameters are invariant and nominal, and no
+inference, variance conversion, wildcard argument, or implicit conversion is
+performed. The compiler substitutes concrete arguments through parameter,
+return, and capability-bound types before lowering and diagnoses an unsatisfied
+or unsupported bound at the call site.
+
+`Option<T>`, `Result<T, E>`, and `Ordering` are closed nominal enums. Their
+variants are `Some(T)`/`None`, `Ok(T)`/`Err(E)`, and `Less`/`Equal`/`Greater`.
+Instantiation identity is the declaring enum plus ordered concrete arguments.
+Representation, discriminant encoding, allocation, and cross-module generic
+ABI remain compiler-private and are not source or FFI contracts.
+
+## Proposed ADR-0111: Recoverable Errors And Panic Boundaries
+
+Expected operation failures are explicit `Result<T, E>` values, or `Option<T>`
+when absence is the complete outcome. They do not trap, return nullable
+sentinels, or use undocumented integer codes. Error propagation is explicit;
+there is no implicit propagation operator, exception handler, or conversion
+between error types without an accepted library operation. Panic and abort are
+reserved for unrecoverable invariant faults, not checked indexing, parsing, or
+conversion failures. Assertion and panic helper APIs require separate
+evaluation, diagnostic, source-span, optimization, and termination contracts.
+
+## Proposed ADR-0112: Explicit Numeric Utilities
+
+The initial numeric utility surface is limited to `Int` helpers `min`, `max`,
+`clamp`, `abs`, and `sign`. They perform no implicit conversion and preserve
+ADR-0043 evaluation and overflow behavior; `abs(Int.MIN)` overflows, and an
+invalid `clamp` range is a diagnosed programmer fault. Checked, saturating, and
+wrapping arithmetic, numeric casts, unsigned and floating-point types, and
+other numeric intrinsics require separate accepted contracts.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers
