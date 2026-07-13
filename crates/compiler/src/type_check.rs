@@ -6947,7 +6947,19 @@ pub fn type_enum_whens(
                             arm.pattern,
                         ));
                     }
-                    for (binding, argument) in pattern.payloads.iter().zip(&variant.arguments) {
+                    let fields = parsed
+                        .class_declarations
+                        .iter()
+                        .find(|declaration| declaration.declaration == enum_class.declaration())
+                        .map(|declaration| {
+                            declaration
+                                .constructor_parameters
+                                .iter()
+                                .filter(|parameter| parameter.field)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    for (index, binding) in pattern.payloads.iter().enumerate() {
                         let Some(binding_name) = parsed
                             .pattern_bindings
                             .iter()
@@ -6955,14 +6967,33 @@ pub fn type_enum_whens(
                         else {
                             continue;
                         };
-                        let Some(field_type) = resolve_enum_payload_type(
-                            *argument,
-                            parsed,
-                            &primitives,
-                            classes.classes(),
-                            type_arena,
-                            &generic_bindings,
-                        ) else {
+                        let field_type = variant
+                            .arguments
+                            .get(index)
+                            .and_then(|argument| {
+                                resolve_enum_payload_type(
+                                    *argument,
+                                    parsed,
+                                    &primitives,
+                                    classes.classes(),
+                                    type_arena,
+                                    &generic_bindings,
+                                )
+                            })
+                            .or_else(|| {
+                                fields.get(index).and_then(|field| {
+                                    resolve_annotation_type_with_generics(
+                                        field.annotation,
+                                        &parsed.type_name_references,
+                                        &parsed.array_types,
+                                        &primitives,
+                                        classes.classes(),
+                                        type_arena,
+                                        &generic_bindings,
+                                    )
+                                })
+                            });
+                        let Some(field_type) = field_type else {
                             continue;
                         };
                         for reference in parsed
