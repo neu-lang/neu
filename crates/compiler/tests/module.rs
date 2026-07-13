@@ -1,4 +1,6 @@
 use compiler::ast::{AstNodeId, AstNodeKind};
+use std::path::Path;
+
 use compiler::module::{
     DeclarationVisibility, ModuleDiagnosticKind, ModuleMetadata, ModuleName,
     PackageGraphDiagnosticKind, PackageNamespace, VirtualPackageGraph, VirtualSource,
@@ -209,6 +211,21 @@ fn virtual_package_graph_rejects_file_imports_and_cycles() {
             .iter()
             .any(|diagnostic| { diagnostic.kind == PackageGraphDiagnosticKind::ImportCycle })
     );
+}
+
+#[test]
+fn library_package_graph_indexes_all_root_packages_without_an_entrypoint() {
+    let graph = VirtualPackageGraph::build_library([
+        VirtualSource::new("core/option.neu", "func option(): Int { return 1; }"),
+        VirtualSource::new("core/result.neu", "func result(): Int { return 2; }"),
+    ])
+    .unwrap();
+
+    assert!(graph.is_library());
+    assert_eq!(graph.entry(), Path::new(""));
+    assert_eq!(graph.packages().len(), 1);
+    assert_eq!(graph.packages()[0].identity, "core");
+    assert_eq!(graph.packages()[0].files.len(), 2);
 }
 
 #[test]

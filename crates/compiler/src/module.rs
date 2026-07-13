@@ -416,18 +416,37 @@ impl VirtualPackageGraph {
         entry: impl Into<PathBuf>,
         sources: impl IntoIterator<Item = VirtualSource>,
     ) -> Result<Self, Vec<PackageGraphDiagnostic>> {
-        let entry_input: PathBuf = entry.into();
-        let entry = normalize_relative_path(&entry_input).map_err(|kind| {
-            vec![PackageGraphDiagnostic {
-                kind,
-                path: entry_input,
-                detail: "entry source path must be a normalized relative .neu path".to_owned(),
-            }]
-        })?;
-        let root = entry
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .to_path_buf();
+        Self::build_with_entry(Some(entry.into()), sources)
+    }
+
+    pub fn build_library(
+        sources: impl IntoIterator<Item = VirtualSource>,
+    ) -> Result<Self, Vec<PackageGraphDiagnostic>> {
+        Self::build_with_entry(None, sources)
+    }
+
+    fn build_with_entry(
+        entry_input: Option<PathBuf>,
+        sources: impl IntoIterator<Item = VirtualSource>,
+    ) -> Result<Self, Vec<PackageGraphDiagnostic>> {
+        let (entry, root) = match entry_input {
+            Some(entry_input) => {
+                let entry = normalize_relative_path(&entry_input).map_err(|kind| {
+                    vec![PackageGraphDiagnostic {
+                        kind,
+                        path: entry_input,
+                        detail: "entry source path must be a normalized relative .neu path"
+                            .to_owned(),
+                    }]
+                })?;
+                let root = entry
+                    .parent()
+                    .unwrap_or_else(|| Path::new(""))
+                    .to_path_buf();
+                (entry, root)
+            }
+            None => (PathBuf::new(), PathBuf::new()),
+        };
         let mut input = BTreeMap::new();
         let mut diagnostics = Vec::new();
         for source in sources {
@@ -472,7 +491,7 @@ impl VirtualPackageGraph {
                 });
             }
         }
-        if !input.contains_key(&entry) {
+        if !entry.as_os_str().is_empty() && !input.contains_key(&entry) {
             diagnostics.push(PackageGraphDiagnostic {
                 kind: PackageGraphDiagnosticKind::InvalidSourcePath,
                 path: entry.clone(),
@@ -504,8 +523,11 @@ impl VirtualPackageGraph {
         }
 
         let mut package_dirs = BTreeSet::new();
-        package_dirs.insert(root.clone());
-        let mut queue = vec![entry.clone()];
+        let mut queue: Vec<PathBuf> = if entry.as_os_str().is_empty() {
+            input.keys().cloned().collect()
+        } else {
+            vec![entry.clone()]
+        };
         let mut visited = BTreeSet::new();
         let mut edges = BTreeMap::<PathBuf, Vec<PathBuf>>::new();
         while let Some(file_path) = queue.pop() {
@@ -792,6 +814,9 @@ impl VirtualPackageGraph {
     pub fn entry(&self) -> &Path {
         &self.entry
     }
+    pub fn is_library(&self) -> bool {
+        self.entry.as_os_str().is_empty()
+    }
     pub fn sources(&self) -> &[VirtualSource] {
         &self.sources
     }
@@ -803,6 +828,10 @@ impl VirtualPackageGraph {
     }
 
     pub fn bootstrap_source(&self) -> String {
+        assert!(
+            !self.is_library(),
+            "library package graphs have no bootstrap source"
+        );
         let mut sources = Vec::new();
         for file in &self.files {
             if file.path == self.entry

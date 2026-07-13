@@ -14,7 +14,29 @@ fn parses_and_expands_a_manifest_source_set() {
     .unwrap();
 
     assert_eq!(manifest.name(), "example.app");
-    assert_eq!(manifest.entrypoint().to_string_lossy(), "src/main.neu");
+    assert_eq!(
+        manifest.entrypoint().unwrap().to_string_lossy(),
+        "src/main.neu"
+    );
+}
+
+#[test]
+fn parses_a_library_manifest_without_an_entrypoint() {
+    let manifest = ProjectManifest::parse(
+        r#"{
+            "name": "neu.stdlib",
+            "srcs": ["core/**/*.neu"],
+            "dependencies": []
+        }"#,
+    )
+    .unwrap();
+
+    assert!(manifest.is_library());
+    assert!(manifest.entrypoint().is_none());
+    assert_eq!(
+        manifest.require_entrypoint().unwrap_err().kind(),
+        ManifestDiagnosticKind::EntrypointRequired
+    );
 }
 
 #[test]
@@ -51,6 +73,29 @@ fn expands_sorted_deduplicated_neu_globs_and_requires_entrypoint() {
                 .into_owned())
             .collect::<Vec<_>>(),
         vec!["src/main.neu", "src/nested/a.neu", "src/z.neu"]
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn expands_library_sources_from_project_root_without_an_entrypoint() {
+    let root = std::env::temp_dir().join(format!("neu-library-manifest-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("core/nested")).unwrap();
+    std::fs::write(root.join("core/option.neu"), "").unwrap();
+    std::fs::write(root.join("core/nested/result.neu"), "").unwrap();
+    let manifest = ProjectManifest::parse(
+        r#"{"name":"neu.stdlib","srcs":["core/**/*.neu"],"dependencies":[]}"#,
+    )
+    .unwrap();
+
+    let sources = manifest.load_sources(&root).unwrap();
+    assert_eq!(
+        sources
+            .iter()
+            .map(|source| source.path().to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        vec!["core/nested/result.neu", "core/option.neu"]
     );
     let _ = std::fs::remove_dir_all(root);
 }

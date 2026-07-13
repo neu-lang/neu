@@ -14,18 +14,23 @@ found at an explicit file path, in the current directory, or by searching
 parent directories. The first discovered manifest wins; an explicit path must
 name a file or an unambiguous project directory.
 
-The user-facing manifest fields are `name`, optional `description`,
-`entrypoint`, `srcs`, and `dependencies`. `name`, `entrypoint`, and `srcs` are
-required. Unknown fields, duplicate keys, malformed JSON, wrong field types,
-empty source patterns, and invalid paths are diagnostics with manifest
-locations. `name` is the module identity and follows the existing dotted
-identifier rules. `description` is informational metadata.
+The user-facing manifest fields are `name`, optional `description`, optional
+`entrypoint`, `srcs`, and `dependencies`. `name` and `srcs` are required.
+An `entrypoint` identifies an executable application; when it is absent, the
+manifest describes a library and its selected source packages are authoritative
+for the exported package graph. Unknown fields, duplicate keys, malformed JSON,
+wrong field types, empty source patterns, and invalid paths are diagnostics with
+manifest locations. `name` is the module identity and follows the existing
+dotted identifier rules. `description` is informational metadata.
 
-`entrypoint` is a normalized relative `.neu` path and must be in the expanded
-authoritative `srcs` allowlist. Patterns support `*`, `**`, and `?`, use `/`
-separators, match `.neu` files only, exclude hidden path components, reject
-absolute paths and `..` escapes, and produce sorted, deduplicated paths.
-Symlinks may not escape the manifest root. Empty matches are diagnostics.
+When present, `entrypoint` is a normalized relative `.neu` path and must be in
+the expanded authoritative `srcs` allowlist. Patterns support `*`, `**`, and
+`?`, use `/` separators, match `.neu` files only, exclude hidden path
+components, reject absolute paths and `..` escapes, and produce sorted,
+deduplicated paths. Symlinks may not escape the manifest root. Empty matches are
+diagnostics. Executable compilation of a library manifest reports that an
+entrypoint is required; library source loading and package-graph construction
+do not require a conventional `src` directory.
 
 The selected source set is loaded into the compiler's virtual source graph. A
 directory package is loaded only when its direct files are selected by the

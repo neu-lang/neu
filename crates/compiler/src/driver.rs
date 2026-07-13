@@ -163,7 +163,10 @@ pub fn compile_manifest_to_executable_for_target(
     let sources = manifest
         .load_sources(&root)
         .map_err(DriverError::Manifest)?;
-    let entry = manifest.entrypoint().to_path_buf();
+    let entry = manifest
+        .require_entrypoint()
+        .map_err(DriverError::Manifest)?
+        .to_path_buf();
     let graph = validate_virtual_project(entry.clone(), sources)?;
     let entry_file = graph
         .files()
