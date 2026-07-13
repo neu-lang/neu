@@ -43,6 +43,45 @@ public func main(): Int { return 0 }
 }
 
 #[test]
+fn compiles_and_runs_generic_enum_predicates() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-generic-enum-test-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+enum Option<T> {
+    Some(T),
+    None,
+    func is_some(): Bool { return when (this) { Option.Some(_) -> true Option.None -> false } }
+}
+public test func option_predicate() {
+    val some: Option<Int> = Option.Some(1);
+    assert(some.is_some(), "Some is present");
+}
+"#;
+    let parsed = compiler::parser::parse_source(SourceFileId::from_raw(31006), source);
+    let declaration = parsed
+        .function_declarations
+        .iter()
+        .find(|function| function.is_test)
+        .unwrap()
+        .declaration;
+    let executable = compile_source_to_test_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31006),
+            ModuleName::parse("generic.test").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("test"),
+        ),
+        declaration,
+    )
+    .unwrap();
+    assert_eq!(Command::new(executable).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn compiles_core_numeric_utilities() {
     let workspace = std::env::temp_dir().join(format!("neu-core-numeric-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);

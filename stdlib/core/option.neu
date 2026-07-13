@@ -17,3 +17,10 @@ enum Option<T> {
         }
     }
 }
+
+public test func option_predicates_work() {
+    val some: Option<Int> = Option.Some(1);
+    val none: Option<Int> = Option.None;
+    assert(some.is_some(), "Some is present");
+    assert(none.is_none(), "None is absent");
+}

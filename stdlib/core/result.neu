@@ -17,3 +17,10 @@ enum Result<T, E> {
         }
     }
 }
+
+public test func result_predicates_work() {
+    val ok: Result<Int, Int> = Result.Ok(1);
+    val err: Result<Int, Int> = Result.Err(2);
+    assert(ok.is_ok(), "Ok is successful");
+    assert(err.is_err(), "Err is an error");
+}

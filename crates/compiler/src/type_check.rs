@@ -1860,6 +1860,63 @@ pub fn apply_method_call_facts(
     }
 }
 
+pub fn apply_enum_method_call_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    let bool_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Bool)).then_some(record.id())
+    });
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        let declaration = match types.get(receiver_type).map(|record| record.kind()) {
+            Some(TypeKind::GenericInstance(identity)) => identity.declaration().declaration(),
+            Some(TypeKind::Nominal(identity)) => identity.declaration(),
+            _ => continue,
+        };
+        let Some(class) = classes.classes.iter().find(|class| {
+            class.declaration == declaration
+                && parsed
+                    .enum_variants
+                    .iter()
+                    .any(|variant| variant.enum_declaration == declaration)
+        }) else {
+            continue;
+        };
+        if parsed.function_declarations.iter().any(|function| {
+            function.owner == Some(class.declaration)
+                && function.name == member.name
+                && function.return_annotation.is_some_and(|annotation| {
+                    parsed.type_name_references.iter().any(|reference| {
+                        reference.reference == annotation && reference.name == "Bool"
+                    })
+                })
+        }) && let Some(bool_type) = bool_type
+        {
+            report.replace_expression_type(ExpressionType::new(call.expression, bool_type));
+            report.retain_diagnostics(|diagnostic| {
+                (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                    || !matches!(
+                        diagnostic.rule(),
+                        TypeRuleDiagnostic::DirectCallDeferred
+                            | TypeRuleDiagnostic::MemberExpressionDeferred
+                    )
+            });
+        }
+    }
+}
+
 pub fn apply_receiver_name_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
@@ -7223,6 +7280,88 @@ pub fn apply_enum_constructor_facts(
         }) else {
             continue;
         };
+        let Some(variant) = parsed.enum_variants.iter().find(|variant| {
+            variant.enum_declaration == class.declaration() && variant.name == member.name
+        }) else {
+            continue;
+        };
+        if variant.arguments.len() == call.arguments.len() {
+            let generic_parameters = parsed
+                .generic_parameters
+                .iter()
+                .filter(|parameter| parameter.owner == Some(class.declaration()))
+                .collect::<Vec<_>>();
+            let mut generic_arguments = vec![None; generic_parameters.len()];
+            for (annotation, argument) in variant.arguments.iter().zip(&call.arguments) {
+                let Some(actual) = report.expression_type(*argument) else {
+                    continue;
+                };
+                if let Some(reference) = parsed
+                    .type_name_references
+                    .iter()
+                    .find(|reference| reference.reference == *annotation)
+                    && let Some(index) = generic_parameters
+                        .iter()
+                        .position(|parameter| parameter.name == reference.name)
+                {
+                    generic_arguments[index] = Some(actual);
+                } else if let Some(reference) = parsed
+                    .name_references
+                    .iter()
+                    .find(|reference| reference.reference == *annotation)
+                    && let Some(index) = generic_parameters
+                        .iter()
+                        .position(|parameter| parameter.name == reference.name)
+                {
+                    generic_arguments[index] = Some(actual);
+                }
+            }
+            if generic_arguments.iter().any(Option::is_none)
+                && let Some(expected_annotation) = parsed
+                    .local_declarations
+                    .iter()
+                    .find(|local| local.initializer == Some(call.expression))
+                    .and_then(|local| local.annotation)
+                && let Some(expected_type) = resolve_annotation_type(
+                    expected_annotation,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &primitives,
+                    classes.classes(),
+                    types,
+                )
+                && let Some(TypeKind::GenericInstance(identity)) =
+                    types.get(expected_type).map(|record| record.kind())
+            {
+                for (slot, argument) in generic_arguments.iter_mut().zip(identity.arguments()) {
+                    if slot.is_none() {
+                        *slot = Some(*argument);
+                    }
+                }
+            }
+            if !generic_parameters.is_empty() && generic_arguments.iter().all(Option::is_some) {
+                let identity = match types.get(class.type_id).map(|record| record.kind()) {
+                    Some(TypeKind::Nominal(identity)) => identity.clone(),
+                    _ => continue,
+                };
+                let arguments = generic_arguments.into_iter().flatten().collect::<Vec<_>>();
+                let result_type = if arguments.is_empty() {
+                    class.type_id
+                } else {
+                    types.generic_instance(GenericTypeIdentity::new(identity, arguments))
+                };
+                report.replace_expression_type(ExpressionType::new(call.expression, result_type));
+                report.replace_expression_type(ExpressionType::new(member.expression, result_type));
+                report.retain_diagnostics(|diagnostic| {
+                    (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                        || !matches!(
+                            diagnostic.rule(),
+                            TypeRuleDiagnostic::DirectCallDeferred
+                                | TypeRuleDiagnostic::MemberExpressionDeferred
+                        )
+                });
+            }
+        }
         let Some(declaration) = parsed
             .class_declarations
             .iter()
