@@ -4,7 +4,7 @@ Only source that fits the current end-to-end Cranelift bootstrap boundary is
 kept here. Every example has one top-level `main` with no parameters and an
 `Int` return, and requires no runtime library, printing, or linker runtime
 features. The examples cover integer arithmetic, structured control flow,
-lexical scopes, classes, class methods, interfaces, and the accepted `Bool`, `Unit`, `Float`,
+lexical scopes, classes, class methods, interfaces, and the accepted `Bool`, `Float`,
 and `Byte` primitive runtime forms, plus mutable `var` initialization and
 reassignment. `cancellation.neu` demonstrates requesting cancellation of a
 child task. `spawn.neu`, `await.neu`, `task_results.neu`, and

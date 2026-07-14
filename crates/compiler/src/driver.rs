@@ -482,24 +482,17 @@ fn compile_source_with_entry(
                     )
                 })
                 .collect::<Option<Vec<_>>>()?;
+            let void_type = types
+                .records()
+                .iter()
+                .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Void))
+                .map(|record| record.id())?;
             let return_type = function
-                .is_test
-                .then(|| {
-                    types
-                        .records()
-                        .iter()
-                        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Unit))
-                        .map(|record| record.id())
+                .return_annotation
+                .map(|annotation| {
+                    type_annotation_type(&parsed, annotation, &mut types, class_types.classes())
                 })
-                .flatten()
-                .or_else(|| {
-                    type_annotation_type(
-                        &parsed,
-                        function.return_annotation?,
-                        &mut types,
-                        class_types.classes(),
-                    )
-                })?;
+                .unwrap_or(Some(void_type))?;
             Some(crate::type_check::FunctionSignature::new(
                 function.declaration,
                 parameters,

@@ -81,11 +81,11 @@ impl RuntimeSymbol {
 }
 
 pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
-    RuntimeSymbol::new("neu_runtime_init", "() -> Unit"),
-    RuntimeSymbol::new("neu_runtime_shutdown", "() -> Unit"),
+    RuntimeSymbol::new("neu_runtime_init", "() -> Void"),
+    RuntimeSymbol::new("neu_runtime_shutdown", "() -> Void"),
     RuntimeSymbol::new("neu_runtime_task_spawn", "(opaque) -> opaque"),
     RuntimeSymbol::new("neu_runtime_task_await", "(opaque) -> opaque"),
-    RuntimeSymbol::new("neu_runtime_task_cancel", "(opaque) -> Unit"),
+    RuntimeSymbol::new("neu_runtime_task_cancel", "(opaque) -> Void"),
 ];
 
 pub struct RuntimeBoundary {
