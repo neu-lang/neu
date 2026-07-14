@@ -494,20 +494,6 @@ pub fn lower_checked_hir_source(
                 )?;
             }
         }
-        if function.is_test && returns.is_empty() {
-            let span = function
-                .body
-                .and_then(|body| source.parsed.arena.node(body))
-                .map(|node| node.span)
-                .ok_or(HirLoweringError::UnsupportedExpression)?;
-            let unit = HirExpressionId::from_raw(expressions.len());
-            expressions.push(HirExpression::unit_literal(
-                unit,
-                span,
-                signature.return_type(),
-            ));
-            returns.push(HirReturn::new(span, unit));
-        }
         let has_control_flow = source
             .parsed
             .if_statements
@@ -1046,7 +1032,6 @@ fn lower_expression(
                     literal.kind == ParsedLiteralKind::BoolTrue,
                 ));
             }
-            ParsedLiteralKind::Unit => output.push(HirExpression::unit_literal(id, span, ty)),
             ParsedLiteralKind::Float => {
                 let bits = source
                     .parsed
@@ -1498,7 +1483,7 @@ fn lower_expression(
                     .map(|typed| typed.ty());
                 matches!(
                     arena.get(ty).map(|record| record.kind()),
-                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    Some(TypeKind::Primitive(PrimitiveType::Void))
                 ) && receiver_type.is_some_and(|receiver_type| {
                     arena
                         .get(receiver_type)
@@ -3652,7 +3637,6 @@ pub enum HirExpressionKind {
     IntLiteral(i64),
     EnumVariant(i64),
     BoolLiteral(bool),
-    UnitLiteral,
     FloatLiteral(u64),
     ByteLiteral(u8),
     ParameterRead(HirParameterId),
@@ -3764,15 +3748,6 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::BoolLiteral(value),
-        }
-    }
-
-    pub fn unit_literal(id: HirExpressionId, span: ByteSpan, ty: TypeId) -> Self {
-        Self {
-            id,
-            span,
-            ty,
-            kind: HirExpressionKind::UnitLiteral,
         }
     }
 

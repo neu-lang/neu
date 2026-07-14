@@ -17,7 +17,7 @@ pub fn classify_ownership_category(types: &TypeArena, ty: TypeId) -> Option<Owne
         TypeKind::Primitive(
             PrimitiveType::Bool
             | PrimitiveType::Int
-            | PrimitiveType::Unit
+            | PrimitiveType::Void
             | PrimitiveType::Float
             | PrimitiveType::Byte,
         ) => Some(OwnershipCategory::Copyable),

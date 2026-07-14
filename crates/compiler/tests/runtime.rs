@@ -22,11 +22,11 @@ fn private_runtime_symbol_contract_is_stable() {
     assert_eq!(
         symbols,
         vec![
-            ("neu_runtime_init", "() -> Unit"),
-            ("neu_runtime_shutdown", "() -> Unit"),
+            ("neu_runtime_init", "() -> Void"),
+            ("neu_runtime_shutdown", "() -> Void"),
             ("neu_runtime_task_spawn", "(opaque) -> opaque"),
             ("neu_runtime_task_await", "(opaque) -> opaque"),
-            ("neu_runtime_task_cancel", "(opaque) -> Unit"),
+            ("neu_runtime_task_cancel", "(opaque) -> Void"),
         ]
     );
 }

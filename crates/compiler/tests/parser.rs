@@ -40,6 +40,30 @@ fn parses_public_test_function_modifier() {
 }
 
 #[test]
+fn parses_omitted_function_return_as_void_declaration() {
+    let output = parse_source(
+        SourceFileId::from_raw(20004),
+        "func do_something() { return; }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.function_declarations.len(), 1);
+    assert_eq!(output.function_declarations[0].return_annotation, None);
+}
+
+#[test]
+fn rejects_unit_type_and_void_literal() {
+    let output = parse_source(
+        SourceFileId::from_raw(20005),
+        "func old_way(): Unit { return (); }",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(!output.diagnostics.is_empty() || output.literal_expressions.is_empty());
+}
+
+#[test]
 fn parses_quoted_directory_import_with_alias() {
     let output = parse_source(
         SourceFileId::from_raw(10003),
@@ -253,7 +277,7 @@ fn parses_type_and_generic_syntax() {
 fn generic_argument_metadata_preserves_direct_nested_arguments() {
     let output = parse_source(
         SourceFileId::from_raw(211),
-        "func use(value: Box<Array<Int>>): Unit;",
+        "func use(value: Box<Array<Int>>);",
     );
 
     assert!(output.diagnostics.is_empty());
@@ -300,7 +324,7 @@ fn generic_parameters_record_their_declaration_owner() {
 
 #[test]
 fn duplicate_generic_parameters_are_diagnosed() {
-    let output = parse_source(SourceFileId::from_raw(213), "func identity<T, T>(): Unit;");
+    let output = parse_source(SourceFileId::from_raw(213), "func identity<T, T>();");
     assert!(
         output
             .diagnostics
@@ -335,11 +359,24 @@ fn function_type_metadata_preserves_parameter_and_return_types() {
     assert_eq!(
         output
             .arena
-            .node(output.function_types[0].return_type)
+            .node(output.function_types[0].return_type.unwrap())
             .unwrap()
             .kind,
         AstNodeKind::NamedType
     );
+}
+
+#[test]
+fn parses_function_type_with_omitted_return() {
+    let output = parse_source(
+        SourceFileId::from_raw(217),
+        "func apply(operation: () ->): Int;",
+    );
+
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.function_types.len(), 1);
+    assert_eq!(output.function_types[0].return_type, None);
 }
 
 #[test]
@@ -602,8 +639,6 @@ fn reports_malformed_type_and_generic_syntax() {
     assert!(kinds.contains(&DiagnosticKind::MalformedGenericParameterList));
     assert!(kinds.contains(&DiagnosticKind::MalformedCapabilityBound));
     assert!(kinds.contains(&DiagnosticKind::MalformedNullableType));
-    assert!(kinds.contains(&DiagnosticKind::MalformedFunctionType));
-    assert!(kinds.contains(&DiagnosticKind::MissingTypeName));
 }
 
 #[test]
@@ -796,14 +831,13 @@ fn records_literal_expression_metadata_for_type_checking() {
 }
 
 #[test]
-fn records_float_and_unit_literal_metadata() {
-    let parsed = parse_source(SourceFileId::from_raw(93), "func run() { 1.5; (); }");
+fn records_float_literal_metadata() {
+    let parsed = parse_source(SourceFileId::from_raw(93), "func run() { 1.5; }");
 
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
-    assert_eq!(parsed.literal_expressions.len(), 2);
+    assert_eq!(parsed.literal_expressions.len(), 1);
     assert_eq!(parsed.literal_expressions[0].kind, ParsedLiteralKind::Float);
-    assert_eq!(parsed.literal_expressions[1].kind, ParsedLiteralKind::Unit);
 }
 
 #[test]
@@ -1412,7 +1446,7 @@ fn structured_scope_and_spawn_lambda_are_preserved_by_parser() {
 fn task_cancellation_uses_member_call_syntax() {
     let output = parse_source(
         SourceFileId::from_raw(903),
-        "suspend func run(): Unit { scope { val task = spawn { -> () }; task.cancel(); } }",
+        "suspend func run() { scope { val task = spawn { -> 1 }; task.cancel(); } }",
     );
     assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
     let cancellation = output

@@ -188,7 +188,7 @@ pub enum PrimitiveType {
     Bool,
     Int,
     String,
-    Unit,
+    Void,
     Null,
     Float,
     Byte,

@@ -684,14 +684,13 @@ fn hir_to_mir_lowers_primitive_parameter_reads() {
 }
 
 #[test]
-fn hir_to_mir_lowers_primitive_literals_and_unit_return() {
+fn hir_to_mir_lowers_primitive_literals() {
     let file = SourceFileId::from_raw(908);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let mut types = TypeArena::new();
     let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
     let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
     let byte_type = types.insert(TypeRecord::primitive(PrimitiveType::Byte));
-    let unit_type = types.insert(TypeRecord::primitive(PrimitiveType::Unit));
     let package = compiler::module::PackageNamespace::parse("demo").unwrap();
     let module_name = ModuleName::parse("app").unwrap();
     let function = |id, ty, expression| {
@@ -728,11 +727,6 @@ fn hir_to_mir_lowers_primitive_literals_and_unit_return() {
                 byte_type,
                 HirExpression::byte_literal(HirExpressionId::from_raw(0), span, byte_type, 255),
             ),
-            function(
-                3,
-                unit_type,
-                HirExpression::unit_literal(HirExpressionId::from_raw(0), span, unit_type),
-            ),
         ],
     );
 
@@ -749,14 +743,6 @@ fn hir_to_mir_lowers_primitive_literals_and_unit_return() {
         mir.functions()[2].blocks()[0].instructions()[0],
         MirInstruction::ByteConstant { .. }
     ));
-    assert!(matches!(
-        mir.functions()[3].blocks()[0].instructions()[0],
-        MirInstruction::UnitConstant { .. }
-    ));
-    assert_eq!(
-        mir.functions()[3].blocks()[0].terminator(),
-        MirTerminator::ReturnUnit { span }
-    );
 }
 
 #[test]

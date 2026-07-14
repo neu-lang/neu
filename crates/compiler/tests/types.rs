@@ -257,7 +257,7 @@ fn primitive_type_records_cover_adr0027_bootstrap_identities() {
         PrimitiveType::Bool,
         PrimitiveType::Int,
         PrimitiveType::String,
-        PrimitiveType::Unit,
+        PrimitiveType::Void,
         PrimitiveType::Null,
     ];
 
