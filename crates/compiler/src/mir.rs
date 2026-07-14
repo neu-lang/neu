@@ -1240,6 +1240,16 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             index: mir_expression_value_id(function, *index),
                             span: expression.span(),
                         });
+                    } else if types
+                        .get(array_expression.ty())
+                        .is_some_and(|record| matches!(record.kind(), TypeKind::DynamicArray(_)))
+                    {
+                        instructions.push(MirInstruction::DynamicArrayLoad {
+                            output,
+                            array: mir_expression_value_id(function, *array),
+                            index: mir_expression_value_id(function, *index),
+                            span: expression.span(),
+                        });
                     } else {
                         let local = match array_expression.kind() {
                             HirExpressionKind::LocalRead(local) => *local,
@@ -2062,6 +2072,28 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::DynamicArrayRemove { array, index } => {
+                let array_id = *array;
+                let array = self.lower_expression(array_id)?;
+                let index = self.lower_expression(*index)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == array_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::DynamicArray(array) => Some(array.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::DynamicArrayRemove {
+                    element_type,
+                    array,
+                    index,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::ArrayLiteral(elements) => {
                 let local = self
                     .function
@@ -2186,13 +2218,33 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::Index { .. }
-            | HirExpressionKind::StringLiteral(_)
+            HirExpressionKind::Index { array, index } => {
+                let array_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == *array)
+                    .map(|candidate| candidate.ty())
+                    .and_then(|ty| self.types.get(ty))
+                    .map(|record| record.kind());
+                if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
+                    let array = self.lower_expression(*array)?;
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::DynamicArrayLoad {
+                        output,
+                        array,
+                        index,
+                        span: expression.span(),
+                    });
+                } else {
+                    return Err(MirLoweringError::UnsupportedExpression);
+                }
+            }
+            HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }
-            | HirExpressionKind::NewObject { .. }
-            | HirExpressionKind::DynamicArrayRemove { .. } => {
+            | HirExpressionKind::NewObject { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -2854,16 +2906,100 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::Index { .. }
-            | HirExpressionKind::StringLiteral(_)
+            HirExpressionKind::DynamicArrayNew => {
+                self.push(MirInstruction::DynamicArrayNew {
+                    output,
+                    type_id: expression.ty(),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::DynamicArraySize(array) => {
+                let array = self.lower_expression(*array)?;
+                self.push(MirInstruction::DynamicArraySize {
+                    output,
+                    array,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::DynamicArrayAdd {
+                array,
+                value,
+                index,
+            } => {
+                let array_id = *array;
+                let array = self.lower_expression(array_id)?;
+                let value = self.lower_expression(*value)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == array_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::DynamicArray(array) => Some(array.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                let index = index
+                    .map(|index| self.lower_expression(index))
+                    .transpose()?;
+                self.push(MirInstruction::DynamicArrayAdd {
+                    element_type,
+                    array,
+                    value,
+                    index,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::DynamicArrayRemove { array, index } => {
+                let array_id = *array;
+                let array = self.lower_expression(array_id)?;
+                let index = self.lower_expression(*index)?;
+                let element_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == array_id)
+                    .and_then(|candidate| self.types.get(candidate.ty()))
+                    .and_then(|record| match record.kind() {
+                        TypeKind::DynamicArray(array) => Some(array.element()),
+                        _ => None,
+                    })
+                    .ok_or(MirLoweringError::UnsupportedExpression)?;
+                self.push(MirInstruction::DynamicArrayRemove {
+                    element_type,
+                    array,
+                    index,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::Index { array, index } => {
+                let array_type = self
+                    .function
+                    .expressions()
+                    .iter()
+                    .find(|candidate| candidate.id() == *array)
+                    .map(|candidate| candidate.ty())
+                    .and_then(|ty| self.types.get(ty))
+                    .map(|record| record.kind());
+                if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
+                    let array = self.lower_expression(*array)?;
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::DynamicArrayLoad {
+                        output,
+                        array,
+                        index,
+                        span: expression.span(),
+                    });
+                } else {
+                    return Err(MirLoweringError::UnsupportedExpression);
+                }
+            }
+            HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
             | HirExpressionKind::FieldAccess { .. }
-            | HirExpressionKind::NewObject { .. }
-            | HirExpressionKind::DynamicArrayNew
-            | HirExpressionKind::DynamicArraySize(_)
-            | HirExpressionKind::DynamicArrayAdd { .. }
-            | HirExpressionKind::DynamicArrayRemove { .. } => {
+            | HirExpressionKind::NewObject { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
             }
         }
@@ -3307,7 +3443,12 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
         Some(TypeKind::ChannelResult(result)) => {
             require_bootstrap_runtime_type(result.element(), types)
         }
-        Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_)) => Ok(()),
+        Some(
+            TypeKind::Nominal(_)
+            | TypeKind::GenericInstance(_)
+            | TypeKind::GenericParameter(_)
+            | TypeKind::Function(_),
+        ) => Ok(()),
         _ => Err(MirLoweringError::UnsupportedRuntimeType),
     }
 }

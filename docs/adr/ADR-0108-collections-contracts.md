@@ -1,6 +1,6 @@
 # ADR-0108: Generic Collections Contracts
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

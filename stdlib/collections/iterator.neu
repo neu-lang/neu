@@ -1,6 +1,6 @@
 package collections
 
-import "../core" as core
+import "../core"
 
 // Initial iterator protocol; concrete adapters follow the accepted collection
 // borrowing and failure contracts.

@@ -1,6 +1,6 @@
 # ADR-0110: Collection Iteration and Failure Contracts
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

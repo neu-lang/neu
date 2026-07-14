@@ -1,6 +1,6 @@
 # ADR-0109: Generic Calls and Enum Runtime Contracts
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

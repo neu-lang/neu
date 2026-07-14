@@ -28,18 +28,18 @@ use crate::{
         IntrinsicDiagnostic, ReturnPathDiagnostic, ReturnTypeDiagnostic, TestDiagnostic,
         TypeCheckDiagnostic, TypeRuleDiagnostic, UnsupportedExecutableFormDiagnostic,
         apply_class_type_facts, apply_control_flow_results, apply_direct_call_results,
-        apply_enum_constructor_facts, apply_enum_function_facts, apply_field_access_facts,
-        apply_intrinsic_call_facts, apply_method_call_facts, apply_receiver_name_facts,
-        apply_receiver_signatures, apply_value_conditional_results, check_constructor_calls,
-        check_direct_calls, check_entry_point, check_indirect_calls, check_return_expression_types,
-        check_straight_line_returns, check_unsupported_executable_forms, diagnose_unresolved_types,
-        infer_local_types, merge_type_check_report, type_annotation_type,
-        type_array_expressions_with_classes, type_array_iterations, type_bind_function_values,
-        type_class_types_in, type_concurrency_operations, type_control_flow,
-        type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
-        type_executable_int_operators, type_function_signatures_in_with_generics,
-        type_lambda_expressions, type_string_operations, type_value_conditionals,
-        validate_compile_time_constants, validate_concurrency_structure,
+        apply_enum_constructor_facts, apply_enum_function_facts, apply_enum_method_call_facts,
+        apply_field_access_facts, apply_intrinsic_call_facts, apply_method_call_facts,
+        apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
+        check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
+        check_return_expression_types_with_arena, check_straight_line_returns,
+        check_unsupported_executable_forms, diagnose_unresolved_types, infer_local_types,
+        merge_type_check_report, type_annotation_type, type_array_expressions_with_classes,
+        type_array_iterations, type_bind_function_values, type_class_types_in,
+        type_concurrency_operations, type_control_flow, type_dynamic_array_operations,
+        type_enum_whens, type_executable_core_in, type_executable_int_operators,
+        type_function_signatures_in_with_generics, type_lambda_expressions, type_string_operations,
+        type_value_conditionals, validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_intrinsic_calls,
         validate_task_member_cancellation_structure, validate_test_declarations,
     },
@@ -60,6 +60,7 @@ pub struct TestMetadata {
     symbol: String,
     declaration: crate::ast::AstNodeId,
     span: crate::source::ByteSpan,
+    source: String,
 }
 
 impl TestMetadata {
@@ -73,6 +74,10 @@ impl TestMetadata {
 
     pub fn span(&self) -> crate::source::ByteSpan {
         self.span
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
     }
 }
 
@@ -132,6 +137,7 @@ pub fn discover_tests(
                 symbol,
                 declaration: function.declaration,
                 span,
+                source: String::new(),
             })
         })
         .collect::<Vec<_>>();
@@ -295,13 +301,64 @@ pub fn discover_manifest_tests(
     let sources = manifest
         .load_sources(&root)
         .map_err(DriverError::Manifest)?;
-    let entry = manifest
-        .entrypoint()
-        .map(ToOwned::to_owned)
-        .or_else(|| sources.first().map(|source| source.path().to_owned()))
-        .ok_or_else(|| {
-            DriverError::Manifest(crate::manifest::ManifestDiagnostic::missing_sources())
-        })?;
+    let entry = manifest.entrypoint().map(ToOwned::to_owned);
+    if entry.is_none() {
+        let graph = VirtualPackageGraph::build_library(
+            sources
+                .iter()
+                .map(|source| VirtualSource::new(source.path(), source.source())),
+        )
+        .map_err(DriverError::PackageGraph)?;
+        let module = ModuleName::parse(manifest.name()).expect("manifest name was validated");
+        let mut tests = Vec::new();
+        for source in &sources {
+            let source_file = graph
+                .files()
+                .iter()
+                .find(|file| file.path == source.path())
+                .map(|file| file.id)
+                .expect("library source is in the source graph");
+            let parsed = parser::parse_source(source_file, source.source());
+            if !parsed.lex_diagnostics.is_empty() {
+                return Err(DriverError::LexDiagnostics(parsed.lex_diagnostics));
+            }
+            if !parsed.diagnostics.is_empty() {
+                return Err(DriverError::ParseDiagnostics(parsed.diagnostics));
+            }
+            let mut discovered = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+            for test in &mut discovered {
+                test.source = source.source().to_owned();
+            }
+            tests.extend(discovered);
+        }
+        tests.sort_by(|left, right| {
+            left.symbol
+                .cmp(&right.symbol)
+                .then_with(|| left.span.start().cmp(&right.span.start()))
+        });
+        let (source, source_file) = sources
+            .first()
+            .map(|source| {
+                let id = graph
+                    .files()
+                    .iter()
+                    .find(|file| file.path == source.path())
+                    .unwrap()
+                    .id;
+                (source.source().to_owned(), id)
+            })
+            .ok_or_else(|| {
+                DriverError::Manifest(crate::manifest::ManifestDiagnostic::missing_sources())
+            })?;
+        return Ok(TestProject {
+            source,
+            source_file,
+            module,
+            package: PackageNamespace::root(),
+            tests,
+        });
+    }
+    let entry = entry.expect("entrypoint exists");
     let graph = VirtualPackageGraph::build_with_dependencies(entry.clone(), sources, dependencies)
         .map_err(DriverError::PackageGraph)?;
     let entry_file = graph
@@ -318,7 +375,10 @@ pub fn discover_manifest_tests(
     if !parsed.diagnostics.is_empty() {
         return Err(DriverError::ParseDiagnostics(parsed.diagnostics));
     }
-    let tests = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+    let mut tests = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+    for test in &mut tests {
+        test.source = source.clone();
+    }
     Ok(TestProject {
         source,
         source_file: entry_file.id,
@@ -484,6 +544,7 @@ fn compile_source_with_entry(
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
     apply_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
+    apply_enum_method_call_facts(&parsed, &class_types, &mut report, &types);
     apply_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     type_lambda_expressions(&parsed, &mut types, &mut report);
@@ -553,6 +614,7 @@ fn compile_source_with_entry(
     apply_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
+    apply_enum_method_call_facts(&parsed, &class_types, &mut report, &types);
     report.retain_diagnostics(|diagnostic| {
         !concurrency_calls.contains(&diagnostic.node())
             || !matches!(
@@ -603,12 +665,6 @@ fn compile_source_with_entry(
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     diagnose_unresolved_types(&parsed, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
-    let intrinsic_diagnostics =
-        validate_intrinsic_calls(&parsed, report.expression_types(), &types);
-    if !intrinsic_diagnostics.is_empty() {
-        return Err(DriverError::IntrinsicDiagnostics(intrinsic_diagnostics));
-    }
-    apply_intrinsic_call_facts(&parsed, &mut report, &types);
     let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed
@@ -632,13 +688,20 @@ fn compile_source_with_entry(
         &signatures,
         report.expression_types(),
     )
-    .with_class_types(&class_types)]);
+    .with_class_types(&class_types)
+    .with_type_arena(&types)]);
     if !calls.diagnostics().is_empty() {
         return Err(DriverError::DirectCallDiagnostics(
             calls.diagnostics().to_vec(),
         ));
     }
     apply_direct_call_results(&mut report, &parsed, &calls);
+    let intrinsic_diagnostics =
+        validate_intrinsic_calls(&parsed, report.expression_types(), &types);
+    if !intrinsic_diagnostics.is_empty() {
+        return Err(DriverError::IntrinsicDiagnostics(intrinsic_diagnostics));
+    }
+    apply_intrinsic_call_facts(&parsed, &mut report, &types);
     let conditional_report = type_value_conditionals(&parsed, report.expression_types(), &types);
     apply_value_conditional_results(&mut report, &conditional_report);
     let mut string_after_when = crate::type_check::TypeCheckReport::new();
@@ -719,13 +782,21 @@ fn compile_source_with_entry(
             return_paths.diagnostics().to_vec(),
         ));
     }
-    let return_types =
-        check_return_expression_types(&parsed, &signatures, report.expression_types());
+    let return_types = check_return_expression_types_with_arena(
+        &parsed,
+        &signatures,
+        report.expression_types(),
+        Some(&types),
+    );
     if !return_types.diagnostics().is_empty() {
         return Err(DriverError::ReturnTypeDiagnostics(
             return_types.diagnostics().to_vec(),
         ));
     }
+    report.retain_diagnostics(|diagnostic| {
+        parsed.generic_parameters.is_empty()
+            || diagnostic.rule() != TypeRuleDiagnostic::WhenArmTypeMismatch
+    });
     let unsupported = check_unsupported_executable_forms(&parsed);
     if !unsupported.diagnostics().is_empty() {
         return Err(DriverError::UnsupportedExecutableForms(

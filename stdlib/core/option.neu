@@ -16,4 +16,34 @@ enum Option<T> {
             Option.None -> true
         }
     }
+
+    func and(other: Option<T>): Option<T> {
+        return when (this) {
+            Option.Some(_) -> other
+            Option.None -> this
+        }
+    }
+
+    func or(other: Option<T>): Option<T> {
+        return when (this) {
+            Option.Some(_) -> this
+            Option.None -> other
+        }
+    }
+}
+
+public test func option_predicates_work() {
+    val some: Option<Int> = Option.Some(1);
+    val none: Option<Int> = Option.None;
+    assert(some.is_some(), "Some is present");
+    assert(none.is_none(), "None is absent");
+}
+
+public test func option_combinators_work() {
+    val some: Option<Int> = Option.Some(1);
+    val none: Option<Int> = Option.None;
+    val and_result: Option<Int> = some.and(none);
+    val or_result: Option<Int> = none.or(some);
+    assert(and_result.is_none(), "and selects the empty operand");
+    assert(or_result.is_some(), "or selects the present operand");
 }

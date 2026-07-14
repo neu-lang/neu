@@ -162,6 +162,7 @@ pub fn validate_intrinsic_calls(
             .map(|record| record.id())
     };
     let bool_type = primitive(PrimitiveType::Bool);
+    let int_type = primitive(PrimitiveType::Int);
     let string_type = primitive(PrimitiveType::String);
     let mut diagnostics = Vec::new();
     for call in &parsed.call_expressions {
@@ -192,13 +193,34 @@ pub fn validate_intrinsic_calls(
             });
             continue;
         }
-        if name == "assert"
-            && expression_types
-                .iter()
-                .find(|entry| entry.expression() == call.arguments[0])
-                .map(|entry| entry.ty())
-                != bool_type
-        {
+        let condition_is_bool = expression_types
+            .iter()
+            .find(|entry| entry.expression() == call.arguments[0])
+            .map(|entry| entry.ty())
+            == bool_type
+            || parsed.binary_expressions.iter().any(|binary| {
+                binary.expression == call.arguments[0]
+                    && matches!(
+                        binary.operator,
+                        ParsedBinaryOperator::Equal
+                            | ParsedBinaryOperator::NotEqual
+                            | ParsedBinaryOperator::Less
+                            | ParsedBinaryOperator::Greater
+                            | ParsedBinaryOperator::LessEqual
+                            | ParsedBinaryOperator::GreaterEqual
+                    )
+                    && expression_types
+                        .iter()
+                        .find(|entry| entry.expression() == binary.left)
+                        .map(|entry| entry.ty())
+                        == int_type
+                    && expression_types
+                        .iter()
+                        .find(|entry| entry.expression() == binary.right)
+                        .map(|entry| entry.ty())
+                        == int_type
+            });
+        if name == "assert" && !condition_is_bool {
             diagnostics.push(IntrinsicDiagnostic {
                 kind: IntrinsicDiagnosticKind::ConditionType,
                 span,
@@ -1838,6 +1860,63 @@ pub fn apply_method_call_facts(
     }
 }
 
+pub fn apply_enum_method_call_facts(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    report: &mut TypeCheckReport,
+    types: &TypeArena,
+) {
+    let bool_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Bool)).then_some(record.id())
+    });
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        let declaration = match types.get(receiver_type).map(|record| record.kind()) {
+            Some(TypeKind::GenericInstance(identity)) => identity.declaration().declaration(),
+            Some(TypeKind::Nominal(identity)) => identity.declaration(),
+            _ => continue,
+        };
+        let Some(class) = classes.classes.iter().find(|class| {
+            class.declaration == declaration
+                && parsed
+                    .enum_variants
+                    .iter()
+                    .any(|variant| variant.enum_declaration == declaration)
+        }) else {
+            continue;
+        };
+        if parsed.function_declarations.iter().any(|function| {
+            function.owner == Some(class.declaration)
+                && function.name == member.name
+                && function.return_annotation.is_some_and(|annotation| {
+                    parsed.type_name_references.iter().any(|reference| {
+                        reference.reference == annotation && reference.name == "Bool"
+                    })
+                })
+        }) && let Some(bool_type) = bool_type
+        {
+            report.replace_expression_type(ExpressionType::new(call.expression, bool_type));
+            report.retain_diagnostics(|diagnostic| {
+                (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                    || !matches!(
+                        diagnostic.rule(),
+                        TypeRuleDiagnostic::DirectCallDeferred
+                            | TypeRuleDiagnostic::MemberExpressionDeferred
+                    )
+            });
+        }
+    }
+}
+
 pub fn apply_receiver_name_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
@@ -1973,6 +2052,7 @@ pub struct ExecutableSourceTypes<'a> {
     signatures: &'a [FunctionSignature],
     expression_types: &'a [ExpressionType],
     class_types: Option<&'a ClassTypeReport>,
+    type_arena: Option<&'a TypeArena>,
 }
 
 impl<'a> ExecutableSourceTypes<'a> {
@@ -1988,11 +2068,17 @@ impl<'a> ExecutableSourceTypes<'a> {
             signatures,
             expression_types,
             class_types: None,
+            type_arena: None,
         }
     }
 
     pub fn with_class_types(mut self, class_types: &'a ClassTypeReport) -> Self {
         self.class_types = Some(class_types);
+        self
+    }
+
+    pub fn with_type_arena(mut self, type_arena: &'a TypeArena) -> Self {
+        self.type_arena = Some(type_arena);
         self
     }
 
@@ -2778,6 +2864,44 @@ fn overload_type_compatible(
     if actual == expected {
         return true;
     }
+    if let Some(arena) = source.type_arena {
+        match (
+            arena.get(actual).map(|record| record.kind()),
+            arena.get(expected).map(|record| record.kind()),
+        ) {
+            (Some(TypeKind::DynamicArray(actual)), Some(TypeKind::DynamicArray(expected))) => {
+                return actual.element() == expected.element()
+                    || matches!(
+                        arena.get(expected.element()).map(|record| record.kind()),
+                        Some(TypeKind::GenericParameter(_))
+                    );
+            }
+            (_, Some(TypeKind::GenericParameter(_))) => return true,
+            (
+                Some(TypeKind::GenericInstance(actual)),
+                Some(TypeKind::GenericInstance(expected)),
+            ) => {
+                return actual.declaration() == expected.declaration()
+                    && actual.arguments().len() == expected.arguments().len()
+                    && actual.arguments().iter().zip(expected.arguments()).all(
+                        |(actual, expected)| {
+                            *actual == *expected
+                                || matches!(
+                                    arena.get(*expected).map(|record| record.kind()),
+                                    Some(TypeKind::GenericParameter(_))
+                                )
+                        },
+                    );
+            }
+            (Some(TypeKind::Nominal(actual)), Some(TypeKind::GenericInstance(expected))) => {
+                return actual == expected.declaration();
+            }
+            (Some(TypeKind::GenericInstance(actual)), Some(TypeKind::Nominal(expected))) => {
+                return actual.declaration() == expected;
+            }
+            _ => {}
+        }
+    }
     let Some(classes) = source.class_types else {
         return false;
     };
@@ -2835,8 +2959,11 @@ pub fn apply_direct_call_results(
         };
         report.record_expression_type(ExpressionType::new(call.expression, ty));
         report.diagnostics.retain(|diagnostic| {
-            diagnostic.node() != call.expression
-                || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
+            !matches!(
+                diagnostic.rule(),
+                TypeRuleDiagnostic::MemberExpressionDeferred
+            ) && (diagnostic.node() != call.expression
+                || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred)
         });
     }
 }
@@ -3823,6 +3950,15 @@ pub fn check_return_expression_types(
     signatures: &[FunctionSignature],
     expression_types: &[ExpressionType],
 ) -> ReturnTypeReport {
+    check_return_expression_types_with_arena(parsed, signatures, expression_types, None)
+}
+
+pub fn check_return_expression_types_with_arena(
+    parsed: &ParseOutput,
+    signatures: &[FunctionSignature],
+    expression_types: &[ExpressionType],
+    arena: Option<&TypeArena>,
+) -> ReturnTypeReport {
     let mut diagnostics = Vec::new();
 
     for returned in &parsed.return_statements {
@@ -3843,7 +3979,34 @@ pub fn check_return_expression_types(
         else {
             continue;
         };
-        if actual != expected {
+        let compatible = actual == expected
+            || arena.is_some_and(|arena| {
+                match (
+                    arena.get(actual).map(|record| record.kind()),
+                    arena.get(expected).map(|record| record.kind()),
+                ) {
+                    (
+                        Some(TypeKind::Nominal(actual)),
+                        Some(TypeKind::GenericInstance(expected)),
+                    ) => actual == expected.declaration(),
+                    (
+                        Some(TypeKind::GenericInstance(actual)),
+                        Some(TypeKind::GenericInstance(expected)),
+                    ) => actual.declaration() == expected.declaration(),
+                    (
+                        Some(TypeKind::DynamicArray(actual)),
+                        Some(TypeKind::DynamicArray(expected)),
+                    ) => {
+                        actual.element() == expected.element()
+                            || matches!(
+                                arena.get(expected.element()).map(|record| record.kind()),
+                                Some(TypeKind::GenericParameter(_))
+                            )
+                    }
+                    _ => false,
+                }
+            });
+        if !compatible {
             let span = parsed.arena.node(value).expect("parsed return value").span;
             diagnostics.push(ReturnTypeDiagnostic::new(
                 ReturnTypeDiagnosticKind::ReturnTypeMismatch,
@@ -4084,7 +4247,9 @@ fn type_function_signatures_in_with_classes_and_generics(
     for function in functions {
         let generic_types: Vec<_> = generic_parameters
             .iter()
-            .filter(|parameter| parameter.owner == Some(function.declaration))
+            .filter(|parameter| {
+                parameter.owner == Some(function.declaration) || function.owner == parameter.owner
+            })
             .filter_map(|parameter| {
                 generic_parameter_types
                     .iter()
@@ -4135,7 +4300,10 @@ fn type_function_signatures_in_with_classes_and_generics(
             generic_parameters: generic_types.iter().map(|(_, ty)| *ty).collect(),
             generic_bounds: generic_parameters
                 .iter()
-                .filter(|parameter| parameter.owner == Some(function.declaration))
+                .filter(|parameter| {
+                    parameter.owner == Some(function.declaration)
+                        || function.owner == parameter.owner
+                })
                 .flat_map(|parameter| {
                     let Some(ty) = generic_parameter_types
                         .iter()
@@ -5155,6 +5323,44 @@ fn resolve_annotation_type_with_generics(
     {
         return Some(*ty);
     }
+    if let Some(reference) = type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)
+        && !reference.generic_argument_names.is_empty()
+    {
+        if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
+            let name = &reference.generic_argument_names[0];
+            let element = generic_types
+                .iter()
+                .find(|(generic, _)| *generic == name)
+                .map(|(_, ty)| *ty)
+                .or_else(|| primitives.type_for_primitive_name(name))?;
+            return Some(arena.dynamic_array(element));
+        }
+        let class = classes.iter().find(|class| class.name == reference.name)?;
+        let arguments = reference
+            .generic_argument_names
+            .iter()
+            .map(|name| {
+                generic_types
+                    .iter()
+                    .find(|(generic, _)| *generic == name)
+                    .map(|(_, ty)| *ty)
+                    .or_else(|| primitives.type_for_primitive_name(name))
+                    .or_else(|| {
+                        classes
+                            .iter()
+                            .find(|class| class.name == *name)
+                            .map(|class| class.type_id)
+                    })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let identity = match arena.get(class.type_id)?.kind() {
+            TypeKind::Nominal(identity) => identity.clone(),
+            _ => return None,
+        };
+        return Some(arena.generic_instance(GenericTypeIdentity::new(identity, arguments)));
+    }
     resolve_annotation_type(
         annotation,
         type_name_references,
@@ -5248,8 +5454,25 @@ pub fn type_array_expressions_with_classes(
             .find(|reference| reference.reference == node)
         {
             if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
-                let element =
-                    primitives.type_for_primitive_name(&reference.generic_argument_names[0])?;
+                let element_name = &reference.generic_argument_names[0];
+                let element = primitives
+                    .type_for_primitive_name(element_name)
+                    .or_else(|| {
+                        parsed
+                            .generic_parameters
+                            .iter()
+                            .find(|parameter| parameter.name == *element_name)
+                            .and_then(|parameter| {
+                                types.records().iter().find_map(|record| {
+                                    matches!(
+                                        record.kind(),
+                                        TypeKind::GenericParameter(generic)
+                                            if generic.declaration() == parameter.parameter
+                                    )
+                                    .then_some(record.id())
+                                })
+                            })
+                    })?;
                 return Some(types.dynamic_array(element));
             }
             return primitives.type_for_primitive_name(&reference.name);
@@ -5364,20 +5587,32 @@ pub fn type_array_expressions_with_classes(
             ));
             continue;
         }
-        if let Some(TypeKind::Array(array)) = types.get(array_ty).map(|record| record.kind()) {
-            report.replace_expression_type(ExpressionType::new(index.expression, array.element()));
-            if let Some(value) = parsed
-                .integer_literals
-                .iter()
-                .find(|literal| literal.expression == index.index)
-                .and_then(|literal| literal.value)
-                && value >= array.length()
-            {
-                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
-                    TypeRuleDiagnostic::ArrayIndexOutOfBounds,
-                    index.index,
+        match types.get(array_ty).map(|record| record.kind()) {
+            Some(TypeKind::Array(array)) => {
+                report.replace_expression_type(ExpressionType::new(
+                    index.expression,
+                    array.element(),
+                ));
+                if let Some(value) = parsed
+                    .integer_literals
+                    .iter()
+                    .find(|literal| literal.expression == index.index)
+                    .and_then(|literal| literal.value)
+                    && value >= array.length()
+                {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::ArrayIndexOutOfBounds,
+                        index.index,
+                    ));
+                }
+            }
+            Some(TypeKind::DynamicArray(array)) => {
+                report.replace_expression_type(ExpressionType::new(
+                    index.expression,
+                    array.element(),
                 ));
             }
+            _ => {}
         }
     }
 
@@ -7201,6 +7436,101 @@ pub fn apply_enum_constructor_facts(
         }) else {
             continue;
         };
+        let Some(variant) = parsed.enum_variants.iter().find(|variant| {
+            variant.enum_declaration == class.declaration() && variant.name == member.name
+        }) else {
+            continue;
+        };
+        if variant.arguments.len() == call.arguments.len() {
+            let generic_parameters = parsed
+                .generic_parameters
+                .iter()
+                .filter(|parameter| parameter.owner == Some(class.declaration()))
+                .collect::<Vec<_>>();
+            let mut generic_arguments = vec![None; generic_parameters.len()];
+            for (annotation, argument) in variant.arguments.iter().zip(&call.arguments) {
+                let Some(actual) = report.expression_type(*argument) else {
+                    continue;
+                };
+                if let Some(reference) = parsed
+                    .type_name_references
+                    .iter()
+                    .find(|reference| reference.reference == *annotation)
+                    && let Some(index) = generic_parameters
+                        .iter()
+                        .position(|parameter| parameter.name == reference.name)
+                {
+                    generic_arguments[index] = Some(actual);
+                } else if let Some(reference) = parsed
+                    .name_references
+                    .iter()
+                    .find(|reference| reference.reference == *annotation)
+                    && let Some(index) = generic_parameters
+                        .iter()
+                        .position(|parameter| parameter.name == reference.name)
+                {
+                    generic_arguments[index] = Some(actual);
+                } else if let Some(reference) = parsed
+                    .type_name_references
+                    .iter()
+                    .find(|reference| reference.reference == *annotation)
+                    && reference.name == "Array"
+                    && reference.generic_argument_names.len() == 1
+                    && let Some(index) = generic_parameters
+                        .iter()
+                        .position(|parameter| parameter.name == reference.generic_argument_names[0])
+                    && let Some(TypeKind::DynamicArray(array)) =
+                        types.get(actual).map(|record| record.kind())
+                {
+                    generic_arguments[index] = Some(array.element());
+                }
+            }
+            if generic_arguments.iter().any(Option::is_none)
+                && let Some(expected_annotation) = parsed
+                    .local_declarations
+                    .iter()
+                    .find(|local| local.initializer == Some(call.expression))
+                    .and_then(|local| local.annotation)
+                && let Some(expected_type) = resolve_annotation_type(
+                    expected_annotation,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &primitives,
+                    classes.classes(),
+                    types,
+                )
+                && let Some(TypeKind::GenericInstance(identity)) =
+                    types.get(expected_type).map(|record| record.kind())
+            {
+                for (slot, argument) in generic_arguments.iter_mut().zip(identity.arguments()) {
+                    if slot.is_none() {
+                        *slot = Some(*argument);
+                    }
+                }
+            }
+            if !generic_parameters.is_empty() && generic_arguments.iter().all(Option::is_some) {
+                let identity = match types.get(class.type_id).map(|record| record.kind()) {
+                    Some(TypeKind::Nominal(identity)) => identity.clone(),
+                    _ => continue,
+                };
+                let arguments = generic_arguments.into_iter().flatten().collect::<Vec<_>>();
+                let result_type = if arguments.is_empty() {
+                    class.type_id
+                } else {
+                    types.generic_instance(GenericTypeIdentity::new(identity, arguments))
+                };
+                report.replace_expression_type(ExpressionType::new(call.expression, result_type));
+                report.replace_expression_type(ExpressionType::new(member.expression, result_type));
+                report.retain_diagnostics(|diagnostic| {
+                    (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                        || !matches!(
+                            diagnostic.rule(),
+                            TypeRuleDiagnostic::DirectCallDeferred
+                                | TypeRuleDiagnostic::MemberExpressionDeferred
+                        )
+                });
+            }
+        }
         let Some(declaration) = parsed
             .class_declarations
             .iter()
@@ -8016,6 +8346,14 @@ fn assignment_compatible(target: TypeId, value: TypeId, arena: &TypeArena) -> bo
     match (target_record.kind(), value_record.kind()) {
         (TypeKind::Nullable(_), TypeKind::Primitive(PrimitiveType::Null)) => true,
         (TypeKind::Nullable(nullable), _) => nullable.base() == value,
+        (TypeKind::DynamicArray(target), TypeKind::DynamicArray(value)) => {
+            target.element() == value.element()
+                || matches!(
+                    arena.get(target.element()).map(|record| record.kind()),
+                    Some(TypeKind::GenericParameter(_))
+                )
+        }
+        (_, TypeKind::GenericParameter(_)) => true,
         _ => false,
     }
 }

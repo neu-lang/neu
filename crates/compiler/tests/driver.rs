@@ -43,6 +43,123 @@ public func main(): Int { return 0 }
 }
 
 #[test]
+fn compiles_and_runs_generic_enum_predicates() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-generic-enum-test-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+enum Option<T> {
+    Some(T),
+    None,
+    func is_some(): Bool { return when (this) { Option.Some(_) -> true Option.None -> false } }
+}
+
+public test func option_predicate() {
+    val some: Option<Int> = Option.Some(1);
+    assert(some.is_some(), "Some is present");
+}
+"#;
+    let parsed = compiler::parser::parse_source(SourceFileId::from_raw(31006), source);
+    let declaration = parsed
+        .function_declarations
+        .iter()
+        .find(|function| function.is_test)
+        .unwrap()
+        .declaration;
+    let executable = compile_source_to_test_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31006),
+            ModuleName::parse("generic.test").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("test"),
+        ),
+        declaration,
+    )
+    .unwrap();
+    assert_eq!(Command::new(executable).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_named_import_call() {
+    let workspace = std::env::temp_dir().join(format!("neu-named-import-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let project = validate_virtual_project(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import {add} from \"./math\"\npublic func main(): Int { return add() }",
+            ),
+            VirtualSource::new(
+                "src/math/math.neu",
+                "package math\npublic func add(): Int { return 7 }",
+            ),
+        ],
+    )
+    .unwrap();
+    let executable = compile_virtual_project_to_executable(
+        &project,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31008),
+            ModuleName::parse("named.import").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(executable).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn compiles_and_runs_generic_enum_method_with_generic_parameter() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-generic-enum-method-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let source = r#"
+enum Option<T> {
+    Some(T),
+    None,
+    func and(other: Option<T>): Option<T> {
+        return when (this) { Option.Some(_) -> other Option.None -> this }
+    }
+    func is_none(): Bool { return when (this) { Option.Some(_) -> false Option.None -> true } }
+}
+public test func option_and_predicate() {
+    val some: Option<Int> = Option.Some(1);
+    val none: Option<Int> = Option.None;
+    val result: Option<Int> = some.and(none);
+    assert(true, "and call executes");
+}
+"#;
+    let parsed = compiler::parser::parse_source(SourceFileId::from_raw(31007), source);
+    let declaration = parsed
+        .function_declarations
+        .iter()
+        .find(|function| function.is_test)
+        .unwrap()
+        .declaration;
+    let executable = compile_source_to_test_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(31007),
+            ModuleName::parse("generic.method").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("test"),
+        ),
+        declaration,
+    )
+    .unwrap();
+    assert_eq!(Command::new(executable).status().unwrap().code(), Some(0));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn compiles_core_numeric_utilities() {
     let workspace = std::env::temp_dir().join(format!("neu-core-numeric-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);

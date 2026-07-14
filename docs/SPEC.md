@@ -905,9 +905,24 @@ unchanged. The old spelling is retained only in historical ADR text.
 The bootstrap scalar element set is `Bool`, `Int`, `Float`, and `Byte`.
 Mutable `var` bindings support `add`, indexed `add`, `remove`, and `size`; `val`
 rejects mutation. Dynamic arrays are move-only, opaque, compiler-managed
-values with host-linking allocation and deterministic traps. Strings, nominal
-elements, nested dynamic arrays, indexing, slices, iterators, public layout,
-FFI, and user allocation APIs remain deferred.
+values with host-linking allocation and deterministic traps. As accepted by
+ADR-0119, an in-scope generic function type parameter may be used as the
+element type. Strings, nominal elements, nested dynamic arrays, indexing,
+slices, iterators, public layout, FFI, and user allocation APIs remain
+deferred.
+
+## ADR-0110: Pure-Neu Collection Foundation
+
+The first `neu.collections` surface is ordinary Neu code in the unified
+stdlib manifest. `Vector<T>` is an owning ordered sequence, `Slice<T>` is an
+immutable ordered view, and `Iterator<T>` is a single-pass protocol whose
+`next` operation returns `core.Option<T>`. Sequence order is deterministic and
+length operations do not depend on I/O or a compiler-provided collection ABI.
+The current algebraic implementations provide the accepted value-level
+representations; storage-backed views, borrow invalidation, checked indexing,
+removal results, and iterator adapters remain gated on the ownership and
+recoverable-error contracts in ADR-0110 and ADR-0111. Hash collections and
+specialized data structures are not part of this phase.
 
 ## ADR-0074: Nominal Fixed-Array Elements
 
@@ -1207,7 +1222,10 @@ object emission, and linking. It does not alter symbol naming, slots, layout,
 calling convention, object format, or ABI. Aliases do not bypass access checks,
 and missing or stale separate-compilation visibility metadata is an error.
 Friend packages, re-exports, wildcard imports, reflection, dynamic loading,
-FFI visibility, and package registries remain deferred.
+FFI visibility, and package registries remain deferred. ADR-0117 accepts named
+imports of the form `import {name, other} from "./directory"`; these are
+file-local, public top-level declarations only, have no qualifier or alias,
+and must not collide with another import or local declaration.
 
 ## ADR-0097: Neu Project Manifest
 
