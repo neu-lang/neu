@@ -7,9 +7,12 @@
 //! the ready queue when the state they wait for changes. Nothing here creates
 //! OS threads.
 //!
-//! The task, scope, and queue layouts are private to generated code. Context
-//! switching uses glibc `ucontext` calls. Offsets into `ucontext_t` match the
-//! glibc layout on Linux, the only host where this scheduler is emitted.
+//! The task, scope, and queue layouts are private to generated code. Each task
+//! switches context in one of two ways, chosen by the target OS. On Linux and
+//! macOS, tasks use `ucontext` (`getcontext`, `makecontext`, `swapcontext`,
+//! `setcontext`) with the struct layout taken from the libc crate. On Windows,
+//! tasks are fibers (`CreateFiber`, `SwitchToFiber`, `ConvertThreadToFiber`).
+//! Other targets have no scheduler, so spawn and scope fail to compile there.
 
 use cranelift_codegen::{
     ir::{
@@ -21,6 +24,7 @@ use cranelift_codegen::{
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::ObjectModule;
+use target_lexicon::{OperatingSystem, Triple};
 
 use crate::backend::CraneliftLoweringError;
 
@@ -34,14 +38,44 @@ const TASK_NEXT: i32 = 48;
 const TASK_INNERMOST_SCOPE: i32 = 56;
 const TASK_STACK: i32 = 64;
 const TASK_CONTEXT: i32 = 72;
-const UCONTEXT_BYTES: i64 = 8192;
-const TASK_BYTES: i64 = TASK_CONTEXT as i64 + UCONTEXT_BYTES;
 const TASK_STACK_BYTES: i64 = 256 * 1024;
 
-// Offsets inside glibc's `ucontext_t`, relative to the context start.
-const UC_LINK: i32 = 8;
-const UC_STACK_SP: i32 = 16;
-const UC_STACK_SIZE: i32 = 32;
+/// Where a task's switchable context lives inside its record, and the offsets
+/// needed to point a `ucontext_t` at the task's stack.
+#[derive(Clone, Copy, Debug)]
+struct ContextLayout {
+    /// Size of the context stored at `TASK_CONTEXT`.
+    bytes: i64,
+    /// Offset of `uc_link` inside a `ucontext_t`.
+    link: i32,
+    /// Offset of the stack pointer inside a `ucontext_t`.
+    stack_sp: i32,
+    /// Offset of the stack size inside a `ucontext_t`.
+    stack_size: i32,
+}
+
+/// A fiber context is a single handle, so it needs no stack offsets.
+const FIBER_LAYOUT: ContextLayout = ContextLayout {
+    bytes: 8,
+    link: 0,
+    stack_sp: 0,
+    stack_size: 0,
+};
+
+/// Layout of the host's `ucontext_t`. The compiler emits code only for the host
+/// (the driver rejects other targets), so the host's libc struct is the right one.
+#[cfg(unix)]
+const UCONTEXT_LAYOUT: ContextLayout = ContextLayout {
+    bytes: std::mem::size_of::<libc::ucontext_t>() as i64,
+    link: std::mem::offset_of!(libc::ucontext_t, uc_link) as i32,
+    stack_sp: std::mem::offset_of!(libc::ucontext_t, uc_stack.ss_sp) as i32,
+    stack_size: std::mem::offset_of!(libc::ucontext_t, uc_stack.ss_size) as i32,
+};
+
+/// Size of a task record for the given context layout.
+fn task_bytes(layout: ContextLayout) -> i64 {
+    TASK_CONTEXT as i64 + layout.bytes
+}
 
 const SCOPE_LIVE: i32 = 0;
 const SCOPE_WAITER: i32 = 8;
@@ -63,6 +97,24 @@ pub(super) const TRAP_SPAWN_OUTSIDE_SCOPE: u8 = 41;
 pub(super) const TRAP_ALLOCATION: u8 = 42;
 const TRAP_UNREACHABLE: u8 = 43;
 
+/// Imported functions that create and switch between task contexts.
+#[derive(Clone, Copy, Debug)]
+enum ContextFunctions {
+    /// Only constructed on Unix hosts, which have libc's `ucontext_t`.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    Ucontext {
+        makecontext: FuncId,
+        getcontext: FuncId,
+        swapcontext: FuncId,
+        setcontext: FuncId,
+    },
+    Fiber {
+        create_fiber: FuncId,
+        switch_to_fiber: FuncId,
+        convert_thread: FuncId,
+    },
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct SchedulerFunctions {
     state: DataId,
@@ -79,10 +131,8 @@ pub(super) struct SchedulerFunctions {
     wait_on_queue: FuncId,
     wake_one: FuncId,
     wake_all: FuncId,
-    makecontext: FuncId,
-    getcontext: FuncId,
-    swapcontext: FuncId,
-    setcontext: FuncId,
+    context: ContextFunctions,
+    layout: ContextLayout,
 }
 
 fn signature(call_conv: CallConv, parameters: usize, returns: usize) -> Signature {
@@ -96,32 +146,97 @@ fn signature(call_conv: CallConv, parameters: usize, returns: usize) -> Signatur
     signature
 }
 
-/// Declares and defines the scheduler functions and their state for one object.
+/// Declares the context functions for `target`, or `None` when the target has no
+/// scheduler.
+fn declare_context_functions(
+    module: &mut ObjectModule,
+    call_conv: CallConv,
+    target: &Triple,
+) -> Result<Option<(ContextFunctions, ContextLayout)>, CraneliftLoweringError> {
+    let definition = |_| CraneliftLoweringError::ObjectDefinitionFailed;
+    match target.operating_system {
+        OperatingSystem::Windows => {
+            let create_fiber = module
+                .declare_function("CreateFiber", Linkage::Import, &signature(call_conv, 3, 1))
+                .map_err(definition)?;
+            let switch_to_fiber = module
+                .declare_function(
+                    "SwitchToFiber",
+                    Linkage::Import,
+                    &signature(call_conv, 1, 0),
+                )
+                .map_err(definition)?;
+            let convert_thread = module
+                .declare_function(
+                    "ConvertThreadToFiber",
+                    Linkage::Import,
+                    &signature(call_conv, 1, 1),
+                )
+                .map_err(definition)?;
+            Ok(Some((
+                ContextFunctions::Fiber {
+                    create_fiber,
+                    switch_to_fiber,
+                    convert_thread,
+                },
+                FIBER_LAYOUT,
+            )))
+        }
+        _ if target.operating_system.is_like_darwin()
+            || matches!(target.operating_system, OperatingSystem::Linux) =>
+        {
+            #[cfg(unix)]
+            {
+                let makecontext = module
+                    .declare_function("makecontext", Linkage::Import, &signature(call_conv, 3, 0))
+                    .map_err(definition)?;
+                let getcontext = module
+                    .declare_function("getcontext", Linkage::Import, &signature(call_conv, 1, 1))
+                    .map_err(definition)?;
+                let swapcontext = module
+                    .declare_function("swapcontext", Linkage::Import, &signature(call_conv, 2, 1))
+                    .map_err(definition)?;
+                let setcontext = module
+                    .declare_function("setcontext", Linkage::Import, &signature(call_conv, 1, 1))
+                    .map_err(definition)?;
+                Ok(Some((
+                    ContextFunctions::Ucontext {
+                        makecontext,
+                        getcontext,
+                        swapcontext,
+                        setcontext,
+                    },
+                    UCONTEXT_LAYOUT,
+                )))
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = (module, call_conv);
+                Ok(None)
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Declares and defines the scheduler functions and their state for one object,
+/// or returns `None` when `target` has no scheduler.
 pub(super) fn declare_scheduler(
     module: &mut ObjectModule,
     malloc: FuncId,
     call_conv: CallConv,
-) -> Result<SchedulerFunctions, CraneliftLoweringError> {
+    target: &Triple,
+) -> Result<Option<SchedulerFunctions>, CraneliftLoweringError> {
     let definition = |_| CraneliftLoweringError::ObjectDefinitionFailed;
+    let Some((context, layout)) = declare_context_functions(module, call_conv, target)? else {
+        return Ok(None);
+    };
     let state = module
         .declare_data("neu_sched_state", Linkage::Local, true, false)
         .map_err(definition)?;
     let mut state_data = DataDescription::new();
     state_data.define_zeroinit(STATE_BYTES as usize);
     module.define_data(state, &state_data).map_err(definition)?;
-
-    let makecontext = module
-        .declare_function("makecontext", Linkage::Import, &signature(call_conv, 3, 0))
-        .map_err(definition)?;
-    let getcontext = module
-        .declare_function("getcontext", Linkage::Import, &signature(call_conv, 1, 1))
-        .map_err(definition)?;
-    let swapcontext = module
-        .declare_function("swapcontext", Linkage::Import, &signature(call_conv, 2, 1))
-        .map_err(definition)?;
-    let setcontext = module
-        .declare_function("setcontext", Linkage::Import, &signature(call_conv, 1, 1))
-        .map_err(definition)?;
 
     let mut declare = |name: &str, parameters: usize| {
         module
@@ -143,13 +258,11 @@ pub(super) fn declare_scheduler(
         wait_on_queue: declare("neu_sched_wait_on_queue", 1)?,
         wake_one: declare("neu_sched_wake_one", 1)?,
         wake_all: declare("neu_sched_wake_all", 1)?,
-        makecontext,
-        getcontext,
-        swapcontext,
-        setcontext,
+        context,
+        layout,
     };
     define_scheduler_bodies(module, &scheduler, call_conv)?;
-    Ok(scheduler)
+    Ok(Some(scheduler))
 }
 
 fn define_function(
@@ -277,11 +390,12 @@ fn define_scheduler_bodies(
             b.ins().return_(&[current]);
 
             b.switch_to_block(create);
-            let size = b.ins().iconst(types::I64, TASK_BYTES);
+            let size = b.ins().iconst(types::I64, task_bytes(s.layout));
             let task = call_value(b, m, s.malloc, &[size])?;
             trap_if_zero(b, task, TRAP_ALLOCATION);
             let zero = b.ins().iconst(types::I64, 0);
             init_task_fields(b, task, zero, zero, zero);
+            emit_root_context(b, m, &s, task)?;
             store_word(b, task, st, STATE_CURRENT);
             b.ins().return_(&[task]);
             Ok(())
@@ -383,9 +497,7 @@ fn define_scheduler_bodies(
             b.switch_to_block(switch);
             let st = state_base(b, m, s.state);
             store_word(b, next, st, STATE_CURRENT);
-            let me_context = b.ins().iadd_imm(me, TASK_CONTEXT as i64);
-            let next_context = b.ins().iadd_imm(next, TASK_CONTEXT as i64);
-            call(b, m, s.swapcontext, &[me_context, next_context])?;
+            emit_switch(b, m, &s, me, next)?;
             let zero = b.ins().iconst(types::I64, 0);
             b.ins().return_(&[zero]);
             Ok(())
@@ -411,7 +523,7 @@ fn define_scheduler_bodies(
                 .trap(TrapCode::unwrap_user(TRAP_SPAWN_OUTSIDE_SCOPE));
 
             b.switch_to_block(create);
-            let size = b.ins().iconst(types::I64, TASK_BYTES);
+            let size = b.ins().iconst(types::I64, task_bytes(s.layout));
             let task = call_value(b, m, s.malloc, &[size])?;
             trap_if_zero(b, task, TRAP_ALLOCATION);
             let zero = b.ins().iconst(types::I64, 0);
@@ -419,16 +531,7 @@ fn define_scheduler_bodies(
             let live = load_word(b, scope, SCOPE_LIVE);
             let live = b.ins().iadd_imm(live, 1);
             store_word(b, live, scope, SCOPE_LIVE);
-            let stack_bytes = b.ins().iconst(types::I64, TASK_STACK_BYTES);
-            let stack = call_value(b, m, s.malloc, &[stack_bytes])?;
-            trap_if_zero(b, stack, TRAP_ALLOCATION);
-            store_word(b, stack, task, TASK_STACK);
-            let context = b.ins().iadd_imm(task, TASK_CONTEXT as i64);
-            call(b, m, s.getcontext, &[context])?;
-            store_word(b, stack, context, UC_STACK_SP);
-            store_word(b, stack_bytes, context, UC_STACK_SIZE);
-            store_word(b, zero, context, UC_LINK);
-            call(b, m, s.makecontext, &[context, entry, zero])?;
+            emit_child_context(b, m, &s, task, entry, zero)?;
             let ready_queue_addr = ready_queue(b, m, ready);
             call(b, m, s.enqueue, &[ready_queue_addr, task])?;
             b.ins().return_(&[task]);
@@ -504,8 +607,7 @@ fn define_scheduler_bodies(
             b.switch_to_block(switch);
             let st = state_base(b, m, s.state);
             store_word(b, next, st, STATE_CURRENT);
-            let next_context = b.ins().iadd_imm(next, TASK_CONTEXT as i64);
-            call(b, m, s.setcontext, &[next_context])?;
+            emit_jump(b, m, &s, next)?;
             b.ins().trap(TrapCode::unwrap_user(TRAP_UNREACHABLE));
             Ok(())
         },
@@ -652,6 +754,107 @@ fn init_task_fields(
     store_word(builder, zero, task, TASK_NEXT);
     store_word(builder, innermost_scope, task, TASK_INNERMOST_SCOPE);
     store_word(builder, zero, task, TASK_STACK);
+}
+
+/// Makes the root task's context refer to the thread that runs the program.
+/// Fibers need the thread converted once before any switch; ucontext saves the
+/// running context into the root record on the first switch.
+fn emit_root_context(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    root: Value,
+) -> Result<(), CraneliftLoweringError> {
+    if let ContextFunctions::Fiber { convert_thread, .. } = scheduler.context {
+        let zero = builder.ins().iconst(types::I64, 0);
+        let fiber = call_value(builder, module, convert_thread, &[zero])?;
+        trap_if_zero(builder, fiber, TRAP_ALLOCATION);
+        store_word(builder, fiber, root, TASK_CONTEXT);
+    }
+    Ok(())
+}
+
+/// Gives a new child task its context, so the first switch to it runs `entry`
+/// on the child's own stack.
+fn emit_child_context(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    task: Value,
+    entry: Value,
+    zero: Value,
+) -> Result<(), CraneliftLoweringError> {
+    let stack_bytes = builder.ins().iconst(types::I64, TASK_STACK_BYTES);
+    match scheduler.context {
+        ContextFunctions::Ucontext {
+            makecontext,
+            getcontext,
+            ..
+        } => {
+            let stack = call_value(builder, module, scheduler.malloc, &[stack_bytes])?;
+            trap_if_zero(builder, stack, TRAP_ALLOCATION);
+            store_word(builder, stack, task, TASK_STACK);
+            let context = builder.ins().iadd_imm(task, TASK_CONTEXT as i64);
+            call(builder, module, getcontext, &[context])?;
+            let layout = scheduler.layout;
+            store_word(builder, stack, context, layout.stack_sp);
+            store_word(builder, stack_bytes, context, layout.stack_size);
+            store_word(builder, zero, context, layout.link);
+            call(builder, module, makecontext, &[context, entry, zero])?;
+        }
+        ContextFunctions::Fiber { create_fiber, .. } => {
+            let fiber = call_value(builder, module, create_fiber, &[stack_bytes, entry, zero])?;
+            trap_if_zero(builder, fiber, TRAP_ALLOCATION);
+            store_word(builder, fiber, task, TASK_CONTEXT);
+        }
+    }
+    Ok(())
+}
+
+/// Saves the running task and resumes `to`. Returns when something switches back.
+fn emit_switch(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    from: Value,
+    to: Value,
+) -> Result<(), CraneliftLoweringError> {
+    match scheduler.context {
+        ContextFunctions::Ucontext { swapcontext, .. } => {
+            let from_context = builder.ins().iadd_imm(from, TASK_CONTEXT as i64);
+            let to_context = builder.ins().iadd_imm(to, TASK_CONTEXT as i64);
+            call(builder, module, swapcontext, &[from_context, to_context])?;
+        }
+        ContextFunctions::Fiber {
+            switch_to_fiber, ..
+        } => {
+            let fiber = load_word(builder, to, TASK_CONTEXT);
+            call(builder, module, switch_to_fiber, &[fiber])?;
+        }
+    }
+    Ok(())
+}
+
+/// Resumes `to` without saving the running task. Never returns.
+fn emit_jump(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    to: Value,
+) -> Result<(), CraneliftLoweringError> {
+    match scheduler.context {
+        ContextFunctions::Ucontext { setcontext, .. } => {
+            let to_context = builder.ins().iadd_imm(to, TASK_CONTEXT as i64);
+            call(builder, module, setcontext, &[to_context])?;
+        }
+        ContextFunctions::Fiber {
+            switch_to_fiber, ..
+        } => {
+            let fiber = load_word(builder, to, TASK_CONTEXT);
+            call(builder, module, switch_to_fiber, &[fiber])?;
+        }
+    }
+    Ok(())
 }
 
 /// Emits a spawn: allocates the child, queues it in the innermost scope, and

@@ -624,17 +624,10 @@ fn declare_runtime_functions(
         .define_function(free, &mut context)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
 
-    // Context switching uses glibc `ucontext`, whose layout is only encoded for
-    // Linux, so the scheduler is emitted for that host alone.
-    let scheduler = if cfg!(target_os = "linux") {
-        Some(scheduler::declare_scheduler(
-            module,
-            malloc,
-            CallConv::triple_default(target),
-        )?)
-    } else {
-        None
-    };
+    // The scheduler depends on the target's context switching (ucontext or
+    // fibers), so it is chosen from the target OS, not the compiler's own host.
+    let scheduler =
+        scheduler::declare_scheduler(module, malloc, CallConv::triple_default(target), target)?;
 
     Ok(RuntimeFunctions {
         malloc,
