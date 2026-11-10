@@ -23,8 +23,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Run tests
-        run: cargo test
+        run: cargo test --workspace --all-targets
 
   codeql:
     name: CodeQL
