@@ -90,3 +90,30 @@ fn build_compiles_an_explicit_neu_project_manifest() {
     assert_eq!(Command::new(&output).status().unwrap().code(), Some(7));
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn build_failure_renders_located_diagnostics() {
+    let root = std::env::temp_dir().join(format!("neu-cli-diagnostics-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("neu.json"),
+        r#"{"name":"cli.diagnostics","entrypoint":"src/main.neu","srcs":["src/main.neu"],"dependencies":[]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("src/main.neu"),
+        "public func main(): Int { return \"hi\"; }\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_neu"))
+        .args(["build", root.join("neu.json").to_str().unwrap()])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr.contains("error[return_type_mismatch]"), "{stderr}");
+    assert!(stderr.contains("--> src/main.neu:1:34"), "{stderr}");
+    assert!(!stderr.contains("ReturnTypeDiagnostics("), "{stderr}");
+    let _ = std::fs::remove_dir_all(root);
+}

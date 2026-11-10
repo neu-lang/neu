@@ -1,9 +1,12 @@
 use std::{fs, path::PathBuf, process::ExitCode};
 
 use clap::{Args, Parser, Subcommand};
-use compiler::driver::{
-    SourceDriverOptions, compile_manifest_to_executable_for_target,
-    compile_source_to_test_executable, discover_manifest_tests,
+use compiler::{
+    driver::{
+        SourceDriverOptions, compile_manifest_to_executable_for_target,
+        compile_source_to_test_executable, discover_manifest_tests,
+    },
+    report::{render_manifest_error, render_test_error},
 };
 use target_lexicon::Triple;
 
@@ -44,7 +47,11 @@ fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("neu: {error}");
+            if error.ends_with('\n') {
+                eprint!("{error}");
+            } else {
+                eprintln!("neu: {error}");
+            }
             ExitCode::from(1)
         }
     }
@@ -63,7 +70,8 @@ fn run() -> Result<(), String> {
 
 fn test(args: TestArgs) -> Result<(), String> {
     let manifest_path = resolve_manifest_path(args.project)?;
-    let project = discover_manifest_tests(&manifest_path).map_err(|error| format!("{error:?}"))?;
+    let project = discover_manifest_tests(&manifest_path)
+        .map_err(|error| render_manifest_error(&manifest_path, &error))?;
     if args.list {
         for test in project.tests() {
             println!("{}", test.symbol());
@@ -90,7 +98,7 @@ fn test(args: TestArgs) -> Result<(), String> {
             ),
             test.declaration(),
         )
-        .map_err(|error| format!("{error:?}"))?;
+        .map_err(|error| render_test_error(test, project.source_file(), &error))?;
         let result = std::process::Command::new(executable)
             .output()
             .map_err(|error| error.to_string())?;
@@ -142,7 +150,7 @@ fn build(args: BuildArgs) -> Result<PathBuf, String> {
         .transpose()?
         .unwrap_or_else(Triple::host);
     compile_manifest_to_executable_for_target(&manifest_path, target, &output)
-        .map_err(|error| format!("{error:?}"))
+        .map_err(|error| render_manifest_error(&manifest_path, &error))
 }
 
 fn safe_executable_name(name: &str) -> String {
