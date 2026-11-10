@@ -18,6 +18,8 @@ use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
 
+mod scheduler;
+
 use crate::{
     mir::{
         MirArithmetic, MirComparison, MirFunction, MirInstruction, MirModule, MirTerminator,
@@ -28,6 +30,12 @@ use crate::{
 
 const INVALID_SHIFT_COUNT_TRAP: TrapCode = TrapCode::unwrap_user(1);
 const NEGATIVE_EXPONENT_TRAP: TrapCode = TrapCode::unwrap_user(2);
+
+/// Channel header: capacity, length, head, tail, closed flag, data pointer,
+/// then the receiver and sender FIFO queues used for suspension.
+const CHANNEL_HEADER_BYTES: i64 = 80;
+const CHANNEL_RECV_QUEUE: i64 = 48;
+const CHANNEL_SEND_QUEUE: i64 = 64;
 
 fn codegen_flags() -> settings::Flags {
     let mut builder = settings::builder();
@@ -54,6 +62,20 @@ struct RuntimeFunctions {
     memcmp: FuncId,
     write: FuncId,
     call_conv: CallConv,
+    /// Task scheduler functions; present only where the host runtime supports them.
+    scheduler: Option<scheduler::SchedulerFunctions>,
+}
+
+/// Returns the scheduler together with the object module it emits into.
+/// Both are needed to emit a suspension or task operation; without a module
+/// (single-function emission) or on a host without a scheduler, this is `None`.
+fn scheduler_with_module<'m>(
+    runtime: Option<&RuntimeFunctions>,
+    module: &'m mut Option<&mut ObjectModule>,
+) -> Option<(scheduler::SchedulerFunctions, &'m mut ObjectModule)> {
+    let scheduler = runtime?.scheduler?;
+    let module = module.as_deref_mut()?;
+    Some((scheduler, module))
 }
 
 impl RuntimeFunctions {
@@ -602,6 +624,18 @@ fn declare_runtime_functions(
         .define_function(free, &mut context)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
 
+    // Context switching uses glibc `ucontext`, whose layout is only encoded for
+    // Linux, so the scheduler is emitted for that host alone.
+    let scheduler = if cfg!(target_os = "linux") {
+        Some(scheduler::declare_scheduler(
+            module,
+            malloc,
+            CallConv::triple_default(target),
+        )?)
+    } else {
+        None
+    };
+
     Ok(RuntimeFunctions {
         malloc,
         free,
@@ -609,6 +643,7 @@ fn declare_runtime_functions(
         memcmp,
         write,
         call_conv: CallConv::triple_default(target),
+        scheduler,
     })
 }
 
@@ -993,10 +1028,16 @@ fn lower_instruction(
         MirInstruction::UnitConstant { .. } => Ok(()),
         MirInstruction::Suspend { .. } | MirInstruction::Resume { .. } => Ok(()),
         MirInstruction::ScopeEnter { .. } => {
+            if let Some((scheduler, module)) = scheduler_with_module(context.runtime, module) {
+                scheduler::emit_scope_enter(builder, module, &scheduler)?;
+            }
             scope_tasks.push(Vec::new());
             Ok(())
         }
         MirInstruction::ScopeExit { .. } => {
+            if let Some((scheduler, module)) = scheduler_with_module(context.runtime, module) {
+                scheduler::emit_scope_exit(builder, module, &scheduler)?;
+            }
             let handles = scope_tasks.pop().unwrap_or_default();
             let runtime = context
                 .runtime
@@ -1140,7 +1181,9 @@ fn lower_instruction(
             captures,
             ..
         } => {
-            let function_id = function_ids
+            let (scheduler, module) = scheduler_with_module(context.runtime, module)
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let callee_id = function_ids
                 .get(callee)
                 .copied()
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
@@ -1149,38 +1192,74 @@ fn lower_instruction(
                 .get(callee)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let module = module
-                .as_deref_mut()
-                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
-            let function_ref = module.declare_func_in_func(function_id, builder.func);
-            let capture_values = captures
+            let parameter_types = context
+                .function_parameter_types
+                .get(callee)
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            if parameter_types.len() != captures.len() {
+                return Err(CraneliftLoweringError::MissingValue);
+            }
+            let parameter_clif = parameter_types
                 .iter()
-                .map(|capture| {
-                    values
-                        .get(capture)
-                        .copied()
-                        .ok_or(CraneliftLoweringError::MissingValue)
+                .map(|ty| {
+                    cranelift_type(*ty, context.type_arena)
+                        .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let call = builder.ins().call(function_ref, &capture_values);
-            let result = builder.inst_results(call).first().copied();
+            let result_clif = if matches!(
+                context
+                    .type_arena
+                    .get(result_type)
+                    .map(|record| record.kind()),
+                Some(TypeKind::Primitive(PrimitiveType::Void))
+            ) {
+                None
+            } else {
+                Some(
+                    cranelift_type(result_type, context.type_arena)
+                        .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?,
+                )
+            };
+            let entry_name = format!(
+                "neu_task_entry_{}_{}",
+                context.function.id().index(),
+                output.index()
+            );
+            let entry = scheduler::define_task_entry(
+                module,
+                &scheduler,
+                &entry_name,
+                callee_id,
+                &parameter_clif,
+                result_clif,
+                context.call_conv,
+            )?;
             let runtime = context
                 .runtime
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
-            let size = builder.ins().iconst(types::I64, 16);
+            let frame_bytes = builder
+                .ins()
+                .iconst(types::I64, 8 * captures.len().max(1) as i64);
             let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
-            let allocation = builder.ins().call(malloc_ref, &[size]);
-            let handle = *builder
-                .inst_results(allocation)
+            let frame_call = builder.ins().call(malloc_ref, &[frame_bytes]);
+            let frame = *builder
+                .inst_results(frame_call)
                 .first()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            builder.ins().trapz(handle, TrapCode::unwrap_user(7));
-            let status = builder.ins().iconst(types::I8, 0);
-            builder.ins().store(MemFlagsData::new(), status, handle, 0);
-            if let Some(result) = result {
-                builder.ins().store(MemFlagsData::new(), result, handle, 8);
+            builder
+                .ins()
+                .trapz(frame, TrapCode::unwrap_user(scheduler::TRAP_ALLOCATION));
+            for (index, capture) in captures.iter().enumerate() {
+                let value = values
+                    .get(capture)
+                    .copied()
+                    .ok_or(CraneliftLoweringError::MissingValue)?;
+                builder
+                    .ins()
+                    .store(MemFlagsData::new(), value, frame, (index * 8) as i32);
             }
-            values.insert(*output, handle);
+            let task = scheduler::emit_spawn(builder, module, &scheduler, entry, frame)?;
+            values.insert(*output, task);
             task_results.insert(*output, result_type);
             task_origins.insert(*output, *output);
             if let Some(scope) = scope_tasks.last_mut() {
@@ -1198,10 +1277,16 @@ fn lower_instruction(
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             let origin = task_origins.get(task).copied().unwrap_or(*task);
-            let status = builder
-                .ins()
-                .load(types::I8, MemFlagsData::new(), handle, 0);
-            builder.ins().trapnz(status, TrapCode::unwrap_user(8));
+            let (scheduler, module) = scheduler_with_module(context.runtime, module)
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            scheduler::emit_await(builder, module, &scheduler, handle)?;
+            let cancelled = builder.ins().load(
+                types::I64,
+                MemFlagsData::new(),
+                handle,
+                scheduler::TASK_CANCELLED,
+            );
+            builder.ins().trapnz(cancelled, TrapCode::unwrap_user(8));
             if !matches!(
                 context
                     .type_arena
@@ -1211,9 +1296,12 @@ fn lower_instruction(
             ) {
                 let value_type = cranelift_type(result_type, context.type_arena)
                     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
-                let value = builder
-                    .ins()
-                    .load(value_type, MemFlagsData::new(), handle, 8);
+                let value = builder.ins().load(
+                    value_type,
+                    MemFlagsData::new(),
+                    handle,
+                    scheduler::TASK_RESULT,
+                );
                 values.insert(
                     *output,
                     normalize_bool_value(value, result_type, context.type_arena, builder),
@@ -1238,8 +1326,10 @@ fn lower_instruction(
                 .get(task)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let status = builder.ins().iconst(types::I8, 1);
-            builder.ins().store(MemFlagsData::new(), status, handle, 0);
+            let one = builder.ins().iconst(types::I64, 1);
+            builder
+                .ins()
+                .store(MemFlagsData::new(), one, handle, scheduler::TASK_CANCELLED);
             Ok(())
         }
         MirInstruction::ChannelCreate {
@@ -1255,7 +1345,7 @@ fn lower_instruction(
             let zero = builder.ins().iconst(types::I64, 0);
             let negative = builder.ins().icmp(IntCC::SignedLessThan, capacity, zero);
             builder.ins().trapnz(negative, TrapCode::unwrap_user(10));
-            let header_size = builder.ins().iconst(types::I64, 48);
+            let header_size = builder.ins().iconst(types::I64, CHANNEL_HEADER_BYTES);
             let malloc_ref = runtime.reference(builder.func, runtime.malloc, false);
             let header_call = builder.ins().call(malloc_ref, &[header_size]);
             let header = *builder
@@ -1282,6 +1372,10 @@ fn lower_instruction(
             builder.ins().store(MemFlagsData::new(), zero, header, 24);
             builder.ins().store(MemFlagsData::new(), zero, header, 32);
             builder.ins().store(MemFlagsData::new(), data, header, 40);
+            builder.ins().store(MemFlagsData::new(), zero, header, 48);
+            builder.ins().store(MemFlagsData::new(), zero, header, 56);
+            builder.ins().store(MemFlagsData::new(), zero, header, 64);
+            builder.ins().store(MemFlagsData::new(), zero, header, 72);
             values.insert(*output, header);
             Ok(())
         }
@@ -1299,6 +1393,11 @@ fn lower_instruction(
                 .get(value)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            let mut scheduler_module = scheduler_with_module(context.runtime, module);
+            let check = builder.create_block();
+            let proceed = builder.create_block();
+            builder.ins().jump(check, &[]);
+            builder.switch_to_block(check);
             let closed = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 32);
@@ -1314,9 +1413,30 @@ fn lower_instruction(
                 .ins()
                 .icmp(IntCC::UnsignedGreaterThanOrEqual, length, capacity);
             let full_and_bounded = builder.ins().band(has_capacity, full);
-            builder
-                .ins()
-                .trapnz(full_and_bounded, TrapCode::unwrap_user(13));
+            match scheduler_module.as_mut() {
+                Some((scheduler, module)) => {
+                    // A full bounded channel suspends the sender until a receive makes room.
+                    let wait = builder.create_block();
+                    builder
+                        .ins()
+                        .brif(full_and_bounded, wait, &[], proceed, &[]);
+                    builder.switch_to_block(wait);
+                    let send_queue = builder.ins().iadd_imm(pointer, CHANNEL_SEND_QUEUE);
+                    scheduler::emit_wait_on_queue(builder, module, scheduler, send_queue)?;
+                    builder.ins().jump(check, &[]);
+                    builder.seal_block(wait);
+                    builder.seal_block(check);
+                }
+                None => {
+                    builder
+                        .ins()
+                        .trapnz(full_and_bounded, TrapCode::unwrap_user(13));
+                    builder.ins().jump(proceed, &[]);
+                    builder.seal_block(check);
+                }
+            }
+            builder.switch_to_block(proceed);
+            builder.seal_block(proceed);
             let data = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 40);
@@ -1342,6 +1462,10 @@ fn lower_instruction(
                 .ins()
                 .store(MemFlagsData::new(), new_length, pointer, 8);
             let _ = element_clif;
+            if let Some((scheduler, module)) = scheduler_module.as_mut() {
+                let recv_queue = builder.ins().iadd_imm(pointer, CHANNEL_RECV_QUEUE);
+                scheduler::emit_wake_one(builder, module, scheduler, recv_queue)?;
+            }
             Ok(())
         }
         MirInstruction::ChannelReceive {
@@ -1354,6 +1478,11 @@ fn lower_instruction(
                 .get(channel)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            let mut scheduler_module = scheduler_with_module(context.runtime, module);
+            let check = builder.create_block();
+            let proceed = builder.create_block();
+            builder.ins().jump(check, &[]);
+            builder.switch_to_block(check);
             let length = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 8);
@@ -1363,9 +1492,28 @@ fn lower_instruction(
             let empty = builder.ins().icmp_imm(IntCC::Equal, length, 0);
             let open = builder.ins().icmp_imm(IntCC::Equal, closed, 0);
             let empty_and_open = builder.ins().band(empty, open);
-            builder
-                .ins()
-                .trapnz(empty_and_open, TrapCode::unwrap_user(14));
+            match scheduler_module.as_mut() {
+                Some((scheduler, module)) => {
+                    // An empty open channel suspends the receiver until a send arrives.
+                    let wait = builder.create_block();
+                    builder.ins().brif(empty_and_open, wait, &[], proceed, &[]);
+                    builder.switch_to_block(wait);
+                    let recv_queue = builder.ins().iadd_imm(pointer, CHANNEL_RECV_QUEUE);
+                    scheduler::emit_wait_on_queue(builder, module, scheduler, recv_queue)?;
+                    builder.ins().jump(check, &[]);
+                    builder.seal_block(wait);
+                    builder.seal_block(check);
+                }
+                None => {
+                    builder
+                        .ins()
+                        .trapnz(empty_and_open, TrapCode::unwrap_user(14));
+                    builder.ins().jump(proceed, &[]);
+                    builder.seal_block(check);
+                }
+            }
+            builder.switch_to_block(proceed);
+            builder.seal_block(proceed);
             let data = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 40);
@@ -1414,6 +1562,10 @@ fn lower_instruction(
             builder
                 .ins()
                 .store(MemFlagsData::new(), new_length, pointer, 8);
+            if let Some((scheduler, module)) = scheduler_module.as_mut() {
+                let send_queue = builder.ins().iadd_imm(pointer, CHANNEL_SEND_QUEUE);
+                scheduler::emit_wake_one(builder, module, scheduler, send_queue)?;
+            }
             Ok(())
         }
         MirInstruction::ChannelClose { channel, .. } => {
@@ -1423,6 +1575,12 @@ fn lower_instruction(
                 .ok_or(CraneliftLoweringError::MissingValue)?;
             let one = builder.ins().iconst(types::I64, 1);
             builder.ins().store(MemFlagsData::new(), one, pointer, 32);
+            if let Some((scheduler, module)) = scheduler_with_module(context.runtime, module) {
+                let recv_queue = builder.ins().iadd_imm(pointer, CHANNEL_RECV_QUEUE);
+                scheduler::emit_wake_all(builder, module, &scheduler, recv_queue)?;
+                let send_queue = builder.ins().iadd_imm(pointer, CHANNEL_SEND_QUEUE);
+                scheduler::emit_wake_all(builder, module, &scheduler, send_queue)?;
+            }
             Ok(())
         }
         MirInstruction::DestroyChannel { value, .. } => {

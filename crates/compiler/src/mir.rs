@@ -2349,6 +2349,10 @@ struct ControlFlowLowerer<'a> {
     expression_index: HashMap<HirExpressionId, HirExpression>,
     lowered: HashSet<HirExpressionId>,
     loops: Vec<(MirBlockId, MirBlockId)>,
+    /// Number of `scope` blocks entered in the current function and not yet exited.
+    scope_depth: usize,
+    /// `scope_depth` recorded at each active loop, parallel to `loops`.
+    loop_scope_depths: Vec<usize>,
 }
 
 impl<'a> ControlFlowLowerer<'a> {
@@ -2391,6 +2395,8 @@ impl<'a> ControlFlowLowerer<'a> {
                 .collect(),
             lowered: HashSet::new(),
             loops: Vec::new(),
+            scope_depth: 0,
+            loop_scope_depths: Vec::new(),
         }
     }
 
@@ -2428,6 +2434,14 @@ impl<'a> ControlFlowLowerer<'a> {
 
     fn is_terminated(&self) -> bool {
         self.blocks[self.current].terminator.is_some()
+    }
+
+    /// Emits one `ScopeExit` per scope being left, innermost first, so each
+    /// scope joins its children before control leaves it.
+    fn emit_scope_exits(&mut self, count: usize, span: ByteSpan) {
+        for _ in 0..count {
+            self.push(MirInstruction::ScopeExit { span });
+        }
     }
 
     fn lower_expression(&mut self, id: HirExpressionId) -> Result<MirValueId, MirLoweringError> {
@@ -3023,7 +3037,9 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
                 HirControlFlow::Scope { body, span } => {
                     self.push(MirInstruction::ScopeEnter { span: *span });
+                    self.scope_depth += 1;
                     self.lower_sequence(body)?;
+                    self.scope_depth -= 1;
                     if !self.is_terminated() {
                         self.push(MirInstruction::ScopeExit { span: *span });
                     }
@@ -3038,6 +3054,8 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
                 HirControlFlow::Return(returned) => {
                     let value = self.lower_expression(returned.expression())?;
+                    // Leaving every enclosing scope joins its children before control leaves.
+                    self.emit_scope_exits(self.scope_depth, returned.span());
                     if self.is_unit(self.function.return_type()) {
                         self.terminate(MirTerminator::return_unit(returned.span()));
                     } else {
@@ -3124,6 +3142,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     ));
                     self.loops
                         .push((self.blocks[exit].id, self.blocks[update].id));
+                    self.loop_scope_depths.push(self.scope_depth);
                     self.current = body_block;
                     self.lower_sequence(body)?;
                     if !self.is_terminated() {
@@ -3133,6 +3152,7 @@ impl<'a> ControlFlowLowerer<'a> {
                         });
                     }
                     self.loops.pop();
+                    self.loop_scope_depths.pop();
                     self.current = update;
                     let current_value = self.fresh_value();
                     self.push(MirInstruction::LoadLocal {
@@ -3239,6 +3259,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     ));
                     self.loops
                         .push((self.blocks[exit].id, self.blocks[update].id));
+                    self.loop_scope_depths.push(self.scope_depth);
                     self.current = body_block;
                     let element = self.fresh_value();
                     if is_dynamic {
@@ -3269,6 +3290,7 @@ impl<'a> ControlFlowLowerer<'a> {
                         });
                     }
                     self.loops.pop();
+                    self.loop_scope_depths.pop();
                     self.current = update;
                     let current = self.fresh_value();
                     self.push(MirInstruction::LoadLocal {
@@ -3303,6 +3325,12 @@ impl<'a> ControlFlowLowerer<'a> {
                         .last()
                         .copied()
                         .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let loop_depth = self
+                        .loop_scope_depths
+                        .last()
+                        .copied()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    self.emit_scope_exits(self.scope_depth - loop_depth, *span);
                     self.terminate(MirTerminator::Branch {
                         target,
                         span: *span,
@@ -3314,6 +3342,12 @@ impl<'a> ControlFlowLowerer<'a> {
                         .last()
                         .copied()
                         .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let loop_depth = self
+                        .loop_scope_depths
+                        .last()
+                        .copied()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    self.emit_scope_exits(self.scope_depth - loop_depth, *span);
                     self.terminate(MirTerminator::Branch {
                         target,
                         span: *span,

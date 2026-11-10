@@ -803,3 +803,61 @@ fn mir_preserves_await_suspension_and_resume_boundaries() {
         MirInstruction::Resume { span: instruction_span } if *instruction_span == span
     )));
 }
+
+#[test]
+fn return_inside_scope_exits_the_scope_before_returning() {
+    // ADR-0101: returning from a scope performs the scope join before control
+    // leaves it, so the MIR must exit the scope ahead of the return terminator.
+    use compiler::hir::HirControlFlow;
+
+    let file = SourceFileId::from_raw(1120);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let hir = HirModule::new(
+        ModuleName::parse("scoped_return").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("scoped_return").unwrap(),
+                compiler::module::PackageNamespace::root(),
+                span,
+                false,
+                int,
+                vec![],
+                vec![],
+                vec![HirExpression::int_literal(
+                    HirExpressionId::from_raw(0),
+                    span,
+                    int,
+                    7,
+                )],
+                vec![],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_control_flow(vec![HirControlFlow::Scope {
+                body: vec![HirControlFlow::Return(HirReturn::new(
+                    span,
+                    HirExpressionId::from_raw(0),
+                ))],
+                span,
+            }]),
+        ],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let instructions = mir.functions()[0].blocks()[0].instructions();
+    let enter = instructions
+        .iter()
+        .position(|instruction| matches!(instruction, MirInstruction::ScopeEnter { .. }))
+        .expect("scope entry");
+    let exit = instructions
+        .iter()
+        .position(|instruction| matches!(instruction, MirInstruction::ScopeExit { .. }))
+        .expect("scope exit before return");
+    assert!(enter < exit, "{instructions:?}");
+    assert!(matches!(
+        mir.functions()[0].blocks()[0].terminator(),
+        MirTerminator::Return { .. }
+    ));
+}
