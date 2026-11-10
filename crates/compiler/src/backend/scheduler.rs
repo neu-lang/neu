@@ -168,6 +168,7 @@ pub(super) struct SchedulerFunctions {
     layout: ContextLayout,
     write: FuncId,
     deadlock_message: DataId,
+    trace: DataId,
 }
 
 fn signature(call_conv: CallConv, parameters: usize, returns: usize) -> Signature {
@@ -281,6 +282,12 @@ pub(super) fn declare_scheduler(
     module
         .define_data(deadlock_message, &message_data)
         .map_err(definition)?;
+    let trace = module
+        .declare_data("neu_sched_trace", Linkage::Local, false, false)
+        .map_err(definition)?;
+    let mut trace_data = DataDescription::new();
+    trace_data.define(b"BFWS\n".to_vec().into_boxed_slice());
+    module.define_data(trace, &trace_data).map_err(definition)?;
 
     let mut declare = |name: &str, parameters: usize| {
         module
@@ -308,6 +315,7 @@ pub(super) fn declare_scheduler(
         layout,
         write,
         deadlock_message,
+        trace,
     };
     define_scheduler_bodies(module, &scheduler, call_conv)?;
     Ok(Some(scheduler))
@@ -412,6 +420,22 @@ fn state_base(
 
 fn trap_if_zero(builder: &mut FunctionBuilder<'_>, value: Value, code: u8) {
     builder.ins().trapz(value, TrapCode::unwrap_user(code));
+}
+
+/// Writes one tag byte to stderr: 0 block, 1 finish, 2 wake, 3 switch.
+fn emit_trace(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    offset: i64,
+) -> Result<(), CraneliftLoweringError> {
+    let global = module.declare_data_in_func(scheduler.trace, builder.func);
+    let base = builder.ins().global_value(types::I64, global);
+    let address = builder.ins().iadd_imm(base, offset);
+    let fd = builder.ins().iconst(types::I64, 2);
+    let one = builder.ins().iconst(types::I64, 1);
+    call(builder, module, scheduler.write, &[fd, address, one])?;
+    Ok(())
 }
 
 fn define_scheduler_bodies(
@@ -531,6 +555,7 @@ fn define_scheduler_bodies(
         s.block,
         signature(call_conv, 0, 1),
         move |b, m, _| {
+            emit_trace(b, m, &s, 0)?;
             let me = call_value(b, m, s.current, &[])?;
             let ready_queue_addr = ready_queue(b, m, ready);
             let next = call_value(b, m, s.dequeue, &[ready_queue_addr])?;
@@ -546,6 +571,7 @@ fn define_scheduler_bodies(
             b.switch_to_block(switch);
             let st = state_base(b, m, s.state);
             store_word(b, next, st, STATE_CURRENT);
+            emit_trace(b, m, &s, 3)?;
             emit_switch(b, m, &s, me, next)?;
             let zero = b.ins().iconst(types::I64, 0);
             b.ins().return_(&[zero]);
@@ -814,6 +840,7 @@ fn define_scheduler_bodies(
         s.finish,
         signature(call_conv, 0, 1),
         move |b, m, _| {
+            emit_trace(b, m, &s, 1)?;
             let me = call_value(b, m, s.current, &[])?;
             let one = b.ins().iconst(types::I64, 1);
             store_word(b, one, me, TASK_DONE);
@@ -889,6 +916,7 @@ fn define_scheduler_bodies(
             b.switch_to_block(switch);
             let st = state_base(b, m, s.state);
             store_word(b, next, st, STATE_CURRENT);
+            emit_trace(b, m, &s, 3)?;
             emit_jump(b, m, &s, next)?;
             b.ins().trap(TrapCode::unwrap_user(TRAP_UNREACHABLE));
             Ok(())
@@ -987,6 +1015,7 @@ fn define_scheduler_bodies(
         s.wake_one,
         signature(call_conv, 1, 1),
         move |b, m, p| {
+            emit_trace(b, m, &s, 2)?;
             let waiter = call_value(b, m, s.dequeue, &[p[0]])?;
             let clear = b.create_block();
             let done = b.create_block();
