@@ -110,7 +110,8 @@ fn build_failure_renders_located_diagnostics() {
         .args(["build", root.join("neu.json").to_str().unwrap()])
         .output()
         .unwrap();
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Diagnostics show `/` separators on every platform.
+    let stderr = String::from_utf8_lossy(&output.stderr).replace('\\', "/");
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr.contains("error[return_type_mismatch]"), "{stderr}");
     assert!(stderr.contains("--> src/main.neu:1:34"), "{stderr}");

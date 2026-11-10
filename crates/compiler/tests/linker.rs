@@ -25,12 +25,17 @@ fn host_link_plan_uses_cc_and_preserves_object_order() {
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
     assert_eq!(plan.program(), Path::new("cc"));
     assert_eq!(plan.arguments()[0], "-o");
-    assert_eq!(plan.arguments()[1], output.as_os_str());
+    assert_eq!(
+        plan.arguments()[1],
+        compiler::linker::executable_path(&output).as_os_str()
+    );
     assert_eq!(plan.arguments()[2], object.as_os_str());
     assert_eq!(plan.entry_symbol(), "main");
     let _ = fs::remove_dir_all(root);
 }
 
+// Overrides the linker with /bin/echo, which exists only on Unix.
+#[cfg(unix)]
 #[test]
 fn neu_linker_overrides_cc() {
     let _environment_lock = linker_environment_lock();
