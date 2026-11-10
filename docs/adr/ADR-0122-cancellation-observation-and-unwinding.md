@@ -41,8 +41,10 @@ next observation point after the request.
 Channel `send` and `receive` are valid only inside `suspend` functions. Using
 either in a function that is not `suspend` is a compile-time error. This keeps
 every point that may block visible in the function signature, so unwinding only
-crosses suspend frames. Non-blocking channel operations are covered by the same
-rule, because the compiler cannot know statically which operations will block.
+crosses suspend frames. Every channel `send` can block when a bounded channel is
+full, and every `receive` can block when a channel is empty. The compiler cannot
+tell statically which calls will block, so the rule applies to all `send` and
+`receive` operations. This ADR adds no non-blocking channel operations.
 
 The diagnostic uses the stable rule name `channel_op_outside_suspend`.
 
