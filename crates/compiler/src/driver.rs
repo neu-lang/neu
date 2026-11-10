@@ -733,6 +733,20 @@ fn compile_source_with_entry(
         // Locals initialized from spawn results need the spawn type from this round.
         infer_local_types(&parsed, &mut report);
     }
+    // A deferred-call diagnostic recorded in an early round is stale once a later
+    // round types its node (for example, `cancel()` on a task whose spawn body
+    // is a suspend call), so it is dropped here.
+    let typed_nodes = report
+        .expression_types()
+        .iter()
+        .map(|expression_type| expression_type.expression())
+        .collect::<Vec<_>>();
+    report.retain_diagnostics(|diagnostic| {
+        !matches!(
+            diagnostic.rule(),
+            TypeRuleDiagnostic::DirectCallDeferred | TypeRuleDiagnostic::MemberExpressionDeferred
+        ) || !typed_nodes.contains(&diagnostic.node())
+    });
     diagnose_unresolved_types(&parsed, &mut report);
     let intrinsic_diagnostics =
         validate_intrinsic_calls(&parsed, report.expression_types(), &types);

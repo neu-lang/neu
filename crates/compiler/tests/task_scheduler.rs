@@ -398,9 +398,7 @@ fn cancelled_task_unwinds_the_children_it_is_joining() {
         }
         suspend func main(): Int {
             scope {
-                val gate = channel<Int>(1);
-                send(gate, 1);
-                val outer = spawn { -> when (receive(gate)) { ChannelResult.Message(value) -> outer_body(); ChannelResult.Closed -> 0; } };
+                val outer = spawn { -> outer_body() };
                 val helper = spawn { -> 1 };
                 val got: Int = await(helper);
                 outer.cancel();
@@ -429,9 +427,7 @@ fn cancelled_awaiter_unwinds_instead_of_deadlocking() {
         }
         suspend func main(): Int {
             scope {
-                val gate = channel<Int>(1);
-                send(gate, 1);
-                val waiter = spawn { -> when (receive(gate)) { ChannelResult.Message(value) -> waiter_body(); ChannelResult.Closed -> 0; } };
+                val waiter = spawn { -> waiter_body() };
                 val helper = spawn { -> 1 };
                 val got: Int = await(helper);
                 waiter.cancel();
