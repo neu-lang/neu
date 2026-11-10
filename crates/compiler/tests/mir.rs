@@ -931,3 +931,59 @@ fn control_flow_returns_destroy_owned_locals() {
         );
     }
 }
+
+#[test]
+fn owned_locals_are_destroyed_in_reverse_declaration_order() {
+    // ADR-0122: cleanup runs in reverse declaration order.
+    use compiler::hir::HirControlFlow;
+
+    let file = SourceFileId::from_raw(1140);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let channel = types.channel(int);
+    let hir = HirModule::new(
+        ModuleName::parse("cleanup_order").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("cleanup_order").unwrap(),
+                compiler::module::PackageNamespace::root(),
+                span,
+                false,
+                int,
+                vec![],
+                vec![
+                    HirLocal::new(compiler::hir::HirLocalId::from_raw(0), span, channel, false),
+                    HirLocal::new(compiler::hir::HirLocalId::from_raw(1), span, channel, false),
+                ],
+                vec![HirExpression::int_literal(
+                    HirExpressionId::from_raw(0),
+                    span,
+                    int,
+                    7,
+                )],
+                vec![],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_control_flow(vec![HirControlFlow::Return(HirReturn::new(
+                span,
+                HirExpressionId::from_raw(0),
+            ))]),
+        ],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let instructions = mir.functions()[0].blocks()[0].instructions();
+    // Each destroy follows a load of the local it destroys; collect those locals in order.
+    let destroyed: Vec<usize> = instructions
+        .windows(2)
+        .filter_map(|pair| match (&pair[0], &pair[1]) {
+            (MirInstruction::LoadLocal { local, .. }, MirInstruction::DestroyChannel { .. }) => {
+                Some(local.index())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(destroyed, vec![1, 0], "{instructions:?}");
+}

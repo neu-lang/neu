@@ -282,3 +282,22 @@ fn deadlock_prints_a_diagnostic_and_traps() {
     assert!(stderr.contains("deadlock"), "{stderr}");
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn early_return_before_a_channel_local_is_declared_does_not_crash() {
+    // The cleanup on the early return must skip the channel local, which was
+    // never initialized.
+    let source = r#"
+        func early(): Int {
+            if (true) {
+                return 3;
+            }
+            val queue = channel<Int>(1);
+            return 4;
+        }
+        public func main(): Int {
+            return early();
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "early_return_cleanup"), 3);
+}

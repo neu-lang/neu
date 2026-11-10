@@ -450,6 +450,10 @@ fn lower_mir_function_with_module(
         let mut clif_blocks = HashMap::new();
         let mut locals = HashMap::new();
         let mut array_locals = HashMap::new();
+        // Owned locals start as null, which the destroy lowerings skip. A local
+        // that is not yet initialized when a function exits is therefore never
+        // destroyed (ADR-0122 unwinding relies on this).
+        let mut owned_locals = Vec::new();
         for local in function.locals() {
             if matches!(
                 type_arena.get(local.ty()).map(|record| record.kind()),
@@ -458,7 +462,19 @@ fn lower_mir_function_with_module(
                 continue;
             }
             if let Some(local_type) = cranelift_type(local.ty(), type_arena) {
-                locals.insert(local.id(), builder.declare_var(local_type));
+                let variable = builder.declare_var(local_type);
+                locals.insert(local.id(), variable);
+                if matches!(
+                    type_arena.get(local.ty()).map(|record| record.kind()),
+                    Some(
+                        TypeKind::Nominal(_)
+                            | TypeKind::GenericInstance(_)
+                            | TypeKind::DynamicArray(_)
+                            | TypeKind::Channel(_)
+                    )
+                ) {
+                    owned_locals.push((variable, local_type));
+                }
             } else if let Some((element_type, length)) = array_shape(local.ty(), type_arena) {
                 let element_type = cranelift_type(element_type, type_arena)
                     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
@@ -503,6 +519,12 @@ fn lower_mir_function_with_module(
                 .get(&mir_block.id())
                 .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
             builder.switch_to_block(clif_block);
+            if mir_block.id() == function.blocks()[0].id() {
+                for (variable, local_type) in owned_locals.iter().copied() {
+                    let zero = builder.ins().iconst(local_type, 0);
+                    builder.def_var(variable, zero);
+                }
+            }
             let mut test_terminated = false;
             for instruction in mir_block.instructions() {
                 lower_instruction(
@@ -1589,12 +1611,20 @@ fn lower_instruction(
                 .get(value)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            let destroy = builder.create_block();
+            let done = builder.create_block();
+            builder.ins().brif(pointer, destroy, &[], done, &[]);
+            builder.switch_to_block(destroy);
             let data = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 40);
             let free_ref = runtime.reference(builder.func, runtime.free, false);
             builder.ins().call(free_ref, &[data]);
             builder.ins().call(free_ref, &[pointer]);
+            builder.ins().jump(done, &[]);
+            builder.seal_block(destroy);
+            builder.switch_to_block(done);
+            builder.seal_block(done);
             Ok(())
         }
         MirInstruction::FunctionReference { output, callee, .. } => {
@@ -1878,9 +1908,17 @@ fn lower_instruction(
                 .get(value)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            let destroy = builder.create_block();
+            let done = builder.create_block();
+            builder.ins().brif(pointer, destroy, &[], done, &[]);
+            builder.switch_to_block(destroy);
             let allocation = builder.ins().iadd_imm(pointer, -16);
             let free_ref = runtime.reference(builder.func, runtime.free, false);
             builder.ins().call(free_ref, &[allocation]);
+            builder.ins().jump(done, &[]);
+            builder.seal_block(destroy);
+            builder.switch_to_block(done);
+            builder.seal_block(done);
             Ok(())
         }
         MirInstruction::DestroyDynamicArray { value, .. } => {
@@ -1891,6 +1929,10 @@ fn lower_instruction(
                 .get(value)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            let destroy = builder.create_block();
+            let done = builder.create_block();
+            builder.ins().brif(pointer, destroy, &[], done, &[]);
+            builder.switch_to_block(destroy);
             let data = builder
                 .ins()
                 .load(types::I64, MemFlagsData::new(), pointer, 16);
@@ -1899,6 +1941,10 @@ fn lower_instruction(
             builder.ins().call(free_ref, &[data_allocation]);
             let header_allocation = builder.ins().iadd_imm(pointer, -8);
             builder.ins().call(free_ref, &[header_allocation]);
+            builder.ins().jump(done, &[]);
+            builder.seal_block(destroy);
+            builder.switch_to_block(done);
+            builder.seal_block(done);
             Ok(())
         }
         MirInstruction::DynamicArrayNew { output, .. } => {

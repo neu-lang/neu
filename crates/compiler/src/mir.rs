@@ -964,53 +964,32 @@ fn owned_local_cleanup(
             .map(|record| record.kind()),
         Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_),)
     ) {
-        for local in function.locals().iter().filter(|local| {
-            matches!(
-                types.get(local.ty()).map(|record| record.kind()),
-                Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_),)
-            )
-        }) {
+        // Reverse declaration order (ADR-0122). A local that was never initialized
+        // is null, and the backend skips destroying a null value.
+        for local in function.locals().iter().rev() {
+            let destroy = match types.get(local.ty()).map(|record| record.kind()) {
+                Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_)) => {
+                    MirInstruction::DestroyObject {
+                        value: cleanup_value,
+                        span: local.span(),
+                    }
+                }
+                Some(TypeKind::DynamicArray(_)) => MirInstruction::DestroyDynamicArray {
+                    value: cleanup_value,
+                    span: local.span(),
+                },
+                Some(TypeKind::Channel(_)) => MirInstruction::DestroyChannel {
+                    value: cleanup_value,
+                    span: local.span(),
+                },
+                _ => continue,
+            };
             instructions.push(MirInstruction::LoadLocal {
                 output: cleanup_value,
                 local: MirLocalId::from_raw(local.id().index()),
                 span: local.span(),
             });
-            instructions.push(MirInstruction::DestroyObject {
-                value: cleanup_value,
-                span: local.span(),
-            });
-        }
-        for local in function.locals().iter().filter(|local| {
-            matches!(
-                types.get(local.ty()).map(|record| record.kind()),
-                Some(TypeKind::DynamicArray(_))
-            )
-        }) {
-            instructions.push(MirInstruction::LoadLocal {
-                output: cleanup_value,
-                local: MirLocalId::from_raw(local.id().index()),
-                span: local.span(),
-            });
-            instructions.push(MirInstruction::DestroyDynamicArray {
-                value: cleanup_value,
-                span: local.span(),
-            });
-        }
-        for local in function.locals().iter().filter(|local| {
-            matches!(
-                types.get(local.ty()).map(|record| record.kind()),
-                Some(TypeKind::Channel(_))
-            )
-        }) {
-            instructions.push(MirInstruction::LoadLocal {
-                output: cleanup_value,
-                local: MirLocalId::from_raw(local.id().index()),
-                span: local.span(),
-            });
-            instructions.push(MirInstruction::DestroyChannel {
-                value: cleanup_value,
-                span: local.span(),
-            });
+            instructions.push(destroy);
         }
     }
     instructions
