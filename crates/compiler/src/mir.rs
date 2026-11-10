@@ -1963,13 +1963,16 @@ impl<'a> ShortCircuitLowerer<'a> {
                 }
             }
             HirExpressionKind::DirectCall(call) => {
+                // Arguments are lowered before the call so their values exist when it is emitted.
+                let arguments = call
+                    .arguments()
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
                 self.push(mir_call_instruction(
                     call,
                     output,
-                    call.arguments()
-                        .iter()
-                        .map(|argument| mir_expression_value_id(self.function, *argument))
-                        .collect(),
+                    arguments,
                     expression.span(),
                 ));
             }
@@ -2596,13 +2599,16 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
             }
             HirExpressionKind::DirectCall(call) => {
+                // Arguments are lowered before the call so their values exist when it is emitted.
+                let arguments = call
+                    .arguments()
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
                 self.push(mir_call_instruction(
                     call,
                     output,
-                    call.arguments()
-                        .iter()
-                        .map(|argument| mir_expression_value_id(self.function, *argument))
-                        .collect(),
+                    arguments,
                     expression.span(),
                 ));
             }

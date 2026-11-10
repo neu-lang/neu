@@ -7,7 +7,8 @@ features. The examples cover integer arithmetic, structured control flow,
 lexical scopes, classes, class methods, interfaces, and the accepted `Bool`, `Float`,
 and `Byte` primitive runtime forms, plus mutable `var` initialization and
 reassignment. `cancellation.neu` demonstrates requesting cancellation of a
-child task. `spawn.neu`, `await.neu`, `task_results.neu`, and
+child task; a cancelled child is a failure, so its scope joins the other children
+and then traps. `spawn.neu`, `await.neu`, `task_results.neu`, and
 `cancel_task.neu` exercise the accepted task operations.
 `runtime_entry.neu` exercises the suspendable executable entry boundary.
 `concurrency_diagnostics.neu` keeps the accepted cancellation path runnable

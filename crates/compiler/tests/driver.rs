@@ -470,7 +470,11 @@ fn old_free_cancel_operation_is_rejected() {
 }
 
 #[test]
-fn unawaited_task_is_cleaned_up_at_scope_exit() {
+fn cancelled_unawaited_task_traps_at_scope_exit() {
+    // Owner decision (ADR-0101 child failure): a child that ends cancelled is a
+    // failure, so the scope joins its children and then traps instead of
+    // returning normally. This replaces the earlier exit-0 expectation.
+
     let workspace = std::env::temp_dir().join(format!("neu-task-cleanup-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -485,7 +489,8 @@ fn unawaited_task_is_cleaned_up_at_scope_exit() {
         ),
     )
     .unwrap();
-    assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    // A trap ends the process by signal, so there is no exit code.
+    assert_eq!(Command::new(output).status().unwrap().code(), None);
     let _ = fs::remove_dir_all(workspace);
 }
 
@@ -607,19 +612,20 @@ fn compiles_current_control_flow_and_primitive_examples() {
         ("function_values", 7),
         ("visibility_public", 7),
         ("structured_scope", 7),
-        ("cancellation", 0),
+        // Negative: the example traps (ADR-0101 child failure, owner decision).
+        ("cancellation", -1),
         ("spawn", 7),
         ("await", 9),
         ("task_results", 7),
-        ("cancel_task", 0),
+        ("cancel_task", -1),
         ("runtime_entry", 7),
-        ("concurrency_diagnostics", 0),
+        ("concurrency_diagnostics", -1),
         ("channels", 7),
         ("channel_receive", 9),
         ("producer_consumer", 8),
         ("concurrency_interfaces", 12),
         ("concurrency_binary", 21),
-        ("concurrency_complete", 7),
+        ("concurrency_complete", -1),
     ] {
         let source_path = repo_root.join(format!("examples/current/{name}.neu"));
         let source = fs::read_to_string(&source_path).unwrap();
@@ -639,7 +645,12 @@ fn compiles_current_control_flow_and_primitive_examples() {
         )
         .unwrap_or_else(|error| panic!("example {name}: {error:?}"));
         let status = Command::new(output).status().unwrap();
-        assert_eq!(status.code(), Some(expected_status), "example {name}");
+        if expected_status < 0 {
+            // A trap ends the process by signal, so there is no exit code.
+            assert_eq!(status.code(), None, "example {name} should trap");
+        } else {
+            assert_eq!(status.code(), Some(expected_status), "example {name}");
+        }
         let _ = fs::remove_dir_all(workspace);
     }
 }
@@ -666,8 +677,10 @@ fn complete_concurrency_smoke_retains_entry_symbols_and_runtime_relocations() {
         ),
     )
     .unwrap();
-    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
-    assert_eq!(Command::new(&executable).status().unwrap().code(), Some(7));
+    // The example cancels a child inside its outer scope, so the scope traps
+    // (ADR-0101 child failure, owner decision).
+    assert_eq!(Command::new(output).status().unwrap().code(), None);
+    assert_eq!(Command::new(&executable).status().unwrap().code(), None);
 
     let object_bytes = fs::read(executable.with_extension("o")).unwrap();
     let object = object::File::parse(object_bytes.as_slice()).unwrap();

@@ -16,8 +16,9 @@
 
 use cranelift_codegen::{
     ir::{
-        AbiParam, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, MemFlagsData,
-        Signature, TrapCode, UserExternalName, UserFuncName, Value, condcodes::IntCC, types,
+        AbiParam, BlockArg, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder,
+        MemFlagsData, Signature, TrapCode, UserExternalName, UserFuncName, Value, condcodes::IntCC,
+        types,
     },
     isa::CallConv,
 };
@@ -37,7 +38,9 @@ const TASK_PARENT_SCOPE: i32 = 40;
 const TASK_NEXT: i32 = 48;
 const TASK_INNERMOST_SCOPE: i32 = 56;
 const TASK_STACK: i32 = 64;
-const TASK_CONTEXT: i32 = 72;
+/// Next task in the same scope, used to cancel siblings when a child fails.
+const TASK_SIBLING: i32 = 72;
+const TASK_CONTEXT: i32 = 80;
 const TASK_STACK_BYTES: i64 = 256 * 1024;
 
 /// Where a task's switchable context lives inside its record, and the offsets
@@ -80,7 +83,11 @@ fn task_bytes(layout: ContextLayout) -> i64 {
 const SCOPE_LIVE: i32 = 0;
 const SCOPE_WAITER: i32 = 8;
 const SCOPE_PARENT: i32 = 16;
-const SCOPE_BYTES: i64 = 24;
+/// Head of the scope's child list, linked through `TASK_SIBLING`.
+const SCOPE_FIRST_CHILD: i32 = 24;
+/// Set when a child ends cancelled; scope exit traps once the children are joined.
+const SCOPE_FAILED: i32 = 32;
+const SCOPE_BYTES: i64 = 40;
 
 const STATE_CURRENT: i32 = 0;
 /// The ready queue is stored at this offset in the scheduler state.
@@ -96,6 +103,7 @@ pub(super) const TRAP_DEADLOCK: u8 = 40;
 pub(super) const TRAP_SPAWN_OUTSIDE_SCOPE: u8 = 41;
 pub(super) const TRAP_ALLOCATION: u8 = 42;
 const TRAP_UNREACHABLE: u8 = 43;
+pub(super) const TRAP_CHILD_FAILED: u8 = 44;
 
 /// Imported functions that create and switch between task contexts.
 #[derive(Clone, Copy, Debug)]
@@ -531,6 +539,9 @@ fn define_scheduler_bodies(
             let live = load_word(b, scope, SCOPE_LIVE);
             let live = b.ins().iadd_imm(live, 1);
             store_word(b, live, scope, SCOPE_LIVE);
+            let first_child = load_word(b, scope, SCOPE_FIRST_CHILD);
+            store_word(b, first_child, task, TASK_SIBLING);
+            store_word(b, task, scope, SCOPE_FIRST_CHILD);
             emit_child_context(b, m, &s, task, entry, zero)?;
             let ready_queue_addr = ready_queue(b, m, ready);
             call(b, m, s.enqueue, &[ready_queue_addr, task])?;
@@ -582,6 +593,45 @@ fn define_scheduler_bodies(
             let live = load_word(b, scope, SCOPE_LIVE);
             let live = b.ins().iadd_imm(live, -1);
             store_word(b, live, scope, SCOPE_LIVE);
+
+            // A child that ends cancelled is a failure: mark the scope failed and
+            // cancel every unfinished sibling. A sibling that has not started skips
+            // its body; a started one is not yet unwound (ADR-0104 observation).
+            let cancelled = load_word(b, me, TASK_CANCELLED);
+            let mark = b.create_block();
+            let after_mark = b.create_block();
+            b.ins().brif(cancelled, mark, &[], after_mark, &[]);
+
+            b.switch_to_block(mark);
+            let one_failed = b.ins().iconst(types::I64, 1);
+            store_word(b, one_failed, scope, SCOPE_FAILED);
+            let first = load_word(b, scope, SCOPE_FIRST_CHILD);
+            let walk = b.create_block();
+            b.append_block_param(walk, types::I64);
+            let visit = b.create_block();
+            let mark_child = b.create_block();
+            let next_child = b.create_block();
+            b.ins().jump(walk, &[BlockArg::Value(first)]);
+
+            b.switch_to_block(walk);
+            let cursor = b.block_params(walk)[0];
+            b.ins().brif(cursor, visit, &[], after_mark, &[]);
+
+            b.switch_to_block(visit);
+            let child_done = load_word(b, cursor, TASK_DONE);
+            let unfinished = b.ins().icmp_imm(IntCC::Equal, child_done, 0);
+            b.ins().brif(unfinished, mark_child, &[], next_child, &[]);
+
+            b.switch_to_block(mark_child);
+            let one_cancel = b.ins().iconst(types::I64, 1);
+            store_word(b, one_cancel, cursor, TASK_CANCELLED);
+            b.ins().jump(next_child, &[]);
+
+            b.switch_to_block(next_child);
+            let sibling = load_word(b, cursor, TASK_SIBLING);
+            b.ins().jump(walk, &[BlockArg::Value(sibling)]);
+
+            b.switch_to_block(after_mark);
             let waiter = load_word(b, scope, SCOPE_WAITER);
             let zero = b.ins().iconst(types::I64, 0);
             let joined = b.ins().icmp_imm(IntCC::Equal, live, 0);
@@ -626,6 +676,9 @@ fn define_scheduler_bodies(
             let zero = b.ins().iconst(types::I64, 0);
             store_word(b, zero, scope, SCOPE_LIVE);
             store_word(b, zero, scope, SCOPE_WAITER);
+            let zero_first = b.ins().iconst(types::I64, 0);
+            store_word(b, zero_first, scope, SCOPE_FIRST_CHILD);
+            store_word(b, zero_first, scope, SCOPE_FAILED);
             let parent = load_word(b, me, TASK_INNERMOST_SCOPE);
             store_word(b, parent, scope, SCOPE_PARENT);
             store_word(b, scope, me, TASK_INNERMOST_SCOPE);
@@ -657,6 +710,14 @@ fn define_scheduler_bodies(
             b.ins().jump(check, &[]);
 
             b.switch_to_block(leave);
+            // A failed child traps once the join is complete (ADR-0101: child failure).
+            let failed = load_word(b, scope, SCOPE_FAILED);
+            let fail = b.create_block();
+            let finish_leave = b.create_block();
+            b.ins().brif(failed, fail, &[], finish_leave, &[]);
+            b.switch_to_block(fail);
+            b.ins().trap(TrapCode::unwrap_user(TRAP_CHILD_FAILED));
+            b.switch_to_block(finish_leave);
             let zero = b.ins().iconst(types::I64, 0);
             store_word(b, zero, scope, SCOPE_WAITER);
             let parent = load_word(b, scope, SCOPE_PARENT);
@@ -753,6 +814,7 @@ fn init_task_fields(
     store_word(builder, parent_scope, task, TASK_PARENT_SCOPE);
     store_word(builder, zero, task, TASK_NEXT);
     store_word(builder, innermost_scope, task, TASK_INNERMOST_SCOPE);
+    store_word(builder, zero, task, TASK_SIBLING);
     store_word(builder, zero, task, TASK_STACK);
 }
 

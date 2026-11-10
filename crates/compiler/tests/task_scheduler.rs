@@ -6,6 +6,27 @@ use compiler::{
     source::SourceFileId,
 };
 
+fn run_status(source: &str, name: &str) -> std::process::ExitStatus {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-scheduler-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(13000),
+            ModuleName::parse(name).unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    let status = Command::new(&executable).status().unwrap();
+    let _ = fs::remove_dir_all(workspace);
+    status
+}
+
 fn compile_and_run(source: &str, name: &str) -> i32 {
     let workspace =
         std::env::temp_dir().join(format!("neu-scheduler-{name}-{}", std::process::id()));
@@ -187,4 +208,43 @@ fn break_out_of_a_scope_joins_the_iteration_child() {
         }
     "#;
     assert_eq!(compile_and_run(source, "break_join"), 21);
+}
+
+#[test]
+fn cancelling_a_child_cancels_its_unfinished_siblings() {
+    // A is cancelled before it starts. When main awaits B, A runs first, sees its
+    // cancellation, and ends cancelled. That cancels B, which has not started, so
+    // B's await traps instead of returning 7.
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val first = spawn { -> 5 };
+                val second = spawn { -> 7 };
+                first.cancel();
+                val got: Int = await(second);
+                return got;
+            }
+            return 0;
+        }
+    "#;
+    // A trap ends the process by signal, so there is no exit code.
+    let status = run_status(source, "sibling_cancel");
+    assert_eq!(status.code(), None, "{status:?}");
+}
+
+#[test]
+fn unrelated_siblings_are_not_cancelled() {
+    // Control for the test above: with no cancelled child, B's await returns 7.
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val first = spawn { -> 5 };
+                val second = spawn { -> 7 };
+                val got: Int = await(second);
+                return got;
+            }
+            return 0;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "unrelated_siblings"), 7);
 }
