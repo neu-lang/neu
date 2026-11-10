@@ -301,3 +301,36 @@ fn early_return_before_a_channel_local_is_declared_does_not_crash() {
     "#;
     assert_eq!(compile_and_run(source, "early_return_cleanup"), 3);
 }
+
+#[test]
+fn spawn_body_can_be_a_when_over_a_channel_receive() {
+    let source = r#"
+        suspend func main(): Int {
+            val queue = channel<Int>(1);
+            send(queue, 4);
+            scope {
+                val worker = spawn { -> when (receive(queue)) { ChannelResult.Message(value) -> value; ChannelResult.Closed -> 9; } };
+                return await(worker);
+            }
+            return 0;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "spawn_when_body"), 4);
+}
+
+#[test]
+fn spawn_body_can_call_a_suspend_function() {
+    let source = r#"
+        suspend func child(): Int {
+            return 6;
+        }
+        suspend func main(): Int {
+            scope {
+                val worker = spawn { -> child() };
+                return await(worker);
+            }
+            return 0;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "spawn_suspend_body"), 6);
+}

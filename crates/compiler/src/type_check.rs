@@ -5840,6 +5840,19 @@ pub fn type_string_operations(
         {
             continue;
         }
+        // `task.cancel()` is typed by the call pass for any task, whatever its result.
+        if member.name == "cancel"
+            && report
+                .expression_type(member.receiver)
+                .is_some_and(|receiver| {
+                    matches!(
+                        types.get(receiver).map(|record| record.kind()),
+                        Some(TypeKind::Task(_))
+                    )
+                })
+        {
+            continue;
+        }
         if member.name == "length" && report.expression_type(member.receiver) == Some(string_type) {
             if let Some(int_type) = int_type {
                 report.replace_expression_type(ExpressionType::new(member.expression, int_type));
