@@ -117,3 +117,32 @@ fn build_failure_renders_located_diagnostics() {
     assert!(!stderr.contains("ReturnTypeDiagnostics("), "{stderr}");
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn build_explains_unsupported_lambda_capture() {
+    let root = std::env::temp_dir().join(format!("neu-cli-capture-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("neu.json"),
+        r#"{"name":"cli.capture","entrypoint":"src/main.neu","srcs":["src/*.neu"],"dependencies":[]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("src/main.neu"),
+        "package cli.capture\n\nclass Box(var value: Int) {\n}\n\nsuspend func main(): Int {\n    scope {\n        val b: Box = new Box(1);\n        val t1 = spawn { -> b.value };\n        val t2 = spawn { -> b.value };\n        return await(t1) + await(t2);\n    }\n    return 0;\n}\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_neu"))
+        .args(["build", root.to_str().unwrap()])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success());
+    assert!(
+        stderr.contains("closure capture not supported"),
+        "stderr was: {stderr}"
+    );
+    assert!(stderr.contains("must be Send"), "stderr was: {stderr}");
+    let _ = std::fs::remove_dir_all(root);
+}
