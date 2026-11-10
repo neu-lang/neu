@@ -950,6 +950,72 @@ pub enum MirLoweringError {
     MissingReturn,
     UnsupportedRuntimeType,
 }
+/// Destroys owned locals, in declaration order for each kind, for a function's
+/// exit. Returns of owned objects skip it, since those values move to the caller.
+fn owned_local_cleanup(
+    function: &HirFunction,
+    types: &TypeArena,
+    cleanup_value: MirValueId,
+) -> Vec<MirInstruction> {
+    let mut instructions = Vec::new();
+    if !matches!(
+        types
+            .get(function.return_type())
+            .map(|record| record.kind()),
+        Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_),)
+    ) {
+        for local in function.locals().iter().filter(|local| {
+            matches!(
+                types.get(local.ty()).map(|record| record.kind()),
+                Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_),)
+            )
+        }) {
+            instructions.push(MirInstruction::LoadLocal {
+                output: cleanup_value,
+                local: MirLocalId::from_raw(local.id().index()),
+                span: local.span(),
+            });
+            instructions.push(MirInstruction::DestroyObject {
+                value: cleanup_value,
+                span: local.span(),
+            });
+        }
+        for local in function.locals().iter().filter(|local| {
+            matches!(
+                types.get(local.ty()).map(|record| record.kind()),
+                Some(TypeKind::DynamicArray(_))
+            )
+        }) {
+            instructions.push(MirInstruction::LoadLocal {
+                output: cleanup_value,
+                local: MirLocalId::from_raw(local.id().index()),
+                span: local.span(),
+            });
+            instructions.push(MirInstruction::DestroyDynamicArray {
+                value: cleanup_value,
+                span: local.span(),
+            });
+        }
+        for local in function.locals().iter().filter(|local| {
+            matches!(
+                types.get(local.ty()).map(|record| record.kind()),
+                Some(TypeKind::Channel(_))
+            )
+        }) {
+            instructions.push(MirInstruction::LoadLocal {
+                output: cleanup_value,
+                local: MirLocalId::from_raw(local.id().index()),
+                span: local.span(),
+            });
+            instructions.push(MirInstruction::DestroyChannel {
+                value: cleanup_value,
+                span: local.span(),
+            });
+        }
+    }
+    instructions
+}
+
 pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule, MirLoweringError> {
     let mut functions = Vec::new();
     for function in hir.functions() {
@@ -1506,63 +1572,11 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
             }
         }
-        if !matches!(
-            types
-                .get(function.return_type())
-                .map(|record| record.kind()),
-            Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_),)
-        ) {
-            let cleanup_value =
-                MirValueId::from_raw(function.parameters().len() + function.expressions().len());
-            for local in function.locals().iter().filter(|local| {
-                matches!(
-                    types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_),)
-                )
-            }) {
-                instructions.push(MirInstruction::LoadLocal {
-                    output: cleanup_value,
-                    local: MirLocalId::from_raw(local.id().index()),
-                    span: local.span(),
-                });
-                instructions.push(MirInstruction::DestroyObject {
-                    value: cleanup_value,
-                    span: local.span(),
-                });
-            }
-            for local in function.locals().iter().filter(|local| {
-                matches!(
-                    types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::DynamicArray(_))
-                )
-            }) {
-                instructions.push(MirInstruction::LoadLocal {
-                    output: cleanup_value,
-                    local: MirLocalId::from_raw(local.id().index()),
-                    span: local.span(),
-                });
-                instructions.push(MirInstruction::DestroyDynamicArray {
-                    value: cleanup_value,
-                    span: local.span(),
-                });
-            }
-            for local in function.locals().iter().filter(|local| {
-                matches!(
-                    types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Channel(_))
-                )
-            }) {
-                instructions.push(MirInstruction::LoadLocal {
-                    output: cleanup_value,
-                    local: MirLocalId::from_raw(local.id().index()),
-                    span: local.span(),
-                });
-                instructions.push(MirInstruction::DestroyChannel {
-                    value: cleanup_value,
-                    span: local.span(),
-                });
-            }
-        }
+        instructions.extend(owned_local_cleanup(
+            function,
+            types,
+            MirValueId::from_raw(function.parameters().len() + function.expressions().len()),
+        ));
         let returned = function.returns().first();
         let is_void = matches!(
             types
@@ -2439,6 +2453,17 @@ impl<'a> ControlFlowLowerer<'a> {
         self.blocks[self.current].terminator.is_some()
     }
 
+    /// Destroys owned locals before control leaves the function, as the simple
+    /// lowering does at its exit.
+    fn emit_owned_cleanup(&mut self) {
+        let function = self.function;
+        let types = self.types;
+        let cleanup_value = self.fresh_value();
+        for instruction in owned_local_cleanup(function, types, cleanup_value) {
+            self.push(instruction);
+        }
+    }
+
     /// Emits one `ScopeExit` per scope being left, innermost first, so each
     /// scope joins its children before control leaves it.
     fn emit_scope_exits(&mut self, count: usize, span: ByteSpan) {
@@ -3062,6 +3087,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     let value = self.lower_expression(returned.expression())?;
                     // Leaving every enclosing scope joins its children before control leaves.
                     self.emit_scope_exits(self.scope_depth, returned.span());
+                    self.emit_owned_cleanup();
                     if self.is_unit(self.function.return_type()) {
                         self.terminate(MirTerminator::return_unit(returned.span()));
                     } else {
@@ -3427,6 +3453,7 @@ fn lower_hir_function_with_control_flow(
         if lowerer.blocks[lowerer.current].terminator.is_none()
             && lowerer.is_unit(function.return_type())
         {
+            lowerer.emit_owned_cleanup();
             lowerer.terminate(MirTerminator::return_unit(function.span()));
         }
     }

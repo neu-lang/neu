@@ -861,3 +861,73 @@ fn return_inside_scope_exits_the_scope_before_returning() {
         MirTerminator::Return { .. }
     ));
 }
+
+#[test]
+fn control_flow_returns_destroy_owned_locals() {
+    // Functions with control flow must run owned-local cleanup on every return
+    // path, not only in the simple straight-line lowering.
+    use compiler::hir::HirControlFlow;
+
+    let file = SourceFileId::from_raw(1130);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let boolean = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let channel = types.channel(int);
+    let hir = HirModule::new(
+        ModuleName::parse("control_flow_cleanup").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("control_flow_cleanup").unwrap(),
+                compiler::module::PackageNamespace::root(),
+                span,
+                false,
+                int,
+                vec![],
+                vec![HirLocal::new(
+                    compiler::hir::HirLocalId::from_raw(0),
+                    span,
+                    channel,
+                    false,
+                )],
+                vec![
+                    HirExpression::bool_literal(HirExpressionId::from_raw(0), span, boolean, true),
+                    HirExpression::int_literal(HirExpressionId::from_raw(1), span, int, 7),
+                ],
+                vec![],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_control_flow(vec![
+                HirControlFlow::If {
+                    condition: HirExpressionId::from_raw(0),
+                    then_body: vec![HirControlFlow::Return(HirReturn::new(
+                        span,
+                        HirExpressionId::from_raw(1),
+                    ))],
+                    else_body: vec![],
+                    span,
+                },
+                HirControlFlow::Return(HirReturn::new(span, HirExpressionId::from_raw(1))),
+            ]),
+        ],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let returning_blocks: Vec<_> = mir.functions()[0]
+        .blocks()
+        .iter()
+        .filter(|block| matches!(block.terminator(), MirTerminator::Return { .. }))
+        .collect();
+    assert_eq!(returning_blocks.len(), 2);
+    for block in returning_blocks {
+        assert!(
+            block
+                .instructions()
+                .iter()
+                .any(|instruction| matches!(instruction, MirInstruction::DestroyChannel { .. })),
+            "return block without cleanup: {:?}",
+            block.instructions()
+        );
+    }
+}
