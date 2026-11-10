@@ -16,11 +16,12 @@ permissions:
   contents: read
   packages: write
 
-# One run per workflow and branch at a time. Runs that start while another is
-# in progress wait in the queue instead of cancelling it.
+# One run per workflow and branch at a time. A new run cancels the run that is
+# still in progress for the same branch, so superseded commits do not hold up
+# the queue.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   test-build:
