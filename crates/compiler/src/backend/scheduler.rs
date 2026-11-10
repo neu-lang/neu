@@ -40,7 +40,11 @@ const TASK_INNERMOST_SCOPE: i32 = 56;
 const TASK_STACK: i32 = 64;
 /// Next task in the same scope, used to cancel siblings when a child fails.
 const TASK_SIBLING: i32 = 72;
-const TASK_CONTEXT: i32 = 80;
+/// The FIFO queue the task is parked on by a channel wait, or 0.
+const TASK_BLOCKED_QUEUE: i32 = 80;
+/// The task this task is awaiting, or 0. Set only while the await is blocked.
+const TASK_AWAITING: i32 = 88;
+const TASK_CONTEXT: i32 = 96;
 const TASK_STACK_BYTES: i64 = 256 * 1024;
 
 /// Where a task's switchable context lives inside its record, and the offsets
@@ -142,6 +146,8 @@ pub(super) struct SchedulerFunctions {
     wait_on_queue: FuncId,
     wake_one: FuncId,
     wake_all: FuncId,
+    unlink: FuncId,
+    cancel: FuncId,
     context: ContextFunctions,
     layout: ContextLayout,
     write: FuncId,
@@ -280,6 +286,8 @@ pub(super) fn declare_scheduler(
         wait_on_queue: declare("neu_sched_wait_on_queue", 1)?,
         wake_one: declare("neu_sched_wake_one", 1)?,
         wake_all: declare("neu_sched_wake_all", 1)?,
+        unlink: declare("neu_sched_unlink", 2)?,
+        cancel: declare("neu_sched_cancel", 1)?,
         context,
         layout,
         write,
@@ -567,7 +575,187 @@ fn define_scheduler_bodies(
         },
     )?;
 
-    // neu_sched_await(task): block until the task completes.
+    // neu_sched_cancel(task): request cancellation of an unfinished task. A task
+    // parked on a channel queue or an await is unlinked and made ready, so it
+    // observes the request. Cancellation then reaches every unfinished child in
+    // the task's open scopes (ADR-0122: propagation to children).
+    define_function(
+        module,
+        s.cancel,
+        signature(call_conv, 1, 1),
+        move |b, m, p| {
+            let task = p[0];
+            let ret_zero = b.create_block();
+            let check_cancelled = b.create_block();
+            let mark = b.create_block();
+            let after_queue = b.create_block();
+            let unlink_queue = b.create_block();
+            let wake_queue = b.create_block();
+            let check_await = b.create_block();
+            let detach = b.create_block();
+            let propagate = b.create_block();
+            let scope_loop = b.create_block();
+            b.append_block_param(scope_loop, types::I64);
+            let scope_body = b.create_block();
+            let child_loop = b.create_block();
+            b.append_block_param(child_loop, types::I64);
+            let child_visit = b.create_block();
+            let child_cancel = b.create_block();
+            let child_next = b.create_block();
+            let scope_next = b.create_block();
+
+            let done = load_word(b, task, TASK_DONE);
+            b.ins().brif(done, ret_zero, &[], check_cancelled, &[]);
+
+            b.switch_to_block(check_cancelled);
+            let cancelled = load_word(b, task, TASK_CANCELLED);
+            b.ins().brif(cancelled, ret_zero, &[], mark, &[]);
+
+            b.switch_to_block(mark);
+            let one = b.ins().iconst(types::I64, 1);
+            store_word(b, one, task, TASK_CANCELLED);
+            let queue = load_word(b, task, TASK_BLOCKED_QUEUE);
+            b.ins().brif(queue, unlink_queue, &[], check_await, &[]);
+
+            b.switch_to_block(unlink_queue);
+            let found = call_value(b, m, s.unlink, &[queue, task])?;
+            b.ins().brif(found, wake_queue, &[], check_await, &[]);
+
+            b.switch_to_block(wake_queue);
+            let ready_queue_addr = ready_queue(b, m, ready);
+            call(b, m, s.enqueue, &[ready_queue_addr, task])?;
+            b.ins().jump(check_await, &[]);
+
+            // Only a task still registered as the awaited task's waiter is moved.
+            // A waiter that a finish already woke is not registered and is skipped.
+            b.switch_to_block(check_await);
+            let awaiting = load_word(b, task, TASK_AWAITING);
+            b.ins().brif(awaiting, after_queue, &[], propagate, &[]);
+
+            b.switch_to_block(after_queue);
+            let registered = load_word(b, awaiting, TASK_WAITER);
+            let is_waiter = b.ins().icmp(IntCC::Equal, registered, task);
+            b.ins().brif(is_waiter, detach, &[], propagate, &[]);
+
+            b.switch_to_block(detach);
+            let zero = b.ins().iconst(types::I64, 0);
+            store_word(b, zero, awaiting, TASK_WAITER);
+            let ready_queue_addr = ready_queue(b, m, ready);
+            call(b, m, s.enqueue, &[ready_queue_addr, task])?;
+            b.ins().jump(propagate, &[]);
+
+            b.switch_to_block(propagate);
+            let innermost = load_word(b, task, TASK_INNERMOST_SCOPE);
+            b.ins().jump(scope_loop, &[BlockArg::Value(innermost)]);
+
+            b.switch_to_block(scope_loop);
+            let scope = b.block_params(scope_loop)[0];
+            b.ins().brif(scope, scope_body, &[], ret_zero, &[]);
+
+            b.switch_to_block(scope_body);
+            let first = load_word(b, scope, SCOPE_FIRST_CHILD);
+            b.ins().jump(child_loop, &[BlockArg::Value(first)]);
+
+            b.switch_to_block(child_loop);
+            let child = b.block_params(child_loop)[0];
+            b.ins().brif(child, child_visit, &[], scope_next, &[]);
+
+            b.switch_to_block(child_visit);
+            let child_done = load_word(b, child, TASK_DONE);
+            b.ins().brif(child_done, child_next, &[], child_cancel, &[]);
+
+            b.switch_to_block(child_cancel);
+            call(b, m, s.cancel, &[child])?;
+            b.ins().jump(child_next, &[]);
+
+            b.switch_to_block(child_next);
+            let sibling = load_word(b, child, TASK_SIBLING);
+            b.ins().jump(child_loop, &[BlockArg::Value(sibling)]);
+
+            b.switch_to_block(scope_next);
+            let parent = load_word(b, scope, SCOPE_PARENT);
+            b.ins().jump(scope_loop, &[BlockArg::Value(parent)]);
+
+            b.switch_to_block(ret_zero);
+            let zero = b.ins().iconst(types::I64, 0);
+            b.ins().return_(&[zero]);
+            Ok(())
+        },
+    )?;
+
+    // neu_sched_unlink(queue, task): remove task from queue. Returns 1 when it
+    // was queued, 0 when it was not (already woken).
+    define_function(
+        module,
+        s.unlink,
+        signature(call_conv, 2, 1),
+        move |b, _m, p| {
+            let queue = p[0];
+            let task = p[1];
+            let check = b.create_block();
+            b.append_block_param(check, types::I64);
+            b.append_block_param(check, types::I64);
+            let visit = b.create_block();
+            let advance = b.create_block();
+            let found = b.create_block();
+            let at_head = b.create_block();
+            let after_head = b.create_block();
+            let remove_tail = b.create_block();
+            let absent = b.create_block();
+
+            let head = load_word(b, queue, QUEUE_HEAD);
+            let zero = b.ins().iconst(types::I64, 0);
+            b.ins()
+                .jump(check, &[BlockArg::Value(head), BlockArg::Value(zero)]);
+
+            b.switch_to_block(check);
+            let cursor = b.block_params(check)[0];
+            let previous = b.block_params(check)[1];
+            b.ins().brif(cursor, visit, &[], absent, &[]);
+
+            b.switch_to_block(visit);
+            let hit = b.ins().icmp(IntCC::Equal, cursor, task);
+            b.ins().brif(hit, found, &[], advance, &[]);
+
+            b.switch_to_block(advance);
+            let next = load_word(b, cursor, TASK_NEXT);
+            b.ins()
+                .jump(check, &[BlockArg::Value(next), BlockArg::Value(cursor)]);
+
+            b.switch_to_block(found);
+            let next = load_word(b, cursor, TASK_NEXT);
+            let no_previous = b.ins().icmp_imm(IntCC::Equal, previous, 0);
+            b.ins().brif(no_previous, at_head, &[], after_head, &[]);
+
+            b.switch_to_block(at_head);
+            store_word(b, next, queue, QUEUE_HEAD);
+            b.ins().jump(remove_tail, &[]);
+
+            b.switch_to_block(after_head);
+            store_word(b, next, previous, TASK_NEXT);
+            b.ins().jump(remove_tail, &[]);
+
+            b.switch_to_block(remove_tail);
+            let tail = load_word(b, queue, QUEUE_TAIL);
+            let was_tail = b.ins().icmp(IntCC::Equal, tail, cursor);
+            let new_tail = b.ins().select(was_tail, previous, tail);
+            store_word(b, new_tail, queue, QUEUE_TAIL);
+            let zero = b.ins().iconst(types::I64, 0);
+            store_word(b, zero, cursor, TASK_NEXT);
+            let one = b.ins().iconst(types::I64, 1);
+            b.ins().return_(&[one]);
+
+            b.switch_to_block(absent);
+            let zero = b.ins().iconst(types::I64, 0);
+            b.ins().return_(&[zero]);
+            Ok(())
+        },
+    )?;
+
+    // neu_sched_await(task): block until the task completes. A cancelled awaiter
+    // returns without the result, and the caller checks its own cancellation
+    // to unwind (ADR-0122). The caller traps on an awaited task that ended
+    // cancelled (ADR-0104).
     define_function(
         module,
         s.await_task,
@@ -577,6 +765,7 @@ fn define_scheduler_bodies(
             let me = call_value(b, m, s.current, &[])?;
             let check = b.create_block();
             let wait = b.create_block();
+            let resume = b.create_block();
             let exit = b.create_block();
             b.ins().jump(check, &[]);
 
@@ -586,7 +775,14 @@ fn define_scheduler_bodies(
 
             b.switch_to_block(wait);
             store_word(b, me, task, TASK_WAITER);
+            store_word(b, task, me, TASK_AWAITING);
             call(b, m, s.block, &[])?;
+            let zero = b.ins().iconst(types::I64, 0);
+            store_word(b, zero, me, TASK_AWAITING);
+            let cancelled = load_word(b, me, TASK_CANCELLED);
+            b.ins().brif(cancelled, exit, &[], resume, &[]);
+
+            b.switch_to_block(resume);
             b.ins().jump(check, &[]);
 
             b.switch_to_block(exit);
@@ -612,8 +808,7 @@ fn define_scheduler_bodies(
             store_word(b, live, scope, SCOPE_LIVE);
 
             // A child that ends cancelled is a failure: mark the scope failed and
-            // cancel every unfinished sibling. A sibling that has not started skips
-            // its body; a started one is not yet unwound (ADR-0104 observation).
+            // cancel every unfinished sibling (ADR-0101, ADR-0122).
             let cancelled = load_word(b, me, TASK_CANCELLED);
             let mark = b.create_block();
             let after_mark = b.create_block();
@@ -640,8 +835,7 @@ fn define_scheduler_bodies(
             b.ins().brif(unfinished, mark_child, &[], next_child, &[]);
 
             b.switch_to_block(mark_child);
-            let one_cancel = b.ins().iconst(types::I64, 1);
-            store_word(b, one_cancel, cursor, TASK_CANCELLED);
+            call(b, m, s.cancel, &[cursor])?;
             b.ins().jump(next_child, &[]);
 
             b.switch_to_block(next_child);
@@ -659,7 +853,11 @@ fn define_scheduler_bodies(
             let ready_queue_ref = ready_queue_addr;
             call(b, m, s.enqueue, &[ready_queue_ref, wake])?;
 
+            // Clear the registration so a later cancel of the awaiter does not
+            // requeue it a second time.
             let own_waiter = load_word(b, me, TASK_WAITER);
+            let zero_waiter = b.ins().iconst(types::I64, 0);
+            store_word(b, zero_waiter, me, TASK_WAITER);
             call(b, m, s.enqueue, &[ready_queue_ref, own_waiter])?;
 
             let next = call_value(b, m, s.dequeue, &[ready_queue_ref])?;
@@ -728,18 +926,23 @@ fn define_scheduler_bodies(
             b.ins().jump(check, &[]);
 
             b.switch_to_block(leave);
-            // A failed child traps once the join is complete (ADR-0101: child failure).
-            let failed = load_word(b, scope, SCOPE_FAILED);
-            let fail = b.create_block();
-            let finish_leave = b.create_block();
-            b.ins().brif(failed, fail, &[], finish_leave, &[]);
-            b.switch_to_block(fail);
-            b.ins().trap(TrapCode::unwrap_user(TRAP_CHILD_FAILED));
-            b.switch_to_block(finish_leave);
             let zero = b.ins().iconst(types::I64, 0);
             store_word(b, zero, scope, SCOPE_WAITER);
             let parent = load_word(b, scope, SCOPE_PARENT);
             store_word(b, parent, me, TASK_INNERMOST_SCOPE);
+            // A failed child traps once the join is complete (ADR-0101: child failure).
+            // A cancelled owner unwinds instead (ADR-0122), so it does not trap here.
+            let failed = load_word(b, scope, SCOPE_FAILED);
+            let check_owner = b.create_block();
+            let fail = b.create_block();
+            let finish_leave = b.create_block();
+            b.ins().brif(failed, check_owner, &[], finish_leave, &[]);
+            b.switch_to_block(check_owner);
+            let owner_cancelled = load_word(b, me, TASK_CANCELLED);
+            b.ins().brif(owner_cancelled, finish_leave, &[], fail, &[]);
+            b.switch_to_block(fail);
+            b.ins().trap(TrapCode::unwrap_user(TRAP_CHILD_FAILED));
+            b.switch_to_block(finish_leave);
             b.ins().return_(&[zero]);
             Ok(())
         },
@@ -752,9 +955,11 @@ fn define_scheduler_bodies(
         signature(call_conv, 1, 1),
         move |b, m, p| {
             let me = call_value(b, m, s.current, &[])?;
+            store_word(b, p[0], me, TASK_BLOCKED_QUEUE);
             call(b, m, s.enqueue, &[p[0], me])?;
             call(b, m, s.block, &[])?;
             let zero = b.ins().iconst(types::I64, 0);
+            store_word(b, zero, me, TASK_BLOCKED_QUEUE);
             b.ins().return_(&[zero]);
             Ok(())
         },
@@ -767,8 +972,18 @@ fn define_scheduler_bodies(
         signature(call_conv, 1, 1),
         move |b, m, p| {
             let waiter = call_value(b, m, s.dequeue, &[p[0]])?;
+            let clear = b.create_block();
+            let done = b.create_block();
+            b.ins().brif(waiter, clear, &[], done, &[]);
+
+            b.switch_to_block(clear);
+            let zero = b.ins().iconst(types::I64, 0);
+            store_word(b, zero, waiter, TASK_BLOCKED_QUEUE);
             let ready_queue_addr = ready_queue(b, m, ready);
             call(b, m, s.enqueue, &[ready_queue_addr, waiter])?;
+            b.ins().jump(done, &[]);
+
+            b.switch_to_block(done);
             let zero = b.ins().iconst(types::I64, 0);
             b.ins().return_(&[zero]);
             Ok(())
@@ -792,6 +1007,8 @@ fn define_scheduler_bodies(
             b.ins().brif(waiter, move_one, &[], exit, &[]);
 
             b.switch_to_block(move_one);
+            let zero = b.ins().iconst(types::I64, 0);
+            store_word(b, zero, waiter, TASK_BLOCKED_QUEUE);
             let ready_queue_addr = ready_queue(b, m, ready);
             call(b, m, s.enqueue, &[ready_queue_addr, waiter])?;
             b.ins().jump(check, &[]);
@@ -834,6 +1051,8 @@ fn init_task_fields(
     store_word(builder, innermost_scope, task, TASK_INNERMOST_SCOPE);
     store_word(builder, zero, task, TASK_SIBLING);
     store_word(builder, zero, task, TASK_STACK);
+    store_word(builder, zero, task, TASK_BLOCKED_QUEUE);
+    store_word(builder, zero, task, TASK_AWAITING);
 }
 
 /// Writes the deadlock diagnostic to stderr. The caller traps afterwards.
@@ -1024,6 +1243,29 @@ pub(super) fn emit_wake_all(
 ) -> Result<(), CraneliftLoweringError> {
     call(builder, module, scheduler.wake_all, &[queue])?;
     Ok(())
+}
+
+/// Requests cancellation of `task` (ADR-0104). The request is observed at the
+/// task's next suspension point.
+pub(super) fn emit_cancel(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    task: Value,
+) -> Result<(), CraneliftLoweringError> {
+    call(builder, module, scheduler.cancel, &[task])?;
+    Ok(())
+}
+
+/// Reads whether the running task has been cancelled. Nonzero means the task
+/// must unwind at this observation point (ADR-0122).
+pub(super) fn emit_current_cancelled(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+) -> Result<Value, CraneliftLoweringError> {
+    let me = call_value(builder, module, scheduler.current, &[])?;
+    Ok(load_word(builder, me, TASK_CANCELLED))
 }
 
 /// Defines the trampoline a new task starts in. It loads the captures from the

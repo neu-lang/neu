@@ -856,10 +856,20 @@ fn return_inside_scope_exits_the_scope_before_returning() {
         .position(|instruction| matches!(instruction, MirInstruction::ScopeExit { .. }))
         .expect("scope exit before return");
     assert!(enter < exit, "{instructions:?}");
-    assert!(matches!(
-        mir.functions()[0].blocks()[0].terminator(),
-        MirTerminator::Return { .. }
-    ));
+    // The scope exit observes cancellation (ADR-0122), so block 0 branches. The
+    // path that is not cancelled continues to the return.
+    let blocks = mir.functions()[0].blocks();
+    let MirTerminator::BranchIf { else_target, .. } = blocks[0].terminator() else {
+        panic!(
+            "scope exit should observe cancellation: {:?}",
+            blocks[0].terminator()
+        );
+    };
+    let resume = blocks
+        .iter()
+        .find(|block| block.id() == else_target)
+        .expect("resume block");
+    assert!(matches!(resume.terminator(), MirTerminator::Return { .. }));
 }
 
 #[test]
@@ -986,4 +996,110 @@ fn owned_locals_are_destroyed_in_reverse_declaration_order() {
         })
         .collect();
     assert_eq!(destroyed, vec![1, 0], "{instructions:?}");
+}
+
+#[test]
+fn unwinding_releases_owned_locals_in_reverse_declaration_order() {
+    // ADR-0122: a cancelled suspend frame runs owned-local cleanup in reverse
+    // declaration order, then returns. The suspend call is the observation point.
+    use compiler::hir::{HirControlFlow, HirDirectCall, HirLocalId};
+
+    let file = SourceFileId::from_raw(1141);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let channel = types.channel(int);
+    let callee = HirFunction::new(
+        HirFunctionId::from_raw(1),
+        ModuleName::parse("unwind_order").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        vec![],
+        vec![],
+        vec![HirExpression::int_literal(
+            HirExpressionId::from_raw(0),
+            span,
+            int,
+            1,
+        )],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    )
+    .with_suspend(true)
+    .with_control_flow(vec![HirControlFlow::Return(HirReturn::new(
+        span,
+        HirExpressionId::from_raw(0),
+    ))]);
+    let caller = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("unwind_order").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        vec![],
+        vec![
+            HirLocal::new(HirLocalId::from_raw(0), span, channel, false),
+            HirLocal::new(HirLocalId::from_raw(1), span, channel, false),
+        ],
+        vec![
+            HirExpression::direct_call(
+                HirExpressionId::from_raw(0),
+                span,
+                int,
+                HirDirectCall::new(HirFunctionId::from_raw(1), vec![]),
+            ),
+            HirExpression::int_literal(HirExpressionId::from_raw(1), span, int, 7),
+        ],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    )
+    .with_suspend(true)
+    .with_control_flow(vec![
+        HirControlFlow::Expression {
+            value: HirExpressionId::from_raw(0),
+            span,
+        },
+        HirControlFlow::Return(HirReturn::new(span, HirExpressionId::from_raw(1))),
+    ]);
+    let hir = HirModule::new(
+        ModuleName::parse("unwind_order").unwrap(),
+        vec![callee, caller],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let blocks = mir.functions()[1].blocks();
+
+    // The call is followed by a cancellation check that branches to the unwind path.
+    let MirTerminator::BranchIf { then_target, .. } = blocks[0].terminator() else {
+        panic!(
+            "suspend call should observe cancellation: {:?}",
+            blocks[0].terminator()
+        );
+    };
+    let unwind = blocks
+        .iter()
+        .find(|block| block.id() == then_target)
+        .expect("unwind block");
+    let instructions = unwind.instructions();
+    let destroyed: Vec<usize> = instructions
+        .windows(2)
+        .filter_map(|pair| match (&pair[0], &pair[1]) {
+            (MirInstruction::LoadLocal { local, .. }, MirInstruction::DestroyChannel { .. }) => {
+                Some(local.index())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(destroyed, vec![1, 0], "{instructions:?}");
+    assert!(
+        instructions
+            .iter()
+            .any(|instruction| matches!(instruction, MirInstruction::DefaultValue { .. })),
+        "{instructions:?}"
+    );
+    assert!(matches!(unwind.terminator(), MirTerminator::Return { .. }));
 }

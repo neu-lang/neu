@@ -334,3 +334,113 @@ fn spawn_body_can_call_a_suspend_function() {
     "#;
     assert_eq!(compile_and_run(source, "spawn_suspend_body"), 6);
 }
+
+fn run_capturing(source: &str, name: &str) -> (Option<i32>, String) {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-scheduler-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(13200),
+            ModuleName::parse(name).unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    let output = Command::new(&executable).output().unwrap();
+    let _ = fs::remove_dir_all(workspace);
+    (
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+#[test]
+fn cancelled_receiver_unwinds_instead_of_deadlocking() {
+    // The worker is cancelled while blocked on an empty channel. Cancellation
+    // must wake it so it unwinds. The scope then fails (ADR-0101: a cancelled
+    // child fails its scope), so the program traps without a deadlock.
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val queue = channel<Int>(1);
+                val ready = channel<Int>(1);
+                val worker = spawn { -> when (receive(queue)) { ChannelResult.Message(value) -> value; ChannelResult.Closed -> 9; } };
+                val helper = spawn { -> send(ready, 1) };
+                val go = receive(ready);
+                worker.cancel();
+                return 5;
+            }
+            return 0;
+        }
+    "#;
+    let (code, stderr) = run_capturing(source, "cancel_receiver");
+    assert_eq!(code, None, "{stderr}");
+    assert!(!stderr.contains("deadlock"), "{stderr}");
+}
+
+#[test]
+fn cancelled_task_unwinds_the_children_it_is_joining() {
+    // The outer task blocks joining its child, which is blocked on a channel.
+    // Cancelling the outer task must reach the child, so both unwind and the
+    // join completes. Without propagation the program would deadlock.
+    let source = r#"
+        suspend func outer_body(): Int {
+            scope {
+                val never = channel<Int>(1);
+                val inner = spawn { -> when (receive(never)) { ChannelResult.Message(value) -> value; ChannelResult.Closed -> 9; } };
+            }
+            return 0;
+        }
+        suspend func main(): Int {
+            scope {
+                val gate = channel<Int>(1);
+                send(gate, 1);
+                val outer = spawn { -> when (receive(gate)) { ChannelResult.Message(value) -> outer_body(); ChannelResult.Closed -> 0; } };
+                val helper = spawn { -> 1 };
+                val got: Int = await(helper);
+                outer.cancel();
+                return 5;
+            }
+            return 0;
+        }
+    "#;
+    let (code, stderr) = run_capturing(source, "cancel_propagates");
+    assert_eq!(code, None, "{stderr}");
+    assert!(!stderr.contains("deadlock"), "{stderr}");
+}
+
+#[test]
+fn cancelled_awaiter_unwinds_instead_of_deadlocking() {
+    // The waiter is cancelled while it awaits its child. It unwinds at the await
+    // and cancels its child, so both finish and the scope fails.
+    let source = r#"
+        suspend func waiter_body(): Int {
+            scope {
+                val never = channel<Int>(1);
+                val worker = spawn { -> when (receive(never)) { ChannelResult.Message(value) -> value; ChannelResult.Closed -> 9; } };
+                return await(worker);
+            }
+            return 0;
+        }
+        suspend func main(): Int {
+            scope {
+                val gate = channel<Int>(1);
+                send(gate, 1);
+                val waiter = spawn { -> when (receive(gate)) { ChannelResult.Message(value) -> waiter_body(); ChannelResult.Closed -> 0; } };
+                val helper = spawn { -> 1 };
+                val got: Int = await(helper);
+                waiter.cancel();
+                return 5;
+            }
+            return 0;
+        }
+    "#;
+    let (code, stderr) = run_capturing(source, "cancel_awaiter");
+    assert_eq!(code, None, "{stderr}");
+    assert!(!stderr.contains("deadlock"), "{stderr}");
+}

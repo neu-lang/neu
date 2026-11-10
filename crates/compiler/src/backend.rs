@@ -2,8 +2,8 @@ use std::{collections::HashMap, fmt::Write as _};
 
 use cranelift_codegen::{
     ir::{
-        AbiParam, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder, MemFlagsData,
-        Signature, TrapCode, UserExternalName, UserFuncName, Value,
+        AbiParam, BlockArg, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder,
+        MemFlagsData, Signature, TrapCode, UserExternalName, UserFuncName, Value,
         condcodes::{FloatCC, IntCC},
         immediates::Ieee64,
         types,
@@ -731,6 +731,16 @@ fn require_bootstrap_runtime_type(
     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)
 }
 
+/// The zero value of a machine type. Unwinding returns it: the caller discards it
+/// because it observes the cancellation first (ADR-0122).
+fn zero_value(builder: &mut FunctionBuilder<'_>, value_type: types::Type) -> Value {
+    match value_type {
+        types::F32 => builder.ins().f32const(0.0),
+        types::F64 => builder.ins().f64const(0.0),
+        _ => builder.ins().iconst(value_type, 0),
+    }
+}
+
 fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<types::Type> {
     match type_arena.get(ty).map(|record| record.kind()) {
         Some(TypeKind::Primitive(PrimitiveType::Bool | PrimitiveType::Byte)) => Some(types::I8),
@@ -1307,6 +1317,43 @@ fn lower_instruction(
             let (scheduler, module) = scheduler_with_module(context.runtime, module)
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
             scheduler::emit_await(builder, module, &scheduler, handle)?;
+            // A cancelled awaiter returns without the result and unwinds (ADR-0122).
+            // The awaited task may still run, so its record is neither read nor freed.
+            let own_cancelled = scheduler::emit_current_cancelled(builder, module, &scheduler)?;
+            let value_type = if matches!(
+                context
+                    .type_arena
+                    .get(result_type)
+                    .map(|record| record.kind()),
+                Some(TypeKind::Primitive(PrimitiveType::Void))
+            ) {
+                None
+            } else {
+                Some(
+                    cranelift_type(result_type, context.type_arena)
+                        .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?,
+                )
+            };
+            let proceed = builder.create_block();
+            let unwound = builder.create_block();
+            let join = builder.create_block();
+            if let Some(value_type) = value_type {
+                builder.append_block_param(join, value_type);
+            }
+            builder
+                .ins()
+                .brif(own_cancelled, unwound, &[], proceed, &[]);
+
+            builder.switch_to_block(unwound);
+            let unwound_args = match value_type {
+                Some(value_type) => vec![BlockArg::Value(zero_value(builder, value_type))],
+                None => Vec::new(),
+            };
+            builder.ins().jump(join, &unwound_args);
+            builder.seal_block(unwound);
+
+            builder.switch_to_block(proceed);
+            builder.seal_block(proceed);
             let cancelled = builder.ins().load(
                 types::I64,
                 MemFlagsData::new(),
@@ -1314,31 +1361,35 @@ fn lower_instruction(
                 scheduler::TASK_CANCELLED,
             );
             builder.ins().trapnz(cancelled, TrapCode::unwrap_user(8));
-            if !matches!(
-                context
-                    .type_arena
-                    .get(result_type)
-                    .map(|record| record.kind()),
-                Some(TypeKind::Primitive(PrimitiveType::Void))
-            ) {
-                let value_type = cranelift_type(result_type, context.type_arena)
-                    .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
-                let value = builder.ins().load(
-                    value_type,
-                    MemFlagsData::new(),
-                    handle,
-                    scheduler::TASK_RESULT,
-                );
-                values.insert(
-                    *output,
-                    normalize_bool_value(value, result_type, context.type_arena, builder),
-                );
-            }
+            let proceed_args = match value_type {
+                Some(value_type) => {
+                    let value = builder.ins().load(
+                        value_type,
+                        MemFlagsData::new(),
+                        handle,
+                        scheduler::TASK_RESULT,
+                    );
+                    vec![BlockArg::Value(normalize_bool_value(
+                        value,
+                        result_type,
+                        context.type_arena,
+                        builder,
+                    ))]
+                }
+                None => Vec::new(),
+            };
             let runtime = context
                 .runtime
                 .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
             let free_ref = runtime.reference(builder.func, runtime.free, false);
             builder.ins().call(free_ref, &[handle]);
+            builder.ins().jump(join, &proceed_args);
+            builder.seal_block(join);
+            builder.switch_to_block(join);
+            if value_type.is_some() {
+                let joined = builder.block_params(join)[0];
+                values.insert(*output, joined);
+            }
             task_results.remove(task);
             task_results.remove(&origin);
             task_origins.remove(task);
@@ -1353,10 +1404,23 @@ fn lower_instruction(
                 .get(task)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
-            let one = builder.ins().iconst(types::I64, 1);
-            builder
-                .ins()
-                .store(MemFlagsData::new(), one, handle, scheduler::TASK_CANCELLED);
+            let (scheduler, module) = scheduler_with_module(context.runtime, module)
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            scheduler::emit_cancel(builder, module, &scheduler, handle)?;
+            Ok(())
+        }
+        MirInstruction::TaskCancelled { output, .. } => {
+            let (scheduler, module) = scheduler_with_module(context.runtime, module)
+                .ok_or(CraneliftLoweringError::UnsupportedInstruction)?;
+            let cancelled = scheduler::emit_current_cancelled(builder, module, &scheduler)?;
+            values.insert(*output, cancelled);
+            Ok(())
+        }
+        MirInstruction::DefaultValue { output, ty, .. } => {
+            let value_type = cranelift_type(*ty, context.type_arena)
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            let value = zero_value(builder, value_type);
+            values.insert(*output, value);
             Ok(())
         }
         MirInstruction::ChannelCreate {
@@ -1423,6 +1487,7 @@ fn lower_instruction(
             let mut scheduler_module = scheduler_with_module(context.runtime, module);
             let check = builder.create_block();
             let proceed = builder.create_block();
+            let join = builder.create_block();
             builder.ins().jump(check, &[]);
             builder.switch_to_block(check);
             let closed = builder
@@ -1450,7 +1515,9 @@ fn lower_instruction(
                     builder.switch_to_block(wait);
                     let send_queue = builder.ins().iadd_imm(pointer, CHANNEL_SEND_QUEUE);
                     scheduler::emit_wait_on_queue(builder, module, scheduler, send_queue)?;
-                    builder.ins().jump(check, &[]);
+                    // A cancelled sender leaves the channel unchanged and unwinds (ADR-0122).
+                    let cancelled = scheduler::emit_current_cancelled(builder, module, scheduler)?;
+                    builder.ins().brif(cancelled, join, &[], check, &[]);
                     builder.seal_block(wait);
                     builder.seal_block(check);
                 }
@@ -1493,6 +1560,9 @@ fn lower_instruction(
                 let recv_queue = builder.ins().iadd_imm(pointer, CHANNEL_RECV_QUEUE);
                 scheduler::emit_wake_one(builder, module, scheduler, recv_queue)?;
             }
+            builder.ins().jump(join, &[]);
+            builder.seal_block(join);
+            builder.switch_to_block(join);
             Ok(())
         }
         MirInstruction::ChannelReceive {
@@ -1508,6 +1578,8 @@ fn lower_instruction(
             let mut scheduler_module = scheduler_with_module(context.runtime, module);
             let check = builder.create_block();
             let proceed = builder.create_block();
+            let join = builder.create_block();
+            builder.append_block_param(join, types::I64);
             builder.ins().jump(check, &[]);
             builder.switch_to_block(check);
             let length = builder
@@ -1527,7 +1599,12 @@ fn lower_instruction(
                     builder.switch_to_block(wait);
                     let recv_queue = builder.ins().iadd_imm(pointer, CHANNEL_RECV_QUEUE);
                     scheduler::emit_wait_on_queue(builder, module, scheduler, recv_queue)?;
-                    builder.ins().jump(check, &[]);
+                    // A cancelled receiver takes no value and unwinds (ADR-0122).
+                    let cancelled = scheduler::emit_current_cancelled(builder, module, scheduler)?;
+                    let no_result = builder.ins().iconst(types::I64, 0);
+                    builder
+                        .ins()
+                        .brif(cancelled, join, &[BlockArg::Value(no_result)], check, &[]);
                     builder.seal_block(wait);
                     builder.seal_block(check);
                 }
@@ -1570,7 +1647,6 @@ fn lower_instruction(
             let tag = builder.ins().select(empty, one, zero);
             builder.ins().store(MemFlagsData::new(), tag, result, 0);
             builder.ins().store(MemFlagsData::new(), loaded, result, 8);
-            values.insert(*output, result);
             let next_raw = builder.ins().iadd_imm(head, 1);
             let capacity = builder
                 .ins()
@@ -1593,6 +1669,11 @@ fn lower_instruction(
                 let send_queue = builder.ins().iadd_imm(pointer, CHANNEL_SEND_QUEUE);
                 scheduler::emit_wake_one(builder, module, scheduler, send_queue)?;
             }
+            builder.ins().jump(join, &[BlockArg::Value(result)]);
+            builder.seal_block(join);
+            builder.switch_to_block(join);
+            let received = builder.block_params(join)[0];
+            values.insert(*output, received);
             Ok(())
         }
         MirInstruction::ChannelClose { channel, .. } => {
