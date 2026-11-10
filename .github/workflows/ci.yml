@@ -16,6 +16,12 @@ permissions:
   contents: read
   packages: write
 
+# One run per workflow and branch at a time. Runs that start while another is
+# in progress wait in the queue instead of cancelling it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Tests
