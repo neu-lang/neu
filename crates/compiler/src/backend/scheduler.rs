@@ -59,6 +59,10 @@ struct ContextLayout {
     stack_sp: i32,
     /// Offset of the stack size inside a `ucontext_t`.
     stack_size: i32,
+    /// Offsets of `uc_mcontext` and `uc_mcsize` on targets whose `ucontext_t`
+    /// points at separate machine-context storage (Darwin). Each context needs
+    /// its own storage before `getcontext` or `swapcontext` writes to it.
+    mcontext: Option<(i32, i32)>,
 }
 
 /// A fiber context is a single handle, so it needs no stack offsets.
@@ -67,6 +71,7 @@ const FIBER_LAYOUT: ContextLayout = ContextLayout {
     link: 0,
     stack_sp: 0,
     stack_size: 0,
+    mcontext: None,
 };
 
 /// Layout of the host's `ucontext_t`. The compiler emits code only for the host
@@ -77,7 +82,18 @@ const UCONTEXT_LAYOUT: ContextLayout = ContextLayout {
     link: std::mem::offset_of!(libc::ucontext_t, uc_link) as i32,
     stack_sp: std::mem::offset_of!(libc::ucontext_t, uc_stack.ss_sp) as i32,
     stack_size: std::mem::offset_of!(libc::ucontext_t, uc_stack.ss_size) as i32,
+    #[cfg(target_os = "macos")]
+    mcontext: Some((
+        std::mem::offset_of!(libc::ucontext_t, uc_mcontext) as i32,
+        std::mem::offset_of!(libc::ucontext_t, uc_mcsize) as i32,
+    )),
+    #[cfg(not(target_os = "macos"))]
+    mcontext: None,
 };
+
+/// Bytes of machine-context storage a Darwin `ucontext_t` points at.
+#[cfg(target_os = "macos")]
+const MCONTEXT_BYTES: i64 = std::mem::size_of::<libc::__darwin_mcontext64>() as i64;
 
 /// Size of a task record for the given context layout.
 fn task_bytes(layout: ContextLayout) -> i64 {
@@ -1071,6 +1087,34 @@ fn emit_deadlock_message(
     Ok(())
 }
 
+/// Gives a `ucontext` its own machine-context storage on targets that need it
+/// (Darwin). `uc_mcontext` is a pointer there, and `getcontext` and `swapcontext`
+/// write through it. Left unset, those calls write into whatever memory the
+/// pointer holds, which corrupts the scheduler's records.
+fn emit_mcontext(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+    context: Value,
+) -> Result<(), CraneliftLoweringError> {
+    let Some((pointer_offset, size_offset)) = scheduler.layout.mcontext else {
+        return Ok(());
+    };
+    #[cfg(target_os = "macos")]
+    {
+        let bytes = builder.ins().iconst(types::I64, MCONTEXT_BYTES);
+        let storage = call_value(builder, module, scheduler.malloc, &[bytes])?;
+        trap_if_zero(builder, storage, TRAP_ALLOCATION);
+        store_word(builder, storage, context, pointer_offset);
+        store_word(builder, bytes, context, size_offset);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (builder, module, context, pointer_offset, size_offset);
+    }
+    Ok(())
+}
+
 /// Makes the root task's context refer to the thread that runs the program.
 /// Fibers need the thread converted once before any switch; ucontext saves the
 /// running context into the root record on the first switch.
@@ -1085,6 +1129,10 @@ fn emit_root_context(
         let fiber = call_value(builder, module, convert_thread, &[zero])?;
         trap_if_zero(builder, fiber, TRAP_ALLOCATION);
         store_word(builder, fiber, root, TASK_CONTEXT);
+    }
+    if let ContextFunctions::Ucontext { .. } = scheduler.context {
+        let context = builder.ins().iadd_imm(root, TASK_CONTEXT as i64);
+        emit_mcontext(builder, module, scheduler, context)?;
     }
     Ok(())
 }
@@ -1110,6 +1158,7 @@ fn emit_child_context(
             trap_if_zero(builder, stack, TRAP_ALLOCATION);
             store_word(builder, stack, task, TASK_STACK);
             let context = builder.ins().iadd_imm(task, TASK_CONTEXT as i64);
+            emit_mcontext(builder, module, scheduler, context)?;
             call(builder, module, getcontext, &[context])?;
             let layout = scheduler.layout;
             store_word(builder, stack, context, layout.stack_sp);
