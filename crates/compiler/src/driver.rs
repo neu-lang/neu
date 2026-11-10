@@ -61,6 +61,7 @@ pub struct TestMetadata {
     declaration: crate::ast::AstNodeId,
     span: crate::source::ByteSpan,
     source: String,
+    line_origins: Vec<crate::report::LineOrigin>,
 }
 
 impl TestMetadata {
@@ -78,6 +79,11 @@ impl TestMetadata {
 
     pub fn source(&self) -> &str {
         &self.source
+    }
+
+    /// The originating file and line of each line of [`Self::source`].
+    pub fn line_origins(&self) -> &[crate::report::LineOrigin] {
+        &self.line_origins
     }
 }
 
@@ -138,6 +144,7 @@ pub fn discover_tests(
                 declaration: function.declaration,
                 span,
                 source: String::new(),
+                line_origins: Vec::new(),
             })
         })
         .collect::<Vec<_>>();
@@ -328,6 +335,12 @@ pub fn discover_manifest_tests(
             let mut discovered = discover_tests(&parsed, &module, &PackageNamespace::root())?;
             for test in &mut discovered {
                 test.source = source.source().to_owned();
+                test.line_origins = (1..=test.source.split('\n').count())
+                    .map(|line| crate::report::LineOrigin {
+                        path: source.path().to_path_buf(),
+                        line,
+                    })
+                    .collect();
             }
             tests.extend(discovered);
         }
@@ -376,8 +389,10 @@ pub fn discover_manifest_tests(
         return Err(DriverError::ParseDiagnostics(parsed.diagnostics));
     }
     let mut tests = discover_tests(&parsed, &module, &PackageNamespace::root())?;
+    let line_origins = graph.bootstrap_line_origins();
     for test in &mut tests {
         test.source = source.clone();
+        test.line_origins = line_origins.clone();
     }
     Ok(TestProject {
         source,

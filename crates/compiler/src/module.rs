@@ -1,5 +1,6 @@
 use crate::ast::{AstNodeId, AstNodeKind};
 use crate::parser::{ParseOutput, parse_source};
+use crate::report::LineOrigin;
 use crate::source::SourceFileId;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
@@ -950,7 +951,7 @@ impl VirtualPackageGraph {
         &self.packages
     }
 
-    pub fn bootstrap_source(&self) -> String {
+    fn bootstrap_lines(&self) -> Vec<(String, LineOrigin)> {
         assert!(
             !self.is_library(),
             "library package graphs have no bootstrap source"
@@ -999,27 +1000,54 @@ impl VirtualPackageGraph {
             }
         }
 
-        sources
+        let mut lines = Vec::new();
+        for (path, source) in sources {
+            let first = lines.len();
+            for (index, line) in source.lines().enumerate() {
+                let trimmed = line.trim_start();
+                if trimmed.starts_with("package ") || trimmed.starts_with("import ") {
+                    continue;
+                }
+                let mut line = line.to_owned();
+                for alias in &aliases {
+                    line = line.replace(&format!("{alias}."), "");
+                }
+                lines.push((
+                    line,
+                    LineOrigin {
+                        path: path.clone(),
+                        line: index + 1,
+                    },
+                ));
+            }
+            // A file without retained lines still contributes one empty
+            // segment to the merged source.
+            if lines.len() == first {
+                lines.push((String::new(), LineOrigin { path, line: 1 }));
+            }
+        }
+        lines
+    }
+
+    /// Returns the merged bootstrap source compiled for an executable graph.
+    ///
+    /// Spans reported against this text can be mapped back to their source
+    /// files with [`Self::bootstrap_line_origins`].
+    pub fn bootstrap_source(&self) -> String {
+        self.bootstrap_lines()
             .into_iter()
-            .map(|(_, source)| {
-                source
-                    .lines()
-                    .filter(|line| {
-                        let trimmed = line.trim_start();
-                        !trimmed.starts_with("package ") && !trimmed.starts_with("import ")
-                    })
-                    .map(|line| {
-                        let mut line = line.to_owned();
-                        for alias in &aliases {
-                            line = line.replace(&format!("{alias}."), "");
-                        }
-                        line
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            })
+            .map(|(line, _)| line)
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// Returns the originating file and one-based line for each line of
+    /// [`Self::bootstrap_source`].
+    pub fn bootstrap_line_origins(&self) -> Vec<LineOrigin> {
+        self.bootstrap_lines()
+            .into_iter()
+            .map(|(_, origin)| origin)
+            .collect()
     }
 }
 
