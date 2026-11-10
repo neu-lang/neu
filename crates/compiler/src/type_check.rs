@@ -93,6 +93,7 @@ pub enum TypeRuleDiagnostic {
     AwaitOutsideSuspend,
     InvalidTaskOperation,
     InvalidChannelOperation,
+    ChannelOpOutsideSuspend,
     InferredInitializerRequired,
     InferredTypeUnavailable,
     StaticFunctionInstanceAccess,
@@ -4630,6 +4631,25 @@ pub fn type_concurrency_operations(
         else {
             continue;
         };
+        // ADR-0122: every send and receive can block, so both are valid only in
+        // suspend functions.
+        if matches!(name, "send" | "receive") {
+            let suspend = parsed
+                .function_declarations
+                .iter()
+                .find(|function| function.declaration == call.function)
+                .is_some_and(|function| function.is_suspend);
+            let already_reported = report.diagnostics().iter().any(|diagnostic| {
+                diagnostic.node() == call.expression
+                    && diagnostic.rule() == TypeRuleDiagnostic::ChannelOpOutsideSuspend
+            });
+            if !suspend && !already_reported {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::ChannelOpOutsideSuspend,
+                    call.expression,
+                ));
+            }
+        }
         match name {
             "channel" => {
                 let Some(element_node) = call

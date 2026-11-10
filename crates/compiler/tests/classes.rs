@@ -621,7 +621,7 @@ fn public_interface_dispatches_a_channel_operation_without_runtime_types() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "public interface ChannelReader { func read(): Int; } class Reader: ChannelReader { override func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
+        "public interface ChannelReader { suspend func read(): Int; } class Reader: ChannelReader { override suspend func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public suspend func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6850),
             ModuleName::parse("public_concurrency_interface").unwrap(),

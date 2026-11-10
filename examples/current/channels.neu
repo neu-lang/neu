@@ -1,6 +1,6 @@
 package examples.current
 
-public func main(): Int {
+public suspend func main(): Int {
     val queue = channel<Int>(2);
     send(queue, 3);
     send(queue, 4);
