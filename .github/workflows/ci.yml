@@ -23,18 +23,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
+  test-build:
+    name: Test & Build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64-unknown-linux-gnu
+            runner: ubuntu-26.04
+            test: true
+          - arch: aarch64-unknown-linux-gnu
+            runner: ubuntu-26.04-arm
+            test: false
+          - arch: aarch64-apple-darwin
+            runner: macos-26
+            test: false
+          - arch: x86_64-pc-windows-msvc
+            runner: windows-2025
+            test: false
+          - arch: aarch64-pc-windows-msvc
+            runner: windows-11-vs2026-arm
+            test: false
 
     steps:
       - uses: actions/checkout@v7
       - name: Check formatting
+        if: matrix.test
         run: cargo fmt --all --check
       - name: Clippy
+        if: matrix.test
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Run tests
+        if: matrix.test
         run: cargo test --workspace --all-targets
+      - name: Build debug
+        if: github.event_name == 'pull_request'
+        run: cargo build --workspace
+      - name: Build release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+        run: cargo build --workspace --release
 
   codeql:
     name: CodeQL
@@ -55,33 +84,3 @@ jobs:
         uses: github/codeql-action/autobuild@v4
       - name: Analyze
         uses: github/codeql-action/analyze@v4
-
-  cargo-build:
-    name: Cargo Build (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    needs:
-      - test
-      - codeql
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86_64-unknown-linux-gnu
-            runner: ubuntu-26.04
-          - arch: aarch64-unknown-linux-gnu
-            runner: ubuntu-26.04-arm
-          - arch: aarch64-apple-darwin
-            runner: macos-26
-          - arch: x86_64-pc-windows-msvc
-            runner: windows-2025
-          - arch: aarch64-pc-windows-msvc
-            runner: windows-11-vs2026-arm
-
-    steps:
-      - uses: actions/checkout@v7
-      - name: Build debug
-        if: github.event_name == 'pull_request'
-        run: cargo build --workspace
-      - name: Build release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-        run: cargo build --workspace --release
