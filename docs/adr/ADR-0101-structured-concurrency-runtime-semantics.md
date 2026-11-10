@@ -1,6 +1,6 @@
 # ADR-0101: Structured Concurrency Runtime Semantics
 
-Status: Accepted
+Status: Accepted; revised by ADR-0122 (cancellation observation, unwinding, child failure)
 
 ## Question
 

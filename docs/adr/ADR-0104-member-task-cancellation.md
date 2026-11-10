@@ -1,6 +1,6 @@
 # ADR-0104: Member Task Cancellation
 
-Status: Accepted
+Status: Accepted; revised by ADR-0122 (observation points, unwinding, propagation)
 
 ## Question
 

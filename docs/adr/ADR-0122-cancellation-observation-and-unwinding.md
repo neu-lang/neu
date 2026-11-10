@@ -1,6 +1,6 @@
 # ADR-0122: Cancellation Observation and Unwinding
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

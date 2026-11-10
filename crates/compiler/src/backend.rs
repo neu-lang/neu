@@ -1119,8 +1119,15 @@ fn lower_instruction(
             for argument in arguments {
                 if let Some(aggregate) = aggregate_values.get(argument) {
                     call_arguments.extend(aggregate.iter().copied());
-                } else if let Some(value) = values.get(argument).copied() {
-                    call_arguments.push(value);
+                } else {
+                    // A missing argument is an error: skipping it would call with the
+                    // wrong arity or miscompile (issue #47).
+                    call_arguments.push(
+                        values
+                            .get(argument)
+                            .copied()
+                            .ok_or(CraneliftLoweringError::MissingValue)?,
+                    );
                 }
             }
             let call = builder.ins().call(function_ref, &call_arguments);
@@ -1684,8 +1691,15 @@ fn lower_instruction(
             for argument in arguments {
                 if let Some(aggregate) = aggregate_values.get(argument) {
                     call_arguments.extend(aggregate.iter().copied());
-                } else if let Some(value) = values.get(argument).copied() {
-                    call_arguments.push(value);
+                } else {
+                    // A missing argument is an error: skipping it would call with the
+                    // wrong arity or miscompile (issue #47).
+                    call_arguments.push(
+                        values
+                            .get(argument)
+                            .copied()
+                            .ok_or(CraneliftLoweringError::MissingValue)?,
+                    );
                 }
             }
             let call = builder
@@ -1786,8 +1800,15 @@ fn lower_instruction(
             for argument in arguments {
                 if let Some(aggregate) = aggregate_values.get(argument) {
                     call_arguments.extend(aggregate.iter().copied());
-                } else if let Some(value) = values.get(argument).copied() {
-                    call_arguments.push(value);
+                } else {
+                    // A missing argument is an error: skipping it would call with the
+                    // wrong arity or miscompile (issue #47).
+                    call_arguments.push(
+                        values
+                            .get(argument)
+                            .copied()
+                            .ok_or(CraneliftLoweringError::MissingValue)?,
+                    );
                 }
             }
             let call = builder
