@@ -63,7 +63,7 @@ impl SystemLinkInvocation {
         if !fs::metadata(object).is_ok_and(|metadata| metadata.is_file()) {
             return Err(LinkInvocationError::MissingObject);
         }
-        let output = output.as_ref().to_owned();
+        let output = executable_path(output.as_ref());
         Ok(Self {
             program: std::env::var_os("NEU_LINKER")
                 .map(PathBuf::from)

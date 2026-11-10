@@ -6,6 +6,14 @@ use compiler::{
     source::SourceFileId,
 };
 
+/// A trap ends the process by signal on Unix. On Windows it is an illegal
+/// instruction, which the process reports as this exit code.
+const WINDOWS_ILLEGAL_INSTRUCTION: i32 = -1073741795;
+
+fn is_trap(code: Option<i32>) -> bool {
+    code.is_none() || code == Some(WINDOWS_ILLEGAL_INSTRUCTION)
+}
+
 fn run_status(source: &str, name: &str) -> std::process::ExitStatus {
     let workspace =
         std::env::temp_dir().join(format!("neu-scheduler-{name}-{}", std::process::id()));
@@ -229,7 +237,7 @@ fn cancelling_a_child_cancels_its_unfinished_siblings() {
     "#;
     // A trap ends the process by signal, so there is no exit code.
     let status = run_status(source, "sibling_cancel");
-    assert_eq!(status.code(), None, "{status:?}");
+    assert!(is_trap(status.code()), "{status:?}");
 }
 
 #[test]
@@ -277,7 +285,7 @@ fn deadlock_prints_a_diagnostic_and_traps() {
     )
     .unwrap();
     let output = Command::new(&executable).output().unwrap();
-    assert_eq!(output.status.code(), None, "{:?}", output.status);
+    assert!(is_trap(output.status.code()), "{:?}", output.status);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("deadlock"), "{stderr}");
     let _ = fs::remove_dir_all(workspace);
@@ -379,7 +387,7 @@ fn cancelled_receiver_unwinds_instead_of_deadlocking() {
         }
     "#;
     let (code, stderr) = run_capturing(source, "cancel_receiver");
-    assert_eq!(code, None, "{stderr}");
+    assert!(is_trap(code), "{stderr}");
     assert!(!stderr.contains("deadlock"), "{stderr}");
 }
 
@@ -408,7 +416,7 @@ fn cancelled_task_unwinds_the_children_it_is_joining() {
         }
     "#;
     let (code, stderr) = run_capturing(source, "cancel_propagates");
-    assert_eq!(code, None, "{stderr}");
+    assert!(is_trap(code), "{stderr}");
     assert!(!stderr.contains("deadlock"), "{stderr}");
 }
 
@@ -437,6 +445,6 @@ fn cancelled_awaiter_unwinds_instead_of_deadlocking() {
         }
     "#;
     let (code, stderr) = run_capturing(source, "cancel_awaiter");
-    assert_eq!(code, None, "{stderr}");
+    assert!(is_trap(code), "{stderr}");
     assert!(!stderr.contains("deadlock"), "{stderr}");
 }

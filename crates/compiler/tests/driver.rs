@@ -13,6 +13,18 @@ use compiler::{
     source::SourceFileId,
 };
 
+/// A trap ends the process by signal on Unix. On Windows it is an illegal
+/// instruction, which the process reports as this exit code.
+const WINDOWS_ILLEGAL_INSTRUCTION: i32 = -1073741795;
+
+fn is_trap(code: Option<i32>) -> bool {
+    code.is_none() || code == Some(WINDOWS_ILLEGAL_INSTRUCTION)
+}
+
+fn trapped(status: std::process::ExitStatus) -> bool {
+    is_trap(status.code())
+}
+
 #[test]
 fn compiles_generic_enum_payload_patterns() {
     let workspace =
@@ -490,7 +502,7 @@ fn cancelled_unawaited_task_traps_at_scope_exit() {
     )
     .unwrap();
     // A trap ends the process by signal, so there is no exit code.
-    assert_eq!(Command::new(output).status().unwrap().code(), None);
+    assert!(trapped(Command::new(output).status().unwrap()));
     let _ = fs::remove_dir_all(workspace);
 }
 
@@ -647,7 +659,7 @@ fn compiles_current_control_flow_and_primitive_examples() {
         let status = Command::new(output).status().unwrap();
         if expected_status < 0 {
             // A trap ends the process by signal, so there is no exit code.
-            assert_eq!(status.code(), None, "example {name} should trap");
+            assert!(trapped(status), "example {name} should trap");
         } else {
             assert_eq!(status.code(), Some(expected_status), "example {name}");
         }
@@ -679,8 +691,8 @@ fn complete_concurrency_smoke_retains_entry_symbols_and_runtime_relocations() {
     .unwrap();
     // The example cancels a child inside its outer scope, so the scope traps
     // (ADR-0101 child failure, owner decision).
-    assert_eq!(Command::new(output).status().unwrap().code(), None);
-    assert_eq!(Command::new(&executable).status().unwrap().code(), None);
+    assert!(trapped(Command::new(output).status().unwrap()));
+    assert!(trapped(Command::new(&executable).status().unwrap()));
 
     let object_bytes = fs::read(executable.with_extension("o")).unwrap();
     let object = object::File::parse(object_bytes.as_slice()).unwrap();

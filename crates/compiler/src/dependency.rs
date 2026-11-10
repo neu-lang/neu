@@ -132,11 +132,16 @@ impl GitDependencyResolver {
     pub fn from_environment() -> Result<Self, DependencyDiagnostic> {
         let root = env::var_os("NEU_PATH")
             .map(PathBuf::from)
-            .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".neu")))
+            // Windows sets USERPROFILE rather than HOME.
+            .or_else(|| {
+                env::var_os("HOME")
+                    .or_else(|| env::var_os("USERPROFILE"))
+                    .map(|home| PathBuf::from(home).join(".neu"))
+            })
             .ok_or_else(|| {
                 DependencyDiagnostic::new(
                     DependencyDiagnosticKind::CacheUnavailable,
-                    "HOME and NEU_PATH are unset",
+                    "HOME, USERPROFILE, and NEU_PATH are unset",
                 )
             })?;
         Ok(Self::new(root))

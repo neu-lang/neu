@@ -67,6 +67,11 @@ fn scheduler_uses_ucontext_on_unix_and_fibers_on_windows() {
         ("x86_64-pc-windows-gnu", false),
         ("x86_64-pc-windows-msvc", false),
     ] {
+        // The ucontext layout comes from the host's libc, so a compiler built for
+        // Windows emits no Unix scheduler. Only Windows targets are checked there.
+        if expects_ucontext && !cfg!(unix) {
+            continue;
+        }
         let target: Triple = triple.parse().unwrap();
         let bytes = emit_mir_function_to_object_for_target(&function, &types, "main", target)
             .unwrap_or_else(|error| panic!("{triple} failed to emit: {error:?}"));
