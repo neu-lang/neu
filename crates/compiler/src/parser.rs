@@ -2293,13 +2293,18 @@ impl<'source> Parser<'source> {
         let mut initializer = None;
         if self.current_kind() == Some(TokenKind::Equal) {
             self.advance();
+            let diagnostics_before = self.diagnostics.len();
             if let Some(span) = self.parse_expression() {
                 initializer = self.latest_expression_node_for_span(span);
             } else {
-                self.diagnostic_current_or_span(
-                    DiagnosticKind::MalformedVariableDeclaration,
-                    self.span_at(start),
-                );
+                // A failed initializer that already reported its root cause
+                // does not also make the whole declaration malformed.
+                if self.diagnostics.len() == diagnostics_before {
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedVariableDeclaration,
+                        self.span_at(start),
+                    );
+                }
                 self.skip_to_statement_boundary();
                 return;
             }
@@ -2416,8 +2421,13 @@ impl<'source> Parser<'source> {
                 BinaryAssociativity::Left => precedence + 1,
                 BinaryAssociativity::Right => precedence,
             };
+            let diagnostics_before = self.diagnostics.len();
             let Some(right) = self.parse_binary_expression(next_min_precedence) else {
-                self.diagnostic(DiagnosticKind::MalformedBinaryExpression, operator_span);
+                // An operand that already reported its own failure is the root
+                // cause; do not report the operator as a second error.
+                if self.diagnostics.len() == diagnostics_before {
+                    self.diagnostic(DiagnosticKind::MalformedBinaryExpression, operator_span);
+                }
                 return Some(left);
             };
             left = self.span(left.start(), right.end());
@@ -2829,7 +2839,12 @@ impl<'source> Parser<'source> {
             }
         }
         self.advance();
-        let body_span = self.parse_expression()?;
+        let Some(body_span) = self.parse_expression() else {
+            // The body already reported its root cause. Skip the rest of the
+            // lambda so the enclosing statement does not re-read it.
+            self.skip_past_lambda_body();
+            return None;
+        };
         let body = self.latest_expression_node_for_span(body_span)?;
         if self.current_kind() != Some(TokenKind::RightBrace) {
             self.diagnostic_current_or_span(DiagnosticKind::MalformedBlock, self.span_at(start));
@@ -4080,6 +4095,23 @@ impl<'source> Parser<'source> {
             ) || self.is_declaration_starter()
             {
                 return;
+            }
+            self.advance();
+        }
+    }
+
+    /// Skips to just past the `}` that closes the enclosing lambda body.
+    fn skip_past_lambda_body(&mut self) {
+        let mut depth = 0usize;
+        while let Some(kind) = self.current_kind() {
+            match kind {
+                TokenKind::LeftBrace => depth += 1,
+                TokenKind::RightBrace if depth == 0 => {
+                    self.advance();
+                    return;
+                }
+                TokenKind::RightBrace => depth -= 1,
+                _ => {}
             }
             self.advance();
         }
