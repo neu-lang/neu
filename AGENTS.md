@@ -67,8 +67,7 @@ Do not implement a semantic decision while its ambiguity remains unresolved.
 
 ## Commit And CI
 
-Use branch names `codex/<topic>` unless the project owner requests another
-name. Use concise subjects with existing prefixes such as `compiler:`,
+Use concise subjects with existing prefixes such as `compiler:`,
 `tests:`, `docs:`, `adr:`, `spec:`, `roadmap:`, or `build:`.
 
 A task is complete only when its tests were created first, scope remains
