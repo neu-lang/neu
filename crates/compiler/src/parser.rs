@@ -351,7 +351,7 @@ pub struct ParsedArrayType {
 pub struct ParsedFunctionType {
     pub function_type: AstNodeId,
     pub parameters: Vec<AstNodeId>,
-    pub return_type: AstNodeId,
+    pub return_type: Option<AstNodeId>,
     pub span: ByteSpan,
 }
 
@@ -407,7 +407,6 @@ pub enum ParsedLiteralKind {
     AcceptedInteger,
     AcceptedString,
     Float,
-    Unit,
     Null,
 }
 
@@ -2765,18 +2764,10 @@ impl<'source> Parser<'source> {
                 self.parse_name_expression()
             }
             Some(TokenKind::LeftParen) if self.peek_kind() == Some(TokenKind::RightParen) => {
-                let start = self.current().expect("left paren exists").span.start();
+                self.diagnostic_current(DiagnosticKind::UnsupportedExpressionForm);
                 self.advance();
-                let end = self.current().expect("right paren exists").span.end();
                 self.advance();
-                let span = self.span(start, end);
-                let expression = self.arena.add_literal_expression(span);
-                self.literal_expressions.push(ParsedLiteralExpression {
-                    expression,
-                    kind: ParsedLiteralKind::Unit,
-                    span,
-                });
-                Some(span)
+                None
             }
             Some(TokenKind::LeftParen) => self.parse_grouped_expression(),
             Some(TokenKind::KwIf) => self.parse_if_expression(),
@@ -3711,6 +3702,12 @@ impl<'source> Parser<'source> {
     fn parse_named_type(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
         let name_end = self.parse_qualified_name_for_type()?;
+        if &self.text[start..name_end] == "Unit" {
+            self.diagnostic(
+                DiagnosticKind::UnsupportedTypeForm,
+                self.span(start, name_end),
+            );
+        }
         let mut end = name_end;
         let reference_index = self.type_name_references.len();
         let generic_arguments = if self.current_kind() == Some(TokenKind::Less) {
@@ -3904,15 +3901,29 @@ impl<'source> Parser<'source> {
         }
         self.advance();
 
-        let Some(return_span) = self.parse_type() else {
-            self.diagnostic_current_or_span(
-                DiagnosticKind::MalformedFunctionType,
-                self.span_at(start),
-            );
-            return None;
+        let return_type = if matches!(
+            self.current_kind(),
+            Some(
+                TokenKind::RightParen
+                    | TokenKind::Comma
+                    | TokenKind::Colon
+                    | TokenKind::Equal
+                    | TokenKind::Semicolon
+                    | TokenKind::RightBrace
+            ) | None
+        ) {
+            None
+        } else {
+            let return_span = self.parse_type()?;
+            Some(self.latest_type_node_for_span(return_span)?)
         };
-        let return_type = self.latest_type_node_for_span(return_span)?;
-        let span = self.span(start, return_span.end());
+        let span = self.span(
+            start,
+            return_type
+                .and_then(|return_type| self.arena.node(return_type).map(|node| node.span.end()))
+                .or_else(|| self.previous_span().map(|span| span.end()))
+                .unwrap_or(start),
+        );
         let function_type = self.arena.add_function_type(span);
         self.function_types.push(ParsedFunctionType {
             function_type,

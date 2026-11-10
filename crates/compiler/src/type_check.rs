@@ -247,10 +247,10 @@ pub fn apply_intrinsic_call_facts(
     report: &mut TypeCheckReport,
     types: &TypeArena,
 ) {
-    let Some(unit_type) = types
+    let Some(void_type) = types
         .records()
         .iter()
-        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Unit))
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Void))
         .map(|record| record.id())
     else {
         return;
@@ -265,7 +265,7 @@ pub fn apply_intrinsic_call_facts(
             continue;
         };
         if matches!(name, "assert" | "fail") {
-            report.replace_expression_type(ExpressionType::new(call.expression, unit_type));
+            report.replace_expression_type(ExpressionType::new(call.expression, void_type));
             report.retain_diagnostics(|diagnostic| {
                 diagnostic.node() != call.expression
                     || !matches!(diagnostic.rule(), TypeRuleDiagnostic::DirectCallDeferred)
@@ -370,7 +370,6 @@ pub enum CompileTimeValue {
     Int(i64),
     Float(u64),
     Byte(u8),
-    Unit,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -3420,7 +3419,6 @@ pub enum LiteralKind {
     AcceptedInteger,
     AcceptedString,
     Float,
-    Unit,
     Null,
 }
 
@@ -3909,16 +3907,11 @@ pub fn check_entry_point(
 pub fn check_straight_line_returns(parsed: &ParseOutput) -> ReturnPathReport {
     let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
-        let is_int_function = function.return_annotation.is_some_and(|annotation| {
-            parsed
-                .type_name_references
-                .iter()
-                .any(|reference| reference.reference == annotation && reference.name == "Int")
-        });
+        let has_explicit_return = function.return_annotation.is_some();
         let Some(body) = function.body else {
             continue;
         };
-        if !is_int_function {
+        if !has_explicit_return {
             continue;
         }
 
@@ -3934,6 +3927,16 @@ pub fn check_straight_line_returns(parsed: &ParseOutput) -> ReturnPathReport {
             ));
             continue;
         };
+        if direct_returns
+            .iter()
+            .all(|returned| returned.value.is_none())
+        {
+            diagnostics.push(ReturnPathDiagnostic::new(
+                ReturnPathDiagnosticKind::MissingReturn,
+                function.declaration,
+            ));
+            continue;
+        }
         let _ = first;
         diagnostics.extend(later.iter().map(|returned| {
             ReturnPathDiagnostic::new(
@@ -3962,14 +3965,31 @@ pub fn check_return_expression_types_with_arena(
     let mut diagnostics = Vec::new();
 
     for returned in &parsed.return_statements {
-        let Some(value) = returned.value else {
-            continue;
-        };
         let Some(expected) = signatures
             .iter()
             .find(|signature| signature.declaration == returned.function)
             .map(|signature| signature.return_type)
         else {
+            continue;
+        };
+        let Some(value) = returned.value else {
+            let is_void = arena.is_some_and(|arena| {
+                matches!(
+                    arena.get(expected).map(|record| record.kind()),
+                    Some(TypeKind::Primitive(PrimitiveType::Void))
+                )
+            });
+            if !is_void {
+                let span = parsed
+                    .arena
+                    .node(returned.statement)
+                    .map(|node| node.span)
+                    .unwrap_or_else(|| parsed.arena.node(returned.function).unwrap().span);
+                diagnostics.push(ReturnTypeDiagnostic::new(
+                    ReturnTypeDiagnosticKind::ReturnTypeMismatch,
+                    span,
+                ));
+            }
             continue;
         };
         let Some(actual) = expression_types
@@ -4070,7 +4090,7 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
                 reference.name != "Array"
                     && !matches!(
                         reference.name.as_str(),
-                        "Bool" | "Int" | "String" | "Unit" | "Float" | "Byte" | "Channel" | "Task"
+                        "Bool" | "Int" | "String" | "Float" | "Byte" | "Channel" | "Task"
                     )
                     && !parsed
                         .generic_parameters
@@ -4257,18 +4277,21 @@ fn type_function_signatures_in_with_classes_and_generics(
                     .map(|record| (parameter.name.as_str(), record.ty()))
             })
             .collect();
-        let Some(return_annotation) = function.return_annotation else {
-            continue;
-        };
-        let Some(return_type) = resolve_annotation_type_with_generics(
-            return_annotation,
-            type_name_references,
-            array_types,
-            &primitives,
-            classes,
-            arena,
-            &generic_types,
-        ) else {
+        let return_type = function
+            .return_annotation
+            .map(|return_annotation| {
+                resolve_annotation_type_with_generics(
+                    return_annotation,
+                    type_name_references,
+                    array_types,
+                    &primitives,
+                    classes,
+                    arena,
+                    &generic_types,
+                )
+            })
+            .unwrap_or(Some(primitives.void_id));
+        let Some(return_type) = return_type else {
             continue;
         };
         let function_parameters: Vec<_> = parameters
@@ -4354,14 +4377,20 @@ pub fn type_function_types(
         else {
             continue;
         };
-        let Some(return_type) = resolve_annotation_type(
-            function.return_type,
-            &parsed.type_name_references,
-            &parsed.array_types,
-            &primitives,
-            &[],
-            types,
-        ) else {
+        let return_type = function
+            .return_type
+            .map(|return_type| {
+                resolve_annotation_type(
+                    return_type,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &primitives,
+                    &[],
+                    types,
+                )
+            })
+            .unwrap_or(Some(primitives.void_id));
+        let Some(return_type) = return_type else {
             continue;
         };
         resolved.push((
@@ -4397,14 +4426,19 @@ pub fn type_annotation_type(
                 )
             })
             .collect::<Option<Vec<_>>>()?;
-        let return_type = resolve_annotation_type(
-            function_type.return_type,
-            &parsed.type_name_references,
-            &parsed.array_types,
-            &PrimitiveTypeIds::module_owned(types),
-            classes,
-            types,
-        )?;
+        let return_type = function_type
+            .return_type
+            .map(|return_type| {
+                resolve_annotation_type(
+                    return_type,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &PrimitiveTypeIds::module_owned(types),
+                    classes,
+                    types,
+                )
+            })
+            .unwrap_or_else(|| Some(PrimitiveTypeIds::module_owned(types).void_id))?;
         return Some(types.function(FunctionType::new(parameters, return_type)));
     }
     resolve_annotation_type(
@@ -4560,7 +4594,7 @@ pub fn type_concurrency_operations(
     types: &mut TypeArena,
     report: &mut TypeCheckReport,
 ) {
-    let unit = PrimitiveTypeIds::module_owned(types).unit_id;
+    let unit = PrimitiveTypeIds::module_owned(types).void_id;
     let int = PrimitiveTypeIds::module_owned(types).int_id;
     for call in &parsed.call_expressions {
         if let Some(member) = parsed
@@ -5980,8 +6014,8 @@ pub fn type_dynamic_array_operations(
     let int_type = types.records().iter().find_map(|record| {
         (record.kind() == &TypeKind::Primitive(PrimitiveType::Int)).then_some(record.id())
     });
-    let unit_type = types.records().iter().find_map(|record| {
-        (record.kind() == &TypeKind::Primitive(PrimitiveType::Unit)).then_some(record.id())
+    let void_type = types.records().iter().find_map(|record| {
+        (record.kind() == &TypeKind::Primitive(PrimitiveType::Void)).then_some(record.id())
     });
     for call in &parsed.call_expressions {
         let Some(member) = parsed
@@ -6002,8 +6036,8 @@ pub fn type_dynamic_array_operations(
         }
         let (result, mutating, valid_arity) = match member.name.as_str() {
             "size" => (int_type, false, call.arguments.is_empty()),
-            "add" => (unit_type, true, matches!(call.arguments.len(), 1 | 2)),
-            "remove" => (unit_type, true, call.arguments.len() == 1),
+            "add" => (void_type, true, matches!(call.arguments.len(), 1 | 2)),
+            "remove" => (void_type, true, call.arguments.len() == 1),
             _ => (None, false, false),
         };
         if !valid_arity {
@@ -6338,7 +6372,7 @@ struct PrimitiveTypeIds {
     bool_id: TypeId,
     int_id: TypeId,
     string_id: TypeId,
-    unit_id: TypeId,
+    void_id: TypeId,
     null_id: TypeId,
     float_id: TypeId,
     byte_id: TypeId,
@@ -6350,7 +6384,7 @@ impl PrimitiveTypeIds {
             bool_id: arena.insert(TypeRecord::primitive(PrimitiveType::Bool)),
             int_id: arena.insert(TypeRecord::primitive(PrimitiveType::Int)),
             string_id: arena.insert(TypeRecord::primitive(PrimitiveType::String)),
-            unit_id: arena.insert(TypeRecord::primitive(PrimitiveType::Unit)),
+            void_id: arena.insert(TypeRecord::primitive(PrimitiveType::Void)),
             null_id: arena.insert(TypeRecord::primitive(PrimitiveType::Null)),
             float_id: arena.insert(TypeRecord::primitive(PrimitiveType::Float)),
             byte_id: arena.insert(TypeRecord::primitive(PrimitiveType::Byte)),
@@ -6374,7 +6408,7 @@ impl PrimitiveTypeIds {
             bool_id: primitive(PrimitiveType::Bool),
             int_id: primitive(PrimitiveType::Int),
             string_id: primitive(PrimitiveType::String),
-            unit_id: primitive(PrimitiveType::Unit),
+            void_id: primitive(PrimitiveType::Void),
             null_id: primitive(PrimitiveType::Null),
             float_id: primitive(PrimitiveType::Float),
             byte_id: primitive(PrimitiveType::Byte),
@@ -6387,7 +6421,6 @@ impl PrimitiveTypeIds {
             LiteralKind::AcceptedInteger => self.int_id,
             LiteralKind::AcceptedString => self.string_id,
             LiteralKind::Float => self.float_id,
-            LiteralKind::Unit => self.unit_id,
             LiteralKind::Null => self.null_id,
         }
     }
@@ -6397,7 +6430,6 @@ impl PrimitiveTypeIds {
             "Bool" => Some(self.bool_id),
             "Int" => Some(self.int_id),
             "String" => Some(self.string_id),
-            "Unit" => Some(self.unit_id),
             "Null" => Some(self.null_id),
             "Float" => Some(self.float_id),
             "Byte" => Some(self.byte_id),
@@ -6438,7 +6470,6 @@ fn literal_kind_from_parser(kind: ParsedLiteralKind) -> LiteralKind {
         ParsedLiteralKind::AcceptedInteger => LiteralKind::AcceptedInteger,
         ParsedLiteralKind::AcceptedString => LiteralKind::AcceptedString,
         ParsedLiteralKind::Float => LiteralKind::Float,
-        ParsedLiteralKind::Unit => LiteralKind::Unit,
         ParsedLiteralKind::Null => LiteralKind::Null,
     }
 }
@@ -6751,7 +6782,7 @@ pub fn type_primitive_operators(
     bool_type: TypeId,
     float_type: TypeId,
     byte_type: TypeId,
-    unit_type: TypeId,
+    void_type: TypeId,
 ) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
     for expression_type in known_expression_types {
@@ -6793,7 +6824,7 @@ pub fn type_primitive_operators(
                 (Some(bool_type), Some(bool_type))
             }
             ParsedBinaryOperator::Equal | ParsedBinaryOperator::NotEqual
-                if left == right && left != unit_type =>
+                if left == right && left != void_type =>
             {
                 (None, Some(bool_type))
             }
@@ -8597,7 +8628,6 @@ fn evaluate_constant(
         return match literal.kind {
             ParsedLiteralKind::BoolTrue => Ok(CompileTimeValue::Bool(true)),
             ParsedLiteralKind::BoolFalse => Ok(CompileTimeValue::Bool(false)),
-            ParsedLiteralKind::Unit => Ok(CompileTimeValue::Unit),
             ParsedLiteralKind::Float => parsed
                 .float_literals
                 .iter()
@@ -8949,7 +8979,7 @@ fn type_core_with_arena(
             primitives.bool_id,
             primitives.float_id,
             primitives.byte_id,
-            primitives.unit_id,
+            primitives.void_id,
         );
         merge_type_check_report(&mut report, primitive_report);
     }

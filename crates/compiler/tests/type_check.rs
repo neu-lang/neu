@@ -1625,7 +1625,7 @@ fn literal_expression_typing_records_adr0027_primitive_types() {
     );
     assert_eq!(
         arena.get(TypeId::from_raw(3)).unwrap().kind(),
-        &TypeKind::Primitive(PrimitiveType::Unit)
+        &TypeKind::Primitive(PrimitiveType::Void)
     );
     assert_eq!(
         arena.get(TypeId::from_raw(4)).unwrap().kind(),
@@ -1691,7 +1691,7 @@ fn parser_literal_metadata_types_to_adr0027_primitives() {
 fn primitive_local_declaration_annotations_record_declaration_signatures() {
     let parsed = parse_source(
         SourceFileId::from_raw(61),
-        "func run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const done: Unit; const absent: Null = null; const ratio: Float = value; const octet: Byte = value; }",
+        "func run() { const ready: Bool = true; const count: Int = 1; const label: String = \"x\"; const absent: Null = null; const ratio: Float = value; const octet: Byte = value; }",
     );
 
     assert!(parsed.lex_diagnostics.is_empty());
@@ -1716,10 +1716,9 @@ fn primitive_local_declaration_annotations_record_declaration_signatures() {
             DeclarationSignature::new(declarations[0], TypeId::from_raw(0)),
             DeclarationSignature::new(declarations[1], TypeId::from_raw(1)),
             DeclarationSignature::new(declarations[2], TypeId::from_raw(2)),
-            DeclarationSignature::new(declarations[3], TypeId::from_raw(3)),
-            DeclarationSignature::new(declarations[4], TypeId::from_raw(4)),
-            DeclarationSignature::new(declarations[5], TypeId::from_raw(5)),
-            DeclarationSignature::new(declarations[6], TypeId::from_raw(6)),
+            DeclarationSignature::new(declarations[3], TypeId::from_raw(4)),
+            DeclarationSignature::new(declarations[4], TypeId::from_raw(5)),
+            DeclarationSignature::new(declarations[5], TypeId::from_raw(6)),
         ]
     );
     assert_eq!(
@@ -1867,7 +1866,7 @@ fn primitive_operators_type_bool_float_and_byte_families() {
     let bool_type = TypeId::from_raw(0);
     let float_type = TypeId::from_raw(5);
     let byte_type = TypeId::from_raw(6);
-    let unit_type = TypeId::from_raw(3);
+    let void_type = TypeId::from_raw(3);
     let bool_left = AstNodeId::from_raw(700);
     let bool_right = AstNodeId::from_raw(701);
     let bool_result = AstNodeId::from_raw(702);
@@ -1927,7 +1926,7 @@ fn primitive_operators_type_bool_float_and_byte_families() {
     ];
 
     let report = type_primitive_operators(
-        &unary, &binary, &known, bool_type, float_type, byte_type, unit_type,
+        &unary, &binary, &known, bool_type, float_type, byte_type, void_type,
     );
 
     assert!(report.diagnostics().is_empty());
@@ -4427,6 +4426,34 @@ fn straight_line_return_validation_reports_missing_and_unreachable_returns() {
 }
 
 #[test]
+fn omitted_return_functions_are_void_and_allow_fallthrough() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(114),
+        "func falls_through() { val ready: Bool = true; } func returns() { return; }",
+    );
+    assert!(parsed.diagnostics.is_empty());
+
+    let mut types = TypeArena::new();
+    let signatures = type_function_signatures_in(
+        &mut types,
+        &parsed.function_declarations,
+        &parsed.function_parameters,
+        &parsed.type_name_references,
+    );
+    assert_eq!(signatures.len(), 2);
+    assert!(signatures.iter().all(|signature| {
+        types
+            .get(signature.return_type())
+            .is_some_and(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Void))
+    }));
+    assert!(
+        check_straight_line_returns(&parsed)
+            .diagnostics()
+            .is_empty()
+    );
+}
+
+#[test]
 fn function_signatures_type_explicit_int_parameters_and_returns() {
     let parsed = parse_source(
         SourceFileId::from_raw(113),
@@ -4449,7 +4476,7 @@ fn function_signatures_type_explicit_int_parameters_and_returns() {
 fn function_signatures_type_all_bootstrap_primitives() {
     let parsed = parse_source(
         SourceFileId::from_raw(919),
-        "func bool_value(value: Bool): Bool { return value; } func unit_value(): Unit { return (); } func float_value(value: Float): Float { return value; } func byte_value(value: Byte): Byte { return value; }",
+        "func bool_value(value: Bool): Bool { return value; } func unit_value() {} func float_value(value: Float): Float { return value; } func byte_value(value: Byte): Byte { return value; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());

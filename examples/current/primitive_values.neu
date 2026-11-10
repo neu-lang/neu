@@ -4,7 +4,6 @@ public func main(): Int {
     val ready: Bool = true;
     val ratio: Float = 3.75;
     val mask: Byte = 0xff;
-    val complete: Unit = ();
     const answer: Int = 1 + 2;
     var exit_code: Int = 6;
     exit_code = 7;

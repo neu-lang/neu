@@ -220,7 +220,7 @@ pub fn satisfies_thread_capability(
         TypeKind::Primitive(
             PrimitiveType::Bool
             | PrimitiveType::Int
-            | PrimitiveType::Unit
+            | PrimitiveType::Void
             | PrimitiveType::Float
             | PrimitiveType::Byte,
         ) => true,

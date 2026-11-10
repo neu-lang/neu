@@ -431,7 +431,7 @@ fn lower_mir_function_with_module(
         for local in function.locals() {
             if matches!(
                 type_arena.get(local.ty()).map(|record| record.kind()),
-                Some(TypeKind::Primitive(PrimitiveType::Unit))
+                Some(TypeKind::Primitive(PrimitiveType::Void))
             ) {
                 continue;
             }
@@ -662,7 +662,7 @@ fn require_bootstrap_runtime_type(
                 | PrimitiveType::Float
                 | PrimitiveType::Byte
                 | PrimitiveType::String
-                | PrimitiveType::Unit
+                | PrimitiveType::Void
         )) | Some(TypeKind::Array(_))
             | Some(TypeKind::DynamicArray(_))
             | Some(TypeKind::Task(_))
@@ -681,7 +681,7 @@ fn cranelift_type(ty: crate::types::TypeId, type_arena: &TypeArena) -> Option<ty
         Some(TypeKind::Primitive(PrimitiveType::Bool | PrimitiveType::Byte)) => Some(types::I8),
         Some(TypeKind::Primitive(PrimitiveType::Int)) => Some(types::I64),
         Some(TypeKind::Primitive(PrimitiveType::Float)) => Some(types::F64),
-        Some(TypeKind::Primitive(PrimitiveType::Unit)) => None,
+        Some(TypeKind::Primitive(PrimitiveType::Void)) => None,
         Some(TypeKind::Primitive(PrimitiveType::String)) => Some(types::I64),
         Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::Function(_)) => {
             Some(types::I64)
@@ -706,7 +706,7 @@ fn flattened_cranelift_types(
             }
             Ok(())
         }
-        Some(TypeKind::Primitive(PrimitiveType::Unit)) => Ok(()),
+        Some(TypeKind::Primitive(PrimitiveType::Void)) => Ok(()),
         Some(_) => {
             output.push(
                 cranelift_type(ty, type_arena)
@@ -1207,7 +1207,7 @@ fn lower_instruction(
                     .type_arena
                     .get(result_type)
                     .map(|record| record.kind()),
-                Some(TypeKind::Primitive(PrimitiveType::Unit))
+                Some(TypeKind::Primitive(PrimitiveType::Void))
             ) {
                 let value_type = cranelift_type(result_type, context.type_arena)
                     .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;

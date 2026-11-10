@@ -2,6 +2,16 @@
 
 Status: Draft seed
 
+## Current Return Convention
+
+A function declaration with no return annotation is a no-result function. The
+compiler represents that result internally as `Void`, but `Void` is not a
+user-facing type name. The former `Unit` type and `()` literal are removed.
+No-result functions may fall through or use bare `return;`; returning a value
+requires an explicitly annotated non-void result. Function types may omit the
+result after `->` (for example `() ->`), which has the same internal no-result
+meaning. No-result functions and compiler intrinsics have no ABI return value.
+
 This file records the initial semantic decisions accepted from ADR-0001 through
 ADR-0020. These are language-level choices, not compiler implementation details.
 
@@ -225,9 +235,16 @@ The compiler defines a small bootstrap type checker with primitive type-checking
 
 Typed output is side-table metadata: an expression type table, declaration signature table, assignment check table, and diagnostics list. The type checker does not rewrite the AST.
 
-Primitive identities `Bool`, `Int`, `String`, `Unit`, and `Null` are type-checking
+Primitive identities `Bool`, `Int`, `String`, and `Null` are type-checking
 identities. `String` receives the compiler-owned opaque runtime representation
 defined by ADR-0064; it has no stable public layout or FFI meaning.
+
+Functions without a return annotation are no-result functions. Their internal
+result is the compiler-only `Void` type; `Void` is not a user-facing type name.
+The removed `Unit` type and `()` literal are rejected. A no-result function may
+fall through or use `return;`; value returns are reserved for non-void
+functions. Function types may omit the result after `->`, which normalizes to
+the same internal no-result type.
 
 Assignment compatibility is exact type identity, except `Null` is assignment-compatible only with nullable target types and non-null base values are assignment-compatible with their nullable wrapper.
 
@@ -258,7 +275,7 @@ existing immutable binding category and has no compile-time evaluation meaning.
 initializer, and is a compile-time constant.
 
 `const` initializers accept primitive literals and pure primitive operators for
-`Bool`, `Int`, `Float`, `Byte`, and `Unit`. Calls, local reads, allocation, I/O,
+`Bool`, `Int`, `Float`, and `Byte`. Calls, local reads, allocation, I/O,
 control flow, strings, nullable values, user-defined values, and unsupported
 operators are rejected. Typed constant facts may be consumed by runtime
 expressions and future fixed-array length expressions.

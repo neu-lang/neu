@@ -1038,9 +1038,6 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::ByteLiteral(value) => instructions.push(
                     MirInstruction::byte_constant(output, *value, expression.span()),
                 ),
-                HirExpressionKind::UnitLiteral => {
-                    instructions.push(MirInstruction::unit_constant(expression.span()))
-                }
                 HirExpressionKind::ParameterRead(parameter) => {
                     instructions.push(MirInstruction::ParameterRead {
                         output,
@@ -1060,7 +1057,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         });
                     } else if !matches!(
                         types.get(expression.ty()).map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
+                        Some(TypeKind::Primitive(PrimitiveType::Void) | TypeKind::Array(_))
                     ) {
                         instructions.push(MirInstruction::LoadLocal {
                             output,
@@ -1460,7 +1457,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         });
                     } else if !matches!(
                         types.get(local.ty()).map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
+                        Some(TypeKind::Primitive(PrimitiveType::Void) | TypeKind::Array(_))
                     ) {
                         instructions.push(MirInstruction::StoreLocal {
                             local: MirLocalId::from_raw(local.id().index()),
@@ -1489,7 +1486,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                             .iter()
                             .find(|local| local.id() == assignment.target())
                             .map(|local| types.get(local.ty()).map(|record| record.kind())),
-                        Some(Some(TypeKind::Primitive(PrimitiveType::Unit)))
+                        Some(Some(TypeKind::Primitive(PrimitiveType::Void)))
                     )
                 {
                     if let Some(index) = assignment.index() {
@@ -1566,18 +1563,17 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 });
             }
         }
-        let returned = function
-            .returns()
-            .first()
-            .ok_or(MirLoweringError::MissingReturn)?;
-        let terminator = if matches!(
+        let returned = function.returns().first();
+        let is_void = matches!(
             types
                 .get(function.return_type())
                 .map(|record| record.kind()),
-            Some(TypeKind::Primitive(PrimitiveType::Unit))
-        ) {
-            MirTerminator::return_unit(returned.span())
+            Some(TypeKind::Primitive(PrimitiveType::Void))
+        );
+        let terminator = if is_void {
+            MirTerminator::return_unit(returned.map_or(function.span(), |returned| returned.span()))
         } else {
+            let returned = returned.ok_or(MirLoweringError::MissingReturn)?;
             MirTerminator::return_value(
                 mir_expression_value_id(function, returned.expression()),
                 returned.span(),
@@ -1845,9 +1841,6 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
-            HirExpressionKind::UnitLiteral => {
-                self.push(MirInstruction::unit_constant(expression.span()));
-            }
             HirExpressionKind::LocalRead(local) => {
                 if matches!(
                     self.types.get(expression.ty()).map(|record| record.kind()),
@@ -1860,7 +1853,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                     });
                 } else if !matches!(
                     self.types.get(expression.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    Some(TypeKind::Primitive(PrimitiveType::Void))
                 ) {
                     self.push(MirInstruction::LoadLocal {
                         output,
@@ -2252,7 +2245,7 @@ impl<'a> ShortCircuitLowerer<'a> {
             if local.initializer() == Some(expression.id())
                 && !matches!(
                     self.types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    Some(TypeKind::Primitive(PrimitiveType::Void))
                 )
             {
                 self.push(MirInstruction::StoreLocal {
@@ -2270,7 +2263,7 @@ impl<'a> ShortCircuitLowerer<'a> {
                         .iter()
                         .find(|local| local.id() == assignment.target())
                         .map(|local| self.types.get(local.ty()).map(|record| record.kind())),
-                    Some(Some(TypeKind::Primitive(PrimitiveType::Unit)))
+                    Some(Some(TypeKind::Primitive(PrimitiveType::Void)))
                 )
             {
                 self.push(MirInstruction::StoreLocal {
@@ -2285,24 +2278,24 @@ impl<'a> ShortCircuitLowerer<'a> {
     }
 
     fn finish(mut self) -> Result<MirFunction, MirLoweringError> {
-        let returned = self
-            .function
-            .returns()
-            .first()
-            .ok_or(MirLoweringError::MissingReturn)?;
-        let value = self.lower_expression(returned.expression())?;
         let return_is_unit = matches!(
             self.types
                 .get(self.function.return_type())
                 .map(|record| record.kind()),
-            Some(TypeKind::Primitive(PrimitiveType::Unit))
+            Some(TypeKind::Primitive(PrimitiveType::Void))
         );
         if self.blocks[self.current].terminator.is_none() {
-            self.blocks[self.current].terminator = Some(if return_is_unit {
-                MirTerminator::return_unit(returned.span())
+            let returned = self.function.returns().first();
+            if return_is_unit {
+                self.blocks[self.current].terminator = Some(MirTerminator::return_unit(
+                    returned.map_or(self.function.span(), |returned| returned.span()),
+                ));
             } else {
-                MirTerminator::return_value(value, returned.span())
-            });
+                let returned = returned.ok_or(MirLoweringError::MissingReturn)?;
+                let value = self.lower_expression(returned.expression())?;
+                self.blocks[self.current].terminator =
+                    Some(MirTerminator::return_value(value, returned.span()));
+            }
         }
         let blocks = self
             .blocks
@@ -2522,9 +2515,6 @@ impl<'a> ControlFlowLowerer<'a> {
                     expression.span(),
                 ));
             }
-            HirExpressionKind::UnitLiteral => {
-                self.push(MirInstruction::unit_constant(expression.span()));
-            }
             HirExpressionKind::ParameterRead(parameter) => {
                 self.push(MirInstruction::ParameterRead {
                     output,
@@ -2544,7 +2534,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     });
                 } else if !matches!(
                     self.types.get(expression.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Primitive(PrimitiveType::Unit))
+                    Some(TypeKind::Primitive(PrimitiveType::Void))
                 ) {
                     self.push(MirInstruction::LoadLocal {
                         output,
@@ -3019,7 +3009,7 @@ impl<'a> ControlFlowLowerer<'a> {
                         self.types
                             .get(self.local_type(*local)?)
                             .map(|record| record.kind()),
-                        Some(TypeKind::Primitive(PrimitiveType::Unit) | TypeKind::Array(_))
+                        Some(TypeKind::Primitive(PrimitiveType::Void) | TypeKind::Array(_))
                     ) {
                         self.push(MirInstruction::StoreLocal {
                             local: MirLocalId::from_raw(local.index()),
@@ -3355,7 +3345,7 @@ impl<'a> ControlFlowLowerer<'a> {
     fn is_unit(&self, ty: TypeId) -> bool {
         matches!(
             self.types.get(ty).map(|record| record.kind()),
-            Some(TypeKind::Primitive(PrimitiveType::Unit))
+            Some(TypeKind::Primitive(PrimitiveType::Void))
         )
     }
 }
@@ -3378,18 +3368,27 @@ fn lower_hir_function_with_control_flow(
                 }
             }
         }
-        let returned = function
-            .returns()
-            .first()
-            .ok_or(MirLoweringError::MissingReturn)?;
-        let value = lowerer.lower_expression(returned.expression())?;
         if lowerer.is_unit(function.return_type()) {
-            lowerer.terminate(MirTerminator::return_unit(returned.span()));
+            let span = function
+                .returns()
+                .first()
+                .map_or(function.span(), |returned| returned.span());
+            lowerer.terminate(MirTerminator::return_unit(span));
         } else {
+            let returned = function
+                .returns()
+                .first()
+                .ok_or(MirLoweringError::MissingReturn)?;
+            let value = lowerer.lower_expression(returned.expression())?;
             lowerer.terminate(MirTerminator::return_value(value, returned.span()));
         }
     } else {
         lowerer.lower_sequence(function.control_flow())?;
+        if lowerer.blocks[lowerer.current].terminator.is_none()
+            && lowerer.is_unit(function.return_type())
+        {
+            lowerer.terminate(MirTerminator::return_unit(function.span()));
+        }
     }
     let ControlFlowLowerer { blocks, locals, .. } = lowerer;
     let blocks = blocks
@@ -3434,7 +3433,7 @@ fn require_bootstrap_runtime_type(ty: TypeId, types: &TypeArena) -> Result<(), M
             | PrimitiveType::Float
             | PrimitiveType::Byte
             | PrimitiveType::String
-            | PrimitiveType::Unit,
+            | PrimitiveType::Void,
         )) => Ok(()),
         Some(TypeKind::Array(array)) => require_bootstrap_runtime_type(array.element(), types),
         Some(TypeKind::DynamicArray(_)) => Ok(()),
@@ -3466,7 +3465,6 @@ fn require_hir_expression_type(
         HirExpressionKind::FloatLiteral(_) => PrimitiveType::Float,
         HirExpressionKind::ByteLiteral(_) => PrimitiveType::Byte,
         HirExpressionKind::StringLiteral(_) => PrimitiveType::String,
-        HirExpressionKind::UnitLiteral => PrimitiveType::Unit,
         _ => return require_bootstrap_runtime_type(expression.ty(), types),
     };
     matches!(

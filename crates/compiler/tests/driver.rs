@@ -695,13 +695,13 @@ fn compiles_primitive_parameter_and_return_matrix() {
         public func bool_identity(value: Bool): Bool { return value; }
         public func float_identity(value: Float): Float { return value; }
         public func byte_identity(value: Byte): Byte { return value; }
-        public func unit_identity(value: Unit): Unit { return (); }
+        public func unit_identity() {}
         public func main(): Int {
             bool_identity(true);
             float_identity(2.5);
             val byte: Byte = 7;
             byte_identity(byte);
-            unit_identity(());
+            unit_identity();
             return 0;
         }
     "#;

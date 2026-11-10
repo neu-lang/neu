@@ -23,7 +23,7 @@ fn primitive_ownership_categories_follow_adr0035() {
     let mut arena = TypeArena::new();
     let bool_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Bool));
     let int_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Int));
-    let unit_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Unit));
+    let unit_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Void));
     let null_ty = arena.insert(TypeRecord::primitive(PrimitiveType::Null));
     let string_ty = arena.insert(TypeRecord::primitive(PrimitiveType::String));
 

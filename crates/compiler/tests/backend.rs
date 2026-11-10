@@ -55,7 +55,7 @@ fn lowers_bool_byte_float_and_unit_returns() {
     let bool_type = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
     let byte_type = types.insert(TypeRecord::primitive(PrimitiveType::Byte));
     let float_type = types.insert(TypeRecord::primitive(PrimitiveType::Float));
-    let unit_type = types.insert(TypeRecord::primitive(PrimitiveType::Unit));
+    let void_type = types.insert(TypeRecord::primitive(PrimitiveType::Void));
 
     let bool_function = MirFunction::new(
         MirFunctionId::from_raw(50),
@@ -123,7 +123,7 @@ fn lowers_bool_byte_float_and_unit_returns() {
         MirFunctionId::from_raw(53),
         span,
         vec![],
-        unit_type,
+        void_type,
         vec![],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
@@ -840,14 +840,14 @@ fn lowers_unit_direct_call_without_abi_result() {
     let file = SourceFileId::from_raw(928);
     let span = ByteSpan::new(file, 0, 10).unwrap();
     let mut types = TypeArena::new();
-    let unit_type = types.insert(TypeRecord::primitive(PrimitiveType::Unit));
+    let void_type = types.insert(TypeRecord::primitive(PrimitiveType::Void));
     let module_name = compiler::module::ModuleName::parse("app").unwrap();
     let package = compiler::module::PackageNamespace::parse("demo").unwrap();
     let helper = MirFunction::new(
         MirFunctionId::from_raw(1),
         span,
         vec![],
-        unit_type,
+        void_type,
         vec![],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
@@ -865,7 +865,7 @@ fn lowers_unit_direct_call_without_abi_result() {
         MirFunctionId::from_raw(0),
         span,
         vec![],
-        unit_type,
+        void_type,
         vec![],
         vec![MirBasicBlock::new(
             MirBlockId::from_raw(0),
@@ -955,7 +955,7 @@ fn source_float_helper_call_reaches_object_emission() {
 fn source_bool_unit_and_byte_helpers_reach_object_emission() {
     let parsed = compiler::parser::parse_source(
         SourceFileId::from_raw(930),
-        "func flag(): Bool { return !false; } func done(): Unit { return (); } func locallyDone(): Unit { const value: Unit = (); return value; } func octet(): Byte { return 255; }",
+        "func flag(): Bool { return !false; } func done() {} func locallyDone() {} func octet(): Byte { return 255; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -995,16 +995,6 @@ fn source_bool_unit_and_byte_helpers_reach_object_emission() {
         byte_return,
         compiler::types::TypeId::from_raw(6),
     ));
-    let unit_local_read = parsed
-        .name_references
-        .iter()
-        .find(|name| name.name == "value")
-        .unwrap();
-    report.record_expression_type(ExpressionType::new(
-        unit_local_read.reference,
-        compiler::types::TypeId::from_raw(3),
-    ));
-
     let hir = lower_checked_hir_source(
         CheckedHirSource::new(
             compiler::module::ModuleName::parse("app").unwrap(),

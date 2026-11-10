@@ -147,20 +147,17 @@ fn hir_preserves_non_integer_primitive_literal_payloads() {
     let file = SourceFileId::from_raw(904);
     let span = ByteSpan::new(file, 0, 4).unwrap();
     let bool_type = TypeId::from_raw(1);
-    let unit_type = TypeId::from_raw(2);
     let float_type = TypeId::from_raw(3);
     let byte_type = TypeId::from_raw(4);
 
     let bool_literal =
         HirExpression::bool_literal(HirExpressionId::from_raw(0), span, bool_type, true);
-    let unit_literal = HirExpression::unit_literal(HirExpressionId::from_raw(1), span, unit_type);
     let float_literal =
         HirExpression::float_literal(HirExpressionId::from_raw(2), span, float_type, -0.0);
     let byte_literal =
         HirExpression::byte_literal(HirExpressionId::from_raw(3), span, byte_type, 255);
 
     assert_eq!(bool_literal.kind(), &HirExpressionKind::BoolLiteral(true));
-    assert_eq!(unit_literal.kind(), &HirExpressionKind::UnitLiteral);
     assert_eq!(
         float_literal.kind(),
         &HirExpressionKind::FloatLiteral((-0.0f64).to_bits())
@@ -200,11 +197,11 @@ fn hir_preserves_channel_operation_kinds() {
 }
 
 #[test]
-fn checked_source_lowers_bool_unit_and_float_literals_to_hir() {
+fn checked_source_lowers_bool_and_float_literals_to_hir() {
     let file = SourceFileId::from_raw(907);
     let parsed = parse_source(
         file,
-        "func flag(): Bool { return true; } func done(): Unit { return (); } func ratio(): Float { return 0.0; }",
+        "func flag(): Bool { return true; } func done() {} func ratio(): Float { return 0.0; }",
     );
     assert!(parsed.lex_diagnostics.is_empty());
     assert!(parsed.diagnostics.is_empty());
@@ -241,10 +238,7 @@ fn checked_source_lowers_bool_unit_and_float_literals_to_hir() {
         module.functions()[0].expressions()[0].kind(),
         HirExpressionKind::BoolLiteral(true)
     ));
-    assert!(matches!(
-        module.functions()[1].expressions()[0].kind(),
-        HirExpressionKind::UnitLiteral
-    ));
+    assert!(module.functions()[1].expressions().is_empty());
     assert!(matches!(
         module.functions()[2].expressions()[0].kind(),
         HirExpressionKind::FloatLiteral(bits) if *bits == 0.0f64.to_bits()

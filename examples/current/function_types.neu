@@ -1,7 +1,6 @@
 package examples.current
 
-func accepts(operation: (Int) -> Int): Unit {
-    return ();
+func accepts(operation: (Int) -> Int) {
 }
 
 func increment(value: Int): Int {
