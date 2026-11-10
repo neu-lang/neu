@@ -123,6 +123,8 @@ pub(super) const TRAP_DEADLOCK: u8 = 40;
 pub(super) const TRAP_SPAWN_OUTSIDE_SCOPE: u8 = 41;
 pub(super) const TRAP_ALLOCATION: u8 = 42;
 const TRAP_UNREACHABLE: u8 = 43;
+/// `getcontext` or `swapcontext` reported failure.
+const TRAP_CONTEXT_FAILED: u8 = 45;
 pub(super) const TRAP_CHILD_FAILED: u8 = 44;
 
 /// Written to stderr right before a deadlock trap, so the failure is explained.
@@ -420,6 +422,14 @@ fn state_base(
 
 fn trap_if_zero(builder: &mut FunctionBuilder<'_>, value: Value, code: u8) {
     builder.ins().trapz(value, TrapCode::unwrap_user(code));
+}
+
+/// Traps when a `ucontext` call reports failure (`-1`). The signatures declare
+/// `int` results as 64-bit, so only the low 32 bits are compared.
+fn trap_if_context_failed(builder: &mut FunctionBuilder<'_>, result: Value, code: u8) {
+    let status = builder.ins().ireduce(types::I32, result);
+    let failed = builder.ins().icmp_imm(IntCC::Equal, status, -1);
+    builder.ins().trapnz(failed, TrapCode::unwrap_user(code));
 }
 
 /// Writes one tag byte to stderr: 0 block, 1 finish, 2 wake, 3 switch.
@@ -1188,7 +1198,8 @@ fn emit_child_context(
             store_word(builder, stack, task, TASK_STACK);
             let context = builder.ins().iadd_imm(task, TASK_CONTEXT as i64);
             emit_mcontext(builder, module, scheduler, context)?;
-            call(builder, module, getcontext, &[context])?;
+            let got = call_value(builder, module, getcontext, &[context])?;
+            trap_if_context_failed(builder, got, TRAP_CONTEXT_FAILED);
             let layout = scheduler.layout;
             store_word(builder, stack, context, layout.stack_sp);
             store_word(builder, stack_bytes, context, layout.stack_size);
@@ -1216,7 +1227,8 @@ fn emit_switch(
         ContextFunctions::Ucontext { swapcontext, .. } => {
             let from_context = builder.ins().iadd_imm(from, TASK_CONTEXT as i64);
             let to_context = builder.ins().iadd_imm(to, TASK_CONTEXT as i64);
-            call(builder, module, swapcontext, &[from_context, to_context])?;
+            let switched = call_value(builder, module, swapcontext, &[from_context, to_context])?;
+            trap_if_context_failed(builder, switched, TRAP_CONTEXT_FAILED);
         }
         ContextFunctions::Fiber {
             switch_to_fiber, ..
