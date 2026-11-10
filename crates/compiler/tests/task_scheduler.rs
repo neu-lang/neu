@@ -248,3 +248,37 @@ fn unrelated_siblings_are_not_cancelled() {
     "#;
     assert_eq!(compile_and_run(source, "unrelated_siblings"), 7);
 }
+
+#[test]
+fn deadlock_prints_a_diagnostic_and_traps() {
+    // No task can run: main waits on a channel nothing will send to. The runtime
+    // writes a diagnostic to stderr, then traps.
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val queue = channel<Int>(1);
+                val result = receive(queue);
+            }
+            return 0;
+        }
+    "#;
+    let workspace = std::env::temp_dir().join(format!("neu-deadlock-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(13100),
+            ModuleName::parse("deadlock").unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    let output = Command::new(&executable).output().unwrap();
+    assert_eq!(output.status.code(), None, "{:?}", output.status);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("deadlock"), "{stderr}");
+    let _ = fs::remove_dir_all(workspace);
+}

@@ -626,8 +626,13 @@ fn declare_runtime_functions(
 
     // The scheduler depends on the target's context switching (ucontext or
     // fibers), so it is chosen from the target OS, not the compiler's own host.
-    let scheduler =
-        scheduler::declare_scheduler(module, malloc, CallConv::triple_default(target), target)?;
+    let scheduler = scheduler::declare_scheduler(
+        module,
+        malloc,
+        write,
+        CallConv::triple_default(target),
+        target,
+    )?;
 
     Ok(RuntimeFunctions {
         malloc,

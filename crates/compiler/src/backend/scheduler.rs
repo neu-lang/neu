@@ -105,6 +105,9 @@ pub(super) const TRAP_ALLOCATION: u8 = 42;
 const TRAP_UNREACHABLE: u8 = 43;
 pub(super) const TRAP_CHILD_FAILED: u8 = 44;
 
+/// Written to stderr right before a deadlock trap, so the failure is explained.
+const DEADLOCK_MESSAGE: &[u8] = b"neu: deadlock: no task can run\n";
+
 /// Imported functions that create and switch between task contexts.
 #[derive(Clone, Copy, Debug)]
 enum ContextFunctions {
@@ -141,6 +144,8 @@ pub(super) struct SchedulerFunctions {
     wake_all: FuncId,
     context: ContextFunctions,
     layout: ContextLayout,
+    write: FuncId,
+    deadlock_message: DataId,
 }
 
 fn signature(call_conv: CallConv, parameters: usize, returns: usize) -> Signature {
@@ -232,6 +237,7 @@ fn declare_context_functions(
 pub(super) fn declare_scheduler(
     module: &mut ObjectModule,
     malloc: FuncId,
+    write: FuncId,
     call_conv: CallConv,
     target: &Triple,
 ) -> Result<Option<SchedulerFunctions>, CraneliftLoweringError> {
@@ -245,6 +251,14 @@ pub(super) fn declare_scheduler(
     let mut state_data = DataDescription::new();
     state_data.define_zeroinit(STATE_BYTES as usize);
     module.define_data(state, &state_data).map_err(definition)?;
+    let deadlock_message = module
+        .declare_data("neu_sched_deadlock_message", Linkage::Local, false, false)
+        .map_err(definition)?;
+    let mut message_data = DataDescription::new();
+    message_data.define(DEADLOCK_MESSAGE.to_vec().into_boxed_slice());
+    module
+        .define_data(deadlock_message, &message_data)
+        .map_err(definition)?;
 
     let mut declare = |name: &str, parameters: usize| {
         module
@@ -268,6 +282,8 @@ pub(super) fn declare_scheduler(
         wake_all: declare("neu_sched_wake_all", 1)?,
         context,
         layout,
+        write,
+        deadlock_message,
     };
     define_scheduler_bodies(module, &scheduler, call_conv)?;
     Ok(Some(scheduler))
@@ -500,6 +516,7 @@ fn define_scheduler_bodies(
             b.ins().brif(none, deadlock, &[], switch, &[]);
 
             b.switch_to_block(deadlock);
+            emit_deadlock_message(b, m, &s)?;
             b.ins().trap(TrapCode::unwrap_user(TRAP_DEADLOCK));
 
             b.switch_to_block(switch);
@@ -652,6 +669,7 @@ fn define_scheduler_bodies(
             b.ins().brif(none, deadlock, &[], switch, &[]);
 
             b.switch_to_block(deadlock);
+            emit_deadlock_message(b, m, &s)?;
             b.ins().trap(TrapCode::unwrap_user(TRAP_DEADLOCK));
 
             b.switch_to_block(switch);
@@ -816,6 +834,22 @@ fn init_task_fields(
     store_word(builder, innermost_scope, task, TASK_INNERMOST_SCOPE);
     store_word(builder, zero, task, TASK_SIBLING);
     store_word(builder, zero, task, TASK_STACK);
+}
+
+/// Writes the deadlock diagnostic to stderr. The caller traps afterwards.
+fn emit_deadlock_message(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    scheduler: &SchedulerFunctions,
+) -> Result<(), CraneliftLoweringError> {
+    let global = module.declare_data_in_func(scheduler.deadlock_message, builder.func);
+    let address = builder.ins().global_value(types::I64, global);
+    let stderr = builder.ins().iconst(types::I64, 2);
+    let length = builder
+        .ins()
+        .iconst(types::I64, DEADLOCK_MESSAGE.len() as i64);
+    call(builder, module, scheduler.write, &[stderr, address, length])?;
+    Ok(())
 }
 
 /// Makes the root task's context refer to the thread that runs the program.
