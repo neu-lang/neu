@@ -38,6 +38,15 @@ The initial severity model is:
 
 Compiler stages may use only severities documented here unless a later implementation phase extends the contract.
 
+## Root Cause And Follow-On Diagnostics
+
+This section is a proposed rule for the parser. It is not yet confirmed by the project owner.
+
+- A failure is reported once, by the innermost construct that detects it.
+- An enclosing construct must not add a diagnostic for a sub-construct failure that has already emitted one.
+- Recovery skips only to the boundary of the failed construct, such as the closing brace of a lambda body, so enclosing constructs do not re-read its tokens.
+- Independent failures in separate statements each keep their own diagnostic.
+
 ## User-Facing Wording
 
 Diagnostics must describe source-level concepts. They must not expose internal compiler jargon such as pass names, internal representation names, implementation IDs, or backend internals unless the user explicitly requested an internal diagnostic mode in a future implementation phase.
