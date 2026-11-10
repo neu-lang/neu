@@ -18,7 +18,7 @@ use crate::{
     module::{PackageGraphDiagnosticKind, VirtualPackageGraph, VirtualSource},
     parser::{ParseOutput, parse_source},
     source::{ByteSpan, SourceFileId},
-    type_check::EntryPointDiagnosticLocation,
+    type_check::{EntryPointDiagnosticLocation, TypeRuleDiagnostic},
 };
 
 /// The source file and one-based line that produced a line of compiled text.
@@ -282,11 +282,16 @@ fn reports_for(error: &DriverError, context: &ManifestContext) -> Vec<Report> {
         DriverError::TypeDiagnostics(diagnostics) => diagnostics
             .iter()
             .map(|diagnostic| {
-                Report::new(
-                    diagnostic.kind(),
-                    humanize(&format!("{:?}", diagnostic.rule())),
-                    node(diagnostic.node()),
-                )
+                let message = match diagnostic.rule() {
+                    TypeRuleDiagnostic::LambdaCaptureUnsupported => {
+                        // Spec: ADR-0088 and ADR-0089 define these capture rules.
+                        "closure capture not supported: captured values must be copied or \
+                         transferred, and values captured by a spawned task must be Send"
+                            .to_owned()
+                    }
+                    rule => humanize(&format!("{rule:?}")),
+                };
+                Report::new(diagnostic.kind(), message, node(diagnostic.node()))
             })
             .collect(),
         DriverError::TestDiagnostics(diagnostics) => diagnostics
