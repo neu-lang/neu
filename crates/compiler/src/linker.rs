@@ -9,6 +9,16 @@ use object::{Object, ObjectSymbol};
 
 use crate::bootstrap::{BootstrapOutcome, map_main_result};
 
+/// The file the system linker writes for `output`. The Windows linker adds `.exe`
+/// to an output name that has no extension, so the driver names that file itself.
+pub fn executable_path(output: &Path) -> PathBuf {
+    if cfg!(windows) && output.extension().is_none() {
+        output.with_extension("exe")
+    } else {
+        output.to_owned()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LinkInvocationError {
     MissingObject,

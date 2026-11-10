@@ -8,7 +8,7 @@ use target_lexicon::Triple;
 use crate::{
     backend::{CraneliftLoweringError, emit_mir_module_to_object},
     hir::{CheckedHirSource, HirLoweringError, lower_checked_hir_source},
-    linker::{LinkInvocationError, SystemLinkInvocation},
+    linker::{LinkInvocationError, SystemLinkInvocation, executable_path},
     mir::{MirLoweringError, lower_hir_to_mir},
     module::{
         ModuleName, PackageGraphDiagnostic, PackageNamespace, VirtualPackageGraph, VirtualSource,
@@ -943,8 +943,9 @@ fn compile_source_with_entry(
         operation: "write object",
         path: object_path.clone(),
     })?;
+    let executable = executable_path(options.output());
     let invocation =
-        SystemLinkInvocation::new(&object_path, options.output()).map_err(DriverError::Link)?;
+        SystemLinkInvocation::new(&object_path, &executable).map_err(DriverError::Link)?;
     invocation.execute().map_err(DriverError::Link)?;
-    Ok(options.output().to_owned())
+    Ok(executable)
 }
