@@ -250,7 +250,8 @@ in their match arm. A name used as the receiver of a member access, such as
 
 Member and generic names resolve by region rather than by lexical scope. A
 generic parameter is visible in its declaration, from its header through its
-body. A field is visible in its class and in every class that inherits from it.
+body. A field is visible in its class and in every class that inherits from it, except
+a private field, which is visible only in its declaring class (ADR-0130).
 A promoted constructor parameter (`val` or `var`) is a field, public unless it
 is marked `private` (ADR-0130). A plain
 constructor parameter is visible in its class only. The region of a class runs

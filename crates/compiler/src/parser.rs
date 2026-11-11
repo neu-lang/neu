@@ -144,6 +144,8 @@ pub struct ParsedConstructorParameter {
     pub name: String,
     pub field: bool,
     pub mutable: bool,
+    /// `private` for a private promoted field (ADR-0130); `public` otherwise.
+    pub visibility: String,
     pub annotation: AstNodeId,
     pub span: ByteSpan,
 }
@@ -1752,6 +1754,12 @@ impl<'source> Parser<'source> {
         self.advance();
         let mut parameters = Vec::new();
         while self.current_kind() != Some(TokenKind::RightParen) && !self.is_eof() {
+            // `private` makes a promoted field private (ADR-0130). It needs `val` or `var`.
+            let private = self.current_kind() == Some(TokenKind::Identifier)
+                && self.current_text() == Some("private");
+            if private {
+                self.advance();
+            }
             let (field, mutable) = match self.current_kind() {
                 Some(TokenKind::KwVal) => {
                     self.advance();
@@ -1763,6 +1771,12 @@ impl<'source> Parser<'source> {
                 }
                 _ => (false, false),
             };
+            if private && !field {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedDeclarationHeader,
+                    self.span_at(self.current().map_or(0, |token| token.span.start())),
+                );
+            }
             let Some(name) = self.current().cloned() else {
                 self.diagnostic_current(DiagnosticKind::MalformedDeclarationHeader);
                 break;
@@ -1793,6 +1807,7 @@ impl<'source> Parser<'source> {
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 field,
                 mutable,
+                visibility: if private { "private" } else { "public" }.to_owned(),
                 annotation,
                 span: self.span(name.span.start(), annotation_span.end()),
             });

@@ -998,3 +998,81 @@ fn inherited_method_and_field_are_reached_through_a_subclass() {
     );
     let _ = fs::remove_dir_all(workspace);
 }
+
+fn compile_private_case(name: &str, source: &str, file: usize) -> Result<Option<i32>, String> {
+    let workspace = std::env::temp_dir().join(format!("neu-private-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let result = compile_source_to_executable(
+        source,
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(file),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    );
+    let outcome = match result {
+        Ok(executable) => Ok(Command::new(executable).status().unwrap().code()),
+        Err(error) => Err(format!("{error:?}")),
+    };
+    let _ = fs::remove_dir_all(workspace);
+    outcome
+}
+
+#[test]
+fn private_constructor_parameter_is_readable_inside_its_class() {
+    assert_eq!(
+        compile_private_case(
+            "inside",
+            "class Holder(private var value: Int) { func get(): Int { return value; } } public func main(): Int { val h: Holder = new Holder(7); return h.get(); }",
+            6900,
+        ),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn private_constructor_parameter_is_rejected_outside_its_class() {
+    let error = compile_private_case(
+        "outside",
+        "class Holder(private var value: Int) {} public func main(): Int { val h: Holder = new Holder(7); return h.value; }",
+        6901,
+    )
+    .unwrap_err();
+    assert!(error.contains("PrivateFieldAccess"), "{error}");
+}
+
+#[test]
+fn private_constructor_parameter_is_not_visible_to_a_subclass() {
+    let error = compile_private_case(
+        "subclass",
+        "class Base(private var value: Int) {} class Child: Base(1) { func get(): Int { return value; } } public func main(): Int { return 7; }",
+        6902,
+    )
+    .unwrap_err();
+    assert!(error.contains("PrivateFieldAccess"), "{error}");
+}
+
+#[test]
+fn public_constructor_parameter_is_readable_outside_its_class() {
+    assert_eq!(
+        compile_private_case(
+            "public",
+            "class Holder(var value: Int) {} public func main(): Int { val h: Holder = new Holder(7); return h.value; }",
+            6903,
+        ),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn private_constructor_parameter_needs_val_or_var() {
+    let error = compile_private_case(
+        "plain",
+        "class Holder(private value: Int) {} public func main(): Int { return 7; }",
+        6904,
+    )
+    .unwrap_err();
+    assert!(error.contains("MalformedDeclarationHeader"), "{error}");
+}
