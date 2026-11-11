@@ -2024,15 +2024,21 @@ impl<'a> ShortCircuitLowerer<'a> {
                 ));
             }
             HirExpressionKind::TestAssert { condition, message } => {
+                // The operands are lowered here, as Precondition does, so their
+                // instructions exist before the check reads them. Control flow
+                // can place the operands in a block lowered earlier.
+                let condition = self.lower_expression(*condition)?;
+                let message = self.lower_expression(*message)?;
                 self.push(MirInstruction::TestAssert {
-                    condition: mir_expression_value_id(self.function, *condition),
-                    message: mir_expression_value_id(self.function, *message),
+                    condition,
+                    message,
                     span: expression.span(),
                 });
             }
             HirExpressionKind::TestFail { message } => {
+                let message = self.lower_expression(*message)?;
                 self.push(MirInstruction::TestFail {
-                    message: mir_expression_value_id(self.function, *message),
+                    message,
                     span: expression.span(),
                 });
             }
@@ -2816,15 +2822,21 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
             }
             HirExpressionKind::TestAssert { condition, message } => {
+                // The operands are lowered here, as Precondition does, so their
+                // instructions exist before the check reads them. Control flow
+                // can place the operands in a block lowered earlier.
+                let condition = self.lower_expression(*condition)?;
+                let message = self.lower_expression(*message)?;
                 self.push(MirInstruction::TestAssert {
-                    condition: mir_expression_value_id(self.function, *condition),
-                    message: mir_expression_value_id(self.function, *message),
+                    condition,
+                    message,
                     span: expression.span(),
                 });
             }
             HirExpressionKind::TestFail { message } => {
+                let message = self.lower_expression(*message)?;
                 self.push(MirInstruction::TestFail {
-                    message: mir_expression_value_id(self.function, *message),
+                    message,
                     span: expression.span(),
                 });
             }
