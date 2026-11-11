@@ -535,3 +535,16 @@ fn byte_bitwise_operator_on_a_local_inferred_from_a_call_result_is_typed() {
     "#;
     assert_eq!(compile_and_run(source, "infer_byte_bitwise"), 3);
 }
+
+#[test]
+fn local_inferred_from_a_suspend_call_result_is_returned() {
+    // The issue 48 repro: the local takes the suspend call's type and is returned.
+    let source = r#"
+        suspend func produce(): Int { return 7; }
+        suspend func main(): Int {
+            val done = produce();
+            return done;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_suspend_return"), 7);
+}
