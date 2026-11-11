@@ -269,7 +269,7 @@ pub struct ParsedNewExpression {
     pub expression: AstNodeId,
     pub type_name: String,
     pub type_span: ByteSpan,
-    /// Explicit type arguments, as in `new Box<Array<Int>>(...)` (ADR-0083,
+    /// Explicit type arguments, as in `new Box<Int[]>(...)` (ADR-0083,
     /// ADR-0128): the named-type reference of each argument.
     pub type_argument_references: Vec<AstNodeId>,
     pub arguments: Vec<AstNodeId>,
@@ -361,6 +361,8 @@ pub struct ParsedArrayType {
     pub element_type: AstNodeId,
     pub length: Option<u64>,
     pub length_name: Option<String>,
+    /// `T[]` is the dynamic array (ADR-0132); `T[N]` is fixed (ADR-0063).
+    pub dynamic: bool,
     pub span: ByteSpan,
 }
 
@@ -1874,7 +1876,12 @@ impl<'source> Parser<'source> {
                     let name = self.current().expect("enum variant name exists").clone();
                     self.advance();
                     let arguments = if self.current_kind() == Some(TokenKind::LeftParen) {
-                        if self.lookahead_kind(2) == Some(TokenKind::Less) {
+                        // A type payload starts with a generic argument list or an
+                        // array suffix (ADR-0132), as in `Box(Int[])`.
+                        if matches!(
+                            self.lookahead_kind(2),
+                            Some(TokenKind::Less | TokenKind::LeftBracket)
+                        ) {
                             self.parse_enum_variant_type_arguments()
                         } else {
                             self.parse_argument_list()
@@ -3020,6 +3027,16 @@ impl<'source> Parser<'source> {
                     .is_some_and(|node| node.span == span)
             })
             .map(|reference| reference.reference)
+            .or_else(|| {
+                self.array_types
+                    .iter()
+                    .find(|array| {
+                        self.arena
+                            .node(array.array)
+                            .is_some_and(|node| node.span == span)
+                    })
+                    .map(|array| array.array)
+            })
     }
 
     fn parse_new_expression(&mut self) -> Option<ByteSpan> {
@@ -3775,25 +3792,30 @@ impl<'source> Parser<'source> {
         while self.current_kind() == Some(TokenKind::LeftBracket) {
             let start = self.current()?.span.start();
             self.advance();
-            let (length, length_name) = match self.current_kind() {
-                Some(TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex) => {
-                    let token = self.current()?.clone();
-                    let value = parsed_integer_value(
-                        token.kind,
-                        &self.text[token.span.start()..token.span.end()],
-                    );
-                    self.advance();
-                    (value, None)
-                }
-                Some(TokenKind::Identifier) => {
-                    let token = self.current()?.clone();
-                    let name = self.text[token.span.start()..token.span.end()].to_owned();
-                    self.advance();
-                    (None, Some(name))
-                }
-                _ => {
-                    self.diagnostic_current(DiagnosticKind::MalformedArrayType);
-                    return None;
+            let dynamic = self.current_kind() == Some(TokenKind::RightBracket);
+            let (length, length_name) = if dynamic {
+                (None, None)
+            } else {
+                match self.current_kind() {
+                    Some(TokenKind::IntDecimal | TokenKind::IntBinary | TokenKind::IntHex) => {
+                        let token = self.current()?.clone();
+                        let value = parsed_integer_value(
+                            token.kind,
+                            &self.text[token.span.start()..token.span.end()],
+                        );
+                        self.advance();
+                        (value, None)
+                    }
+                    Some(TokenKind::Identifier) => {
+                        let token = self.current()?.clone();
+                        let name = self.text[token.span.start()..token.span.end()].to_owned();
+                        self.advance();
+                        (None, Some(name))
+                    }
+                    _ => {
+                        self.diagnostic_current(DiagnosticKind::MalformedArrayType);
+                        return None;
+                    }
                 }
             };
             if self.current_kind() != Some(TokenKind::RightBracket) {
@@ -3802,10 +3824,10 @@ impl<'source> Parser<'source> {
             }
             let end = self.current()?.span.end();
             self.advance();
-            suffixes.push((start, end, length, length_name));
+            suffixes.push((start, end, length, length_name, dynamic));
         }
         let full_end = suffixes.last().map(|suffix| suffix.1);
-        for (_start, _end, length, length_name) in suffixes.into_iter().rev() {
+        for (_start, _end, length, length_name, dynamic) in suffixes.into_iter().rev() {
             let element_type = self.latest_type_node_for_span(span)?;
             let array_span = self.span(span.start(), full_end?);
             let array = self.arena.add_array_type(array_span);
@@ -3814,6 +3836,7 @@ impl<'source> Parser<'source> {
                 element_type,
                 length,
                 length_name,
+                dynamic,
                 span: array_span,
             });
             span = array_span;

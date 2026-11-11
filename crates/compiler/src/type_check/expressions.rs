@@ -390,6 +390,7 @@ pub(crate) fn resolve_annotation_type(
 ) -> Option<TypeId> {
     if let Some(ty) = super::generics::resolve_type_reference(
         type_name_references,
+        array_types,
         annotation,
         primitives,
         classes,
@@ -402,18 +403,6 @@ pub(crate) fn resolve_annotation_type(
         .iter()
         .find(|reference| reference.reference == annotation)
     {
-        if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
-            let element_name = &reference.generic_argument_names[0];
-            let element = primitives
-                .type_for_primitive_name(element_name)
-                .or_else(|| {
-                    classes
-                        .iter()
-                        .find(|class| class.name == *element_name)
-                        .map(|class| class.type_id)
-                })?;
-            return Some(arena.dynamic_array(element));
-        }
         if reference.name == "Channel" && reference.generic_argument_names.len() == 1 {
             let element_name = &reference.generic_argument_names[0];
             let element = primitives
@@ -438,7 +427,7 @@ pub(crate) fn resolve_annotation_type(
                 })?;
             return Some(arena.task(result));
         }
-        if !reference.generic_argument_names.is_empty() {
+        if !reference.generic_arguments.is_empty() {
             let class = classes.iter().find(|class| class.name == reference.name)?;
             let arguments = reference
                 .generic_argument_names
@@ -476,6 +465,9 @@ pub(crate) fn resolve_annotation_type(
         classes,
         arena,
     )?;
+    if array.dynamic {
+        return Some(arena.dynamic_array(element));
+    }
     Some(arena.array(element, array.length?))
 }
 

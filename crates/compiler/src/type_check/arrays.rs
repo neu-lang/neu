@@ -33,34 +33,43 @@ pub fn type_array_expressions_with_classes(
             .iter()
             .find(|reference| reference.reference == node)
         {
-            if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
-                let element_name = &reference.generic_argument_names[0];
-                let element = primitives
-                    .type_for_primitive_name(element_name)
-                    .or_else(|| {
-                        parsed
-                            .generic_parameters
-                            .iter()
-                            .find(|parameter| parameter.name == *element_name)
-                            .and_then(|parameter| {
-                                types.records().iter().find_map(|record| {
-                                    matches!(
-                                        record.kind(),
-                                        TypeKind::GenericParameter(generic)
-                                            if generic.declaration() == parameter.parameter
-                                    )
-                                    .then_some(record.id())
-                                })
-                            })
-                    })?;
-                return Some(types.dynamic_array(element));
-            }
             return primitives.type_for_primitive_name(&reference.name);
         }
         let array = parsed
             .array_types
             .iter()
             .find(|array| array.array == node)?;
+        if array.dynamic {
+            // A dynamic array's element may be a generic parameter in scope (ADR-0132).
+            let generic_types: Vec<(&str, TypeId)> = parsed
+                .generic_parameters
+                .iter()
+                .filter_map(|parameter| {
+                    types
+                        .records()
+                        .iter()
+                        .find_map(|record| {
+                            matches!(
+                                record.kind(),
+                                TypeKind::GenericParameter(generic)
+                                    if generic.declaration() == parameter.parameter
+                            )
+                            .then_some(record.id())
+                        })
+                        .map(|id| (parameter.name.as_str(), id))
+                })
+                .collect();
+            let element = super::generics::resolve_annotation_type_with_generics(
+                array.element_type,
+                &parsed.type_name_references,
+                &parsed.array_types,
+                &primitives,
+                classes,
+                types,
+                &generic_types,
+            )?;
+            return Some(types.dynamic_array(element));
+        }
         let element =
             resolve_array_element_type(array.element_type, parsed, types, primitives, classes)?;
         Some(types.array(
@@ -268,15 +277,12 @@ pub fn type_dynamic_array_operations(
         .local_declarations
         .iter()
         .filter(|declaration| {
-            declaration
-                .annotation
-                .and_then(|annotation| {
-                    parsed
-                        .type_name_references
-                        .iter()
-                        .find(|reference| reference.reference == annotation)
-                })
-                .is_some_and(|reference| reference.name == "Array")
+            declaration.annotation.is_some_and(|annotation| {
+                parsed
+                    .array_types
+                    .iter()
+                    .any(|array| array.dynamic && array.array == annotation)
+            })
         })
         .map(|declaration| declaration.declaration)
         .collect::<Vec<_>>();

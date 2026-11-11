@@ -275,10 +275,7 @@ fn parses_type_and_generic_syntax() {
 
 #[test]
 fn generic_argument_metadata_preserves_direct_nested_arguments() {
-    let output = parse_source(
-        SourceFileId::from_raw(211),
-        "func use(value: Box<Array<Int>>);",
-    );
+    let output = parse_source(SourceFileId::from_raw(211), "func use(value: Box<Int[]>);");
 
     assert!(output.diagnostics.is_empty());
     let reference = output
@@ -287,13 +284,18 @@ fn generic_argument_metadata_preserves_direct_nested_arguments() {
         .find(|reference| reference.name == "Box")
         .unwrap();
     assert_eq!(reference.generic_arguments.len(), 1);
-    assert_eq!(reference.generic_argument_names, vec!["Array"]);
-    let nested = output
+    let array = output
+        .array_types
+        .iter()
+        .find(|array| array.dynamic)
+        .unwrap();
+    assert_eq!(reference.generic_argument_references, vec![array.array]);
+    let element = output
         .type_name_references
         .iter()
-        .find(|reference| reference.name == "Array")
+        .find(|reference| reference.reference == array.element_type)
         .unwrap();
-    assert_eq!(nested.generic_argument_names, vec!["Int"]);
+    assert_eq!(element.name, "Int");
 }
 
 #[test]

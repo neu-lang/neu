@@ -1412,15 +1412,17 @@ pub fn apply_enum_constructor_facts(
                         .position(|parameter| parameter.name == reference.name)
                 {
                     generic_arguments[index] = Some(actual);
-                } else if let Some(reference) = parsed
-                    .type_name_references
+                } else if let Some(array) = parsed
+                    .array_types
                     .iter()
-                    .find(|reference| reference.reference == *annotation)
-                    && reference.name == "Array"
-                    && reference.generic_argument_names.len() == 1
+                    .find(|array| array.array == *annotation && array.dynamic)
+                    && let Some(element) = parsed
+                        .type_name_references
+                        .iter()
+                        .find(|element| element.reference == array.element_type)
                     && let Some(index) = generic_parameters
                         .iter()
-                        .position(|parameter| parameter.name == reference.generic_argument_names[0])
+                        .position(|parameter| parameter.name == element.name)
                     && let Some(TypeKind::DynamicArray(array)) =
                         types.get(actual).map(|record| record.kind())
                 {

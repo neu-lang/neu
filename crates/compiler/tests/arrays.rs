@@ -89,7 +89,7 @@ fn iterates_dynamic_array_elements() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "func make(): Array<Int> { var values: Array<Int> = new Int[]; values.add(1); values.add(2); values.add(4); return values; } public func main(): Int { val values: Array<Int> = make(); var total: Int = 0; for value in values { total = total + value; } return total; }";
+    let source = "func make(): Int[] { var values: Int[] = new Int[]; values.add(1); values.add(2); values.add(4); return values; } public func main(): Int { val values: Int[] = make(); var total: Int = 0; for value in values { total = total + value; } return total; }";
     let output = compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -110,7 +110,7 @@ fn accepts_generic_dynamic_array_storage() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "func make<T>(value: T): Array<T> { var values: Array<T> = new T[]; values.add(value); return values; } public func main(): Int { return 0; }";
+    let source = "func make<T>(value: T): T[] { var values: T[] = new T[]; values.add(value); return values; } public func main(): Int { return 0; }";
     compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -131,7 +131,7 @@ fn loads_dynamic_array_elements_by_index() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); return values[1]; }";
+    let source = "public func main(): Int { var values: Int[] = new Int[]; values.add(4); values.add(7); return values[1]; }";
     let output = compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -155,7 +155,7 @@ fn loads_dynamic_array_elements_inside_control_flow() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); var result: Int = 0; if (true) { result = values[1]; } return result; }";
+    let source = "public func main(): Int { var values: Int[] = new Int[]; values.add(4); values.add(7); var result: Int = 0; if (true) { result = values[1]; } return result; }";
     let output = compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -179,7 +179,7 @@ fn rejects_dynamic_array_structural_mutation_during_iteration() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "public func main(): Int { var values: Array<Int> = new Int[]; for value in values { values.add(value); } return 0; }";
+    let source = "public func main(): Int { var values: Int[] = new Int[]; for value in values { values.add(value); } return 0; }";
     let error = compiler::driver::compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -275,8 +275,7 @@ fn compiles_empty_dynamic_array_and_reads_size() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source =
-        "public func main(): Int { var values: Array<Int> = new Int[]; return values.size(); }";
+    let source = "public func main(): Int { var values: Int[] = new Int[]; return values.size(); }";
     let output = compiler::driver::compile_source_to_executable(
         source,
         compiler::driver::SourceDriverOptions::new(
@@ -298,7 +297,7 @@ fn appends_and_removes_dynamic_array_elements() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "public func main(): Int { var values: Array<Int> = new Int[]; values.add(9, 0); values.add(7); values.remove(0); return values.size(); }";
+    let source = "public func main(): Int { var values: Int[] = new Int[]; values.add(9, 0); values.add(7); values.remove(0); return values.size(); }";
     let output = compiler::driver::compile_source_to_executable(
         source,
         compiler::driver::SourceDriverOptions::new(
@@ -363,7 +362,7 @@ fn passes_dynamic_arrays_through_parameters_and_returns() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "func identity(values: Array<Int>): Array<Int> { return values; } public func main(): Int { var values: Array<Int> = new Int[]; values.add(7); val returned: Array<Int> = identity(values); return returned.size(); }";
+    let source = "func identity(values: Int[]): Int[] { return values; } public func main(): Int { var values: Int[] = new Int[]; values.add(7); val returned: Int[] = identity(values); return returned.size(); }";
     let output = compiler::driver::compile_source_to_executable(
         source,
         compiler::driver::SourceDriverOptions::new(
@@ -447,7 +446,7 @@ fn dynamic_array_element_write_stores_the_element() {
     assert_eq!(
         dynamic_array_exit_status(
             "element-write",
-            "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); values[1] = 9; return values[1]; }",
+            "public func main(): Int { var values: Int[] = new Int[]; values.add(4); values.add(7); values[1] = 9; return values[1]; }",
             6330,
         ),
         Some(9)
@@ -459,7 +458,7 @@ fn dynamic_array_element_write_inside_a_block_stores_the_element() {
     assert_eq!(
         dynamic_array_exit_status(
             "element-write-block",
-            "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); if (values[0] == 4) { values[1] = 9; } return values[1]; }",
+            "public func main(): Int { var values: Int[] = new Int[]; values.add(4); values.add(7); if (values[0] == 4) { values[1] = 9; } return values[1]; }",
             6331,
         ),
         Some(9)
@@ -470,7 +469,7 @@ fn dynamic_array_element_write_inside_a_block_stores_the_element() {
 fn dynamic_array_element_write_out_of_bounds_traps() {
     let code = dynamic_array_exit_status(
         "element-write-trap",
-        "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values[1] = 9; return 7; }",
+        "public func main(): Int { var values: Int[] = new Int[]; values.add(4); values[1] = 9; return 7; }",
         6332,
     );
     assert_ne!(code, Some(7));
@@ -483,7 +482,7 @@ fn dynamic_array_element_write_on_a_val_array_is_rejected() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let error = compile_source_to_executable(
-        "public func main(): Int { val values: Array<Int> = new Int[]; values[0] = 9; return 7; }",
+        "public func main(): Int { val values: Int[] = new Int[]; values[0] = 9; return 7; }",
         SourceDriverOptions::new(
             SourceFileId::from_raw(6333),
             compiler::module::ModuleName::parse("arrays").unwrap(),
@@ -501,9 +500,47 @@ fn dynamic_array_bool_element_write_stores_the_element() {
     assert_eq!(
         dynamic_array_exit_status(
             "bool-element-write",
-            "public func main(): Int { var values: Array<Bool> = new Bool[]; values.add(false); values[0] = true; if (values[0]) { return 7; } return 1; }",
+            "public func main(): Int { var values: Bool[] = new Bool[]; values.add(false); values[0] = true; if (values[0]) { return 7; } return 1; }",
             6334,
         ),
         Some(7)
     );
+}
+
+#[test]
+fn array_spelling_is_not_a_type() {
+    let workspace = std::env::temp_dir().join(format!("neu-array-spelling-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "public func main(): Int { var values: Array<Int> = new Int[]; return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6340),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("Array"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn dynamic_array_is_an_enum_payload() {
+    let workspace = std::env::temp_dir().join(format!("neu-array-payload-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "enum Holder<T> { Storage(T[]), Empty } public func main(): Int { return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6341),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(Command::new(executable).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
 }

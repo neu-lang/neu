@@ -56,7 +56,7 @@ fn class_method_calls_an_array_field() {
     assert_eq!(
         run_exit_code(
             "array_field",
-            "class Counter(var items: Array<Int>) {\n    func count(): Int {\n        return items.size();\n    }\n}\n\npublic func main(): Int {\n    var values: Array<Int> = new Int[];\n    values.add(4);\n    val c: Counter = new Counter(values);\n    return c.count();\n}\n",
+            "class Counter(var items: Int[]) {\n    func count(): Int {\n        return items.size();\n    }\n}\n\npublic func main(): Int {\n    var values: Int[] = new Int[];\n    values.add(4);\n    val c: Counter = new Counter(values);\n    return c.count();\n}\n",
         ),
         Some(1)
     );
@@ -67,7 +67,7 @@ fn generic_class_with_an_array_field_stores_and_counts_elements() {
     assert_eq!(
         run_exit_code(
             "generic_storage",
-            "class Stack<T>(var items: Array<T>) {\n    func push(value: T) {\n        items.add(value);\n    }\n    func len(): Int {\n        return items.size();\n    }\n}\n\npublic func main(): Int {\n    var values: Array<Int> = new Int[];\n    val s: Stack<Int> = new Stack<Int>(values);\n    s.push(4);\n    s.push(5);\n    return s.len();\n}\n",
+            "class Stack<T>(var items: T[]) {\n    func push(value: T) {\n        items.add(value);\n    }\n    func len(): Int {\n        return items.size();\n    }\n}\n\npublic func main(): Int {\n    var values: Int[] = new Int[];\n    val s: Stack<Int> = new Stack<Int>(values);\n    s.push(4);\n    s.push(5);\n    return s.len();\n}\n",
         ),
         Some(2)
     );
@@ -305,7 +305,7 @@ fn nested_generic_argument_in_a_new_expression_and_method() {
     assert_eq!(
         run_exit_code(
             "nested_new",
-            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    var items: Array<Int> = new Int[];\n    items.add(7);\n    val boxed: Box<Array<Int>> = new Box<Array<Int>>(items);\n    val inner: Array<Int> = boxed.get();\n    return inner[0];\n}\n",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    var items: Int[] = new Int[];\n    items.add(7);\n    val boxed: Box<Int[]> = new Box<Int[]>(items);\n    val inner: Int[] = boxed.get();\n    return inner[0];\n}\n",
         ),
         Some(7)
     );
@@ -316,7 +316,7 @@ fn nested_generic_superclass_argument_forwards_a_nested_value() {
     assert_eq!(
         run_exit_code(
             "nested_superclass",
-            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child(var items: Array<Int>): Base<Array<Int>>(items) {\n}\n\npublic func main(): Int {\n    var items: Array<Int> = new Int[];\n    items.add(7);\n    val c: Child = new Child(items);\n    val inner: Array<Int> = c.get();\n    return inner[0];\n}\n",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child(var items: Int[]): Base<Int[]>(items) {\n}\n\npublic func main(): Int {\n    var items: Int[] = new Int[];\n    items.add(7);\n    val c: Child = new Child(items);\n    val inner: Int[] = c.get();\n    return inner[0];\n}\n",
         ),
         Some(7)
     );
@@ -340,7 +340,7 @@ fn nested_generic_annotation_must_match_its_value() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let error = compile_source_to_executable(
-        "class Box<T>(var value: T) {} public func main(): Int { val b: Box<Array<Int>> = new Box<Int>(3); return 7; }",
+        "class Box<T>(var value: T) {} public func main(): Int { val b: Box<Int[]> = new Box<Int>(3); return 7; }",
         SourceDriverOptions::new(
             SourceFileId::from_raw(81996),
             ModuleName::parse("generic.class").unwrap(),
@@ -360,7 +360,7 @@ fn nested_generic_arguments_are_invariant() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let error = compile_source_to_executable(
-        "class Box<T>(var value: T) {} public func main(): Int { var bools: Array<Bool> = new Bool[]; val b: Box<Array<Int>> = new Box<Array<Bool>>(bools); return 7; }",
+        "class Box<T>(var value: T) {} public func main(): Int { var bools: Bool[] = new Bool[]; val b: Box<Int[]> = new Box<Bool[]>(bools); return 7; }",
         SourceDriverOptions::new(
             SourceFileId::from_raw(81997),
             ModuleName::parse("generic.class").unwrap(),

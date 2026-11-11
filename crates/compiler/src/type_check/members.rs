@@ -105,6 +105,7 @@ pub(crate) fn apply_generic_new_expressions(
             .map(|argument| {
                 super::generics::resolve_type_reference(
                     &parsed.type_name_references,
+                    &parsed.array_types,
                     *argument,
                     &primitives,
                     classes.classes(),

@@ -7,7 +7,7 @@ enum Deque<T> {
     OneDeque(T),
     TwoDeque(T, T),
     ThreeDeque(T, T, T),
-    Storage(Array<T>),
+    Storage(T[]),
 
     func len(): Int {
         return when (this) {
@@ -32,7 +32,7 @@ public test func deque_basics_work() {
 }
 
 public test func deque_storage_length_is_preserved() {
-    var values: Array<Int> = new Int[];
+    var values: Int[] = new Int[];
     values.add(1);
     values.add(2);
     values.add(3);

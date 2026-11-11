@@ -9,7 +9,7 @@ enum Vector<T> {
     Two(T, T),
     Three(T, T, T),
     Four(T, T, T, T),
-    Storage(Array<T>),
+    Storage(T[]),
 
     func len(): Int {
         return when (this) {
@@ -38,7 +38,7 @@ public test func vector_basics_work() {
 }
 
 public test func vector_storage_operations_work() {
-    var values: Array<Int> = new Int[];
+    var values: Int[] = new Int[];
     values.add(4);
     values.add(5);
     val vector: Vector<Int> = Vector.Storage(values);

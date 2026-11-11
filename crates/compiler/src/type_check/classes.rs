@@ -931,6 +931,7 @@ pub fn type_class_types_in(
             .map(|argument| {
                 resolve_type_reference(
                     &parsed.type_name_references,
+                    &parsed.array_types,
                     *argument,
                     &primitives,
                     &class_snapshot,
@@ -942,7 +943,7 @@ pub fn type_class_types_in(
         record.superclass_arguments = arguments.unwrap_or_default();
     }
     for field in &parsed.field_declarations {
-        // Primitive annotations first. Other annotations, such as Array<T>,
+        // Primitive annotations first. Other annotations, such as T[],
         // resolve through the general annotation resolver with the class's
         // type parameters in scope (ADR-0126).
         let Some(type_id) = primitive_annotation_type_for_node(
@@ -1119,7 +1120,7 @@ pub fn apply_class_type_facts(
         };
         // A generic instance annotation such as `Box<Int>` is typed by the
         // generic-aware annotation pass, not by the bare class type.
-        if !reference.generic_argument_names.is_empty() {
+        if !reference.generic_arguments.is_empty() {
             continue;
         }
         let Some(class) = classes.classes.iter().find(|class| {
