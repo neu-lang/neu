@@ -257,3 +257,21 @@ fn named_import_of_a_public_class_compiles_and_runs() {
     assert_eq!(Command::new(executable).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn named_import_of_a_public_enum_is_accepted() {
+    let graph = VirtualPackageGraph::build(
+        "src/main.neu",
+        [
+            VirtualSource::new(
+                "src/main.neu",
+                "import {Color} from \"./models\"\n\npublic func main(): Int {\n    return 1\n}\n",
+            ),
+            VirtualSource::new(
+                "src/models/color.neu",
+                "package models\n\npublic enum Color {\n    Red,\n    Blue\n}\n",
+            ),
+        ],
+    );
+    assert!(graph.is_ok(), "{:?}", graph.err());
+}
