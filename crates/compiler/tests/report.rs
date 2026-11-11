@@ -318,3 +318,55 @@ fn duplicate_named_import_across_statements_is_rejected() {
         "{rendered}"
     );
 }
+
+#[test]
+fn named_import_alias_is_rejected_at_the_as_keyword() {
+    let project = Project::new(
+        "named_import_alias",
+        &[
+            (
+                "src/main.neu",
+                "import {add as plus} from \"./math\"\n\npublic func main(): Int {\n    return 1\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\npublic func add(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("error[named_import_alias]"), "{rendered}");
+    assert!(rendered.contains("src/main.neu:1:13"), "{rendered}");
+    assert!(!rendered.contains("malformed"), "{rendered}");
+}
+
+#[test]
+fn qualified_access_without_a_qualified_import_points_at_the_package_name() {
+    let project = Project::new(
+        "qualifier_not_imported",
+        &[
+            (
+                "src/main.neu",
+                "import {add} from \"./math\"\n\npublic func main(): Int {\n    return math.add()\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\npublic func add(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(
+        rendered.contains("error[qualifier_not_imported]"),
+        "{rendered}"
+    );
+    assert!(rendered.contains("src/main.neu:4:12"), "{rendered}");
+    assert!(
+        rendered.contains("`math` is not imported as a qualifier in this file"),
+        "{rendered}"
+    );
+}

@@ -34,7 +34,7 @@ small manifest project under `examples/projects/manifest_app`:
 
 ```sh
 cargo run -p neu -- build examples/projects/manifest_app
-examples/projects/manifest_app/target/manifest.app
+examples/projects/manifest_app/target/manifest-app
 echo $?
 ```
 
@@ -46,6 +46,16 @@ cargo run -p neu -- build examples/projects/manifest_app \
 ```
 
 The compiler leaves an intermediate object file beside the requested output.
+
+The repository also includes `examples/projects/named_import_app`, which uses
+the named form `import {add} from "./math"`. Its `main` returns the imported
+`add()` result, so it also exits with status `7`:
+
+```sh
+cargo run -p neu -- build examples/projects/named_import_app
+examples/projects/named_import_app/target/named_import-app
+echo $?
+```
 
 ## Examples
 

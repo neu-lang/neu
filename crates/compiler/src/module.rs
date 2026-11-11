@@ -395,6 +395,9 @@ pub enum PackageGraphDiagnosticKind {
     ImportCycle,
     InaccessibleImport,
     ImportQualifierCollision,
+    QualifierNotImported,
+    DuplicateNamedImport,
+    NamedImportCollision,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -579,6 +582,20 @@ impl VirtualPackageGraph {
                 .push(path.clone());
         }
 
+        let known_qualifiers: BTreeMap<String, PathBuf> = package_members
+            .keys()
+            .map(|directory| {
+                (
+                    package_qualifier_for_directory(
+                        directory,
+                        &package_members,
+                        &file_by_path,
+                        &parsed_sources,
+                    ),
+                    directory.clone(),
+                )
+            })
+            .collect();
         let mut package_dirs = BTreeSet::new();
         let mut queue: Vec<PathBuf> = if entry.as_os_str().is_empty() {
             input.keys().cloned().collect()
@@ -795,6 +812,58 @@ impl VirtualPackageGraph {
                     queue.push(member);
                 }
             }
+            // Only a qualified import in this file makes a package reachable
+            // through its qualifier. Named imports and other files do not.
+            let mut visible_qualifiers: BTreeSet<&str> =
+                qualifiers.keys().map(String::as_str).collect();
+            visible_qualifiers.insert(current_qualifier.as_str());
+            let local_names: BTreeSet<&str> = parsed
+                .declaration_names
+                .iter()
+                .map(|declaration| declaration.name.as_str())
+                .chain(
+                    parsed
+                        .local_binding_names
+                        .iter()
+                        .map(|binding| binding.name.as_str()),
+                )
+                .chain(
+                    parsed
+                        .function_parameters
+                        .iter()
+                        .map(|parameter| parameter.name.as_str()),
+                )
+                .chain(
+                    parsed
+                        .pattern_bindings
+                        .iter()
+                        .map(|binding| binding.name.as_str()),
+                )
+                .collect();
+            for member in &parsed.member_expressions {
+                let Some(receiver) = parsed
+                    .name_references
+                    .iter()
+                    .find(|reference| reference.reference == member.receiver)
+                else {
+                    continue;
+                };
+                let name = receiver.name.as_str();
+                if visible_qualifiers.contains(name)
+                    || local_names.contains(name)
+                    || !known_qualifiers.contains_key(name)
+                {
+                    continue;
+                }
+                diagnostics.push(PackageGraphDiagnostic {
+                    span: Some(receiver.name_span),
+                    kind: PackageGraphDiagnosticKind::QualifierNotImported,
+                    path: file_path.clone(),
+                    detail: format!(
+                        "`{name}` is not imported as a qualifier in this file; add a qualified import of its package"
+                    ),
+                });
+            }
             let mut named_names = BTreeSet::new();
             for import in &parsed.imports {
                 if import.names.is_empty() {
@@ -831,14 +900,20 @@ impl VirtualPackageGraph {
                     .flatten()
                     .flat_map(|path| {
                         let id = file_by_path[path];
-                        parsed_sources
-                            .get(&id)
+                        let parsed = parsed_sources.get(&id);
+                        let functions = parsed
                             .into_iter()
                             .flat_map(|parsed| parsed.function_declarations.iter())
                             .filter(|function| {
                                 function.top_level && function.visibility == "public"
                             })
-                            .map(|function| function.name.clone())
+                            .map(|function| function.name.clone());
+                        let classes = parsed
+                            .into_iter()
+                            .flat_map(|parsed| parsed.class_declarations.iter())
+                            .filter(|class| class.visibility == "public")
+                            .map(|class| class.name.clone());
+                        functions.chain(classes)
                     })
                     .collect();
                 for (index, name) in import.names.iter().enumerate() {
@@ -846,7 +921,7 @@ impl VirtualPackageGraph {
                     if !named_names.insert(name.clone()) {
                         diagnostics.push(PackageGraphDiagnostic {
                             span: name_span,
-                            kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                            kind: PackageGraphDiagnosticKind::DuplicateNamedImport,
                             path: file_path.clone(),
                             detail: format!("`{name}` is imported more than once"),
                         });
@@ -857,7 +932,7 @@ impl VirtualPackageGraph {
                     {
                         diagnostics.push(PackageGraphDiagnostic {
                             span: name_span,
-                            kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                            kind: PackageGraphDiagnosticKind::NamedImportCollision,
                             path: file_path.clone(),
                             detail: format!("named import {name} collides with another name"),
                         });

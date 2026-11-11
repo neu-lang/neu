@@ -1682,3 +1682,99 @@ fn keeps_while_unsupported() {
             .any(|diagnostic| { diagnostic.kind == DiagnosticKind::UnsupportedStatementForm })
     );
 }
+
+#[test]
+fn named_imports_accept_commas_without_spaces() {
+    let output = parse_source(
+        SourceFileId::from_raw(10040),
+        "import{ add ,sub }from \"./math\" public func main();",
+    );
+    assert!(output.lex_diagnostics.is_empty());
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.imports[0].names, vec!["add", "sub"]);
+}
+
+#[test]
+fn named_import_with_empty_braces_is_malformed() {
+    let output = parse_source(
+        SourceFileId::from_raw(10041),
+        "import {} from \"./math\" public func main();",
+    );
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedDeclarationHeader),
+        "{:?}",
+        output.diagnostics
+    );
+}
+
+#[test]
+fn named_import_without_separator_is_malformed() {
+    let output = parse_source(
+        SourceFileId::from_raw(10042),
+        "import {add sub} from \"./math\" public func main();",
+    );
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedDeclarationHeader),
+        "{:?}",
+        output.diagnostics
+    );
+}
+
+#[test]
+fn named_import_with_unclosed_brace_is_malformed() {
+    let output = parse_source(
+        SourceFileId::from_raw(10043),
+        "import {add from \"./math\" public func main();",
+    );
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedDeclarationHeader),
+        "{:?}",
+        output.diagnostics
+    );
+}
+
+#[test]
+fn named_import_without_from_is_malformed() {
+    let output = parse_source(
+        SourceFileId::from_raw(10044),
+        "import {add} \"./math\" public func main();",
+    );
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::MalformedImportPath),
+        "{:?}",
+        output.diagnostics
+    );
+}
+
+#[test]
+fn named_import_alias_is_reported_once() {
+    let output = parse_source(
+        SourceFileId::from_raw(10045),
+        "import {add as plus} from \"./math\" public func main();",
+    );
+    assert_eq!(output.imports[0].names, vec!["add"]);
+    let kinds: Vec<_> = output.diagnostics.iter().map(|d| d.kind).collect();
+    assert_eq!(kinds, vec![DiagnosticKind::NamedImportAlias], "{kinds:?}");
+}
+
+#[test]
+fn named_imports_accept_a_trailing_comma() {
+    let output = parse_source(
+        SourceFileId::from_raw(10046),
+        "import {add, sub,} from \"./math\" public func main();",
+    );
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.imports[0].names, vec!["add", "sub"]);
+}
