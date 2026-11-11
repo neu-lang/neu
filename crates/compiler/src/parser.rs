@@ -47,6 +47,7 @@ pub enum DiagnosticKind {
     MalformedArrayLiteral,
     MalformedIndexExpression,
     MalformedImportPath,
+    NamedImportAlias,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -769,6 +770,15 @@ impl<'source> Parser<'source> {
                         }
                     }
                     self.advance();
+                    if self.current_kind() == Some(TokenKind::KwAs) {
+                        if let Some(span) = self.current().map(|token| token.span) {
+                            self.diagnostic(DiagnosticKind::NamedImportAlias, span);
+                        }
+                        self.advance();
+                        if self.current_kind() == Some(TokenKind::Identifier) {
+                            self.advance();
+                        }
+                    }
                     if self.current_kind() == Some(TokenKind::Comma) {
                         self.advance();
                     } else if self.current_kind() != Some(TokenKind::RightBrace) {
