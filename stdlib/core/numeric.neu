@@ -14,6 +14,7 @@ public func max(left: Int, right: Int): Int {
 }
 
 public func clamp(value: Int, lower: Int, upper: Int): Int {
+    precondition(lower <= upper, "clamp requires lower <= upper");
     if value < lower {
         return lower
     }

@@ -11,6 +11,7 @@ child task; a cancelled child is a failure, so its scope joins the other childre
 and then traps. `spawn.neu`, `await.neu`, `task_results.neu`, and
 `cancel_task.neu` exercise the accepted task operations.
 `runtime_entry.neu` exercises the suspendable executable entry boundary.
+`preconditions.neu` exercises `precondition` on a condition that holds.
 `concurrency_diagnostics.neu` keeps the accepted cancellation path runnable
 for diagnostic and adversarial regression coverage.
 `channels.neu` exercises bounded FIFO message transfer and typed closure

@@ -1,0 +1,16 @@
+// A precondition that holds does nothing; the value of the helper is returned.
+func bounded(value: Int, lower: Int, upper: Int): Int {
+    precondition(lower <= upper, "bounded requires lower <= upper");
+    if value < lower {
+        return lower;
+    }
+    if value > upper {
+        return upper;
+    }
+    return value;
+}
+
+func main(): Int {
+    precondition(1 < 2, "one is less than two");
+    return bounded(9, 0, 7);
+}

@@ -1514,7 +1514,7 @@ fn lower_expression(
             .iter()
             .find(|name| name.reference == call.callee)
             .map(|name| name.name.as_str());
-        if matches!(builtin_name, Some("assert" | "fail")) {
+        if matches!(builtin_name, Some("assert" | "fail" | "precondition")) {
             let arguments = call
                 .arguments
                 .iter()
@@ -1529,7 +1529,21 @@ fn lower_expression(
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let operation_id = HirExpressionId::from_raw(output.len());
-            if builtin_name == Some("assert") {
+            if builtin_name == Some("precondition") {
+                output.push(HirExpression::precondition(
+                    operation_id,
+                    span,
+                    ty,
+                    arguments
+                        .first()
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                    arguments
+                        .get(1)
+                        .copied()
+                        .ok_or(HirLoweringError::UnsupportedExpression)?,
+                ));
+            } else if builtin_name == Some("assert") {
                 output.push(HirExpression::test_assert(
                     operation_id,
                     span,
@@ -3669,6 +3683,10 @@ pub enum HirExpressionKind {
     TestFail {
         message: HirExpressionId,
     },
+    Precondition {
+        condition: HirExpressionId,
+        message: HirExpressionId,
+    },
     IndirectCall {
         callee: HirExpressionId,
         arguments: Vec<HirExpressionId>,
@@ -3952,6 +3970,21 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::TestFail { message },
+        }
+    }
+
+    pub fn precondition(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        condition: HirExpressionId,
+        message: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::Precondition { condition, message },
         }
     }
 

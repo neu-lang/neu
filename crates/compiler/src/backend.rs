@@ -33,6 +33,10 @@ const NEGATIVE_EXPONENT_TRAP: TrapCode = TrapCode::unwrap_user(2);
 /// Trap for a runtime division or remainder whose divisor is zero (SPEC, ADR-0043).
 const DIVISION_BY_ZERO_TRAP: TrapCode = TrapCode::unwrap_user(18);
 const DIVISION_BY_ZERO_MESSAGE: &[u8] = b"neu: division by zero\n";
+/// Trap for a `precondition` whose condition is false (ADR-0123).
+const PRECONDITION_TRAP: TrapCode = TrapCode::unwrap_user(19);
+const PRECONDITION_PREFIX: &[u8] = b"neu: precondition failed: ";
+const NEWLINE: &[u8] = b"\n";
 
 /// Channel header: capacity, length, head, tail, closed flag, data pointer,
 /// then the receiver and sender FIFO queues used for suspension.
@@ -66,6 +70,9 @@ struct RuntimeFunctions {
     write: FuncId,
     /// The `neu: division by zero` message, written before a zero-divisor trap.
     division_by_zero_message: DataId,
+    /// The `neu: precondition failed: ` prefix and the newline ending the message.
+    precondition_prefix: DataId,
+    newline: DataId,
     call_conv: CallConv,
     /// Task scheduler functions; present only where the host runtime supports them.
     scheduler: Option<scheduler::SchedulerFunctions>,
@@ -641,6 +648,22 @@ fn declare_runtime_functions(
     module
         .define_data(division_by_zero_message, &message_data)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let precondition_prefix = module
+        .declare_data("neu_precondition_prefix", Linkage::Local, false, false)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let mut prefix_data = DataDescription::new();
+    prefix_data.define(PRECONDITION_PREFIX.to_vec().into_boxed_slice());
+    module
+        .define_data(precondition_prefix, &prefix_data)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let newline = module
+        .declare_data("neu_newline", Linkage::Local, false, false)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let mut newline_data = DataDescription::new();
+    newline_data.define(NEWLINE.to_vec().into_boxed_slice());
+    module
+        .define_data(newline, &newline_data)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let mut context = cranelift_codegen::Context::new();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, free.as_u32()), malloc_signature);
@@ -676,6 +699,8 @@ fn declare_runtime_functions(
         memcmp,
         write,
         division_by_zero_message,
+        precondition_prefix,
+        newline,
         call_conv: CallConv::triple_default(target),
         scheduler,
     })
@@ -1233,6 +1258,55 @@ fn lower_instruction(
             builder.ins().trap(TrapCode::unwrap_user(16));
             builder.switch_to_block(pass_block);
             builder.ins().return_(&[]);
+            builder.seal_block(fail_block);
+            builder.seal_block(pass_block);
+            Ok(())
+        }
+        MirInstruction::Precondition {
+            condition, message, ..
+        } => {
+            let condition = values
+                .get(condition)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let message = values
+                .get(message)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let failure = builder.ins().icmp_imm(IntCC::Equal, condition, 0);
+            let fail_block = builder.create_block();
+            let pass_block = builder.create_block();
+            builder
+                .ins()
+                .brif(failure, fail_block, &[], pass_block, &[]);
+            builder.switch_to_block(fail_block);
+            // Without a runtime or module (single-function emission) the failure
+            // still traps, but writes no message.
+            if let (Some(runtime), Some(module)) = (context.runtime, module.as_deref_mut()) {
+                let write = runtime.reference_write(builder.func);
+                let stderr = builder.ins().iconst(types::I64, 2);
+                let prefix = module.declare_data_in_func(runtime.precondition_prefix, builder.func);
+                let prefix_address = builder.ins().global_value(types::I64, prefix);
+                let prefix_length = builder
+                    .ins()
+                    .iconst(types::I64, PRECONDITION_PREFIX.len() as i64);
+                builder
+                    .ins()
+                    .call(write, &[stderr, prefix_address, prefix_length]);
+                let length = builder
+                    .ins()
+                    .load(types::I64, MemFlagsData::new(), message, 0);
+                let bytes = builder.ins().iadd_imm(message, 8);
+                builder.ins().call(write, &[stderr, bytes, length]);
+                let newline = module.declare_data_in_func(runtime.newline, builder.func);
+                let newline_address = builder.ins().global_value(types::I64, newline);
+                let newline_length = builder.ins().iconst(types::I64, NEWLINE.len() as i64);
+                builder
+                    .ins()
+                    .call(write, &[stderr, newline_address, newline_length]);
+            }
+            builder.ins().trap(PRECONDITION_TRAP);
+            builder.switch_to_block(pass_block);
             builder.seal_block(fail_block);
             builder.seal_block(pass_block);
             Ok(())

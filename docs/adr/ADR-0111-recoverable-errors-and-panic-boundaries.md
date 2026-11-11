@@ -1,6 +1,6 @@
 # ADR-0111: Recoverable Errors and Panic Boundaries
 
-Status: Accepted
+Status: Accepted; precondition failures are revised by ADR-0123
 
 ## Question
 

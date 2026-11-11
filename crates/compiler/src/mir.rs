@@ -340,6 +340,11 @@ pub enum MirInstruction {
         message: MirValueId,
         span: ByteSpan,
     },
+    Precondition {
+        condition: MirValueId,
+        message: MirValueId,
+        span: ByteSpan,
+    },
     FunctionReference {
         output: MirValueId,
         callee: MirFunctionId,
@@ -578,6 +583,7 @@ impl MirInstruction {
             | Self::DirectCall { span, .. }
             | Self::TestAssert { span, .. }
             | Self::TestFail { span, .. }
+            | Self::Precondition { span, .. }
             | Self::FunctionReference { span, .. }
             | Self::IndirectCall { span, .. }
             | Self::VirtualCall { span, .. }
@@ -1237,6 +1243,13 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
                 HirExpressionKind::TestFail { message } => {
                     instructions.push(MirInstruction::TestFail {
+                        message: mir_expression_value_id(function, *message),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::Precondition { condition, message } => {
+                    instructions.push(MirInstruction::Precondition {
+                        condition: mir_expression_value_id(function, *condition),
                         message: mir_expression_value_id(function, *message),
                         span: expression.span(),
                     });
@@ -2023,6 +2036,17 @@ impl<'a> ShortCircuitLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::Precondition { condition, message } => {
+                // The operands are lowered here, as the other operations do, so their
+                // instructions exist before the check reads them.
+                let condition = self.lower_expression(*condition)?;
+                let message = self.lower_expression(*message)?;
+                self.push(MirInstruction::Precondition {
+                    condition,
+                    message,
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::FunctionReference(callee) => {
                 self.push(MirInstruction::FunctionReference {
                     output,
@@ -2801,6 +2825,17 @@ impl<'a> ControlFlowLowerer<'a> {
             HirExpressionKind::TestFail { message } => {
                 self.push(MirInstruction::TestFail {
                     message: mir_expression_value_id(self.function, *message),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::Precondition { condition, message } => {
+                // The operands are lowered here, as the other operations do, so their
+                // instructions exist before the check reads them.
+                let condition = self.lower_expression(*condition)?;
+                let message = self.lower_expression(*message)?;
+                self.push(MirInstruction::Precondition {
+                    condition,
+                    message,
                     span: expression.span(),
                 });
             }
