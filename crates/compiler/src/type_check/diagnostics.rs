@@ -33,6 +33,8 @@ pub enum TypeRuleDiagnostic {
     FunctionTypeApplicationDeferred,
     MemberExpressionDeferred,
     PrivateFieldAccess,
+    /// Two primitive operands of different types (ADR-0059).
+    PrimitiveTypeMismatch,
     BinaryExpressionDeferred,
     UnaryExpressionDeferred,
     IfValueDeferred,
@@ -146,6 +148,21 @@ impl TypeCheckDiagnostic {
             node,
             expected_type: None,
             actual_type: None,
+        }
+    }
+
+    /// A primitive operator's operands have different types (ADR-0059).
+    pub fn primitive_type_mismatch(
+        node: AstNodeId,
+        expected_type: TypeId,
+        actual_type: TypeId,
+    ) -> Self {
+        Self {
+            kind: TypeCheckDiagnosticKind::TypeMismatch,
+            rule: TypeRuleDiagnostic::PrimitiveTypeMismatch,
+            node,
+            expected_type: Some(expected_type),
+            actual_type: Some(actual_type),
         }
     }
 

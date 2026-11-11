@@ -1216,6 +1216,53 @@ pub fn type_primitive_local_declaration_initializers(
 /// ADR-0059 allows no implicit conversion between `Byte` and `Int`. This runs once
 /// the types have settled, since a name initializer can be typed after the first
 /// declaration pass, which would otherwise skip the check.
+/// Reports a comparison whose operands have different types when one is a `Bool`,
+/// `Float`, or `Byte`. Primitive operands are never converted implicitly, so the
+/// comparison has no type (ADR-0059). Other comparisons, such as those with `null`,
+/// keep their own rules.
+pub(crate) fn diagnose_primitive_comparisons(
+    parsed: &ParseOutput,
+    types: &TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    let primitive = |ty: TypeId| {
+        matches!(
+            types.get(ty).map(|record| record.kind()),
+            Some(TypeKind::Primitive(
+                PrimitiveType::Bool | PrimitiveType::Float | PrimitiveType::Byte
+            ))
+        )
+    };
+    for binary in &parsed.binary_expressions {
+        if !matches!(
+            binary.operator,
+            ParsedBinaryOperator::Equal
+                | ParsedBinaryOperator::NotEqual
+                | ParsedBinaryOperator::Less
+                | ParsedBinaryOperator::Greater
+                | ParsedBinaryOperator::LessEqual
+                | ParsedBinaryOperator::GreaterEqual
+        ) || report.expression_type(binary.expression).is_some()
+        {
+            continue;
+        }
+        let (Some(left), Some(right)) = (
+            report.expression_type(binary.left),
+            report.expression_type(binary.right),
+        ) else {
+            continue;
+        };
+        if left == right || !(primitive(left) || primitive(right)) {
+            continue;
+        }
+        report.record_diagnostic(TypeCheckDiagnostic::primitive_type_mismatch(
+            binary.right,
+            left,
+            right,
+        ));
+    }
+}
+
 pub(crate) fn diagnose_local_initializer_mismatches(
     parsed: &ParseOutput,
     types: &TypeArena,

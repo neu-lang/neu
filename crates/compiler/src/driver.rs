@@ -785,6 +785,7 @@ fn compile_source_with_entry(
         &class_types,
         &mut report,
     );
+    crate::type_check::diagnose_primitive_comparisons(&parsed, &types, &mut report);
     diagnose_unresolved_types(&parsed, &mut report);
     let intrinsic_diagnostics =
         validate_intrinsic_calls(&parsed, report.expression_types(), &types);
