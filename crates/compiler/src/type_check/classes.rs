@@ -391,7 +391,13 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 }
                 continue;
             };
+            // Implementing an interface method needs no `override` marker. Only
+            // replacing a superclass method does.
+            let parent_is_interface = parsed.class_declarations.iter().any(|candidate| {
+                candidate.interface && Some(candidate.declaration) == parent_method.owner
+            });
             if !method.is_override
+                && !parent_is_interface
                 && let Some(node) = parsed.arena.node(method.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {

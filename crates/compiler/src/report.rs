@@ -326,6 +326,10 @@ fn reports_for(error: &DriverError, context: &ManifestContext) -> Vec<Report> {
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind(), span(diagnostic.span())))
             .collect(),
+        DriverError::DispatchDiagnostics(diagnostics) => diagnostics
+            .iter()
+            .map(|diagnostic| Report::kind(diagnostic.kind(), span(diagnostic.span())))
+            .collect(),
         DriverError::DirectCallDiagnostics(diagnostics) => diagnostics
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind(), span(diagnostic.span())))

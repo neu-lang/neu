@@ -36,7 +36,7 @@ fn suspend_interface_method_compiles_and_dispatches() {
     // Previously the class-body parser looped forever on `suspend` members.
     let source = r#"
         public interface Source { suspend func read(): Int; }
-        class Constant: Source { override suspend func read(): Int { return 12; } }
+        class Constant: Source { suspend func read(): Int { return 12; } }
         public suspend func main(): Int {
             val source: Source = new Constant();
             return source.read();

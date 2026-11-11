@@ -222,6 +222,7 @@ pub enum DriverError {
     TestDiagnostics(Vec<TestDiagnostic>),
     IntrinsicDiagnostics(Vec<IntrinsicDiagnostic>),
     ConstructorDiagnostics(Vec<ConstructorDiagnostic>),
+    DispatchDiagnostics(Vec<crate::type_check::DispatchDiagnostic>),
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
     OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
     UnknownNames(Vec<crate::unknown_names::UnknownName>),
@@ -489,6 +490,10 @@ fn compile_source_with_entry(
     let constructor_diagnostics = check_constructor_calls(&parsed, &class_types);
     if !constructor_diagnostics.is_empty() {
         return Err(DriverError::ConstructorDiagnostics(constructor_diagnostics));
+    }
+    let dispatch_diagnostics = crate::type_check::check_dispatch(&parsed);
+    if !dispatch_diagnostics.is_empty() {
+        return Err(DriverError::DispatchDiagnostics(dispatch_diagnostics));
     }
     let mut signatures = type_function_signatures_in_with_generics(
         &mut types,

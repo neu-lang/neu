@@ -621,7 +621,7 @@ fn public_interface_dispatches_a_channel_operation_without_runtime_types() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "public interface ChannelReader { suspend func read(): Int; } class Reader: ChannelReader { override suspend func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public suspend func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
+        "public interface ChannelReader { suspend func read(): Int; } class Reader: ChannelReader { suspend func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public suspend func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6850),
             ModuleName::parse("public_concurrency_interface").unwrap(),
@@ -667,7 +667,7 @@ fn resolves_overloaded_interface_methods_through_interface_dispatch() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "interface Choice { func pick(value: Int): Int; func pick(value: Bool): Int; } class Impl: Choice { override func pick(value: Int): Int { return 1; } override func pick(value: Bool): Int { return 9; } } public func main(): Int { val choice: Choice = new Impl(); return choice.pick(true); }",
+        "interface Choice { func pick(value: Int): Int; func pick(value: Bool): Int; } class Impl: Choice { func pick(value: Int): Int { return 1; } func pick(value: Bool): Int { return 9; } } public func main(): Int { val choice: Choice = new Impl(); return choice.pick(true); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6839),
             ModuleName::parse("classes").unwrap(),
@@ -790,7 +790,7 @@ fn bare_field_name_assignment_writes_the_receiver_field() {
 fn interface_method_return_type_must_match() {
     let mismatched = parse_source(
         SourceFileId::from_raw(6850),
-        "interface Readable { func read(): Int; } class Item: Readable { override func read(): Bool { return true; } }",
+        "interface Readable { func read(): Int; } class Item: Readable { func read(): Bool { return true; } }",
     );
     assert!(
         check_dispatch(&mismatched)
@@ -801,13 +801,13 @@ fn interface_method_return_type_must_match() {
 
     let matching = parse_source(
         SourceFileId::from_raw(6851),
-        "interface Readable { func read(): Int; } class Item: Readable { override func read(): Int { return 1; } }",
+        "interface Readable { func read(): Int; } class Item: Readable { func read(): Int { return 1; } }",
     );
     assert!(check_dispatch(&matching).is_empty());
 
     let generic_mismatched = parse_source(
         SourceFileId::from_raw(6852),
-        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { override func next(): Bool { return true; } }",
+        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { func next(): Bool { return true; } }",
     );
     assert!(
         check_dispatch(&generic_mismatched)
@@ -818,7 +818,48 @@ fn interface_method_return_type_must_match() {
 
     let generic_matching = parse_source(
         SourceFileId::from_raw(6853),
-        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { override func next(): Int { return n; } }",
+        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { func next(): Int { return n; } }",
     );
     assert!(check_dispatch(&generic_matching).is_empty());
+}
+
+#[test]
+fn interface_implementation_compiles_without_override_and_missing_method_is_rejected() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "interface Readable { func read(): Int; } class Item: Readable { func read(): Int { return 7; } } public func main(): Int { val r: Readable = new Item(); return r.read(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6860),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(7)
+    );
+
+    let error = compile_source_to_executable(
+        "interface Readable { func read(): Int; } class Item: Readable {} public func main(): Int { return 7; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6861),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("missing"),
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        format!("{error:?}").contains("MissingInterfaceMethod"),
+        "{error:?}"
+    );
+    let _ = fs::remove_dir_all(workspace);
 }
