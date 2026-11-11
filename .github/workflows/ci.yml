@@ -49,15 +49,6 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Linker diagnostics (temporary)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          for tool in cc gcc clang clang-cl link lld-link; do
-            echo "== $tool: $(which $tool 2>/dev/null || echo missing)"
-          done
-          cc --version || true
-          cc -print-prog-name=ld || true
       - name: Run tests
         run: cargo test --workspace --all-targets --no-fail-fast
       - name: Build debug

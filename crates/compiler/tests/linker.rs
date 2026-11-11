@@ -13,7 +13,7 @@ fn linker_environment_lock() -> std::sync::MutexGuard<'static, ()> {
 }
 
 #[test]
-fn host_link_plan_uses_cc_and_preserves_object_order() {
+fn host_link_plan_uses_the_default_driver_and_preserves_object_order() {
     let _environment_lock = linker_environment_lock();
     let root = std::env::temp_dir().join(format!("neu-system-link-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -22,14 +22,21 @@ fn host_link_plan_uses_cc_and_preserves_object_order() {
     let output = root.join("program");
     fs::write(&object, b"object").unwrap();
 
+    let (driver, driver_arguments) = compiler::linker::default_linker();
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
-    assert_eq!(plan.program(), Path::new("cc"));
-    assert_eq!(plan.arguments()[0], "-o");
+    let base = driver_arguments.len();
+    assert_eq!(plan.program(), Path::new(driver));
+    let planned_driver_arguments: Vec<&str> = plan.arguments()[..base]
+        .iter()
+        .map(|argument| argument.to_str().unwrap())
+        .collect();
+    assert_eq!(planned_driver_arguments, driver_arguments);
+    assert_eq!(plan.arguments()[base], "-o");
     assert_eq!(
-        plan.arguments()[1],
+        plan.arguments()[base + 1],
         compiler::linker::executable_path(&output).as_os_str()
     );
-    assert_eq!(plan.arguments()[2], object.as_os_str());
+    assert_eq!(plan.arguments()[base + 2], object.as_os_str());
     assert_eq!(plan.entry_symbol(), "main");
     let _ = fs::remove_dir_all(root);
 }
