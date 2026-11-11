@@ -49,6 +49,11 @@ fn numeric_helpers() -> &'static str {
         .expect("numeric helpers precede the test function")
 }
 
+/// Windows writes `\r\n` for the runtime's newline. The message text is the same.
+fn with_unix_newlines(stderr: &str) -> String {
+    stderr.replace("\r\n", "\n")
+}
+
 #[test]
 fn precondition_that_holds_continues() {
     let source = r#"
@@ -73,7 +78,7 @@ fn precondition_that_fails_writes_its_message_and_traps() {
     let (code, stderr) = run_capturing(source, "fails");
     assert!(is_trap(code), "{stderr}");
     assert_eq!(
-        stderr,
+        with_unix_newlines(&stderr),
         "neu: precondition failed: one is not greater than two\n"
     );
 }
@@ -110,7 +115,7 @@ fn clamp_with_inverted_bounds_traps_with_the_precondition_message() {
     let (code, stderr) = run_capturing(&source, "clamp_inverted");
     assert!(is_trap(code), "{stderr}");
     assert_eq!(
-        stderr,
+        with_unix_newlines(&stderr),
         "neu: precondition failed: clamp requires lower <= upper\n"
     );
 }
