@@ -176,7 +176,7 @@ pub fn validate_intrinsic_calls(
         else {
             continue;
         };
-        let expected = if name == "assert" {
+        let expected = if matches!(name, "assert" | "precondition") {
             2
         } else if name == "fail" {
             1
@@ -222,13 +222,17 @@ pub fn validate_intrinsic_calls(
                         .map(|entry| entry.ty())
                         == int_type
             });
-        if name == "assert" && !condition_is_bool {
+        if matches!(name, "assert" | "precondition") && !condition_is_bool {
             diagnostics.push(IntrinsicDiagnostic {
                 kind: IntrinsicDiagnosticKind::ConditionType,
                 span,
             });
         }
-        let message = call.arguments[if name == "assert" { 1 } else { 0 }];
+        let message = call.arguments[if matches!(name, "assert" | "precondition") {
+            1
+        } else {
+            0
+        }];
         if expression_types
             .iter()
             .find(|entry| entry.expression() == message)
@@ -266,7 +270,7 @@ pub fn apply_intrinsic_call_facts(
         else {
             continue;
         };
-        if matches!(name, "assert" | "fail") {
+        if matches!(name, "assert" | "fail" | "precondition") {
             report.replace_expression_type(ExpressionType::new(call.expression, void_type));
             report.retain_diagnostics(|diagnostic| {
                 diagnostic.node() != call.expression
@@ -2260,6 +2264,7 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
                         | "close"
                         | "assert"
                         | "fail"
+                        | "precondition"
                 )
             {
                 continue;

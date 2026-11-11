@@ -1433,7 +1433,8 @@ evaluation, diagnostic, source-span, optimization, and termination contracts.
 The initial numeric utility surface is limited to `Int` helpers `min`, `max`,
 `clamp`, `abs`, and `sign`. They perform no implicit conversion and preserve
 ADR-0043 evaluation and overflow behavior; `abs(Int.MIN)` overflows, and an
-invalid `clamp` range is a diagnosed programmer fault. Checked, saturating, and
+invalid `clamp` range is a diagnosed programmer fault, reported through the
+precondition operation of ADR-0123. Checked, saturating, and
 wrapping arithmetic, numeric casts, unsigned and floating-point types, and
 other numeric intrinsics require separate accepted contracts.
 

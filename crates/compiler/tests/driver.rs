@@ -656,6 +656,7 @@ macro_rules! current_example_tests {
 
 current_example_tests! {
     example_control_flow => "control_flow", 7;
+    example_preconditions => "preconditions", 7;
     example_primitive_values => "primitive_values", 7;
     example_fixed_arrays => "fixed_arrays", 7;
     example_strings => "strings", 7;
