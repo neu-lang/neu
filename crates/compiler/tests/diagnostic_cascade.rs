@@ -21,11 +21,12 @@ fn missing_binary_operand_reports_one_root_cause() {
 
 #[test]
 fn failed_lambda_body_reports_one_root_cause() {
-    // A lambda body that is a statement, not an expression, is one error. The
-    // statement parser must not re-read the rest of the body as declarations.
+    // A lambda body that is a statement, not an expression, is one error
+    // (SPEC, Lambda Bodies). The statement parser must not re-read the rest of
+    // the body as declarations.
     assert_eq!(
         parser_kinds("func main() { val f = { x: Int -> val y: Int = x; y }; return 0; }"),
-        vec![DiagnosticKind::MissingExpression],
+        vec![DiagnosticKind::LambdaBodyNotSingleExpression],
     );
 }
 

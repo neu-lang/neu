@@ -1189,6 +1189,30 @@ assignment, ownership, nullability, capability, dispatch, cleanup, HIR, MIR,
 and ABI rules. Parameters, returns, fields, constructors, and public
 signatures remain explicitly typed.
 
+## Lambda Bodies
+
+A lambda body is a single expression, by design (issue 54). The body
+`{ -> val y = 3; y + 4 }` is a statement list and is rejected with
+`lambda_body_not_single_expression` at the first statement token. A body with a
+`;` followed by more code, as in `{ -> foo(); bar() }`, is rejected the same way
+at the `;`. Each case reports once. Statement-block lambda bodies are not part
+of the language. Adding them changes lambda return and capture rules, so they
+need a new or revised ADR before implementation.
+
+## Local Type Inference
+
+ADR-0090 governs local inference. An unannotated `val` or `var` takes the exact
+type of its initializer when that type is already resolved. This holds for
+literals, calls, and arithmetic expressions. An annotated lambda local is
+callable: `val f: () -> Int = { -> 7 };`, and so is a lambda passed to a
+parameter with a function type.
+
+An unannotated lambda local, such as `val f = { -> 7 }`, has no function type
+in this specification, because the return type of a lambda is not defined when
+it has no annotation. Such a local is not callable and must be annotated. Defining
+lambda return-type inference is an open owner decision. It requires an ADR
+revision.
+
 ## ADR-0091: Optional Control-Header Parentheses
 
 `if`, `for`, and `when` headers may omit their surrounding parentheses while
