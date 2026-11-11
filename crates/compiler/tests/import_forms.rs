@@ -117,20 +117,25 @@ fn alias_replaces_the_package_qualifier() {
 }
 
 #[test]
-fn qualifier_check_ignores_local_names_that_match_a_package() {
-    // Only the package graph is checked here: lowering a local that shares a
-    // package qualifier's name is a separate, pre-existing HIR limitation.
-    let graph = VirtualPackageGraph::build(
-        "src/main.neu",
-        [
-            VirtualSource::new(
-                "src/main.neu",
-                "import {add} from \"./math\"\n\nclass Box(var v: Int) {\n}\n\npublic func main(): Int {\n    val math: Box = new Box(7);\n    return math.v\n}\n",
-            ),
-            math_package(),
-        ],
+fn local_named_like_a_package_qualifier_compiles_and_runs() {
+    assert_eq!(
+        run_exit_code(
+            "shadow",
+            "import {add} from \"./math\"\n\nclass Box(var v: Int) {\n}\n\npublic func main(): Int {\n    val math: Box = new Box(7);\n    return math.v\n}\n",
+        ),
+        Some(7)
     );
-    assert!(graph.is_ok(), "{:?}", graph.err());
+}
+
+#[test]
+fn identifiers_that_contain_a_qualifier_name_are_untouched() {
+    assert_eq!(
+        run_exit_code(
+            "contains",
+            "import \"./math\"\n\nclass Box(var v: Int) {\n}\n\npublic func main(): Int {\n    val mymath: Box = new Box(7);\n    return mymath.v + math.add() - 7\n}\n",
+        ),
+        Some(7)
+    );
 }
 
 #[test]
@@ -274,4 +279,13 @@ fn named_import_of_a_public_enum_is_accepted() {
         ],
     );
     assert!(graph.is_ok(), "{:?}", graph.err());
+}
+
+#[test]
+fn qualified_access_without_any_import_is_rejected() {
+    let kinds = graph_error("public func main(): Int {\n    return math.add();\n}\n");
+    assert!(
+        kinds.contains(&PackageGraphDiagnosticKind::QualifierNotImported),
+        "{kinds:?}"
+    );
 }
