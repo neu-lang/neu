@@ -38,8 +38,9 @@ use crate::{
         type_array_iterations, type_bind_function_values, type_class_types_in,
         type_concurrency_operations, type_control_flow, type_dynamic_array_operations,
         type_enum_whens, type_executable_core_in, type_executable_int_operators,
-        type_function_signatures_in_with_generics, type_lambda_expressions, type_string_operations,
-        type_value_conditionals, validate_compile_time_constants, validate_concurrency_structure,
+        type_function_signatures_in_with_generics, type_lambda_expressions,
+        type_primitive_operators, type_string_operations, type_value_conditionals,
+        validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_intrinsic_calls,
         validate_task_member_cancellation_structure, validate_test_declarations,
     },
@@ -642,7 +643,7 @@ fn compile_source_with_entry(
                     | TypeRuleDiagnostic::MemberExpressionDeferred
             )
     });
-    type_int_operators(&parsed, &types, &mut report);
+    type_operators_in_round(&parsed, &types, &mut report);
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
@@ -682,7 +683,7 @@ fn compile_source_with_entry(
     for _ in 0..3 {
         // Operators on locals whose types come from call results need those call
         // types, which exist only after the direct-call results above.
-        type_int_operators(&parsed, &types, &mut report);
+        type_operators_in_round(&parsed, &types, &mut report);
         infer_local_types(&parsed, &mut report);
         type_lambda_expressions(&parsed, &mut types, &mut report);
         type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
@@ -916,10 +917,11 @@ fn compile_source_with_entry(
     Ok(executable)
 }
 
-/// Types integer unary and binary operators whose operands are known or not yet
-/// typed. An operand's type can arrive from a later pass (a call result), so
-/// this runs again in the typing rounds, not only once.
-fn type_int_operators(
+/// Types integer, `Bool`, `Float`, and `Byte` unary and binary operators whose
+/// operands are known or not yet typed. An operand's type can arrive from a
+/// later pass (a call result), so this runs again in the typing rounds, not only
+/// once.
+fn type_operators_in_round(
     parsed: &parser::ParseOutput,
     types: &TypeArena,
     report: &mut crate::type_check::TypeCheckReport,
@@ -963,4 +965,38 @@ fn type_int_operators(
         int_type,
     );
     merge_type_check_report(report, inferred_operators);
+
+    let primitive = |kind: PrimitiveType| {
+        types
+            .records()
+            .iter()
+            .find(|record| record.kind() == &TypeKind::Primitive(kind))
+            .map(|record| record.id())
+    };
+    if let (Some(bool_id), Some(float_id), Some(byte_id), Some(void_id)) = (
+        primitive(PrimitiveType::Bool),
+        primitive(PrimitiveType::Float),
+        primitive(PrimitiveType::Byte),
+        primitive(PrimitiveType::Void),
+    ) {
+        let primitive_report = type_primitive_operators(
+            &parsed.unary_expressions,
+            &parsed.binary_expressions,
+            report.expression_types(),
+            bool_id,
+            float_id,
+            byte_id,
+            void_id,
+        );
+        // Only new expression types are kept. The report repeats the known types,
+        // and the core pass already reported this operator's diagnostics.
+        for expression_type in primitive_report.expression_types() {
+            if report
+                .expression_type(expression_type.expression())
+                .is_none()
+            {
+                report.record_expression_type(*expression_type);
+            }
+        }
+    }
 }

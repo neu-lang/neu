@@ -476,3 +476,31 @@ fn operators_on_a_local_inferred_from_a_call_result_are_typed() {
     "#;
     assert_eq!(compile_and_run(source, "infer_call_operator"), 3);
 }
+
+#[test]
+fn bool_operator_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func is_big(): Bool { return true; }
+        func main(): Int {
+            val b = is_big();
+            val c = !b;
+            if c { return 1; }
+            return 2;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_bool_operator"), 2);
+}
+
+#[test]
+fn float_operator_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func half(): Float { return 1.5; }
+        func main(): Int {
+            val f = half();
+            val g = f + 1.0;
+            if g == 2.5 { return 3; }
+            return 4;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_float_operator"), 3);
+}
