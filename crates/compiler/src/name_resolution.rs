@@ -3,9 +3,9 @@ use std::collections::{HashMap, hash_map::Entry};
 use crate::ast::{AstArena, AstNodeId, AstNodeKind};
 use crate::module::{ModuleMetadata, ModuleName, PackageNamespace};
 use crate::parser::{
-    ParsedDeclarationName, ParsedEnumVariant, ParsedFunctionParameter, ParsedLocalBindingName,
-    ParsedMatchArm, ParsedNameReference, ParsedQualifiedCasePattern, ParsedTypeNameReference,
-    ParsedWhenExpression,
+    ParseOutput, ParsedDeclarationName, ParsedEnumVariant, ParsedFunctionParameter,
+    ParsedLambdaExpression, ParsedLocalBindingName, ParsedMatchArm, ParsedNameReference,
+    ParsedQualifiedCasePattern, ParsedTypeNameReference, ParsedWhenExpression,
 };
 use crate::source::ByteSpan;
 use crate::symbol::{SymbolId, SymbolInterner};
@@ -679,10 +679,26 @@ impl LocalScopeTree {
 }
 
 pub fn build_local_scope_tree(arena: &AstArena) -> LocalScopeTree {
+    let is_scope_owner = |kind: AstNodeKind| {
+        matches!(
+            kind,
+            AstNodeKind::Block
+                | AstNodeKind::DeclarationBody
+                | AstNodeKind::LambdaExpression
+                | AstNodeKind::MatchArm
+        )
+    };
+    // Blocks, lambdas, and match arms nest; a declaration body does not.
+    let is_nesting_owner = |kind: AstNodeKind| {
+        matches!(
+            kind,
+            AstNodeKind::Block | AstNodeKind::LambdaExpression | AstNodeKind::MatchArm
+        )
+    };
     let mut scope_owners: Vec<_> = arena
         .nodes()
         .iter()
-        .filter(|node| matches!(node.kind, AstNodeKind::Block | AstNodeKind::DeclarationBody))
+        .filter(|node| is_scope_owner(node.kind))
         .collect();
     scope_owners.sort_by_key(|node| (node.span.start(), std::cmp::Reverse(node.span.end())));
 
@@ -690,12 +706,12 @@ pub fn build_local_scope_tree(arena: &AstArena) -> LocalScopeTree {
     let mut owner_scopes: Vec<(&crate::ast::AstNode, LocalScopeId)> = Vec::new();
 
     for owner in scope_owners {
-        let parent = if owner.kind == AstNodeKind::Block {
+        let parent = if is_nesting_owner(owner.kind) {
             owner_scopes
                 .iter()
                 .rev()
                 .find(|(candidate, _)| {
-                    candidate.kind == AstNodeKind::Block
+                    is_nesting_owner(candidate.kind)
                         && candidate.span.start() < owner.span.start()
                         && owner.span.end() < candidate.span.end()
                 })
@@ -1012,7 +1028,7 @@ pub fn bind_unqualified_function_references(
 
         match declarations.lookup_top_level(TopLevelLookup::new(
             metadata.name().clone(),
-            package,
+            package.clone(),
             name,
             DeclarationKind::Function,
             reference.name_span,
@@ -1217,12 +1233,184 @@ impl AcceptedNameReferenceBind {
     }
 }
 
+/// Value names the language provides without a declaration. Each is matched by
+/// name in the type checker, HIR, or parser. These are never resolved against
+/// declarations.
+pub const LANGUAGE_PROVIDED_VALUE_NAMES: &[&str] = &[
+    "assert",
+    "await",
+    "cancel",
+    "channel",
+    "clone",
+    "close",
+    "fail",
+    "length",
+    "precondition",
+    "receive",
+    "send",
+    "spawn",
+    "super",
+    "this",
+];
+
+/// Primitive type names the type checker resolves by name.
+pub const PRIMITIVE_TYPE_NAMES: &[&str] = &[
+    "Array", "Bool", "Byte", "Channel", "Float", "Int", "Null", "String", "Task",
+];
+
+/// A region of source in which a member or generic name is visible: a generic
+/// parameter inside its declaration, a field inside its class and the classes
+/// that inherit it, or a constructor parameter inside its class (issue 85).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeclaredRegion {
+    pub name: String,
+    pub span: ByteSpan,
+}
+
+/// Returns the regions in which generic parameters, fields, and constructor
+/// parameters of one source file are visible.
+pub fn declared_regions(parsed: &ParseOutput, arena: &AstArena) -> Vec<DeclaredRegion> {
+    let class_named = |name: &str| {
+        parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == name)
+    };
+    // Whether `class` inherits from `target` through its superclass names.
+    let inherits = |class: &crate::parser::ParsedClassDeclaration, target: AstNodeId| {
+        let mut current = class.superclass.as_deref();
+        for _ in 0..64 {
+            let Some(name) = current else {
+                return false;
+            };
+            let Some(parent) = class_named(name) else {
+                return false;
+            };
+            if parent.declaration == target {
+                return true;
+            }
+            current = parent.superclass.as_deref();
+        }
+        false
+    };
+    // A class declaration node covers only its header, so a class's extent is
+    // the span the parser recorded for the whole declaration.
+    // A function declaration node likewise covers only its header, so its
+    // extent runs through its body block.
+    let span_of = |node: AstNodeId| {
+        if let Some(class) = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.declaration == node)
+        {
+            return Some(class.span);
+        }
+        if let Some(function) = parsed
+            .function_declarations
+            .iter()
+            .find(|function| function.declaration == node)
+            && let Some(body) = function.body
+        {
+            let header = arena.node(node)?.span;
+            let body = arena.node(body)?.span;
+            return ByteSpan::new(header.file(), header.start(), body.end());
+        }
+        arena.node(node).map(|node| node.span)
+    };
+
+    let mut regions = Vec::new();
+    for parameter in &parsed.generic_parameters {
+        if let Some(span) = parameter.owner.and_then(span_of) {
+            regions.push(DeclaredRegion {
+                name: parameter.name.clone(),
+                span,
+            });
+        }
+    }
+    for field in &parsed.field_declarations {
+        for class in &parsed.class_declarations {
+            if (class.declaration == field.owner || inherits(class, field.owner))
+                && let Some(span) = span_of(class.declaration)
+            {
+                regions.push(DeclaredRegion {
+                    name: field.name.clone(),
+                    span,
+                });
+            }
+        }
+    }
+    for class in &parsed.class_declarations {
+        for parameter in &class.constructor_parameters {
+            // A promoted parameter (`val` or `var`) is a field, so subclasses
+            // inherit it. A plain parameter is visible in its class only.
+            for owner in &parsed.class_declarations {
+                let inherited = parameter.field && inherits(owner, class.declaration);
+                if owner.declaration != class.declaration && !inherited {
+                    continue;
+                }
+                if let Some(span) = span_of(owner.declaration) {
+                    regions.push(DeclaredRegion {
+                        name: parameter.name.clone(),
+                        span,
+                    });
+                }
+            }
+        }
+    }
+    regions
+}
+
+fn in_declared_region(regions: &[DeclaredRegion], name: &str, reference: ByteSpan) -> bool {
+    regions.iter().any(|region| {
+        region.name == name
+            && region.span.file() == reference.file()
+            && region.span.start() <= reference.start()
+            && reference.end() <= region.span.end()
+    })
+}
+
+/// Runs scope-aware name resolution over one parsed source file and returns
+/// the references that no lexical scope or package declaration provides
+/// (issue 85). The executable path runs this after the unknown-name check, so
+/// every name reported here is declared somewhere but not in scope.
+pub fn unresolved_names(
+    parsed: &ParseOutput,
+    metadata: &ModuleMetadata,
+) -> Vec<ResolutionDiagnostic> {
+    let mut interner = SymbolInterner::new();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let declarations = build_declaration_index(metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_all_local_bindings(&parsed.arena, parsed, &scopes, &mut interner);
+    let receivers: Vec<_> = parsed
+        .member_expressions
+        .iter()
+        .map(|member| member.receiver)
+        .collect();
+    let regions = declared_regions(parsed, &parsed.arena);
+    bind_accepted_name_references(
+        metadata,
+        &parsed.arena,
+        &parsed.name_references,
+        &parsed.type_name_references,
+        &receivers,
+        &regions,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    )
+    .diagnostics()
+    .to_vec()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn bind_accepted_name_references(
     metadata: &ModuleMetadata,
     arena: &AstArena,
     name_references: &[ParsedNameReference],
     type_name_references: &[ParsedTypeNameReference],
+    member_receivers: &[AstNodeId],
+    declared_regions: &[DeclaredRegion],
     scopes: &LocalScopeTree,
     local_bindings: &LocalBindingIndex,
     declarations: &DeclarationIndex,
@@ -1232,10 +1420,70 @@ pub fn bind_accepted_name_references(
     let mut inserts = Vec::new();
     let mut diagnostics = Vec::new();
 
+    // A primitive or language-provided name is never a declared value.
+    // Enum payload types are parsed as expressions, so primitives are
+    // filtered there too.
+    let name_references: Vec<_> = name_references
+        .iter()
+        .filter(|reference| {
+            !LANGUAGE_PROVIDED_VALUE_NAMES.contains(&reference.name.as_str())
+                && !PRIMITIVE_TYPE_NAMES.contains(&reference.name.as_str())
+        })
+        .cloned()
+        .collect();
+
+    // A type name used as a receiver, as in `Color.Red`, names the type when
+    // no local binding of that name is visible.
+    let mut remaining = Vec::new();
+    for reference in name_references {
+        let receiver_type = if member_receivers.contains(&reference.reference) {
+            receiver_type_name(
+                metadata,
+                arena,
+                &reference,
+                scopes,
+                local_bindings,
+                declarations,
+                interner,
+            )
+        } else {
+            None
+        };
+        match receiver_type {
+            Some(symbol) => {
+                inserts.push(table.insert(ResolvedName::new(reference.reference, symbol)))
+            }
+            None => remaining.push(reference),
+        }
+    }
+    let name_references = remaining;
+
+    // Generic parameters, fields, and constructor parameters resolve by
+    // region, not by scope (issue 85).
+    let mut name_references_left = Vec::new();
+    for reference in name_references {
+        if in_declared_region(declared_regions, &reference.name, reference.name_span) {
+            let symbol = interner.intern(&reference.name);
+            inserts.push(table.insert(ResolvedName::new(reference.reference, symbol)));
+        } else {
+            name_references_left.push(reference);
+        }
+    }
+    let name_references = name_references_left;
+    let type_name_references: Vec<_> = type_name_references
+        .iter()
+        .filter(|reference| !PRIMITIVE_TYPE_NAMES.contains(&reference.name.as_str()))
+        .filter(|reference| {
+            !in_declared_region(declared_regions, &reference.name, reference.name_span)
+        })
+        .cloned()
+        .collect();
+    let type_name_references = type_name_references.as_slice();
+
     let function_bind = bind_unqualified_function_references(
         metadata,
         arena,
-        name_references,
+        &name_references,
         scopes,
         local_bindings,
         declarations,
@@ -1294,6 +1542,48 @@ pub fn bind_accepted_name_references(
         table,
         inserts,
         diagnostics,
+    }
+}
+
+fn receiver_type_name(
+    metadata: &ModuleMetadata,
+    arena: &AstArena,
+    reference: &ParsedNameReference,
+    scopes: &LocalScopeTree,
+    local_bindings: &LocalBindingIndex,
+    declarations: &DeclarationIndex,
+    interner: &mut SymbolInterner,
+) -> Option<SymbolId> {
+    let name = interner.intern(&reference.name);
+    let local_visible =
+        containing_block_scope(arena, scopes, reference.reference).is_some_and(|scope| {
+            matches!(
+                local_bindings.lookup_local(
+                    scopes,
+                    arena,
+                    LocalNameLookup::new(scope, name, reference.name_span),
+                ),
+                LocalNameLookupResult::Found(_)
+            )
+        });
+    if local_visible {
+        return None;
+    }
+    let package = metadata
+        .packages()
+        .iter()
+        .find(|package| package.source_file() == reference.name_span.file())
+        .map(|package| package.namespace().clone())
+        .unwrap_or_else(PackageNamespace::root);
+    match declarations.lookup_top_level(TopLevelLookup::new(
+        metadata.name().clone(),
+        package,
+        name,
+        DeclarationKind::Type,
+        reference.name_span,
+    )) {
+        TopLevelLookupResult::Found(declaration) => Some(declaration.key().name()),
+        TopLevelLookupResult::Unresolved(_) => None,
     }
 }
 
@@ -1469,6 +1759,173 @@ pub fn build_function_parameter_binding_index(
     }
 }
 
+/// Builds the local binding index for one source file: `let`, `var`, and
+/// `val` locals, function parameters, lambda parameters, `for` loop variables,
+/// and pattern bindings (ADR-0026). Callers pass the result to
+/// [`bind_accepted_name_references`].
+pub fn build_all_local_bindings(
+    arena: &AstArena,
+    parsed: &ParseOutput,
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut build =
+        build_scoped_local_binding_index(arena, &parsed.local_binding_names, scopes, interner);
+    let parameters = build_function_parameter_binding_index(
+        arena,
+        &parsed.function_parameters,
+        scopes,
+        interner,
+    );
+    let lambda_parameters =
+        build_lambda_parameter_binding_index(&parsed.lambda_expressions, scopes, interner);
+    let loop_variables = build_loop_variable_binding_index(parsed, scopes, interner);
+    let pattern_variables = build_pattern_binding_index(parsed, scopes, interner);
+    for index in [
+        &parameters,
+        &lambda_parameters,
+        &loop_variables,
+        &pattern_variables,
+    ] {
+        for binding in index.index().bindings() {
+            let insert = build.index.insert(binding.clone());
+            if let LocalBindingInsert::Duplicate { .. } = insert
+                && let Some(node) = arena.node(binding.binding())
+            {
+                build.diagnostics.push(ResolutionDiagnostic::new(
+                    ResolutionDiagnosticKind::DuplicateName,
+                    node.span,
+                ));
+            }
+            build.inserts.push(insert);
+        }
+        build
+            .diagnostics
+            .extend(index.diagnostics().iter().cloned());
+    }
+    build
+}
+
+fn build_loop_variable_binding_index(
+    parsed: &ParseOutput,
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut index = LocalBindingIndex::new();
+    let mut inserts = Vec::new();
+
+    for loop_statement in &parsed.for_statements {
+        let Some(scope) = scopes
+            .scopes()
+            .iter()
+            .find(|scope| scope.owner() == loop_statement.body)
+            .map(|scope| scope.id())
+        else {
+            continue;
+        };
+        let name = interner.intern(&loop_statement.binding_name);
+        inserts.push(index.insert(LocalBinding::new(
+            LocalBindingKey::new(scope, name),
+            loop_statement.binding_name_node,
+            LocalBindingKind::Immutable,
+        )));
+    }
+
+    LocalBindingIndexBuild {
+        index,
+        inserts,
+        diagnostics: Vec::new(),
+    }
+}
+
+fn build_pattern_binding_index(
+    parsed: &ParseOutput,
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut index = LocalBindingIndex::new();
+    let mut inserts = Vec::new();
+
+    for binding in &parsed.pattern_bindings {
+        // The innermost arm whose span contains the pattern owns the binding.
+        let Some(arm) = parsed
+            .match_arms
+            .iter()
+            .filter(|arm| {
+                arm.span.file() == binding.name_span.file()
+                    && arm.span.start() <= binding.name_span.start()
+                    && binding.name_span.end() <= arm.span.end()
+            })
+            .min_by_key(|arm| arm.span.end() - arm.span.start())
+        else {
+            continue;
+        };
+        let Some(scope) = scopes
+            .scopes()
+            .iter()
+            .find(|scope| scope.owner() == arm.arm)
+            .map(|scope| scope.id())
+        else {
+            continue;
+        };
+        let name = interner.intern(&binding.name);
+        inserts.push(index.insert(LocalBinding::new(
+            LocalBindingKey::new(scope, name),
+            binding.pattern,
+            LocalBindingKind::Immutable,
+        )));
+    }
+
+    LocalBindingIndexBuild {
+        index,
+        inserts,
+        diagnostics: Vec::new(),
+    }
+}
+
+fn build_lambda_parameter_binding_index(
+    lambdas: &[ParsedLambdaExpression],
+    scopes: &LocalScopeTree,
+    interner: &mut SymbolInterner,
+) -> LocalBindingIndexBuild {
+    let mut index = LocalBindingIndex::new();
+    let mut inserts = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for lambda in lambdas {
+        let Some(scope) = scopes
+            .scopes()
+            .iter()
+            .find(|scope| scope.owner() == lambda.expression)
+            .map(|scope| scope.id())
+        else {
+            continue;
+        };
+        for parameter in &lambda.parameters {
+            let name = interner.intern(&parameter.name);
+            let key = LocalBindingKey::new(scope, name);
+            let insert = index.insert(LocalBinding::new(
+                key,
+                parameter.parameter,
+                LocalBindingKind::Immutable,
+            ));
+            if matches!(insert, LocalBindingInsert::Duplicate { .. }) {
+                diagnostics.push(ResolutionDiagnostic::new(
+                    ResolutionDiagnosticKind::DuplicateName,
+                    parameter.name_span,
+                ));
+            }
+            inserts.push(insert);
+        }
+    }
+
+    LocalBindingIndexBuild {
+        index,
+        inserts,
+        diagnostics,
+    }
+}
+
 fn function_body_scope(
     arena: &AstArena,
     scopes: &LocalScopeTree,
@@ -1499,8 +1956,10 @@ fn containing_block_scope(
             let Some(owner) = arena.node(scope.owner()) else {
                 return false;
             };
-            owner.kind == AstNodeKind::Block
-                && owner.span.start() <= node_span.start()
+            matches!(
+                owner.kind,
+                AstNodeKind::Block | AstNodeKind::LambdaExpression | AstNodeKind::MatchArm
+            ) && owner.span.start() <= node_span.start()
                 && node_span.end() <= owner.span.end()
         })
         .min_by_key(|scope| {

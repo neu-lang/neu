@@ -8,27 +8,9 @@
 
 use std::collections::BTreeSet;
 
+use crate::name_resolution::LANGUAGE_PROVIDED_VALUE_NAMES;
 use crate::parser::ParseOutput;
 use crate::source::ByteSpan;
-
-/// Names the compiler provides without a declaration. Each is matched by name
-/// in the type checker, HIR, or parser.
-const BUILT_IN_NAMES: &[&str] = &[
-    "assert",
-    "await",
-    "cancel",
-    "channel",
-    "clone",
-    "close",
-    "fail",
-    "length",
-    "precondition",
-    "receive",
-    "send",
-    "spawn",
-    "super",
-    "this",
-];
 
 /// A simple name that the program never declares.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -39,7 +21,7 @@ pub struct UnknownName {
 
 /// Returns each unknown simple name reference, in source order.
 pub fn find_unknown_names(parsed: &ParseOutput) -> Vec<UnknownName> {
-    let mut declared: BTreeSet<&str> = BUILT_IN_NAMES.iter().copied().collect();
+    let mut declared: BTreeSet<&str> = LANGUAGE_PROVIDED_VALUE_NAMES.iter().copied().collect();
     declared.extend(parsed.declaration_names.iter().map(|d| d.name.as_str()));
     declared.extend(parsed.local_binding_names.iter().map(|b| b.name.as_str()));
     declared.extend(parsed.function_parameters.iter().map(|p| p.name.as_str()));

@@ -235,10 +235,27 @@ that name: no declaration, local binding, parameter, lambda parameter, field,
 class, constructor parameter, enum variant, loop variable, generic parameter,
 or built-in. Built-ins are `assert`, `await`, `cancel`, `channel`, `clone`,
 `close`, `fail`, `length`, `precondition`, `receive`, `send`, `spawn`, `super`,
-and `this`. The check is conservative: a name declared anywhere in the program
-is never reported, so scope-sensitive misuse of a declared name is not covered
-here. A qualifier whose package does not exist is an unknown name at the
+and `this`. Scope-sensitive misuse of a declared name is reported by the scope-aware check
+below (issue 85). A qualifier whose package does not exist is an unknown name at the
 qualifier.
+
+Scope-aware names on the executable path (issue 85). After the unknown-name
+check, a simple name reference is reported as `out_of_scope_name` at the name
+when it is declared somewhere in the program but no visible binding provides it
+at the reference. Visible bindings are: `val`, `var`, and `const` locals of an
+enclosing block, function parameters in their function body, lambda parameters
+in the lambda body, `for` loop variables in the loop body, and pattern bindings
+in their match arm. A name used as the receiver of a member access, such as
+`Color.Red`, names a type when no local of that name is visible.
+
+Member and generic names resolve by region rather than by lexical scope. A
+generic parameter is visible in its declaration, from its header through its
+body. A field is visible in its class and in every class that inherits from it.
+A promoted constructor parameter (`val` or `var`) is a field. A plain
+constructor parameter is visible in its class only. The region of a class runs
+from its header through its closing brace, and the region of a function runs
+from its header through its body. Built-in and primitive type names are never
+bound, as listed above.
 
 ## ADR-0027: Type Checking Core
 

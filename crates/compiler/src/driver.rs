@@ -224,6 +224,7 @@ pub enum DriverError {
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
     OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
     UnknownNames(Vec<crate::unknown_names::UnknownName>),
+    OutOfScopeNames(Vec<crate::unknown_names::UnknownName>),
     Hir(HirLoweringError),
     Mir(MirLoweringError),
     Backend(CraneliftLoweringError),
@@ -435,6 +436,22 @@ fn compile_source_with_entry(
     let unknown_names = crate::unknown_names::find_unknown_names(&parsed);
     if !unknown_names.is_empty() {
         return Err(DriverError::UnknownNames(unknown_names));
+    }
+    if let Ok(metadata) = crate::module::ModuleMetadata::with_packages(
+        options.module().clone(),
+        [(options.source_file(), options.package().clone())],
+    ) {
+        let out_of_scope: Vec<_> = crate::name_resolution::unresolved_names(&parsed, &metadata)
+            .iter()
+            .map(|diagnostic| crate::unknown_names::UnknownName {
+                name: source[diagnostic.primary_span().start()..diagnostic.primary_span().end()]
+                    .to_owned(),
+                span: diagnostic.primary_span(),
+            })
+            .collect();
+        if !out_of_scope.is_empty() {
+            return Err(DriverError::OutOfScopeNames(out_of_scope));
+        }
     }
 
     if selected_entry.is_none() {

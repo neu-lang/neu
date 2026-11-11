@@ -119,6 +119,8 @@ pub struct ParsedImport {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedClassDeclaration {
     pub declaration: AstNodeId,
+    /// The whole declaration, from its header through its closing brace.
+    pub span: ByteSpan,
     pub name: String,
     pub visibility: String,
     pub is_final: bool,
@@ -217,6 +219,7 @@ pub struct ParsedForStatement {
     pub binding: AstNodeId,
     pub binding_name: String,
     pub binding_name_span: ByteSpan,
+    pub binding_name_node: AstNodeId,
     pub start: AstNodeId,
     pub end: AstNodeId,
     pub array: Option<AstNodeId>,
@@ -361,6 +364,7 @@ pub struct ParsedFunctionType {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedLambdaParameter {
+    pub parameter: AstNodeId,
     pub name: String,
     pub name_span: ByteSpan,
     pub annotation: Option<AstNodeId>,
@@ -1449,8 +1453,13 @@ impl<'source> Parser<'source> {
             let previous_class = self.current_class.replace(declaration);
             self.parse_enum_body(declaration);
             self.current_class = previous_class;
+            let span = self.span(
+                start,
+                self.previous_span().map_or(body_start, |span| span.end()),
+            );
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
+                span,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 visibility: self.pending_method_visibility.clone(),
                 is_final: true,
@@ -1466,8 +1475,13 @@ impl<'source> Parser<'source> {
             let previous_class = self.current_class.replace(declaration);
             let fields = self.parse_class_body(declaration);
             self.current_class = previous_class;
+            let span = self.span(
+                start,
+                self.previous_span().map_or(body_start, |span| span.end()),
+            );
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
+                span,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 visibility: self.pending_method_visibility.clone(),
                 is_final,
@@ -1486,8 +1500,13 @@ impl<'source> Parser<'source> {
             self.parse_declaration_body();
             self.current_class = previous_class;
             self.current_class_is_interface = previous_interface;
+            let span = self.span(
+                start,
+                self.previous_span().map_or(body_start, |span| span.end()),
+            );
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
+                span,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 visibility: self.pending_method_visibility.clone(),
                 is_final: false,
@@ -2206,6 +2225,7 @@ impl<'source> Parser<'source> {
             binding: statement,
             binding_name,
             binding_name_span: binding_token.span,
+            binding_name_node: self.arena.add_loop_binding(binding_token.span),
             start: start_expression,
             end: end_expression,
             array: is_array.then_some(start_expression),
@@ -2860,7 +2880,9 @@ impl<'source> Parser<'source> {
             } else {
                 None
             };
+            let parameter = self.arena.add_lambda_parameter(name.span);
             parameters.push(ParsedLambdaParameter {
+                parameter,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 name_span: name.span,
                 annotation,

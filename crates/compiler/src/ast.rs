@@ -20,6 +20,8 @@ pub enum AstNodeKind {
     ImportDeclaration,
     FunctionDeclaration,
     FunctionParameter,
+    LambdaParameter,
+    LoopBinding,
     ClassDeclaration,
     StructDeclaration,
     EnumDeclaration,
@@ -100,6 +102,14 @@ impl AstArena {
 
     pub fn add_function_parameter(&mut self, span: ByteSpan) -> AstNodeId {
         self.push(AstNodeKind::FunctionParameter, span)
+    }
+
+    pub fn add_lambda_parameter(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::LambdaParameter, span)
+    }
+
+    pub fn add_loop_binding(&mut self, span: ByteSpan) -> AstNodeId {
+        self.push(AstNodeKind::LoopBinding, span)
     }
 
     pub fn add_struct_declaration(&mut self, span: ByteSpan) -> AstNodeId {

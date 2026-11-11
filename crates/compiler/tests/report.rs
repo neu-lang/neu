@@ -451,3 +451,23 @@ fn lambda_parameter_without_a_type_needs_context() {
     );
     assert!(rendered.contains("src/main.neu:2:"), "{rendered}");
 }
+
+#[test]
+fn out_of_scope_local_is_reported_at_the_reference() {
+    let project = Project::new(
+        "out_of_scope",
+        &[(
+            "src/main.neu",
+            "public func first(): Int {\n    val total: Int = 1;\n    return total;\n}\n\npublic func second(): Int {\n    return total;\n}\n\npublic func main(): Int {\n    return first();\n}\n",
+        )],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("error[out_of_scope_name]"), "{rendered}");
+    assert!(rendered.contains("src/main.neu:7:12"), "{rendered}");
+    assert!(
+        rendered.contains("`total` is not in scope here"),
+        "{rendered}"
+    );
+}
