@@ -12,6 +12,22 @@ fn linker_environment_lock() -> std::sync::MutexGuard<'static, ()> {
     LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
 }
 
+/// Compiles a C fixture with the link driver's own target, so the object and the
+/// libraries it links against agree on a machine type. A plain `cc` on Windows
+/// arm64 produces x64 objects, which conflict with the arm64 MSVC libraries.
+fn compile_fixture(source: &Path, object: &Path) {
+    let (driver, driver_arguments) = compiler::linker::default_linker();
+    let status = Command::new(driver)
+        .args(driver_arguments)
+        .arg("-c")
+        .arg(source)
+        .arg("-o")
+        .arg(object)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
 #[test]
 fn host_link_plan_uses_the_default_driver_and_preserves_object_order() {
     let _environment_lock = linker_environment_lock();
@@ -85,18 +101,7 @@ fn host_linker_can_execute_a_compiled_program() {
     let object = root.join("main.o");
     let output = root.join("program");
     fs::write(&source, b"int main(void) { return 7; }\n").unwrap();
-    assert!(
-        Command::new("cc")
-            .args([
-                "-c",
-                source.to_str().unwrap(),
-                "-o",
-                object.to_str().unwrap()
-            ])
-            .status()
-            .unwrap()
-            .success()
-    );
+    compile_fixture(&source, &object);
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
     plan.execute().unwrap();
     assert_eq!(
@@ -120,18 +125,7 @@ fn host_link_rejects_missing_private_runtime_symbols_before_invoking_linker() {
         b"extern void neu_runtime_missing(void); int main(void) { neu_runtime_missing(); return 0; }\n",
     )
     .unwrap();
-    assert!(
-        Command::new("cc")
-            .args([
-                "-c",
-                source.to_str().unwrap(),
-                "-o",
-                object.to_str().unwrap()
-            ])
-            .status()
-            .unwrap()
-            .success()
-    );
+    compile_fixture(&source, &object);
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
     assert_eq!(
         plan.execute(),
