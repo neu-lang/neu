@@ -221,6 +221,81 @@ fn non_source_errors_render_without_debug_syntax() {
 }
 
 #[test]
+fn named_import_of_a_missing_name_points_at_the_import_with_a_message() {
+    let project = Project::new(
+        "missing_named_import",
+        &[
+            (
+                "src/main.neu",
+                "import {missing} from \"./math\"\n\npublic func main(): Int {\n    return 1\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\npublic func add(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("src/main.neu:1:"), "{rendered}");
+    assert!(
+        rendered.contains("`missing` is not a public top-level declaration of `./math`"),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn private_member_through_an_alias_points_at_the_member_with_a_message() {
+    let project = Project::new(
+        "private_member",
+        &[
+            (
+                "src/main.neu",
+                "import \"./math\" as arithmetic\n\npublic func main(): Int {\n    return arithmetic.hidden()\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\nprivate func hidden(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("src/main.neu:4:"), "{rendered}");
+    assert!(
+        rendered.contains("`hidden` is not public in `arithmetic`"),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn named_import_collision_points_at_the_imported_name() {
+    let project = Project::new(
+        "named_import_collision",
+        &[
+            (
+                "src/main.neu",
+                "import {add} from \"./math\"\n\npublic func main(): Int {\n    return 1\n}\n\nfunc add(): Int {\n    return 0\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\npublic func add(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("src/main.neu:1:9"), "{rendered}");
+    assert!(
+        rendered.contains("named import add collides with another name"),
+        "{rendered}"
+    );
+}
+
+#[test]
 fn duplicate_named_import_across_statements_is_rejected() {
     let project = Project::new(
         "duplicate_named_import",

@@ -109,6 +109,8 @@ pub struct ParsedImport {
     pub path: String,
     pub alias: Option<String>,
     pub names: Vec<String>,
+    /// The source span of each name in `names`, in the same order.
+    pub name_spans: Vec<ByteSpan>,
     pub span: ByteSpan,
 }
 
@@ -753,6 +755,7 @@ impl<'source> Parser<'source> {
         self.saw_package_or_import = true;
         self.advance();
         let mut names = Vec::new();
+        let mut name_spans = Vec::new();
         if self.current_kind() == Some(TokenKind::LeftBrace) {
             self.advance();
             while self.current_kind() != Some(TokenKind::RightBrace)
@@ -761,6 +764,9 @@ impl<'source> Parser<'source> {
                 if let Some(TokenKind::Identifier) = self.current_kind() {
                     if let Some(name) = self.current_text().map(str::to_owned) {
                         names.push(name);
+                        if let Some(span) = self.current().map(|token| token.span) {
+                            name_spans.push(span);
+                        }
                     }
                     self.advance();
                     if self.current_kind() == Some(TokenKind::Comma) {
@@ -834,6 +840,7 @@ impl<'source> Parser<'source> {
                 path,
                 alias,
                 names,
+                name_spans,
                 span: self.span(start, end),
             });
         }
