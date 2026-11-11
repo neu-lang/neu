@@ -763,6 +763,7 @@ fn compile_source_with_entry(
             TypeRuleDiagnostic::DirectCallDeferred | TypeRuleDiagnostic::MemberExpressionDeferred
         ) || !typed_nodes.contains(&diagnostic.node())
     });
+    crate::type_check::diagnose_primitive_local_mismatches(&parsed, &types, &mut report);
     diagnose_unresolved_types(&parsed, &mut report);
     let intrinsic_diagnostics =
         validate_intrinsic_calls(&parsed, report.expression_types(), &types);

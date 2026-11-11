@@ -232,3 +232,33 @@ fn string_index_inside_a_block_reads_a_byte() {
     assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn byte_local_is_not_implicitly_converted_to_int() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-byte-int-mismatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "public func main(): Int { val b: Byte = 1; val x: Int = b; return 7; }",
+        options(&workspace.join("program")),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn string_index_is_not_implicitly_converted_to_int() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-string-byte-mismatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        r#"public func main(): Int { val s: String = "abc"; val c: Int = s[1]; return 7; }"#,
+        options(&workspace.join("program")),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}
