@@ -1,0 +1,5 @@
+import {add} from "./math"
+
+public func main(): Int {
+    return add()
+}

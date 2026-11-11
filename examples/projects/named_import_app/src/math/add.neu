@@ -1,0 +1,5 @@
+package math
+
+public func add(): Int {
+    return 7
+}

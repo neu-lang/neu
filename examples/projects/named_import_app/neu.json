@@ -1,0 +1,7 @@
+{
+  "name": "named_import.app",
+  "description": "A Neu project that uses a named import",
+  "entrypoint": "src/main.neu",
+  "srcs": ["src/**/*.neu"],
+  "dependencies": []
+}
