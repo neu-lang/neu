@@ -13,7 +13,39 @@ ADRs listed under "Resolutions". No code has been written.
 - A3 (generic collection fields): ADR-0126 supersedes the ADR-0119 clause deferring
   generic collection fields.
 - A4 (`LinkedList`): deferred. Not implemented in this phase.
-- A5 and A6: not yet answered. Treat as open.
+- A5 (sequence type): retain only `ArrayList<T>`. `Vector<T>` is removed from the package.
+  This supersedes the `Vector<T>` naming in ADR-0108, ADR-0110, ADR-0118, and ADR-0126,
+  and in issue #20's sequence scope. Those ADRs need a superseding revision before
+  `stdlib/collections/vector.neu` is deleted.
+- A6 (`List<T>` method set): proposed, not yet approved. See "Proposed List<T> set" below.
+
+## Proposed `List<T>` set (pending approval)
+
+Required interface methods:
+- `len(): Int`
+- `get(index: Int): Option<T>`. Checked; returns an owned copy. Available only when `T` is copyable. See open point B1.
+- `set(index: Int, value: T): Result<Unit, E>`. Replaces the element at a valid index; the old element is destroyed.
+- `push(value: T): Result<Unit, E>`. Growth failure returns `Err` and leaves the list unchanged (A1).
+- `insert(index: Int, value: T): Result<Unit, E>`. Valid indices are `0..=len`.
+- `remove(index: Int): Result<T, E>`. Returns the owned element (A2).
+- `pop(): Option<T>`. Returns the owned last element, or `None` when empty.
+- `clear(): Unit`. Removal and clear report no allocation failure (ADR-0114).
+
+Default methods (ADR-0134):
+- `is_empty(): Bool` defined as `len() == 0`.
+- `first(): Option<T>` and `last(): Option<T>`, defined through `get`.
+
+Deferred, not in the set:
+- `capacity`, `reserve`, `shrink`: ADR-0073 exposes no capacity, so the issue's capacity scope needs a decision (B2).
+- `contains`, `index_of`, `deduplicate`: need `Eq` (ADR-0113).
+- `clone`: waits on the `Clone` protocol (#62).
+- `append`, `extend`, `retain`, `reverse`: bulk operations, deferred to a later phase.
+- Iterators and slices: gated on ADR-0118's borrow and iterator wiring.
+
+Open points for approval:
+- B1. `E` is undefined. ADR-0110 says the error payload must be accepted before the public API is frozen. Proposed: `enum CollectionError { IndexOutOfBounds, AllocationFailed }`.
+- B2. Capacity. Keep it hidden (ADR-0073), or expose a query under a new ADR?
+- B3. `get` on move-only `T`. Option (a): `get` requires a copy bound. Option (b): defer `get`, `first`, and `last` until a borrowed-return rule exists.
 
 Requested in chat (not named in issue #20). Authority touching these names:
 ADR-0132 (`ArrayList<T>` is ordinary Neu code over `T[]`, private fields), ADR-0134
