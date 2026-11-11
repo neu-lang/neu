@@ -591,3 +591,72 @@ fn chained_call_results_through_locals_are_typed_in_order() {
     "#;
     assert_eq!(compile_and_run(source, "infer_call_chain"), 12);
 }
+
+#[test]
+fn await_of_a_void_task_used_as_a_statement_is_accepted() {
+    // Issue 49: a task whose body returns Void is awaited for completion only.
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val queue = channel<Int>(2);
+                val second = spawn { -> send(queue, 2) };
+                await(second);
+            }
+            return 0;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "await_void_statement"), 0);
+}
+
+#[test]
+fn await_of_a_void_task_continues_with_the_next_statement() {
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val queue = channel<Int>(2);
+                val second = spawn { -> send(queue, 2) };
+                await(second);
+            }
+            return 9;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "await_void_continues"), 9);
+}
+
+#[test]
+fn binding_the_value_of_awaiting_a_void_task_is_rejected() {
+    // A no-result task yields no value. Binding its await result is rejected with
+    // a stable rule name, not accepted.
+    let source = r#"
+        suspend func main(): Int {
+            scope {
+                val queue = channel<Int>(2);
+                val second = spawn { -> send(queue, 2) };
+                val done = await(second);
+            }
+            return 0;
+        }
+    "#;
+    let workspace = std::env::temp_dir().join(format!(
+        "neu-scheduler-await-void-bind-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&workspace);
+    std::fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let result = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(13000),
+            ModuleName::parse("await_void_bind").unwrap(),
+            PackageNamespace::root(),
+            &executable,
+        ),
+    );
+    let _ = std::fs::remove_dir_all(workspace);
+    let error = result.expect_err("binding an await of a no-result task must be rejected");
+    assert!(
+        format!("{error:?}").contains("AwaitVoidResult"),
+        "{error:?}"
+    );
+}

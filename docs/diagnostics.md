@@ -67,6 +67,8 @@ Snapshots must not be used to encode guessed language behavior. If a compiler ru
 
 ## Concurrency Diagnostics
 
+- `AwaitVoidResult` (ADR-0101): an `await` of a task with no result, bound to a
+  local. Such an `await` may be used as a statement. Reported at the `await` call.
 - `channel_op_outside_suspend` (ADR-0122): a channel `send` or `receive` outside
   a `suspend` function. Reported at the call expression.
 - Runtime deadlock (ADR-0101, ADR-0122): when no task can run, the program writes
