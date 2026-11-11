@@ -238,6 +238,11 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
             {
                 continue;
             }
+            // A member call on a generic instance is typed and targeted by
+            // members.rs, with the receiver's type arguments substituted (ADR-0126).
+            if member.is_some_and(|member| receiver_is_generic_instance(source, member.receiver)) {
+                continue;
+            }
             if member.is_some_and(|member| {
                 source
                     .parsed
@@ -1050,4 +1055,17 @@ pub fn check_indirect_calls(
         }
     }
     report
+}
+
+/// Whether an expression's type is a generic class instance.
+pub(crate) fn receiver_is_generic_instance(
+    source: &ExecutableSourceTypes<'_>,
+    receiver: AstNodeId,
+) -> bool {
+    source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression == receiver)
+        .and_then(|typed| source.type_arena.and_then(|arena| arena.get(typed.ty)))
+        .is_some_and(|record| matches!(record.kind(), TypeKind::GenericInstance(_)))
 }

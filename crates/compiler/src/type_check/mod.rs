@@ -34,6 +34,7 @@ mod expressions;
 mod flow;
 mod generics;
 mod intrinsics;
+mod members;
 mod operators;
 mod returns;
 
@@ -46,5 +47,6 @@ pub use expressions::*;
 pub use flow::*;
 pub use generics::*;
 pub use intrinsics::*;
+pub use members::*;
 pub use operators::*;
 pub use returns::*;

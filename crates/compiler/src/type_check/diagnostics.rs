@@ -71,6 +71,7 @@ pub enum TypeRuleDiagnostic {
     StringOperationUnsupported,
     LambdaCaptureUnsupported,
     LambdaParameterTypeRequired,
+    GenericArgumentMismatch,
     SpawnOutsideScope,
     AwaitOutsideSuspend,
     AwaitVoidResult,

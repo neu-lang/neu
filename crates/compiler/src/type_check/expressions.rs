@@ -368,13 +368,15 @@ pub fn type_annotation_type(
             .unwrap_or_else(|| Some(PrimitiveTypeIds::module_owned(types).void_id))?;
         return Some(types.function(FunctionType::new(parameters, return_type)));
     }
-    resolve_annotation_type(
+    // Generic class annotations such as `Box<Int>` keep their type arguments.
+    crate::type_check::resolve_annotation_type_with_generics(
         annotation,
         &parsed.type_name_references,
         &parsed.array_types,
         &PrimitiveTypeIds::module_owned(types),
         classes,
         types,
+        &[],
     )
 }
 

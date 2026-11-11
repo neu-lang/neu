@@ -265,6 +265,8 @@ pub struct ParsedNewExpression {
     pub expression: AstNodeId,
     pub type_name: String,
     pub type_span: ByteSpan,
+    /// Explicit type argument names, as in `new Box<Int>(...)` (ADR-0083).
+    pub type_arguments: Vec<String>,
     pub arguments: Vec<AstNodeId>,
     pub dynamic_array: bool,
     pub span: ByteSpan,
@@ -2954,6 +2956,40 @@ impl<'source> Parser<'source> {
         Some(span)
     }
 
+    /// Parses `<A, B>` after a constructed class name. Each argument is a
+    /// simple name; nested type arguments are not parsed here.
+    fn parse_new_type_arguments(&mut self) -> Option<Vec<String>> {
+        let start = self.current()?.span.start();
+        self.advance();
+        let mut names = Vec::new();
+        loop {
+            let token = self.current()?.clone();
+            if token.kind != TokenKind::Identifier {
+                self.diagnostic_current_or_span(
+                    DiagnosticKind::MalformedGenericArgumentList,
+                    self.span_at(start),
+                );
+                return None;
+            }
+            names.push(self.text[token.span.start()..token.span.end()].to_owned());
+            self.advance();
+            match self.current_kind() {
+                Some(TokenKind::Comma) => self.advance(),
+                Some(TokenKind::Greater) => {
+                    self.advance();
+                    return Some(names);
+                }
+                _ => {
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedGenericArgumentList,
+                        self.span_at(start),
+                    );
+                    return None;
+                }
+            }
+        }
+    }
+
     fn parse_new_expression(&mut self) -> Option<ByteSpan> {
         let start = self.current()?.span.start();
         self.advance();
@@ -2967,6 +3003,11 @@ impl<'source> Parser<'source> {
         }
         let type_name = self.text[type_token.span.start()..type_token.span.end()].to_owned();
         self.advance();
+        let type_arguments = if self.current_kind() == Some(TokenKind::Less) {
+            self.parse_new_type_arguments()?
+        } else {
+            Vec::new()
+        };
         if self.current_kind() == Some(TokenKind::LeftBracket)
             && self.peek_kind() == Some(TokenKind::RightBracket)
         {
@@ -2979,6 +3020,7 @@ impl<'source> Parser<'source> {
                 expression,
                 type_name,
                 type_span: type_token.span,
+                type_arguments: Vec::new(),
                 arguments: Vec::new(),
                 dynamic_array: true,
                 span,
@@ -3017,6 +3059,7 @@ impl<'source> Parser<'source> {
             expression,
             type_name,
             type_span: type_token.span,
+            type_arguments,
             arguments,
             dynamic_array: false,
             span,

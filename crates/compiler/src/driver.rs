@@ -27,9 +27,10 @@ use crate::{
         ConstructorDiagnostic, DirectCallDiagnostic, EntryPointDiagnostic, ExecutableSourceTypes,
         IntrinsicDiagnostic, ReturnPathDiagnostic, ReturnTypeDiagnostic, TestDiagnostic,
         TypeCheckDiagnostic, TypeRuleDiagnostic, UnsupportedExecutableFormDiagnostic,
-        apply_class_type_facts, apply_control_flow_results, apply_direct_call_results,
-        apply_enum_constructor_facts, apply_enum_function_facts, apply_enum_method_call_facts,
-        apply_field_access_facts, apply_intrinsic_call_facts, apply_method_call_facts,
+        apply_bare_field_references, apply_class_type_facts, apply_control_flow_results,
+        apply_direct_call_results, apply_enum_constructor_facts, apply_enum_function_facts,
+        apply_enum_method_call_facts, apply_field_access_facts, apply_generic_instance_calls,
+        apply_generic_new_expressions, apply_intrinsic_call_facts, apply_method_call_facts,
         apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
         check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
         check_return_expression_types_with_arena, check_straight_line_returns,
@@ -555,6 +556,7 @@ fn compile_source_with_entry(
         &[],
     );
     apply_class_type_facts(&parsed, &class_types, &mut report);
+    apply_bare_field_references(&parsed, &class_types, &mut report);
     for local in &parsed.local_declarations {
         let Some(annotation) = local.annotation else {
             continue;
@@ -577,6 +579,9 @@ fn compile_source_with_entry(
     apply_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
     apply_enum_method_call_facts(&parsed, &class_types, &mut report, &types);
     apply_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
+    let primitives = crate::type_check::PrimitiveTypeIds::module_owned(&mut types);
+    apply_generic_new_expressions(&parsed, &class_types, &mut types, primitives, &mut report);
+    apply_generic_instance_calls(&parsed, &signatures, &mut types, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     type_lambda_expressions(&parsed, &mut types, &mut report);
     let array_iterations = type_array_iterations(&parsed, report.expression_types(), &types);
@@ -702,6 +707,9 @@ fn compile_source_with_entry(
         .with_class_types(&class_types)
         .with_type_arena(&types)]);
         apply_direct_call_results(&mut report, &parsed, &calls);
+        // Member calls on generic instances are typed after the direct-call
+        // results, which know nothing about type arguments (ADR-0126).
+        apply_generic_instance_calls(&parsed, &signatures, &mut types, &mut report);
         type_operators_in_round(&parsed, &types, &mut report);
         infer_local_types(&parsed, &mut report);
         let stable = resolved_calls.as_ref().is_some_and(|previous| {
@@ -922,6 +930,10 @@ fn compile_source_with_entry(
         .iter()
         .map(|function| infer_source_parameter_effects(&parsed, function.declaration))
         .collect::<Vec<_>>();
+    let mut call_targets = calls.resolved_declarations().to_vec();
+    call_targets.extend(crate::type_check::generic_instance_call_targets(
+        &parsed, &types, &report,
+    ));
     let hir = lower_checked_hir_source({
         let source = CheckedHirSource::new(
             options.module().clone(),
@@ -935,7 +947,7 @@ fn compile_source_with_entry(
         .with_type_arena(&types)
         .with_effect_contracts(&effect_contracts)
         .with_class_types(&class_types)
-        .with_call_targets(calls.resolved_declarations());
+        .with_call_targets(&call_targets);
         match selected_entry {
             Some(entry) => source.with_entry_declaration(entry),
             None => source,
