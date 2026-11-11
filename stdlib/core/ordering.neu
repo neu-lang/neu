@@ -12,3 +12,18 @@ enum Ordering {
         }
     }
 }
+
+// Maps each outcome to a distinct code so the tests can compare results.
+private func ordering_code(ordering: Ordering): Int {
+    return when (ordering) {
+        Ordering.Less -> 1
+        Ordering.Equal -> 2
+        Ordering.Greater -> 3
+    };
+}
+
+public test func ordering_reverse_works() {
+    assert(ordering_code(Ordering.Less.reverse()) == 3, "Less reverses to Greater");
+    assert(ordering_code(Ordering.Equal.reverse()) == 2, "Equal reverses to Equal");
+    assert(ordering_code(Ordering.Greater.reverse()) == 1, "Greater reverses to Less");
+}
