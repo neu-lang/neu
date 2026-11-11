@@ -74,6 +74,10 @@ Snapshots must not be used to encode guessed language behavior. If a compiler ru
 - Runtime deadlock (ADR-0101, ADR-0122): when no task can run, the program writes
   `neu: deadlock: no task can run` to stderr and traps. This is a runtime message,
   not a compile-time diagnostic.
+- Runtime precondition failure (ADR-0123): when a `precondition` condition is
+  false at run time, the program writes `neu: precondition failed: ` with the
+  message and a newline to stderr, and traps. Its compile-time argument checks
+  are reported at the call.
 - Runtime division by zero (SPEC, ADR-0043): when a divisor is zero at run time,
   the program writes `neu: division by zero` to stderr and traps. Statically known
   zero divisors are the compile-time `division_by_zero` diagnostic instead.

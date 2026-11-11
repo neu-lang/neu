@@ -1417,7 +1417,7 @@ Instantiation identity is the declaring enum plus ordered concrete arguments.
 Representation, discriminant encoding, allocation, and cross-module generic
 ABI remain compiler-private and are not source or FFI contracts.
 
-## Proposed ADR-0111: Recoverable Errors And Panic Boundaries
+## ADR-0111: Recoverable Errors And Panic Boundaries
 
 Expected operation failures are explicit `Result<T, E>` values, or `Option<T>`
 when absence is the complete outcome. They do not trap, return nullable
@@ -1428,7 +1428,7 @@ reserved for unrecoverable invariant faults, not checked indexing, parsing, or
 conversion failures. Assertion and panic helper APIs require separate
 evaluation, diagnostic, source-span, optimization, and termination contracts.
 
-## Proposed ADR-0112: Explicit Numeric Utilities
+## ADR-0112: Explicit Numeric Utilities
 
 The initial numeric utility surface is limited to `Int` helpers `min`, `max`,
 `clamp`, `abs`, and `sign`. They perform no implicit conversion and preserve
@@ -1436,6 +1436,17 @@ ADR-0043 evaluation and overflow behavior; `abs(Int.MIN)` overflows, and an
 invalid `clamp` range is a diagnosed programmer fault. Checked, saturating, and
 wrapping arithmetic, numeric casts, unsigned and floating-point types, and
 other numeric intrinsics require separate accepted contracts.
+
+## ADR-0123: Precondition Failure
+
+`precondition(condition, message)` is a built-in operation, callable from any
+function, with `condition: Bool` and `message: String`. It returns no value.
+Its arguments are evaluated left to right, then the check runs. When the
+condition holds it has no effect. When it fails, the program writes
+`neu: precondition failed: `, the message, and a newline to stderr, then traps.
+The runtime message carries no source span. It is not removed or moved past its
+arguments' evaluation. ADR-0111 still governs `panic`, `abort`, `assert`,
+`debug_assert`, `unreachable`, `todo`, and `unimplemented`.
 
 ## Proposed ADR-0113: Collection Protocol Contracts
 
