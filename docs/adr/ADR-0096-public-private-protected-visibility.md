@@ -2,6 +2,9 @@
 
 Status: Accepted
 
+Superseded in part by ADR-0127: the `override` keyword is removed, and
+replacements of inherited methods need no marker.
+
 ## Question
 
 What source-level visibility model replaces the bootstrap `internal` default
