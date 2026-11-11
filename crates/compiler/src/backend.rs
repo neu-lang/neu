@@ -393,6 +393,60 @@ fn emit_mir_function_to_object_impl(
         .map_err(|_| CraneliftLoweringError::ObjectEmissionFailed)
 }
 
+/// Orders a function's blocks so that every block is lowered after the blocks
+/// that dominate it. A value defined in one block is then in scope where a
+/// later block uses it. Blocks unreachable from the entry keep their original
+/// relative order and come last.
+fn blocks_in_lowering_order(function: &MirFunction) -> Vec<&crate::mir::MirBasicBlock> {
+    let blocks = function.blocks();
+    if blocks.is_empty() {
+        return Vec::new();
+    }
+    let index_of: HashMap<crate::mir::MirBlockId, usize> = blocks
+        .iter()
+        .enumerate()
+        .map(|(index, block)| (block.id(), index))
+        .collect();
+    let mut visited = vec![false; blocks.len()];
+    let mut postorder = Vec::new();
+    let mut stack = vec![(0usize, false)];
+    while let Some((index, expanded)) = stack.pop() {
+        if expanded {
+            postorder.push(index);
+            continue;
+        }
+        if visited[index] {
+            continue;
+        }
+        visited[index] = true;
+        stack.push((index, true));
+        for successor in terminator_successors(&blocks[index].terminator()) {
+            if let Some(&next) = index_of.get(&successor)
+                && !visited[next]
+            {
+                stack.push((next, false));
+            }
+        }
+    }
+    let mut order: Vec<usize> = postorder.into_iter().rev().collect();
+    order.extend((0..blocks.len()).filter(|index| !visited[*index]));
+    order.into_iter().map(|index| &blocks[index]).collect()
+}
+
+fn terminator_successors(terminator: &MirTerminator) -> Vec<crate::mir::MirBlockId> {
+    match terminator {
+        MirTerminator::Branch { target, .. } => vec![*target],
+        MirTerminator::BranchIf {
+            then_target,
+            else_target,
+            ..
+        } => vec![*then_target, *else_target],
+        MirTerminator::Return { .. }
+        | MirTerminator::ReturnUnit { .. }
+        | MirTerminator::Trap { .. } => Vec::new(),
+    }
+}
+
 fn lower_mir_function(
     function: &MirFunction,
     type_arena: &TypeArena,
@@ -431,6 +485,7 @@ fn lower_mir_function_with_module(
     runtime: Option<&RuntimeFunctions>,
 ) -> Result<Function, CraneliftLoweringError> {
     require_bootstrap_runtime_type(function.return_type(), type_arena)?;
+    let entry_status = entry_returns_status(function, type_arena)?;
     if function.blocks().is_empty() {
         return Err(CraneliftLoweringError::UnsupportedFunctionShape);
     }
@@ -526,7 +581,7 @@ fn lower_mir_function_with_module(
             }
         }
 
-        for mir_block in function.blocks() {
+        for mir_block in blocks_in_lowering_order(function) {
             let clif_block = *clif_blocks
                 .get(&mir_block.id())
                 .ok_or(CraneliftLoweringError::UnsupportedTerminator)?;
@@ -554,10 +609,9 @@ fn lower_mir_function_with_module(
                     function_ids,
                     &lowering_context,
                 )?;
-                if matches!(
-                    instruction,
-                    MirInstruction::TestAssert { .. } | MirInstruction::TestFail { .. }
-                ) {
+                // A failing test traps and ends the block. A passing assert
+                // continues with the next statement.
+                if matches!(instruction, MirInstruction::TestFail { .. }) {
                     test_terminated = true;
                     break;
                 }
@@ -569,6 +623,7 @@ fn lower_mir_function_with_module(
                     &mut builder,
                     &values,
                     &aggregate_values,
+                    entry_status,
                 )?;
             }
         }
@@ -599,10 +654,26 @@ fn mir_signature(
     }
     let mut flattened = Vec::new();
     flattened_cranelift_types(function.return_type(), type_arena, &mut flattened)?;
-    signature
-        .returns
-        .extend(flattened.into_iter().map(AbiParam::new));
+    if entry_returns_status(function, type_arena)? {
+        // The process exit status is the entry's return value, so a `Void`
+        // entry returns status 0 rather than an undefined register.
+        signature.returns.push(AbiParam::new(types::I32));
+    } else {
+        signature
+            .returns
+            .extend(flattened.into_iter().map(AbiParam::new));
+    }
     Ok(signature)
+}
+
+/// Whether an entry function returns `Void` and so exits with a status of 0.
+fn entry_returns_status(
+    function: &MirFunction,
+    type_arena: &TypeArena,
+) -> Result<bool, CraneliftLoweringError> {
+    let mut flattened = Vec::new();
+    flattened_cranelift_types(function.return_type(), type_arena, &mut flattened)?;
+    Ok(function.is_entry() && flattened.is_empty())
 }
 
 fn declare_runtime_functions(
@@ -1257,7 +1328,6 @@ fn lower_instruction(
             builder.switch_to_block(fail_block);
             builder.ins().trap(TrapCode::unwrap_user(16));
             builder.switch_to_block(pass_block);
-            builder.ins().return_(&[]);
             builder.seal_block(fail_block);
             builder.seal_block(pass_block);
             Ok(())
@@ -3137,6 +3207,7 @@ fn lower_terminator(
     builder: &mut FunctionBuilder<'_>,
     values: &HashMap<MirValueId, Value>,
     aggregate_values: &HashMap<MirValueId, Vec<Value>>,
+    entry_status: bool,
 ) -> Result<(), CraneliftLoweringError> {
     match terminator {
         MirTerminator::Return { value, .. } => {
@@ -3152,7 +3223,12 @@ fn lower_terminator(
             Ok(())
         }
         MirTerminator::ReturnUnit { .. } => {
-            builder.ins().return_(&[]);
+            if entry_status {
+                let status = builder.ins().iconst(types::I32, 0);
+                builder.ins().return_(&[status]);
+            } else {
+                builder.ins().return_(&[]);
+            }
             Ok(())
         }
         MirTerminator::Branch { target, .. } => {
