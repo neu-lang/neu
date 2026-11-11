@@ -1619,6 +1619,28 @@ partially mutating, discarding elements, or returning a nullable sentinel.
 Growth policy, relocation, alignment, and physical allocation remain
 compiler/runtime facts.
 
+## ADR-0135: Stdlib Error Interface
+
+`stdlib/core` declares the nominal interface `Error` with one required method,
+`kind(): ErrorKind`, and the closed enum `ErrorKind`. Adding an `ErrorKind` variant
+requires a revision of this section. Error values are classes that implement `Error`;
+enums cannot implement interfaces (ADR-0079). A class implementing `Error` is
+assignable to `Error` by static upcast. There is no implicit conversion back, and
+downcasts and runtime type tests remain deferred.
+
+`Result<T, Error>` is a valid instantiation. An interface type may be a type argument
+and an enum payload type. `Err` owns the interface value, which is move-only and
+non-null. Destroying the `Result` destroys the concrete object exactly once. This
+rule lifts the generic-enum and interface deferral for this case only.
+
+`Error` declares `Send` and `Share`. Each implementing class must satisfy both. The
+syntax for declaring these capabilities on an interface is not yet accepted.
+
+`AllocationFailedError` is a zero-field class that the runtime constructs without heap
+allocation. Callers branch on `kind()` with an exhaustive `when` over `ErrorKind`.
+Message text, error chaining, `?` propagation, and implicit error conversion are
+deferred.
+
 ## Project Build Command
 
 The `neu` workspace binary exposes only `neu build` initially. It discovers

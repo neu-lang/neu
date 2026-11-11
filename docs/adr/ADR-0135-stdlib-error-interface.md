@@ -1,6 +1,6 @@
 # ADR-0135: Stdlib Error Interface
 
-Status: Proposed
+Status: Accepted; O1 through O4 resolved by the project owner (see Resolutions)
 
 ## Question
 
@@ -61,11 +61,10 @@ Concrete error types are classes that implement `Error`:
 8. Callers branch on `err.kind()` with an exhaustive `when` over `ErrorKind`. They do
    not branch on concrete class.
 
-### Send and Share (proposed, see O1)
+### Send and Share (see O1)
 
-9. An `Error` value carries `Send` and `Share` only if the interface declares them.
-   Each implementing class must satisfy the declared capabilities (ADR-0014,
-   ADR-0037). The proposed default is that `Error` declares both.
+9. `Error` declares `Send` and `Share`. Each implementing class must satisfy both
+   (ADR-0014, ADR-0037).
 
 ## Non-goals
 
@@ -91,21 +90,22 @@ This ADR does not add:
 - Every failing `Result` returns an object, so error construction allocates unless
   O2 is resolved.
 
-## Open questions
+## Resolutions
 
-- **O1. Send and Share.** Should `Error` declare both capabilities, or should interface
-  values never carry them? Declaring them forbids error classes with non-`Send`
-  fields. Not declaring them forbids sending any `Result<T, Error>` across tasks.
-  Accepted ADR-0014 says explicit declaration is used "where necessary"; no accepted
-  ADR gives the syntax for declaring capabilities on an interface.
-- **O2. Allocation-free construction of `AllocationFailedError`.** Constructing the
-  error object may itself need allocation, which is the failure being reported. Options:
-  a zero-field class the target can construct without the heap, or a compiler-reserved
-  instance. Neither is specified.
-- **O3. Location of `ErrorKind` and the error classes.** Proposed: `stdlib/core`, so
-  that `collections` and later packages share them. Alternative: per-package kinds.
-- **O4. Interface-typed payload in a generic enum.** ADR-0033 defers generic enums and
-  interfaces at bootstrap. Accepting decision 5 needs that restriction lifted.
+- **O1. Send and Share.** `Error` declares `Send` and `Share`, and each implementing class
+  must satisfy both. Consequence: error classes may hold only `Send` and `Share` fields.
+  Gap: no accepted ADR gives syntax for declaring capabilities on an interface. Required
+  follow-up below.
+- **O2. Allocation-free construction.** `AllocationFailedError` is a zero-field class. The
+  runtime must construct it without a heap allocation, so reporting allocation failure
+  never requires allocation. The mechanism (a static instance or a compiler-reserved
+  instance) is left to implementation and must be covered by the test in Required follow-up.
+- **O3. Location.** `ErrorKind` and the error classes live in `stdlib/core`, so
+  `collections` and later packages share them.
+- **O4. Interface-typed payload in a generic enum.** Narrow rule: an interface type may be
+  a type argument and an enum payload type. `Err` owns the interface value. Destroying the
+  `Result` destroys the concrete object exactly once (ADR-0067). This lifts the ADR-0033
+  and SPEC deferral for this case only. Other generic-enum behavior stays deferred.
 
 ## Required follow-up
 
@@ -119,8 +119,12 @@ Before implementation, add negative tests written first:
 - `Send` and `Share` checks follow the outcome of O1;
 - `AllocationFailedError` construction under simulated allocation failure (O2).
 
-Accepting this ADR requires answers to O1 through O4 and an update to `docs/SPEC.md`
-before implementation relies on it.
+- Define, in an accepted ADR, the syntax for declaring `Send` and `Share` on an interface
+  (O1). Until then, `Error`'s capability declaration cannot be written in source.
+- Define the zero-allocation construction mechanism for `AllocationFailedError` (O2).
+
+`docs/SPEC.md` carries this ADR's section. Implementation may rely on it only after the
+tests above exist and fail first.
 
 ## Dependencies
 
