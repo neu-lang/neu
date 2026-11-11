@@ -1217,6 +1217,30 @@ impl AcceptedNameReferenceBind {
     }
 }
 
+/// Value names the language provides without a declaration. Each is matched by
+/// name in the type checker, HIR, or parser. These are never resolved against
+/// declarations.
+pub const LANGUAGE_PROVIDED_VALUE_NAMES: &[&str] = &[
+    "assert",
+    "await",
+    "cancel",
+    "channel",
+    "clone",
+    "close",
+    "fail",
+    "length",
+    "precondition",
+    "receive",
+    "send",
+    "spawn",
+    "super",
+    "this",
+];
+
+/// Primitive type names the type checker resolves by name.
+pub const PRIMITIVE_TYPE_NAMES: &[&str] =
+    &["Array", "Bool", "Byte", "Float", "Int", "Null", "String"];
+
 #[allow(clippy::too_many_arguments)]
 pub fn bind_accepted_name_references(
     metadata: &ModuleMetadata,
@@ -1232,10 +1256,22 @@ pub fn bind_accepted_name_references(
     let mut inserts = Vec::new();
     let mut diagnostics = Vec::new();
 
+    let name_references: Vec<_> = name_references
+        .iter()
+        .filter(|reference| !LANGUAGE_PROVIDED_VALUE_NAMES.contains(&reference.name.as_str()))
+        .cloned()
+        .collect();
+    let type_name_references: Vec<_> = type_name_references
+        .iter()
+        .filter(|reference| !PRIMITIVE_TYPE_NAMES.contains(&reference.name.as_str()))
+        .cloned()
+        .collect();
+    let type_name_references = type_name_references.as_slice();
+
     let function_bind = bind_unqualified_function_references(
         metadata,
         arena,
-        name_references,
+        &name_references,
         scopes,
         local_bindings,
         declarations,

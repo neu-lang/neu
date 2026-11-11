@@ -2264,3 +2264,41 @@ fn accepted_name_reference_binding_collects_expression_and_type_unresolved_diagn
             .all(|diagnostic| diagnostic.kind() == ResolutionDiagnosticKind::UnresolvedName)
     );
 }
+
+fn bind_single_file(source: &str) -> compiler::name_resolution::AcceptedNameReferenceBind {
+    let file = SourceFileId::from_raw(300);
+    let parsed = parse_source(file, source);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let metadata = ModuleMetadata::with_packages(
+        ModuleName::parse("demo").unwrap(),
+        [(file, PackageNamespace::root())],
+    )
+    .unwrap();
+    let scopes = build_local_scope_tree(&parsed.arena);
+    let mut interner = SymbolInterner::new();
+    let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
+    let locals = build_scoped_local_binding_index(
+        &parsed.arena,
+        &parsed.local_binding_names,
+        &scopes,
+        &mut interner,
+    );
+    bind_accepted_name_references(
+        &metadata,
+        &parsed.arena,
+        &parsed.name_references,
+        &parsed.type_name_references,
+        &scopes,
+        locals.index(),
+        declarations.index(),
+        &mut interner,
+    )
+}
+
+#[test]
+fn language_provided_names_and_primitive_types_are_not_unresolved() {
+    let bound = bind_single_file(
+        "func run(): Int {\n    val s: String = \"x\";\n    assert(true);\n    return 1;\n}\n",
+    );
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
