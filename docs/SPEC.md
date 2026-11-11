@@ -1207,11 +1207,11 @@ literals, calls, and arithmetic expressions. An annotated lambda local is
 callable: `val f: () -> Int = { -> 7 };`, and so is a lambda passed to a
 parameter with a function type.
 
-An unannotated lambda local, such as `val f = { -> 7 }`, has no function type
-in this specification, because the return type of a lambda is not defined when
-it has no annotation. Such a local is not callable and must be annotated. Defining
-lambda return-type inference is an open owner decision. It requires an ADR
-revision.
+An unannotated lambda local, such as `val f = { -> 7 }`, is function-typed, and
+its return type is the type of its body expression. It may be called. A lambda
+parameter may omit its type when context supplies one: the annotation of the
+local it initializes, or the annotated parameter of a callee with a unique
+declaration. Otherwise the parameter is an error. See ADR-0125.
 
 ## ADR-0091: Optional Control-Header Parentheses
 
