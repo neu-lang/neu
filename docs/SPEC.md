@@ -221,7 +221,7 @@ duplicate, and ambiguity rules remain unchanged.
 
 Declaration bodies and block expressions introduce lexical scopes. Top-level declarations in the same module and package namespace are visible throughout that module/package namespace regardless of source-file order. Local bindings are not visible before their declaration statement and remain visible through the end of their containing lexical block unless shadowed.
 
-Unqualified lookup searches innermost local lexical scope outward, then the current source file's package namespace in the current module. Package-qualified lookup uses the explicitly named package namespace in the current module only. Imports remain syntax-only and do not add lookup candidates.
+Unqualified lookup searches innermost local lexical scope outward, then the current source file's package namespace in the current module. Package-qualified lookup uses the explicitly named package namespace in the current module only. Imports add lookup candidates only as defined in Import Forms below: a qualified import makes its package reachable through its qualifier, and a named import makes its listed names unqualified, each in the importing source file only.
 
 Duplicate local bindings in the same scope and duplicate top-level declarations with the same module, package namespace, declaration name, and declaration kind are rejected. Ambiguous lookup reports ambiguity instead of choosing by insertion order, source-file order, or parser traversal order.
 
@@ -1294,6 +1294,52 @@ unique and cannot shadow another import, the current package qualifier, or a
 local declaration. Such failures are `import_qualifier_collision` diagnostics
 with both import origins and an alias suggestion, before qualified lookup or
 later compiler stages.
+
+## Import Forms
+
+Source files import package directories (ADR-0095). Two forms are accepted, and
+both are file-local: they affect only the importing source file and never
+re-export names (ADR-0117).
+
+Qualified import: `import "./relative/directory"`, optionally followed by
+`as alias`. The package is reachable in the importing file through its
+qualifier, which is the alias when one is written or the deterministic package
+qualifier otherwise. Qualified access such as `math.add()` is accepted only when
+the file has a qualified import whose qualifier is `math`.
+
+Named import: `import {name, other} from "./relative/directory"`. Names are
+separated by commas, and whitespace around names, commas, and braces is not
+significant. Each name must be a public top-level declaration of the imported
+package; public functions, classes, and interfaces qualify. The listed names are
+usable unqualified in the importing file. A named import creates no package
+qualifier, so `math.add()` after only `import {add} from "./math"` is rejected.
+An empty list (`import {} from ...`) is malformed.
+
+Aliases on named imports are not supported. `import {add as plus} from ...` is
+rejected with `named_import_alias` at the `as` keyword. Aliases remain available
+on qualified imports only.
+
+Diagnostics for import forms:
+
+- `named_import_alias`: an `as` alias on a named import, reported at `as`.
+- `malformed_declaration_header`: an empty or unclosed brace list, or a missing
+  comma between names, reported at the offending token.
+- `malformed_import_path`: a missing `from` or a path that is not a string.
+- `inaccessible_import`: a named import of a name that does not exist or is not
+  public in the imported package, reported at the name.
+- `duplicate_named_import`: the same name listed twice in named imports of one
+  source file, reported at the second occurrence.
+- `named_import_collision`: a named import whose name matches a top-level
+  declaration of the importing file, reported at the imported name.
+- `qualifier_not_imported`: qualified access through a package qualifier that the
+  file does not import, reported at the qualifier.
+- `import_qualifier_collision`: a qualified import whose qualifier conflicts with
+  another import or a local name (ADR-0098).
+
+A local binding, parameter, or declaration with the same name as a package
+qualifier shadows the qualifier in that file, so `math.v` on such a local is not
+reported as `qualifier_not_imported`. Lowering a local that shares a package
+qualifier's name is a separate limitation and is not covered by this section.
 
 ## ADR-0099: Git Dependency Resolution And Lockfiles
 
