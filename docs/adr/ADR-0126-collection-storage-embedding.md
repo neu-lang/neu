@@ -11,9 +11,11 @@ representation behind methods?
 
 ## Decision
 
-- A generic class may declare a `private` field whose type is `Array<T>`, where
-  `T` is the class's own type parameter. The field is owned by the instance and
-  is accessible only inside the declaring class (ADR-0096).
+- A generic class may declare a `private` field whose type is any collection,
+  including `Array<T>` and another stdlib collection such as `Vector<T>`, where
+  the field's type arguments may use the class's own type parameters. The field
+  is owned by the instance and is accessible only inside the declaring class
+  (ADR-0096).
 - A collection's public surface is its methods. Its storage is not a public
   variant, field, or constructor argument.
 - Construction uses explicit type arguments, `new Vector<T>(...)`, as ADR-0083
@@ -26,17 +28,20 @@ representation behind methods?
 - Send and Share follow the element type. A collection is Send or Share exactly
   when its element type is, because the array field carries that capability
   (ADR-0014, ADR-0089).
+- Ownership follows the element type. A `Vector<T>` is copyable exactly when `T`
+  is copyable, and move-only otherwise. Copying a copyable `Vector<T>` is
+  implicit; using a moved `Vector<T>` is a use-after-move error.
 
 ## Scope
 
-This ADR authorizes embedding for `Vector<T>` only. It does not add:
+This ADR authorizes embedding for any generic class. It does not add:
 
 - `Slice<T>` or any other borrowed view. Those remain under ADR-0118 until the
   borrow analyses are wired into the driver (#51, #64).
 - `Deque<T>`. It is removed from the package until its contract is accepted.
 - Capacity policy, hashing, ordering, or iterator adapters.
-- Implicit copying. A collection is copied only by an explicit clone, which
-  waits for the `Clone` protocol (#62).
+- Explicit clone for move-only collections. It waits for the `Clone` protocol
+  (#62).
 
 ## Required compiler support
 
@@ -50,20 +55,18 @@ tests written first:
 3. Method calls on an `Array` field from inside its class. Today
    `items.size()` in a class method is an `unsupported_type_rule`.
 
-## Unresolved questions
+## Resolved questions
 
-The project owner approved the decision above. These questions are not decided
-by this ADR and need a separate decision before the behavior they affect is
-implemented.
+The project owner decided the two questions left open when the ADR was drafted:
 
-1. Should a `Vector<T>` whose element type is move-only be move-only, with no
-   implicit copy? Undecided.
-2. Should embedding be limited to `Array<T>`, or should a private field of any
-   stdlib collection type be allowed later? This ADR limits it to `Array<T>`.
+1. A `Vector<T>` is copyable exactly when `T` is copyable, and move-only
+   otherwise (see Decision).
+2. Any collection may be embedded in any generic class, not only `Array<T>`
+   (see Decision).
 
 ## Consequences
 
-If accepted, `stdlib/collections/vector.neu` becomes a single generic class with
-private storage. The enum variants are removed, and `Deque` is removed with
+`stdlib/collections/vector.neu` becomes a single generic class with private
+storage. The enum variants are removed, and `Deque` is removed with
 them. The compiler gains the three capabilities above, and ADR-0118's
 deferral is limited to slices and the other items in its Scope section.
