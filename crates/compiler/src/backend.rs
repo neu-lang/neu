@@ -2319,6 +2319,41 @@ fn lower_instruction(
             );
             Ok(())
         }
+        MirInstruction::DynamicArrayStore {
+            local,
+            index,
+            value,
+            ..
+        } => {
+            // Same bounds check and trap as a read; the element is stored as a word.
+            let variable = locals
+                .get(local)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let pointer = builder.use_var(variable);
+            let index = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let word = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let invalid = builder
+                .ins()
+                .icmp(IntCC::UnsignedGreaterThanOrEqual, index, length);
+            builder.ins().trapnz(invalid, TrapCode::unwrap_user(7));
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let offset = builder.ins().imul_imm(index, 8);
+            let address = builder.ins().iadd(data, offset);
+            builder.ins().store(MemFlagsData::new(), word, address, 0);
+            Ok(())
+        }
         MirInstruction::DynamicArrayAdd {
             array,
             value,

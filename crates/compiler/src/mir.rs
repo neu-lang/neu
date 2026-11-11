@@ -475,6 +475,12 @@ pub enum MirInstruction {
         index: MirValueId,
         span: ByteSpan,
     },
+    DynamicArrayStore {
+        local: MirLocalId,
+        index: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
     DynamicArrayAdd {
         element_type: TypeId,
         array: MirValueId,
@@ -618,6 +624,7 @@ impl MirInstruction {
             Self::DynamicArrayNew { span, .. } => *span,
             Self::DynamicArraySize { span, .. }
             | Self::DynamicArrayLoad { span, .. }
+            | Self::DynamicArrayStore { span, .. }
             | Self::DynamicArrayAdd { span, .. }
             | Self::DynamicArrayRemove { span, .. } => *span,
             Self::FieldLoad { span, .. } => *span,
@@ -1616,12 +1623,14 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     )
                 {
                     if let Some(index) = assignment.index() {
-                        instructions.push(MirInstruction::ArrayStore {
-                            local: MirLocalId::from_raw(assignment.target().index()),
-                            index: mir_expression_value_id(function, index),
-                            value: output,
-                            span: assignment.span(),
-                        });
+                        instructions.push(indexed_store_instruction(
+                            function,
+                            types,
+                            assignment.target(),
+                            mir_expression_value_id(function, index),
+                            output,
+                            assignment.span(),
+                        ));
                     } else {
                         instructions.push(MirInstruction::StoreLocal {
                             local: MirLocalId::from_raw(assignment.target().index()),
@@ -3411,16 +3420,20 @@ impl<'a> ControlFlowLowerer<'a> {
                         .map(|index| self.lower_expression(index))
                         .transpose()?;
                     let value = self.lower_expression(assignment.value())?;
-                    let local = MirLocalId::from_raw(assignment.target().index());
                     match index {
-                        Some(index) => self.push(MirInstruction::ArrayStore {
-                            local,
-                            index,
-                            value,
-                            span: assignment.span(),
-                        }),
+                        Some(index) => {
+                            let store = indexed_store_instruction(
+                                self.function,
+                                self.types,
+                                assignment.target(),
+                                index,
+                                value,
+                                assignment.span(),
+                            );
+                            self.push(store);
+                        }
                         None => self.push(MirInstruction::StoreLocal {
-                            local,
+                            local: MirLocalId::from_raw(assignment.target().index()),
                             value,
                             span: assignment.span(),
                         }),
@@ -3934,6 +3947,40 @@ fn lower_unary(operator: HirUnaryOperator) -> Result<MirUnary, MirLoweringError>
         HirUnaryOperator::Minus => MirUnary::Negate,
         HirUnaryOperator::BitwiseNot => MirUnary::BitwiseNot,
     })
+}
+
+/// The store for `local[index] = value`: an element of a dynamic array is stored
+/// through the array's storage, and a fixed array element in its local slot.
+fn indexed_store_instruction(
+    function: &HirFunction,
+    types: &TypeArena,
+    target: HirLocalId,
+    index: MirValueId,
+    value: MirValueId,
+    span: ByteSpan,
+) -> MirInstruction {
+    let local = MirLocalId::from_raw(target.index());
+    let dynamic = function
+        .locals()
+        .iter()
+        .find(|candidate| candidate.id() == target)
+        .and_then(|candidate| types.get(candidate.ty()))
+        .is_some_and(|record| matches!(record.kind(), TypeKind::DynamicArray(_)));
+    if dynamic {
+        MirInstruction::DynamicArrayStore {
+            local,
+            index,
+            value,
+            span,
+        }
+    } else {
+        MirInstruction::ArrayStore {
+            local,
+            index,
+            value,
+            span,
+        }
+    }
 }
 
 /// The runtime tag of an object. Every instance of a generic class shares its

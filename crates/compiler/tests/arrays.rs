@@ -421,3 +421,89 @@ fn indexed_assignment_inside_a_block_uses_a_variable_index() {
     assert_eq!(Command::new(output).status().unwrap().code(), Some(6));
     let _ = fs::remove_dir_all(workspace);
 }
+
+fn dynamic_array_exit_status(name: &str, source: &str, file: usize) -> Option<i32> {
+    let workspace = std::env::temp_dir().join(format!("neu-array-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let output = compile_source_to_executable(
+        source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(file),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            &executable,
+        ),
+    )
+    .unwrap();
+    let code = Command::new(output).status().unwrap().code();
+    let _ = fs::remove_dir_all(workspace);
+    code
+}
+
+#[test]
+fn dynamic_array_element_write_stores_the_element() {
+    assert_eq!(
+        dynamic_array_exit_status(
+            "element-write",
+            "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); values[1] = 9; return values[1]; }",
+            6330,
+        ),
+        Some(9)
+    );
+}
+
+#[test]
+fn dynamic_array_element_write_inside_a_block_stores_the_element() {
+    assert_eq!(
+        dynamic_array_exit_status(
+            "element-write-block",
+            "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values.add(7); if (values[0] == 4) { values[1] = 9; } return values[1]; }",
+            6331,
+        ),
+        Some(9)
+    );
+}
+
+#[test]
+fn dynamic_array_element_write_out_of_bounds_traps() {
+    let code = dynamic_array_exit_status(
+        "element-write-trap",
+        "public func main(): Int { var values: Array<Int> = new Int[]; values.add(4); values[1] = 9; return 7; }",
+        6332,
+    );
+    assert_ne!(code, Some(7));
+}
+
+#[test]
+fn dynamic_array_element_write_on_a_val_array_is_rejected() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-array-val-write-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "public func main(): Int { val values: Array<Int> = new Int[]; values[0] = 9; return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(6333),
+            compiler::module::ModuleName::parse("arrays").unwrap(),
+            compiler::module::PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("ImmutableArrayMutation"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn dynamic_array_bool_element_write_stores_the_element() {
+    assert_eq!(
+        dynamic_array_exit_status(
+            "bool-element-write",
+            "public func main(): Int { var values: Array<Bool> = new Bool[]; values.add(false); values[0] = true; if (values[0]) { return 7; } return 1; }",
+            6334,
+        ),
+        Some(7)
+    );
+}
