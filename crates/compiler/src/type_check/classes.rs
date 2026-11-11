@@ -641,22 +641,43 @@ pub fn type_class_types_in(
             constructor_parameter_count: declaration.constructor_parameters.len(),
         });
     }
+    // Generic parameter types are built over the whole list, in declaration
+    // order, as the signature builder builds them, so the same parameter gets
+    // the same type identity everywhere (ADR-0083).
+    let mut parameter_symbols = SymbolInterner::new();
+    let parameter_records =
+        build_generic_parameter_types(&parsed.generic_parameters, &mut parameter_symbols, types);
+    let class_generic_types = |owner: AstNodeId| -> Vec<(&str, TypeId)> {
+        parsed
+            .generic_parameters
+            .iter()
+            .filter(|parameter| parameter.owner == Some(owner))
+            .filter_map(|parameter| {
+                parameter_records
+                    .iter()
+                    .find(|record| record.parameter() == parameter.parameter)
+                    .map(|record| (parameter.name.as_str(), record.ty()))
+            })
+            .collect()
+    };
     for field in &parsed.field_declarations {
-        // Primitive annotations first. Other stdlib types, such as Array<T>,
-        // resolve through the general annotation resolver (ADR-0126).
+        // Primitive annotations first. Other annotations, such as Array<T>,
+        // resolve through the general annotation resolver with the class's
+        // type parameters in scope (ADR-0126).
         let Some(type_id) = primitive_annotation_type_for_node(
             field.annotation,
             &parsed.type_name_references,
             primitives,
         )
         .or_else(|| {
-            resolve_annotation_type(
+            resolve_annotation_type_with_generics(
                 field.annotation,
                 &parsed.type_name_references,
                 &parsed.array_types,
                 &primitives,
                 &[],
                 types,
+                &class_generic_types(field.owner),
             )
         }) else {
             continue;
@@ -693,13 +714,14 @@ pub fn type_class_types_in(
                 primitives,
             )
             .or_else(|| {
-                resolve_annotation_type(
+                resolve_annotation_type_with_generics(
                     parameter.annotation,
                     &parsed.type_name_references,
                     &parsed.array_types,
                     &primitives,
                     &[],
                     types,
+                    &class_generic_types(class.declaration),
                 )
             }) else {
                 continue;
@@ -814,6 +836,11 @@ pub fn apply_class_type_facts(
         else {
             continue;
         };
+        // A generic instance annotation such as `Box<Int>` is typed by the
+        // generic-aware annotation pass, not by the bare class type.
+        if !reference.generic_argument_names.is_empty() {
+            continue;
+        }
         let Some(class) = classes.classes.iter().find(|class| {
             parsed
                 .class_declarations
@@ -829,6 +856,9 @@ pub fn apply_class_type_facts(
         ));
     }
     for expression in &parsed.new_expressions {
+        if !expression.type_arguments.is_empty() {
+            continue;
+        }
         if let Some(class) = classes.classes.iter().find(|class| {
             parsed
                 .class_declarations

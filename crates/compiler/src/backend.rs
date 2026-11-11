@@ -835,6 +835,7 @@ fn require_bootstrap_runtime_type(
             | Some(TypeKind::ChannelResult(_))
             | Some(TypeKind::Nominal(_))
             | Some(TypeKind::GenericInstance(_))
+            | Some(TypeKind::GenericParameter(_))
             | Some(TypeKind::Function(_))
     )
     .then_some(())

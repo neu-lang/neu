@@ -615,7 +615,18 @@ pub(crate) fn resolve_annotation_type_with_generics(
                 .or_else(|| primitives.type_for_primitive_name(name))?;
             return Some(arena.dynamic_array(element));
         }
-        let class = classes.iter().find(|class| class.name == reference.name)?;
+        // Not a user class, such as Channel<T> or Task<T>: the plain resolver
+        // knows these built-in generic types.
+        let Some(class) = classes.iter().find(|class| class.name == reference.name) else {
+            return resolve_annotation_type(
+                annotation,
+                type_name_references,
+                array_types,
+                primitives,
+                classes,
+                arena,
+            );
+        };
         let arguments = reference
             .generic_argument_names
             .iter()

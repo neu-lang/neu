@@ -1371,7 +1371,7 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 HirExpressionKind::NewObject { arguments, .. } => {
                     instructions.push(MirInstruction::NewObject {
                         output,
-                        type_id: expression.ty(),
+                        type_id: class_tag_type(expression.ty(), types),
                         arguments: arguments
                             .iter()
                             .map(|argument| mir_expression_value_id(function, *argument))
@@ -3835,4 +3835,16 @@ fn lower_unary(operator: HirUnaryOperator) -> Result<MirUnary, MirLoweringError>
         HirUnaryOperator::Minus => MirUnary::Negate,
         HirUnaryOperator::BitwiseNot => MirUnary::BitwiseNot,
     })
+}
+
+/// The runtime tag of an object. Every instance of a generic class shares its
+/// class's tag, because generic code is erased (ADR-0126), so virtual dispatch
+/// finds the same target for each instance.
+fn class_tag_type(ty: TypeId, types: &TypeArena) -> TypeId {
+    match types.get(ty).map(|record| record.kind()) {
+        Some(TypeKind::GenericInstance(identity)) => types
+            .existing_id(&TypeKind::Nominal(identity.declaration().clone()))
+            .unwrap_or(ty),
+        _ => ty,
+    }
 }

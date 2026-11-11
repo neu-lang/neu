@@ -538,6 +538,11 @@ impl TypeArena {
         self.records.get(id.index())
     }
 
+    /// The id of a record already in the arena, without inserting it.
+    pub fn existing_id(&self, kind: &TypeKind) -> Option<TypeId> {
+        self.index.get(kind).copied()
+    }
+
     pub fn records(&self) -> &[TypeRecord] {
         &self.records
     }
