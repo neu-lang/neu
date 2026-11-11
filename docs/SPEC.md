@@ -978,6 +978,10 @@ deferred.
 
 ## ADR-0118: Pure-Neu Collection Foundation
 
+Collection storage embedding is authorized for `Vector<T>` only, as a private
+field of type `Array<T>` of a generic class, by ADR-0126. Slices, `Deque<T>`,
+and copying remain deferred as stated in ADR-0126.
+
 The first `neu.collections` surface is ordinary Neu code in the unified
 stdlib manifest. `Vector<T>` is an owning ordered sequence, `Slice<T>` is an
 immutable ordered view, and `Iterator<T>` is a single-pass protocol whose

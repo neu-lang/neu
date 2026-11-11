@@ -1,6 +1,6 @@
 # ADR-0126: Collection Storage Embedding
 
-Status: Proposed; revises the embedding deferral in ADR-0118
+Status: Accepted; revises the embedding deferral in ADR-0118
 
 ## Question
 
@@ -9,7 +9,7 @@ currently be an enum whose variants are public. Should a generic class be able
 to own an `Array<T>` as a private field, so that a collection hides its
 representation behind methods?
 
-## Proposed decision
+## Decision
 
 - A generic class may declare a `private` field whose type is `Array<T>`, where
   `T` is the class's own type parameter. The field is owned by the instance and
@@ -50,12 +50,16 @@ tests written first:
 3. Method calls on an `Array` field from inside its class. Today
    `items.size()` in a class method is an `unsupported_type_rule`.
 
-## Open questions for the project owner
+## Unresolved questions
+
+The project owner approved the decision above. These questions are not decided
+by this ADR and need a separate decision before the behavior they affect is
+implemented.
 
 1. Should a `Vector<T>` whose element type is move-only be move-only, with no
-   implicit copy?
+   implicit copy? Undecided.
 2. Should embedding be limited to `Array<T>`, or should a private field of any
-   stdlib collection type be allowed later? This draft limits it to `Array<T>`.
+   stdlib collection type be allowed later? This ADR limits it to `Array<T>`.
 
 ## Consequences
 
