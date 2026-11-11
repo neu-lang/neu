@@ -535,7 +535,9 @@ two's-complement representation. Shifts `<<` and `>>` require a shift count in
 reports `integer_overflow`; known division or modulo by zero reports
 `division_by_zero`; known negative exponent reports `negative_exponent`; known
 invalid shift count reports `invalid_shift_count`. Equivalent runtime failures
-trap and must not silently wrap or continue. Wrapping, saturating, unchecked
+trap and must not silently wrap or continue. A runtime division or remainder by
+zero writes `neu: division by zero` and a newline to stderr, then traps. The
+check runs before the divide, for `Int` and `Byte`. Wrapping, saturating, unchecked
 arithmetic, numeric casts, unsigned integers, fixed-width aliases, floats,
 machine-word integers, rotates, population count, and bit-scan intrinsics are
 deferred.
