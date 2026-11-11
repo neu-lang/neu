@@ -1,5 +1,0 @@
-package function;
-
-public interface Consumer<T> {
-
-}
