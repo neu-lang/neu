@@ -34,7 +34,7 @@ small manifest project under `examples/projects/manifest_app`:
 
 ```sh
 cargo run -p neu -- build examples/projects/manifest_app
-examples/projects/manifest_app/target/manifest.app
+examples/projects/manifest_app/target/manifest-app
 echo $?
 ```
 
@@ -53,7 +53,7 @@ the named form `import {add} from "./math"`. Its `main` returns the imported
 
 ```sh
 cargo run -p neu -- build examples/projects/named_import_app
-examples/projects/named_import_app/target/named_import.app
+examples/projects/named_import_app/target/named_import-app
 echo $?
 ```
 
