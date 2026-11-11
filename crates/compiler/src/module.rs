@@ -1,4 +1,5 @@
 use crate::ast::{AstNodeId, AstNodeKind};
+use crate::lexer::{TokenKind, lex};
 use crate::parser::{ParseOutput, parse_source};
 use crate::report::LineOrigin;
 use crate::source::{ByteSpan, SourceFileId};
@@ -1097,39 +1098,23 @@ impl VirtualPackageGraph {
             .to_owned();
         sources.insert(0, (self.entry.clone(), entry_source));
 
-        let mut aliases = BTreeSet::new();
-        if let Some(entry) = sources.first() {
-            let id = self
-                .files
-                .iter()
-                .find(|file| file.path == entry.0)
-                .map(|file| file.id)
-                .expect("entry has source id");
-            for import in parse_source(id, &entry.1).imports {
-                aliases.insert(import.alias.unwrap_or_else(|| {
-                    Path::new(&import.path)
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or_default()
-                        .to_owned()
-                }));
-            }
-        }
-
         let mut lines = Vec::new();
         for (path, source) in sources {
             let first = lines.len();
+            let id = self
+                .files
+                .iter()
+                .find(|file| file.path == path)
+                .map(|file| file.id)
+                .expect("graph file has source id");
+            let source = strip_qualifiers(id, &source);
             for (index, line) in source.lines().enumerate() {
                 let trimmed = line.trim_start();
                 if trimmed.starts_with("package ") || trimmed.starts_with("import ") {
                     continue;
                 }
-                let mut line = line.to_owned();
-                for alias in &aliases {
-                    line = line.replace(&format!("{alias}."), "");
-                }
                 lines.push((
-                    line,
+                    line.to_owned(),
                     LineOrigin {
                         path: path.clone(),
                         line: index + 1,
@@ -1165,6 +1150,78 @@ impl VirtualPackageGraph {
             .map(|(_, origin)| origin)
             .collect()
     }
+}
+
+/// Removes the package qualifiers of one source file before files are merged.
+///
+/// A qualifier is an identifier token that names a package imported by this
+/// file, followed directly by `.`, and not preceded by `.`. A name the file
+/// declares or binds is never a qualifier there, so a local named like a
+/// package keeps its meaning. Matching works on tokens, so text inside string
+/// literals and comments is left alone. Only qualifier text is removed, so the
+/// number of lines does not change.
+fn strip_qualifiers(id: SourceFileId, source: &str) -> String {
+    let parsed = parse_source(id, source);
+    let qualifiers: BTreeSet<String> = parsed
+        .imports
+        .iter()
+        .filter(|import| import.names.is_empty())
+        .map(|import| {
+            import.alias.clone().unwrap_or_else(|| {
+                Path::new(&import.path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or_default()
+                    .to_owned()
+            })
+        })
+        .collect();
+    let locals: BTreeSet<&str> = parsed
+        .declaration_names
+        .iter()
+        .map(|declaration| declaration.name.as_str())
+        .chain(
+            parsed
+                .local_binding_names
+                .iter()
+                .map(|binding| binding.name.as_str()),
+        )
+        .chain(
+            parsed
+                .function_parameters
+                .iter()
+                .map(|parameter| parameter.name.as_str()),
+        )
+        .chain(
+            parsed
+                .pattern_bindings
+                .iter()
+                .map(|binding| binding.name.as_str()),
+        )
+        .collect();
+    let tokens = lex(id, source).tokens;
+    let mut removals = Vec::new();
+    for (index, pair) in tokens.windows(2).enumerate() {
+        let (name, dot) = (&pair[0], &pair[1]);
+        if name.kind != TokenKind::Identifier || dot.kind != TokenKind::Dot {
+            continue;
+        }
+        if dot.span.start() != name.span.end() {
+            continue;
+        }
+        if index > 0 && tokens[index - 1].kind == TokenKind::Dot {
+            continue;
+        }
+        let text = &source[name.span.start()..name.span.end()];
+        if qualifiers.contains(text) && !locals.contains(text) {
+            removals.push(name.span.start()..dot.span.end());
+        }
+    }
+    let mut stripped = source.to_owned();
+    for range in removals.into_iter().rev() {
+        stripped.replace_range(range, "");
+    }
+    stripped
 }
 
 fn normalize_relative_path(path: &Path) -> Result<PathBuf, PackageGraphDiagnosticKind> {
