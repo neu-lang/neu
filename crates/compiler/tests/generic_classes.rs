@@ -266,3 +266,36 @@ fn superclass_type_argument_mismatch_is_rejected() {
     assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn constructor_argument_forwards_through_a_three_level_chain() {
+    assert_eq!(
+        run_exit_code(
+            "chain_forward",
+            "class A<T>(var value: T) {\n}\n\nclass B<U>(var extra: U): A<U>(extra) {\n}\n\nclass C: B<Int>(7) {\n}\n\npublic func main(): Int {\n    val c: C = new C();\n    return c.value;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn bool_argument_forwards_through_a_chain_and_is_decoded() {
+    assert_eq!(
+        run_exit_code(
+            "chain_bool",
+            "class A<T>(var value: T) {\n}\n\nclass B<U>(var extra: U): A<U>(extra) {\n}\n\nclass C(var flag: Bool): B<Bool>(flag) {\n}\n\npublic func main(): Int {\n    val c: C = new C(true);\n    if (c.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn bool_literal_through_a_chain_is_decoded() {
+    assert_eq!(
+        run_exit_code(
+            "chain_bool_literal",
+            "class A<T>(var value: T) {\n}\n\nclass B<U>(var extra: U): A<U>(extra) {\n}\n\nclass C: B<Bool>(true) {\n}\n\npublic func main(): Int {\n    val c: C = new C();\n    if (c.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
