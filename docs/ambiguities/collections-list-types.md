@@ -1,6 +1,19 @@
 # Ambiguity Report: `List<T>`, `ArrayList<T>`, `LinkedList<T>`
 
-Status: Open. Blocks implementation of the three types. No code has been written.
+Status: Decided by the project owner; implementation still gated on the superseding
+ADRs listed under "Resolutions". No code has been written.
+
+## Resolutions
+
+- A1 (growth failure): `Result`. Amend ADR-0073 and ADR-0114 so that growth-requiring
+  `add` on `T[]` returns a recoverable `Result` and leaves the list unchanged on failure.
+  Requires a compiler growth primitive that reports failure.
+- A2 (move-only removal): move-out `remove(index)` returns the owned element as `T`
+  inside a bounds `Result` (ADR-0110). Revises ADR-0073's `Unit`-returning `remove`.
+- A3 (generic collection fields): ADR-0126 supersedes the ADR-0119 clause deferring
+  generic collection fields.
+- A4 (`LinkedList`): deferred. Not implemented in this phase.
+- A5 and A6: not yet answered. Treat as open.
 
 Requested in chat (not named in issue #20). Authority touching these names:
 ADR-0132 (`ArrayList<T>` is ordinary Neu code over `T[]`, private fields), ADR-0134
