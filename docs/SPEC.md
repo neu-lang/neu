@@ -1309,7 +1309,7 @@ the file has a qualified import whose qualifier is `math`.
 
 Named import: `import {name, other} from "./relative/directory"`. Names are
 separated by commas, and whitespace around names, commas, and braces is not
-significant. Each name must be a public top-level declaration of the imported
+significant. A single trailing comma before the closing brace is accepted. Each name must be a public top-level declaration of the imported
 package; public functions, classes, and interfaces qualify. The listed names are
 usable unqualified in the importing file. A named import creates no package
 qualifier, so `math.add()` after only `import {add} from "./math"` is rejected.

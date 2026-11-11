@@ -1768,3 +1768,13 @@ fn named_import_alias_is_reported_once() {
     let kinds: Vec<_> = output.diagnostics.iter().map(|d| d.kind).collect();
     assert_eq!(kinds, vec![DiagnosticKind::NamedImportAlias], "{kinds:?}");
 }
+
+#[test]
+fn named_imports_accept_a_trailing_comma() {
+    let output = parse_source(
+        SourceFileId::from_raw(10046),
+        "import {add, sub,} from \"./math\" public func main();",
+    );
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    assert_eq!(output.imports[0].names, vec!["add", "sub"]);
+}
