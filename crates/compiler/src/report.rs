@@ -387,10 +387,14 @@ fn package_graph_reports(
             return reports;
         }
     }
+    let location = match diagnostic.span {
+        Some(span) => Location::Span(span),
+        None => Location::Path(diagnostic.path.clone()),
+    };
     vec![Report::new(
         diagnostic.kind,
         diagnostic.detail.clone(),
-        Some(Location::Path(diagnostic.path.clone())),
+        Some(location),
     )]
 }
 

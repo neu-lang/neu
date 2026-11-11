@@ -1,7 +1,7 @@
 use crate::ast::{AstNodeId, AstNodeKind};
 use crate::parser::{ParseOutput, parse_source};
 use crate::report::LineOrigin;
-use crate::source::SourceFileId;
+use crate::source::{ByteSpan, SourceFileId};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 
@@ -402,6 +402,8 @@ pub struct PackageGraphDiagnostic {
     pub kind: PackageGraphDiagnosticKind,
     pub path: PathBuf,
     pub detail: String,
+    /// The source location of the problem, when the compiler has one.
+    pub span: Option<ByteSpan>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -477,6 +479,7 @@ impl VirtualPackageGraph {
             Some(entry_input) => {
                 let entry = normalize_relative_path(&entry_input).map_err(|kind| {
                     vec![PackageGraphDiagnostic {
+                        span: None,
                         kind,
                         path: entry_input,
                         detail: "entry source path must be a normalized relative .neu path"
@@ -498,6 +501,7 @@ impl VirtualPackageGraph {
                 Ok(path) if path.extension().and_then(|ext| ext.to_str()) == Some("neu") => path,
                 Ok(path) => {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: None,
                         kind: PackageGraphDiagnosticKind::InvalidSourcePath,
                         path,
                         detail: "virtual source files must use the .neu extension".to_owned(),
@@ -506,6 +510,7 @@ impl VirtualPackageGraph {
                 }
                 Err(kind) => {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: None,
                         kind,
                         path: source.path().to_owned(),
                         detail: "source paths must be normalized and relative".to_owned(),
@@ -520,6 +525,7 @@ impl VirtualPackageGraph {
                     .any(|prefix| path.starts_with(prefix))
             {
                 diagnostics.push(PackageGraphDiagnostic {
+                    span: None,
                     kind: PackageGraphDiagnosticKind::SourceOutsideRoot,
                     path,
                     detail: "source is outside the entry source root".to_owned(),
@@ -534,6 +540,7 @@ impl VirtualPackageGraph {
                 .is_some()
             {
                 diagnostics.push(PackageGraphDiagnostic {
+                    span: None,
                     kind: PackageGraphDiagnosticKind::InvalidSourcePath,
                     path,
                     detail: "duplicate virtual source path".to_owned(),
@@ -542,6 +549,7 @@ impl VirtualPackageGraph {
         }
         if !entry.as_os_str().is_empty() && !input.contains_key(&entry) {
             diagnostics.push(PackageGraphDiagnostic {
+                span: None,
                 kind: PackageGraphDiagnosticKind::InvalidSourcePath,
                 path: entry.clone(),
                 detail: "entry source is not present".to_owned(),
@@ -588,6 +596,7 @@ impl VirtualPackageGraph {
                 .expect("source was parsed during graph initialization");
             if !parsed.lex_diagnostics.is_empty() || !parsed.diagnostics.is_empty() {
                 diagnostics.push(PackageGraphDiagnostic {
+                    span: None,
                     kind: PackageGraphDiagnosticKind::SourceParseDiagnostics,
                     path: file_path.clone(),
                     detail: "source contains lexical or parser diagnostics".to_owned(),
@@ -618,9 +627,10 @@ impl VirtualPackageGraph {
             for reference in &parsed.name_references {
                 if !reference.name.contains('.') && same_package_private.contains(&reference.name) {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(reference.name_span),
                         kind: PackageGraphDiagnosticKind::InaccessibleImport,
                         path: file_path.clone(),
-                        detail: reference.name.clone(),
+                        detail: format!("`{}` is private to its package", reference.name),
                     });
                 }
             }
@@ -641,16 +651,18 @@ impl VirtualPackageGraph {
                 if alias.is_empty() || !is_identifier_segment(&alias) {
                     if explicit_alias.is_some() {
                         diagnostics.push(PackageGraphDiagnostic {
+                            span: Some(import.span),
                             kind: PackageGraphDiagnosticKind::MalformedAlias,
                             path: file_path.clone(),
-                            detail: alias.clone(),
+                            detail: format!("alias `{alias}` is not a valid identifier"),
                         });
                     }
                 } else if !aliases.insert(alias.clone()) {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind: PackageGraphDiagnosticKind::DuplicateAlias,
                         path: file_path.clone(),
-                        detail: alias.clone(),
+                        detail: format!("alias `{alias}` is already used by another import"),
                     });
                 }
                 let directory = if import.path.starts_with('.') {
@@ -668,9 +680,13 @@ impl VirtualPackageGraph {
                 };
                 let Some(directory) = directory else {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind: PackageGraphDiagnosticKind::ImportPathTraversal,
                         path: file_path.clone(),
-                        detail: import.path.clone(),
+                        detail: format!(
+                            "import path `{}` does not name a package in this project",
+                            import.path
+                        ),
                     });
                     continue;
                 };
@@ -684,6 +700,7 @@ impl VirtualPackageGraph {
                 });
                 if aliases.contains(&qualifier) && qualifier != alias {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
                         path: file_path.clone(),
                         detail: format!("add an explicit alias for {qualifier}"),
@@ -696,6 +713,7 @@ impl VirtualPackageGraph {
                         .any(|declaration| declaration.name == qualifier)
                 {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
                         path: file_path.clone(),
                         detail: format!("qualifier {qualifier} conflicts with a local name"),
@@ -705,6 +723,7 @@ impl VirtualPackageGraph {
                     && previous != directory
                 {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
                         path: file_path.clone(),
                         detail: format!(
@@ -743,9 +762,10 @@ impl VirtualPackageGraph {
                         && imported_names.contains(&member.name)
                     {
                         diagnostics.push(PackageGraphDiagnostic {
+                            span: Some(member.span),
                             kind: PackageGraphDiagnosticKind::InaccessibleImport,
                             path: file_path.clone(),
-                            detail: member.name.clone(),
+                            detail: format!("`{}` is not public in `{}`", member.name, alias),
                         });
                     }
                 }
@@ -759,6 +779,7 @@ impl VirtualPackageGraph {
                         PackageGraphDiagnosticKind::MissingPackageDirectory
                     };
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind,
                         path: file_path.clone(),
                         detail: directory.to_string_lossy().into_owned(),
@@ -793,9 +814,13 @@ impl VirtualPackageGraph {
                 };
                 let Some(directory) = directory else {
                     diagnostics.push(PackageGraphDiagnostic {
+                        span: Some(import.span),
                         kind: PackageGraphDiagnosticKind::ImportPathTraversal,
                         path: file_path.clone(),
-                        detail: import.path.clone(),
+                        detail: format!(
+                            "import path `{}` does not name a package in this project",
+                            import.path
+                        ),
                     });
                     continue;
                 };
@@ -816,7 +841,8 @@ impl VirtualPackageGraph {
                     })
                     .collect();
                 let mut seen = BTreeSet::new();
-                for name in &import.names {
+                for (index, name) in import.names.iter().enumerate() {
+                    let name_span = import.name_spans.get(index).copied();
                     if !seen.insert(name.clone())
                         || parsed
                             .declaration_names
@@ -824,15 +850,20 @@ impl VirtualPackageGraph {
                             .any(|declaration| declaration.name == *name)
                     {
                         diagnostics.push(PackageGraphDiagnostic {
+                            span: name_span,
                             kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
                             path: file_path.clone(),
                             detail: format!("named import {name} collides with another name"),
                         });
                     } else if !exported_names.contains(name) {
                         diagnostics.push(PackageGraphDiagnostic {
+                            span: name_span,
                             kind: PackageGraphDiagnosticKind::InaccessibleImport,
                             path: file_path.clone(),
-                            detail: name.clone(),
+                            detail: format!(
+                                "`{name}` is not a public top-level declaration of `{}`",
+                                import.path
+                            ),
                         });
                     }
                 }
@@ -855,6 +886,7 @@ impl VirtualPackageGraph {
                 .collect();
             if members.is_empty() {
                 diagnostics.push(PackageGraphDiagnostic {
+                    span: None,
                     kind: PackageGraphDiagnosticKind::EmptyPackageDirectory,
                     path: directory.clone(),
                     detail: directory.to_string_lossy().into_owned(),
@@ -872,6 +904,7 @@ impl VirtualPackageGraph {
             }
             if headers.len() > 1 {
                 diagnostics.push(PackageGraphDiagnostic {
+                    span: None,
                     kind: PackageGraphDiagnosticKind::PackageHeaderDisagreement,
                     path: directory.clone(),
                     detail: headers.into_iter().collect::<Vec<_>>().join(","),
@@ -890,6 +923,7 @@ impl VirtualPackageGraph {
                 .is_some()
             {
                 diagnostics.push(PackageGraphDiagnostic {
+                    span: None,
                     kind: PackageGraphDiagnosticKind::DuplicatePackageIdentity,
                     path: directory.clone(),
                     detail: identity.clone(),
@@ -911,6 +945,7 @@ impl VirtualPackageGraph {
 
         if let Some(cycle) = find_package_cycle(&edges, &root) {
             diagnostics.push(PackageGraphDiagnostic {
+                span: None,
                 kind: PackageGraphDiagnosticKind::ImportCycle,
                 path: cycle,
                 detail: "package imports form a cycle".to_owned(),
