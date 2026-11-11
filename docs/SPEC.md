@@ -1257,7 +1257,8 @@ diagnostics.
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may
-declare explicit generic parameters. A member environment is its enclosing
+declare explicit generic parameters. A type argument may itself be a generic
+instance or `Array<T>`, to any depth (ADR-0128). A member environment is its enclosing
 type parameters followed by its own parameters. Duplicate names in one list
 are rejected; member-level shadowing is allowed because parameter identity is
 the declaration node, not the spelling.
