@@ -304,3 +304,272 @@ pub(crate) fn apply_generic_instance_fields(
         }
     }
 }
+
+/// Types a field read through a subclass whose superclass is generic: the field's
+/// type has the superclass's type parameters replaced by the type arguments the
+/// subclass gives (ADR-0083).
+pub(crate) fn apply_inherited_field_types(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for member in &parsed.member_expressions {
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        let Some(class) = classes
+            .classes()
+            .iter()
+            .find(|class| class.type_id == receiver_type)
+        else {
+            continue;
+        };
+        let Some(field) = classes.fields().iter().find(|field| {
+            field.name() == member.name
+                && class_or_superclass_owns_field(parsed, class.declaration, field.owner())
+        }) else {
+            continue;
+        };
+        if field.owner() == class.declaration {
+            continue;
+        }
+        let Some(mapping) = inherited_parameter_types(classes, class.declaration, field.owner())
+        else {
+            continue;
+        };
+        if mapping.is_empty() {
+            continue;
+        }
+        let mut substitution = GenericSubstitution::new();
+        for (parameter, argument) in mapping {
+            substitution.insert(parameter, argument);
+        }
+        let specialized = substitution.apply(field.type_id(), types);
+        report.replace_expression_type(ExpressionType::new(member.expression, specialized));
+    }
+}
+
+/// The type arguments a receiver gives its class's type parameters, as pairs of
+/// the parameter and the argument.
+type ReceiverSubstitution = Vec<(TypeId, TypeId)>;
+
+/// The class that a receiver's type denotes, with the substitution for that
+/// class's own type parameters (the receiver's type arguments). A nominal class
+/// has no substitution.
+fn receiver_class(
+    classes: &ClassTypeReport,
+    types: &TypeArena,
+    receiver_type: TypeId,
+) -> Option<(AstNodeId, ReceiverSubstitution)> {
+    if let Some(TypeKind::GenericInstance(identity)) =
+        types.get(receiver_type).map(|record| record.kind())
+    {
+        let declaration = identity.declaration().declaration();
+        let record = classes
+            .classes()
+            .iter()
+            .find(|class| class.declaration == declaration && !class.interface)?;
+        let own = record
+            .generic_parameters
+            .iter()
+            .copied()
+            .zip(identity.arguments().iter().copied())
+            .collect();
+        return Some((declaration, own));
+    }
+    let class = classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == receiver_type && !class.interface)?;
+    Some((class.declaration, Vec::new()))
+}
+
+/// The inherited method that `call` invokes on a class receiver, with the class it
+/// is declared in and the receiver's own type arguments.
+fn inherited_call(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    types: &TypeArena,
+    receiver_type: Option<TypeId>,
+    member: &crate::parser::ParsedMemberExpression,
+) -> Option<(AstNodeId, AstNodeId, ReceiverSubstitution)> {
+    let (class, own) = receiver_class(classes, types, receiver_type?)?;
+    let owner = inherited_method_owner(parsed, classes, class, &member.name)?;
+    let method = parsed.function_declarations.iter().find(|method| {
+        method.owner == Some(owner) && method.name == member.name && !method.is_static
+    })?;
+    Some((class, method.declaration, own))
+}
+
+/// Types a call to an inherited method by substituting the superclass's type
+/// arguments into the method's signature (ADR-0083).
+pub(crate) fn apply_inherited_calls(
+    parsed: &ParseOutput,
+    signatures: &[FunctionSignature],
+    classes: &ClassTypeReport,
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        let receiver_type = report.expression_type(member.receiver);
+        let Some((class, declaration, own)) =
+            inherited_call(parsed, classes, types, receiver_type, member)
+        else {
+            continue;
+        };
+        let Some(signature) = signatures
+            .iter()
+            .find(|signature| signature.declaration == declaration)
+        else {
+            continue;
+        };
+        let owner = parsed
+            .function_declarations
+            .iter()
+            .find(|method| method.declaration == declaration)
+            .and_then(|method| method.owner);
+        let Some(mapping) =
+            owner.and_then(|owner| inherited_parameter_types(classes, class, owner))
+        else {
+            continue;
+        };
+        let mut substitution = GenericSubstitution::new();
+        for (parameter, argument) in mapping {
+            let argument = own
+                .iter()
+                .find(|(own_parameter, _)| *own_parameter == argument)
+                .map_or(argument, |(_, ty)| *ty);
+            substitution.insert(parameter, argument);
+        }
+        let specialized = signature.specialize(&substitution, types);
+        // An instance method's signature lists its receiver first.
+        for (argument, parameter) in call
+            .arguments
+            .iter()
+            .zip(specialized.parameter_types().iter().skip(1))
+        {
+            if report.expression_type(*argument) != Some(*parameter) {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::GenericArgumentMismatch,
+                    *argument,
+                ));
+            }
+        }
+        report.replace_expression_type(ExpressionType::new(
+            call.expression,
+            specialized.return_type(),
+        ));
+        report.retain_diagnostics(|diagnostic| {
+            (diagnostic.node() != call.expression && diagnostic.node() != member.expression)
+                || !matches!(
+                    diagnostic.rule(),
+                    TypeRuleDiagnostic::DirectCallDeferred
+                        | TypeRuleDiagnostic::MemberExpressionDeferred
+                )
+        });
+    }
+}
+
+/// The call targets of calls to inherited methods, for HIR lowering.
+pub(crate) fn inherited_call_targets(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    types: &TypeArena,
+    report: &TypeCheckReport,
+) -> Vec<crate::type_check::ResolvedCallDeclaration> {
+    let mut targets = Vec::new();
+    for call in &parsed.call_expressions {
+        let Some(member) = parsed
+            .member_expressions
+            .iter()
+            .find(|member| member.expression == call.callee)
+        else {
+            continue;
+        };
+        if let Some((_, declaration, _)) = inherited_call(
+            parsed,
+            classes,
+            types,
+            report.expression_type(member.receiver),
+            member,
+        ) {
+            targets.push(crate::type_check::ResolvedCallDeclaration {
+                call: call.expression,
+                declaration,
+            });
+        }
+    }
+    targets
+}
+
+/// Checks each argument to a superclass constructor against the superclass's
+/// constructor parameter, with the superclass's type parameters replaced by the
+/// type arguments the subclass gives (ADR-0083).
+pub(crate) fn check_superclass_arguments(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for child in &parsed.class_declarations {
+        let Some(parent_name) = child.superclass.as_deref() else {
+            continue;
+        };
+        let Some(parent) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == parent_name)
+        else {
+            continue;
+        };
+        let mapping = inherited_parameter_types(classes, child.declaration, parent.declaration)
+            .unwrap_or_default();
+        let mut substitution = GenericSubstitution::new();
+        for (parameter, argument) in mapping {
+            substitution.insert(parameter, argument);
+        }
+        for (index, argument) in child.superclass_arguments.iter().enumerate() {
+            let Some(parameter) = parent.constructor_parameters.get(index) else {
+                continue;
+            };
+            let Some(field) = classes.fields().iter().find(|field| {
+                field.owner() == parent.declaration && field.name() == parameter.name
+            }) else {
+                continue;
+            };
+            // A subclass constructor parameter forwarded to the superclass is a
+            // name reference to its promoted field, which has the parameter's type.
+            if report.expression_type(*argument).is_none()
+                && let Some(name) = parsed
+                    .name_references
+                    .iter()
+                    .find(|name| name.reference == *argument)
+                && let Some(own) = classes
+                    .fields()
+                    .iter()
+                    .find(|field| field.owner() == child.declaration && field.name() == name.name)
+            {
+                report.replace_expression_type(ExpressionType::new(*argument, own.type_id()));
+            }
+            let Some(actual) = report.expression_type(*argument) else {
+                continue;
+            };
+            let expected = substitution.apply(field.type_id(), types);
+            if actual != expected
+                && !crate::type_check::calls::class_value_assignable(classes, actual, expected)
+            {
+                report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+                    *argument, expected, actual,
+                ));
+            }
+        }
+    }
+}

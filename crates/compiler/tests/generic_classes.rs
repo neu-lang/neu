@@ -191,3 +191,78 @@ fn class_implements_a_generic_interface_with_a_type_argument() {
         Some(7)
     );
 }
+
+#[test]
+fn generic_superclass_method_returns_the_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_method",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child: Base<Int>(7) {\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    return c.get();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_superclass_field_read_decodes_the_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_field",
+            "class Base<T>(var value: T) {\n}\n\nclass Child: Base<Bool>(true) {\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    if (c.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_superclass_override_with_the_substituted_return_type_is_accepted() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_override",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child: Base<Int>(7) {\n    func get(): Int {\n        return 3;\n    }\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    return c.get();\n}\n",
+        ),
+        Some(3)
+    );
+}
+
+#[test]
+fn generic_superclass_bool_result_is_decoded() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_bool_result",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child: Base<Bool>(true) {\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    if (c.get()) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_subclass_inherits_a_method_with_its_own_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "generic_subclass",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child<U>(var extra: U): Base<U>(extra) {\n}\n\npublic func main(): Int {\n    val c: Child<Int> = new Child<Int>(7);\n    return c.get();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn superclass_type_argument_mismatch_is_rejected() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-superclass-mismatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "class Base<T>(var value: T) {} class Child: Base<Int>(true) {} public func main(): Int { return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(81995),
+            ModuleName::parse("generic.class").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}

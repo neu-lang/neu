@@ -1240,10 +1240,17 @@ fn lower_expression(
         let declared = constructor_declared_types(source, &new_expression.type_name);
         let mut arguments = Vec::new();
         for (index, argument) in argument_nodes.iter().enumerate() {
+            // A superclass argument that forwards a constructor parameter of the
+            // class being constructed takes that parameter's argument value.
+            let forwarded = if index < inherited {
+                forwarded_constructor_argument(source, new_expression, *argument)
+            } else {
+                None
+            };
             let lowered = lower_expression(
                 source,
                 function_declaration,
-                *argument,
+                forwarded.unwrap_or(*argument),
                 local_bindings,
                 output,
             )?;
@@ -2105,6 +2112,33 @@ fn conditional_branch_expression(
                 .node(*expression)
                 .map_or(0, |node| node.span.end())
         })
+}
+
+/// The argument of `new` that a superclass argument forwards, when the superclass
+/// argument names a constructor parameter of the class being constructed.
+fn forwarded_constructor_argument(
+    source: &CheckedHirSource<'_>,
+    new_expression: &crate::parser::ParsedNewExpression,
+    argument: crate::ast::AstNodeId,
+) -> Option<crate::ast::AstNodeId> {
+    let name = source
+        .parsed
+        .name_references
+        .iter()
+        .find(|name| name.reference == argument)?;
+    let class = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == new_expression.type_name)?;
+    if !class.superclass_arguments.contains(&argument) {
+        return None;
+    }
+    let position = class
+        .constructor_parameters
+        .iter()
+        .position(|parameter| parameter.name == name.name)?;
+    new_expression.arguments.get(position).copied()
 }
 
 fn append_superclass_argument_nodes(

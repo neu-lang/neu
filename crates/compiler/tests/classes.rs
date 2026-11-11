@@ -972,3 +972,29 @@ fn implementing_instance_is_accepted_as_an_interface_argument() {
     );
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn inherited_method_and_field_are_reached_through_a_subclass() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-inherited-member-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "class Base(var value: Int) { func get(): Int { return value; } } class Child(var extra: Int): Base(extra) {} public func main(): Int { val c: Child = new Child(5); return c.get() + c.value + 2; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6890),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(12)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}

@@ -243,6 +243,13 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
             if member.is_some_and(|member| receiver_is_generic_instance(source, member.receiver)) {
                 continue;
             }
+            // A call to a method inherited from a superclass is typed and targeted
+            // by members.rs, which substitutes the superclass's type arguments.
+            if member.is_some_and(|member| {
+                receiver_inherits_method(source, member.receiver, &target_name)
+            }) {
+                continue;
+            }
             if member.is_some_and(|member| {
                 source
                     .parsed
@@ -1007,7 +1014,11 @@ pub(crate) fn call_path_exists(
 
 /// Whether a class instance may be passed where `expected` is required: the same
 /// class, a superclass, or an interface the class or a superclass implements.
-fn class_value_assignable(classes: &ClassTypeReport, actual: TypeId, expected: TypeId) -> bool {
+pub(crate) fn class_value_assignable(
+    classes: &ClassTypeReport,
+    actual: TypeId,
+    expected: TypeId,
+) -> bool {
     if actual == expected {
         return true;
     }
@@ -1090,6 +1101,38 @@ pub fn check_indirect_calls(
 }
 
 /// Whether an expression's type is a generic class instance.
+/// Whether a receiver's class inherits the instance method `name` from a superclass.
+pub(crate) fn receiver_inherits_method(
+    source: &ExecutableSourceTypes<'_>,
+    receiver: AstNodeId,
+    name: &str,
+) -> bool {
+    let Some(classes) = source.class_types else {
+        return false;
+    };
+    let Some(receiver_type) = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression == receiver)
+        .map(|typed| typed.ty)
+    else {
+        return false;
+    };
+    classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == receiver_type)
+        .is_some_and(|class| {
+            crate::type_check::classes::inherited_method_owner(
+                source.parsed,
+                classes,
+                class.declaration,
+                name,
+            )
+            .is_some()
+        })
+}
+
 pub(crate) fn receiver_is_generic_instance(
     source: &ExecutableSourceTypes<'_>,
     receiver: AstNodeId,

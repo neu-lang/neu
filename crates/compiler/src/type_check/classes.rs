@@ -14,6 +14,10 @@ pub struct ClassTypeRecord {
     pub(crate) superclass: Option<String>,
     pub(crate) interfaces: Vec<String>,
     pub(crate) constructor_parameter_count: usize,
+    /// The class's own type parameters, in declaration order.
+    pub(crate) generic_parameters: Vec<TypeId>,
+    /// The type arguments written on the superclass, resolved to types.
+    pub(crate) superclass_arguments: Vec<TypeId>,
 }
 
 impl ClassTypeRecord {
@@ -375,7 +379,27 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
         {
             let targets = inherited_method_targets(parsed, child, &method.name)
                 .into_iter()
-                .filter(|target| same_parameters(method, target))
+                .filter(|target| {
+                    // A superclass parameter `T` is compared as the subclass sees it.
+                    let mapping = target
+                        .owner
+                        .map(|owner| inherited_name_mapping(parsed, child, owner))
+                        .unwrap_or_default();
+                    let mapped: Vec<Option<String>> = parameter_types_by_function
+                        .get(&target.declaration)
+                        .into_iter()
+                        .flatten()
+                        .map(|name| {
+                            name.as_ref().map(|name| {
+                                mapping
+                                    .iter()
+                                    .find(|(parameter, _)| parameter == name)
+                                    .map_or_else(|| name.clone(), |(_, argument)| argument.clone())
+                            })
+                        })
+                        .collect();
+                    parameter_types_by_function.get(&method.declaration) == Some(&mapped)
+                })
                 .collect::<Vec<_>>();
             let Some(parent_method) = targets.first().copied() else {
                 continue;
@@ -410,7 +434,18 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 Some((interface, arguments)) => {
                     interface_return_name(parsed, interface, &arguments, parent_method)
                 }
-                None => type_annotation_name(parsed, parent_method.return_annotation),
+                None => {
+                    let mapping = parent_method
+                        .owner
+                        .map(|owner| inherited_name_mapping(parsed, child, owner))
+                        .unwrap_or_default();
+                    type_annotation_name(parsed, parent_method.return_annotation).map(|name| {
+                        mapping
+                            .iter()
+                            .find(|(parameter, _)| *parameter == name)
+                            .map_or(name, |(_, argument)| argument.clone())
+                    })
+                }
             };
             let return_compatible =
                 type_annotation_name(parsed, method.return_annotation) == parent_return;
@@ -643,6 +678,150 @@ impl ClassTypeReport {
     }
 }
 
+/// The mapping from the type parameter names of `owner`, an ancestor of `child`
+/// or an interface it implements, to the names `child` gives them (ADR-0083).
+pub(crate) fn inherited_name_mapping(
+    parsed: &ParseOutput,
+    child: &ParsedClassDeclaration,
+    owner: AstNodeId,
+) -> Vec<(String, String)> {
+    let parameter_names = |declaration: AstNodeId| -> Vec<String> {
+        parsed
+            .generic_parameters
+            .iter()
+            .filter(|parameter| parameter.owner == Some(declaration))
+            .map(|parameter| parameter.name.clone())
+            .collect()
+    };
+    if let Some(interface) = parsed
+        .class_declarations
+        .iter()
+        .find(|candidate| candidate.declaration == owner && candidate.interface)
+    {
+        let Some(index) = child
+            .interfaces
+            .iter()
+            .position(|name| *name == interface.name)
+        else {
+            return Vec::new();
+        };
+        let arguments = child
+            .interface_arguments
+            .get(index)
+            .cloned()
+            .unwrap_or_default();
+        return parameter_names(owner).into_iter().zip(arguments).collect();
+    }
+    let mut mapping: Vec<(String, String)> = Vec::new();
+    let mut current = child;
+    loop {
+        let Some(parent) = current.superclass.as_deref().and_then(|name| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == name)
+        }) else {
+            return Vec::new();
+        };
+        let arguments: Vec<String> = current
+            .superclass_type_arguments
+            .iter()
+            .map(|argument| {
+                mapping
+                    .iter()
+                    .find(|(parameter, _)| parameter == argument)
+                    .map_or_else(|| argument.clone(), |(_, name)| name.clone())
+            })
+            .collect();
+        mapping = parameter_names(parent.declaration)
+            .into_iter()
+            .zip(arguments)
+            .collect();
+        if parent.declaration == owner {
+            return mapping;
+        }
+        current = parent;
+    }
+}
+
+/// The nearest ancestor of `class` that declares the instance method `name`, when
+/// `class` itself does not declare it. Such a call is an inherited call.
+pub(crate) fn inherited_method_owner(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    class: AstNodeId,
+    name: &str,
+) -> Option<AstNodeId> {
+    let declares = |owner: AstNodeId| {
+        parsed
+            .function_declarations
+            .iter()
+            .any(|method| method.owner == Some(owner) && method.name == name && !method.is_static)
+    };
+    if declares(class) {
+        return None;
+    }
+    let mut current = classes
+        .classes()
+        .iter()
+        .find(|candidate| candidate.declaration == class)?;
+    loop {
+        let parent = classes
+            .classes()
+            .iter()
+            .find(|candidate| Some(candidate.name.as_str()) == current.superclass.as_deref())?;
+        if declares(parent.declaration) {
+            return Some(parent.declaration);
+        }
+        current = parent;
+    }
+}
+
+/// The mapping from the type parameters of `owner`, an ancestor of the class
+/// `receiver`, to the types that `receiver` inherits them as (ADR-0083). The
+/// mapping is empty when `owner` is `receiver` itself, and `None` when `owner`
+/// is not an ancestor.
+pub(crate) fn inherited_parameter_types(
+    classes: &ClassTypeReport,
+    receiver: AstNodeId,
+    owner: AstNodeId,
+) -> Option<Vec<(TypeId, TypeId)>> {
+    let mut current = classes
+        .classes()
+        .iter()
+        .find(|class| class.declaration == receiver)?;
+    if current.declaration == owner {
+        return Some(Vec::new());
+    }
+    let mut mapping: Vec<(TypeId, TypeId)> = Vec::new();
+    loop {
+        let parent = classes
+            .classes()
+            .iter()
+            .find(|class| Some(class.name.as_str()) == current.superclass.as_deref())?;
+        let arguments: Vec<TypeId> = current
+            .superclass_arguments
+            .iter()
+            .map(|argument| {
+                mapping
+                    .iter()
+                    .find(|(parameter, _)| parameter == argument)
+                    .map_or(*argument, |(_, ty)| *ty)
+            })
+            .collect();
+        mapping = parent
+            .generic_parameters
+            .iter()
+            .copied()
+            .zip(arguments)
+            .collect();
+        if parent.declaration == owner {
+            return Some(mapping);
+        }
+        current = parent;
+    }
+}
+
 pub fn type_class_types(
     parsed: &ParseOutput,
     module: &ModuleName,
@@ -687,6 +866,8 @@ pub fn type_class_types_in(
             superclass: declaration.superclass.clone(),
             interfaces: declaration.interfaces.clone(),
             constructor_parameter_count: declaration.constructor_parameters.len(),
+            generic_parameters: Vec::new(),
+            superclass_arguments: Vec::new(),
         });
     }
     // Generic parameter types are built over the whole list, in declaration
@@ -708,6 +889,44 @@ pub fn type_class_types_in(
             })
             .collect()
     };
+    let class_names: Vec<(String, TypeId)> = report
+        .classes
+        .iter()
+        .map(|class| (class.name.clone(), class.type_id))
+        .collect();
+    for record in &mut report.classes {
+        record.generic_parameters = class_generic_types(record.declaration)
+            .into_iter()
+            .map(|(_, ty)| ty)
+            .collect();
+        let Some(declaration) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.declaration == record.declaration)
+        else {
+            continue;
+        };
+        let generic_types = class_generic_types(record.declaration);
+        let arguments: Option<Vec<TypeId>> = declaration
+            .superclass_type_arguments
+            .iter()
+            .map(|name| {
+                primitives.type_for_primitive_name(name).or_else(|| {
+                    generic_types
+                        .iter()
+                        .find(|(parameter, _)| *parameter == name.as_str())
+                        .map(|(_, ty)| *ty)
+                        .or_else(|| {
+                            class_names
+                                .iter()
+                                .find(|(class, _)| class == name)
+                                .map(|(_, ty)| *ty)
+                        })
+                })
+            })
+            .collect();
+        record.superclass_arguments = arguments.unwrap_or_default();
+    }
     for field in &parsed.field_declarations {
         // Primitive annotations first. Other annotations, such as Array<T>,
         // resolve through the general annotation resolver with the class's

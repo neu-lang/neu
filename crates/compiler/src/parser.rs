@@ -128,6 +128,8 @@ pub struct ParsedClassDeclaration {
     pub is_abstract: bool,
     pub superclass: Option<String>,
     pub superclass_arguments: Vec<AstNodeId>,
+    /// The type arguments written on the superclass, as in `Base<Int>()`.
+    pub superclass_type_arguments: Vec<String>,
     pub interfaces: Vec<String>,
     /// The type arguments of each entry in `interfaces`, in the same order.
     pub interface_arguments: Vec<Vec<String>>,
@@ -1339,6 +1341,7 @@ impl<'source> Parser<'source> {
 
         let mut superclass = None;
         let mut superclass_arguments = Vec::new();
+        let mut superclass_type_arguments: Vec<String> = Vec::new();
         let mut interfaces = Vec::new();
         let mut interface_arguments: Vec<Vec<String>> = Vec::new();
         if self.current_kind() == Some(TokenKind::Colon) {
@@ -1374,15 +1377,6 @@ impl<'source> Parser<'source> {
                     Vec::new()
                 };
                 let is_superclass = self.current_kind() == Some(TokenKind::LeftParen);
-                if is_superclass && !type_arguments.is_empty() {
-                    // A generic superclass has no accepted contract yet.
-                    self.diagnostic_current_or_span(
-                        DiagnosticKind::MalformedDeclarationHeader,
-                        reference.span,
-                    );
-                    self.skip_to_declaration_boundary(in_body);
-                    return;
-                }
                 if is_superclass {
                     self.advance();
                     if self.current_kind() != Some(TokenKind::RightParen) {
@@ -1432,6 +1426,7 @@ impl<'source> Parser<'source> {
                 }
                 if is_superclass && superclass.is_none() {
                     superclass = Some(name);
+                    superclass_type_arguments = type_arguments;
                 } else {
                     interfaces.push(name);
                     interface_arguments.push(type_arguments);
@@ -1488,6 +1483,7 @@ impl<'source> Parser<'source> {
                 is_abstract: false,
                 superclass: None,
                 superclass_arguments: Vec::new(),
+                superclass_type_arguments: Vec::new(),
                 interfaces: Vec::new(),
                 interface_arguments: Vec::new(),
                 fields: Vec::new(),
@@ -1511,6 +1507,7 @@ impl<'source> Parser<'source> {
                 is_abstract,
                 superclass,
                 superclass_arguments,
+                superclass_type_arguments,
                 interfaces,
                 interface_arguments,
                 fields,
@@ -1537,6 +1534,7 @@ impl<'source> Parser<'source> {
                 is_abstract: false,
                 superclass,
                 superclass_arguments: Vec::new(),
+                superclass_type_arguments: Vec::new(),
                 interfaces,
                 interface_arguments,
                 fields: Vec::new(),
