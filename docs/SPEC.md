@@ -251,7 +251,8 @@ in their match arm. A name used as the receiver of a member access, such as
 Member and generic names resolve by region rather than by lexical scope. A
 generic parameter is visible in its declaration, from its header through its
 body. A field is visible in its class and in every class that inherits from it.
-A promoted constructor parameter (`val` or `var`) is a field. A plain
+A promoted constructor parameter (`val` or `var`) is a field, public unless it
+is marked `private` (ADR-0130). A plain
 constructor parameter is visible in its class only. The region of a class runs
 from its header through its closing brace, and the region of a function runs
 from its header through its body. Built-in and primitive type names are never
@@ -754,7 +755,7 @@ stdlib, printing, or scheduler behavior is added.
 ## ADR-0092: Array Element Iteration
 
 `for (value in array)` and the equivalent unparenthesized header iterate fixed
-`T[N]` and compiler-managed `Array<T>` values exactly once, in ascending index
+`T[N]` and compiler-managed `T[]` values exactly once, in ascending index
 order. Empty arrays execute no iterations. The loop binding is an immutable
 compiler-inferred read-only binding: copyable elements are copied, while
 move-only elements are implicitly shared-borrowed and do not consume the array.
@@ -878,7 +879,7 @@ stable object ABI, FFI, and standard-library allocation remain deferred.
 ## ADR-0069: Primary Constructors And Construction
 
 A class may have one primary constructor parameter list after its name:
-`class Name(val field: T, var other: U) { ... }`. Constructor parameters
+`class Name(val field: T, private var other: U) { ... }`. Constructor parameters
 marked `val` or `var` are fields initialized left to right. Unmarked parameters
 are temporary constructor parameters. Names must be unique; duplicate fields
 are diagnostics. The parameter list may be empty.
@@ -965,7 +966,8 @@ unchanged. The old spelling is retained only in historical ADR text.
 
 ## ADR-0073: Bootstrap Dynamic Arrays
 
-`Array<T>` is a compiler-managed dynamic array distinct from fixed `T[N]`.
+`T[]` is a compiler-managed dynamic array distinct from fixed `T[N]`. The
+spelling `Array<T>` is superseded by ADR-0129.
 `new T[]` creates an empty array when `T` is determined by the declared type.
 The bootstrap scalar element set is `Bool`, `Int`, `Float`, and `Byte`.
 Mutable `var` bindings support `add`, indexed `add`, `remove`, and `size`; `val`
@@ -978,7 +980,7 @@ deferred.
 
 ## ADR-0118: Pure-Neu Collection Foundation
 
-Any generic class may hold a collection, including `Array<T>`, in a private
+Any generic class may hold a collection, including `T[]`, in a private
 field, by ADR-0126. A `Vector<T>` is copyable exactly when its element type is.
 Slices and explicit clone remain deferred as stated in ADR-0126.
 
@@ -1258,7 +1260,7 @@ diagnostics.
 
 Top-level functions, classes, interfaces, enums, and accepted members may
 declare explicit generic parameters. A type argument may itself be a generic
-instance or `Array<T>`, to any depth (ADR-0128). A member environment is its enclosing
+instance or `T[]`, to any depth (ADR-0128). A member environment is its enclosing
 type parameters followed by its own parameters. Duplicate names in one list
 are rejected; member-level shadowing is allowed because parameter identity is
 the declaration node, not the spelling.
