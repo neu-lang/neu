@@ -904,3 +904,66 @@ fn override_keyword_is_rejected() {
     );
     assert!(!parsed.diagnostics.is_empty());
 }
+
+#[test]
+fn subclass_instance_is_accepted_as_a_base_argument() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-subclass-argument-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { return invoke(new Child()); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6880),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(2)
+    );
+    let _ = fs::remove_dir_all(workspace);
+
+    let unrelated = compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Other { func value(): Int { return 3; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { return invoke(new Other()); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6881),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            std::env::temp_dir().join(format!("neu-subclass-argument-bad-{}", std::process::id())),
+        ),
+    );
+    assert!(unrelated.is_err());
+}
+
+#[test]
+fn implementing_instance_is_accepted_as_an_interface_argument() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-argument-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "interface Counter { func next(): Int; } class Source(var n: Int): Counter { func next(): Int { return n; } } func take(c: Counter): Int { return c.next(); } public func main(): Int { return take(new Source(7)); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6882),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(7)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}

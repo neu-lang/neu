@@ -680,7 +680,8 @@ fn compile_source_with_entry(
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
-    let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
+    let indirect_calls =
+        check_indirect_calls(&parsed, report.expression_types(), &types, &class_types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed
         .call_expressions

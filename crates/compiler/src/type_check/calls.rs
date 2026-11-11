@@ -1005,10 +1005,42 @@ pub(crate) fn call_path_exists(
     false
 }
 
+/// Whether a class instance may be passed where `expected` is required: the same
+/// class, a superclass, or an interface the class or a superclass implements.
+fn class_value_assignable(classes: &ClassTypeReport, actual: TypeId, expected: TypeId) -> bool {
+    if actual == expected {
+        return true;
+    }
+    let Some(actual_class) = classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == actual)
+    else {
+        return false;
+    };
+    if let Some(expected_class) = classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == expected)
+        && expected_class.interface
+        && actual_class.interfaces.contains(&expected_class.name)
+    {
+        return true;
+    }
+    actual_class.superclass.as_deref().is_some_and(|parent| {
+        classes
+            .classes()
+            .iter()
+            .find(|class| class.name == parent)
+            .is_some_and(|parent| class_value_assignable(classes, parent.type_id, expected))
+    })
+}
+
 pub fn check_indirect_calls(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     types: &TypeArena,
+    classes: &ClassTypeReport,
 ) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
     for expression_type in known_expression_types {
@@ -1040,7 +1072,7 @@ pub fn check_indirect_calls(
                 valid = false;
                 continue;
             };
-            if actual != *expected {
+            if actual != *expected && !class_value_assignable(classes, actual, *expected) {
                 report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
                     *argument, *expected, actual,
                 ));
