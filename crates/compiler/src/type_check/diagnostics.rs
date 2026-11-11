@@ -32,6 +32,7 @@ pub enum TypeRuleDiagnostic {
     DirectCallDeferred,
     FunctionTypeApplicationDeferred,
     MemberExpressionDeferred,
+    PrivateFieldAccess,
     BinaryExpressionDeferred,
     UnaryExpressionDeferred,
     IfValueDeferred,

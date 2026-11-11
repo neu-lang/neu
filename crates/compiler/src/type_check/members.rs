@@ -27,6 +27,13 @@ pub fn apply_bare_field_references(
         }) else {
             continue;
         };
+        if !private_field_accessible(parsed, field, name.reference) {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::PrivateFieldAccess,
+                name.reference,
+            ));
+            continue;
+        }
         report.replace_expression_type(ExpressionType::new(name.reference, field.type_id()));
     }
 }
@@ -105,6 +112,7 @@ pub(crate) fn apply_generic_new_expressions(
             .map(|argument| {
                 super::generics::resolve_type_reference(
                     &parsed.type_name_references,
+                    &parsed.array_types,
                     *argument,
                     &primitives,
                     classes.classes(),
@@ -272,6 +280,12 @@ pub(crate) fn apply_generic_instance_fields(
         }) else {
             continue;
         };
+        if !private_field_accessible(parsed, field, member.expression) {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::PrivateFieldAccess,
+                member.expression,
+            ));
+        }
         let field_type = field.type_id();
         let mut symbols = SymbolInterner::new();
         let parameter_types =

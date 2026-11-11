@@ -1255,7 +1255,7 @@ pub const LANGUAGE_PROVIDED_VALUE_NAMES: &[&str] = &[
 
 /// Primitive type names the type checker resolves by name.
 pub const PRIMITIVE_TYPE_NAMES: &[&str] = &[
-    "Array", "Bool", "Byte", "Channel", "Float", "Int", "Null", "String", "Task",
+    "Bool", "Byte", "Channel", "Float", "Int", "Null", "String", "Task",
 ];
 
 /// A region of source in which a member or generic name is visible: a generic

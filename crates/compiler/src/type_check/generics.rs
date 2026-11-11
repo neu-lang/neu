@@ -592,8 +592,23 @@ pub(crate) fn resolve_annotation_type_with_generics(
     arena: &mut TypeArena,
     generic_types: &[(&str, TypeId)],
 ) -> Option<TypeId> {
+    if let Some(array) = array_types.iter().find(|array| array.array == annotation)
+        && array.dynamic
+    {
+        let element = resolve_annotation_type_with_generics(
+            array.element_type,
+            type_name_references,
+            array_types,
+            primitives,
+            classes,
+            arena,
+            generic_types,
+        )?;
+        return Some(arena.dynamic_array(element));
+    }
     if let Some(ty) = resolve_type_reference(
         type_name_references,
+        array_types,
         annotation,
         primitives,
         classes,
@@ -614,17 +629,8 @@ pub(crate) fn resolve_annotation_type_with_generics(
     if let Some(reference) = type_name_references
         .iter()
         .find(|reference| reference.reference == annotation)
-        && !reference.generic_argument_names.is_empty()
+        && !reference.generic_arguments.is_empty()
     {
-        if reference.name == "Array" && reference.generic_argument_names.len() == 1 {
-            let name = &reference.generic_argument_names[0];
-            let element = generic_types
-                .iter()
-                .find(|(generic, _)| *generic == name)
-                .map(|(_, ty)| *ty)
-                .or_else(|| primitives.type_for_primitive_name(name))?;
-            return Some(arena.dynamic_array(element));
-        }
         // Not a user class, such as Channel<T> or Task<T>: the plain resolver
         // knows these built-in generic types.
         let Some(class) = classes.iter().find(|class| class.name == reference.name) else {
@@ -723,16 +729,33 @@ pub(crate) fn resolve_enum_payload_type(
 
 /// Resolves a named-type reference to a type, with its generic arguments resolved
 /// recursively (ADR-0128). A type argument may itself be a generic instance or an
-/// `Array<T>`. `None` when a name is not a primitive, a generic parameter in scope,
-/// a user class, or the built-in `Array`.
+/// `T[]`. `None` when a name is not a primitive, a generic parameter in scope,
+/// a user class, or the dynamic array `T[]` (ADR-0132).
 pub(crate) fn resolve_type_reference(
     references: &[ParsedTypeNameReference],
+    array_types: &[ParsedArrayType],
     node: AstNodeId,
     primitives: &PrimitiveTypeIds,
     classes: &[ClassTypeRecord],
     generic_types: &[(&str, TypeId)],
     arena: &mut TypeArena,
 ) -> Option<TypeId> {
+    if let Some(array) = array_types.iter().find(|array| array.array == node) {
+        // Only dynamic arrays are type arguments; fixed `T[N]` is deferred (ADR-0128).
+        if !array.dynamic {
+            return None;
+        }
+        let element = resolve_type_reference(
+            references,
+            array_types,
+            array.element_type,
+            primitives,
+            classes,
+            generic_types,
+            arena,
+        )?;
+        return Some(arena.dynamic_array(element));
+    }
     let reference = references
         .iter()
         .find(|reference| reference.reference == node)?;
@@ -755,6 +778,7 @@ pub(crate) fn resolve_type_reference(
         .map(|argument| {
             resolve_type_reference(
                 references,
+                array_types,
                 *argument,
                 primitives,
                 classes,
@@ -763,9 +787,6 @@ pub(crate) fn resolve_type_reference(
             )
         })
         .collect::<Option<Vec<_>>>()?;
-    if reference.name == "Array" && arguments.len() == 1 {
-        return Some(arena.dynamic_array(arguments[0]));
-    }
     let class = classes.iter().find(|class| class.name == reference.name)?;
     let identity = match arena.get(class.type_id)?.kind() {
         TypeKind::Nominal(identity) => identity.clone(),

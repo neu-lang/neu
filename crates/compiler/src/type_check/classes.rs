@@ -931,6 +931,7 @@ pub fn type_class_types_in(
             .map(|argument| {
                 resolve_type_reference(
                     &parsed.type_name_references,
+                    &parsed.array_types,
                     *argument,
                     &primitives,
                     &class_snapshot,
@@ -942,7 +943,7 @@ pub fn type_class_types_in(
         record.superclass_arguments = arguments.unwrap_or_default();
     }
     for field in &parsed.field_declarations {
-        // Primitive annotations first. Other annotations, such as Array<T>,
+        // Primitive annotations first. Other annotations, such as T[],
         // resolve through the general annotation resolver with the class's
         // type parameters in scope (ADR-0126).
         let Some(type_id) = primitive_annotation_type_for_node(
@@ -1025,7 +1026,7 @@ pub fn type_class_types_in(
                 owner: class.declaration,
                 type_id,
                 name: parameter.name.clone(),
-                visibility: "public".to_owned(),
+                visibility: parameter.visibility.clone(),
                 mutable: parameter.mutable,
             });
         }
@@ -1119,7 +1120,7 @@ pub fn apply_class_type_facts(
         };
         // A generic instance annotation such as `Box<Int>` is typed by the
         // generic-aware annotation pass, not by the bare class type.
-        if !reference.generic_argument_names.is_empty() {
+        if !reference.generic_arguments.is_empty() {
             continue;
         }
         let Some(class) = classes.classes.iter().find(|class| {
@@ -1265,6 +1266,30 @@ pub fn apply_class_type_facts(
     });
 }
 
+/// Whether a use of a field at `site` is allowed by its visibility. A private field
+/// is used only inside its declaring class, not by a subclass or outside (ADR-0130).
+pub(crate) fn private_field_accessible(
+    parsed: &ParseOutput,
+    field: &FieldTypeRecord,
+    site: AstNodeId,
+) -> bool {
+    if field.visibility != "private" {
+        return true;
+    }
+    let Some(site_span) = parsed.arena.node(site).map(|node| node.span) else {
+        return false;
+    };
+    parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.declaration == field.owner)
+        .is_some_and(|class| {
+            class.span.file() == site_span.file()
+                && class.span.start() <= site_span.start()
+                && site_span.end() <= class.span.end()
+        })
+}
+
 pub fn apply_field_access_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
@@ -1323,6 +1348,12 @@ pub fn apply_field_access_facts(
         }) else {
             continue;
         };
+        if !private_field_accessible(parsed, field, member.expression) {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::PrivateFieldAccess,
+                member.expression,
+            ));
+        }
         report.replace_expression_type(ExpressionType::new(member.expression, field.type_id));
         if parsed
             .assignment_statements

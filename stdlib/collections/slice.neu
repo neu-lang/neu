@@ -7,7 +7,7 @@ enum Slice<T> {
     EmptySlice,
     OneSlice(T),
     TwoSlice(T, T),
-    Storage(Array<T>),
+    Storage(T[]),
 
     func len(): Int {
         return when (this) {
@@ -31,7 +31,7 @@ public test func slice_basics_work() {
 }
 
 public test func slice_storage_length_is_preserved() {
-    var values: Array<Int> = new Int[];
+    var values: Int[] = new Int[];
     values.add(9);
     values.add(10);
     val slice: Slice<Int> = Slice.Storage(values);

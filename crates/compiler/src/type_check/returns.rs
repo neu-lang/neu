@@ -413,8 +413,12 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
         .iter()
         .filter(|node| {
             let dynamic_generic = node.kind == AstNodeKind::GenericArgument
-                && parsed.type_name_references.iter().any(|reference| {
-                    reference.name == "Array" && reference.generic_arguments.contains(&node.id)
+                && parsed.array_types.iter().any(|array| {
+                    array.dynamic
+                        && parsed
+                            .arena
+                            .node(array.array)
+                            .is_some_and(|array_node| array_node.span == node.span)
                 });
             !dynamic_generic
                 && matches!(
@@ -455,15 +459,13 @@ pub fn check_unsupported_executable_forms(parsed: &ParseOutput) -> UnsupportedEx
             .type_name_references
             .iter()
             .filter(|reference| {
-                reference.name != "Array"
-                    && !matches!(
-                        reference.name.as_str(),
-                        "Bool" | "Int" | "String" | "Float" | "Byte" | "Channel" | "Task"
-                    )
-                    && !parsed
-                        .generic_parameters
-                        .iter()
-                        .any(|parameter| parameter.name == reference.name)
+                !matches!(
+                    reference.name.as_str(),
+                    "Bool" | "Int" | "String" | "Float" | "Byte" | "Channel" | "Task"
+                ) && !parsed
+                    .generic_parameters
+                    .iter()
+                    .any(|parameter| parameter.name == reference.name)
                     && !parsed
                         .class_declarations
                         .iter()
