@@ -976,7 +976,7 @@ element type. Strings, nominal elements, nested dynamic arrays, indexing,
 slices, iterators, public layout, FFI, and user allocation APIs remain
 deferred.
 
-## ADR-0110: Pure-Neu Collection Foundation
+## ADR-0118: Pure-Neu Collection Foundation
 
 The first `neu.collections` surface is ordinary Neu code in the unified
 stdlib manifest. `Vector<T>` is an owning ordered sequence, `Slice<T>` is an
