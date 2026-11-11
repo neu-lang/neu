@@ -4,6 +4,9 @@
 
 Accepted.
 
+Superseded in part by ADR-0127: the `override` keyword is removed, and
+replacements of inherited methods need no marker.
+
 ## Decision
 
 Class bodies may declare associated functions with `static func name(...)`.
