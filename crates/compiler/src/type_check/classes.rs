@@ -642,11 +642,23 @@ pub fn type_class_types_in(
         });
     }
     for field in &parsed.field_declarations {
+        // Primitive annotations first. Other stdlib types, such as Array<T>,
+        // resolve through the general annotation resolver (ADR-0126).
         let Some(type_id) = primitive_annotation_type_for_node(
             field.annotation,
             &parsed.type_name_references,
             primitives,
-        ) else {
+        )
+        .or_else(|| {
+            resolve_annotation_type(
+                field.annotation,
+                &parsed.type_name_references,
+                &parsed.array_types,
+                &primitives,
+                &[],
+                types,
+            )
+        }) else {
             continue;
         };
         if report.fields.iter().any(|existing: &FieldTypeRecord| {
@@ -679,7 +691,17 @@ pub fn type_class_types_in(
                 parameter.annotation,
                 &parsed.type_name_references,
                 primitives,
-            ) else {
+            )
+            .or_else(|| {
+                resolve_annotation_type(
+                    parameter.annotation,
+                    &parsed.type_name_references,
+                    &parsed.array_types,
+                    &primitives,
+                    &[],
+                    types,
+                )
+            }) else {
                 continue;
             };
             if report
