@@ -1310,8 +1310,11 @@ Neu provides cooperative, single-threaded structured concurrency through
 compiler-owned `suspend func`, `scope { ... }`, `spawn { ... }`, and
 `await(task)` forms. `spawn` is valid only inside an active lexical scope and
 returns an opaque move-only `Task<T>`. `await` consumes the handle once and
-returns its owned result. Scope exit waits for all registered children and
-performs cleanup; child failure cancels unfinished siblings and reports the
+returns its owned result. A task whose body has no result (a no-result function,
+internally `Void`) yields no value: `await` of it may be used as a statement, and
+binding its value to a local is rejected with `AwaitVoidResult`. Scope exit
+waits for all registered children and performs cleanup; child failure cancels
+unfinished siblings and reports the
 first failure in deterministic creation order. The scheduler is FIFO at
 accepted suspension points and does not imply OS threads or parallel execution.
 

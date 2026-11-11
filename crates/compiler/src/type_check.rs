@@ -91,6 +91,7 @@ pub enum TypeRuleDiagnostic {
     LambdaCaptureUnsupported,
     SpawnOutsideScope,
     AwaitOutsideSuspend,
+    AwaitVoidResult,
     InvalidTaskOperation,
     InvalidChannelOperation,
     ChannelOpOutsideSuspend,
@@ -4835,6 +4836,19 @@ pub fn type_concurrency_operations(
                     ));
                     continue;
                 };
+                // A no-result task yields no value, so an `await` of one may be a statement
+                // but not the initializer of a local (SPEC, ADR-0101).
+                if result == unit
+                    && parsed
+                        .local_declarations
+                        .iter()
+                        .any(|declaration| declaration.initializer == Some(call.expression))
+                {
+                    report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                        TypeRuleDiagnostic::AwaitVoidResult,
+                        call.expression,
+                    ));
+                }
                 report.replace_expression_type(ExpressionType::new(call.expression, result));
             }
             "cancel" => {
