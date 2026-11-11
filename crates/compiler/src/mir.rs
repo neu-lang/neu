@@ -3261,7 +3261,24 @@ impl<'a> ControlFlowLowerer<'a> {
                         span: expression.span(),
                     });
                 } else {
-                    return Err(MirLoweringError::UnsupportedExpression);
+                    // A fixed array is read through its local, as in straight-line code.
+                    let local = match self
+                        .function
+                        .expressions()
+                        .iter()
+                        .find(|candidate| candidate.id() == *array)
+                        .map(|candidate| candidate.kind())
+                    {
+                        Some(HirExpressionKind::LocalRead(local)) => *local,
+                        _ => return Err(MirLoweringError::UnsupportedExpression),
+                    };
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::ArrayLoad {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        index,
+                        span: expression.span(),
+                    });
                 }
             }
             HirExpressionKind::StringLiteral(bytes) => {
@@ -3380,12 +3397,25 @@ impl<'a> ControlFlowLowerer<'a> {
                     });
                 }
                 HirControlFlow::Assignment(assignment) => {
+                    let index = assignment
+                        .index()
+                        .map(|index| self.lower_expression(index))
+                        .transpose()?;
                     let value = self.lower_expression(assignment.value())?;
-                    self.push(MirInstruction::StoreLocal {
-                        local: MirLocalId::from_raw(assignment.target().index()),
-                        value,
-                        span: assignment.span(),
-                    });
+                    let local = MirLocalId::from_raw(assignment.target().index());
+                    match index {
+                        Some(index) => self.push(MirInstruction::ArrayStore {
+                            local,
+                            index,
+                            value,
+                            span: assignment.span(),
+                        }),
+                        None => self.push(MirInstruction::StoreLocal {
+                            local,
+                            value,
+                            span: assignment.span(),
+                        }),
+                    }
                 }
                 HirControlFlow::Return(returned) => {
                     let value = self.lower_expression(returned.expression())?;
