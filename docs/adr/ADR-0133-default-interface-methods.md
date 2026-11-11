@@ -53,7 +53,8 @@ of the following supplies the method:
 - Default bodies of generic interfaces, such as `List<T>`, are deferred. The
   compiler reports them as unsupported until the substitution of type arguments
   into default bodies is decided.
-- `super` calls to an interface default (`Iface.super.m()`).
+- The interface-qualified form `Iface.super.m()`. A superclass `super.m()` that
+  reaches a default is supported (ADR-0134).
 - Interface state and fields.
 
 ## Consequences

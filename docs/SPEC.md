@@ -857,8 +857,9 @@ A default is not `final`; `final` on an interface method remains a diagnostic.
 A class that inherits the same name and parameter types from two interfaces, and
 declares no such method itself, is an ambiguous interface method. A default may
 also be declared in a generic interface; its erased representation and the
-representation of implementations follow ADR-0134. `super` calls to a default
-are a deferred diagnostic.
+representation of implementations follow ADR-0134. A superclass `super.m()` call
+reaches a default that the superclass inherits, with the superclass's type
+arguments substituted. The qualified form `Iface.super.m()` is deferred.
 
 ## ADR-0067: Object Lifecycle And ABI
 

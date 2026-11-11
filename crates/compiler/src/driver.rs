@@ -583,7 +583,7 @@ fn compile_source_with_entry(
     type_array_expressions_with_classes(&mut types, &parsed, &mut report, class_types.classes());
     type_dynamic_array_operations(&parsed, &mut report, &types);
     type_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
-    apply_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_receiver_name_facts(&parsed, &class_types, &mut types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_inherited_field_types(&parsed, &class_types, &mut types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
@@ -671,7 +671,7 @@ fn compile_source_with_entry(
                     | TypeRuleDiagnostic::MemberExpressionDeferred
             )
     });
-    apply_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_receiver_name_facts(&parsed, &class_types, &mut types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_inherited_field_types(&parsed, &class_types, &mut types, &mut report);
     check_superclass_arguments(&parsed, &class_types, &mut types, &mut report);

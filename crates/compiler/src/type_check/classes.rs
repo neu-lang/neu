@@ -18,6 +18,8 @@ pub struct ClassTypeRecord {
     pub(crate) generic_parameters: Vec<TypeId>,
     /// The type arguments written on the superclass, resolved to types.
     pub(crate) superclass_arguments: Vec<TypeId>,
+    /// The type arguments written on each entry of `interfaces`, in the same order.
+    pub(crate) interface_arguments: Vec<Vec<TypeId>>,
 }
 
 impl ClassTypeRecord {
@@ -1015,6 +1017,71 @@ pub(crate) fn inherited_method_owner(
     None
 }
 
+/// The mapping from the type parameters of `interface` to the types that the class
+/// `receiver` implements it with, through its own interfaces or those of an
+/// ancestor (ADR-0134). Empty when the interface is not generic.
+fn interface_parameter_types(
+    classes: &ClassTypeReport,
+    receiver: AstNodeId,
+    interface: &ClassTypeRecord,
+) -> Option<Vec<(TypeId, TypeId)>> {
+    let mut current = classes
+        .classes()
+        .iter()
+        .find(|class| class.declaration == receiver)?;
+    // Maps the parameters of `current` to the types the receiver gives them. The
+    // receiver's own parameters map to themselves, so the mapping starts empty.
+    let mut mapping: Vec<(TypeId, TypeId)> = Vec::new();
+    let substitute = |mapping: &[(TypeId, TypeId)], ty: TypeId| {
+        mapping
+            .iter()
+            .find(|(parameter, _)| *parameter == ty)
+            .map_or(ty, |(_, argument)| *argument)
+    };
+    loop {
+        if let Some(index) = current
+            .interfaces
+            .iter()
+            .position(|name| *name == interface.name)
+        {
+            let arguments: Vec<TypeId> = current
+                .interface_arguments
+                .get(index)
+                .map(|arguments| {
+                    arguments
+                        .iter()
+                        .map(|argument| substitute(&mapping, *argument))
+                        .collect()
+                })
+                .unwrap_or_default();
+            return Some(
+                interface
+                    .generic_parameters
+                    .iter()
+                    .copied()
+                    .zip(arguments)
+                    .collect(),
+            );
+        }
+        let parent = classes
+            .classes()
+            .iter()
+            .find(|class| Some(class.name.as_str()) == current.superclass.as_deref())?;
+        let arguments: Vec<TypeId> = current
+            .superclass_arguments
+            .iter()
+            .map(|argument| substitute(&mapping, *argument))
+            .collect();
+        mapping = parent
+            .generic_parameters
+            .iter()
+            .copied()
+            .zip(arguments)
+            .collect();
+        current = parent;
+    }
+}
+
 /// The mapping from the type parameters of `owner`, an ancestor of the class
 /// `receiver`, to the types that `receiver` inherits them as (ADR-0083). The
 /// mapping is empty when `owner` is `receiver` itself, and `None` when `owner`
@@ -1024,12 +1091,12 @@ pub(crate) fn inherited_parameter_types(
     receiver: AstNodeId,
     owner: AstNodeId,
 ) -> Option<Vec<(TypeId, TypeId)>> {
-    if classes
+    if let Some(interface) = classes
         .classes()
         .iter()
-        .any(|candidate| candidate.declaration == owner && candidate.interface)
+        .find(|candidate| candidate.declaration == owner && candidate.interface)
     {
-        return Some(Vec::new());
+        return interface_parameter_types(classes, receiver, interface);
     }
     let mut current = classes
         .classes()
@@ -1113,6 +1180,7 @@ pub fn type_class_types_in(
             constructor_parameter_count: declaration.constructor_parameters.len(),
             generic_parameters: Vec::new(),
             superclass_arguments: Vec::new(),
+            interface_arguments: Vec::new(),
         });
     }
     // Generic parameter types are built over the whole list, in declaration
@@ -1164,6 +1232,27 @@ pub fn type_class_types_in(
             })
             .collect();
         record.superclass_arguments = arguments.unwrap_or_default();
+        record.interface_arguments = declaration
+            .interface_arguments
+            .iter()
+            .map(|arguments| {
+                arguments
+                    .iter()
+                    .map(|argument| {
+                        resolve_type_reference(
+                            &parsed.type_name_references,
+                            &parsed.array_types,
+                            *argument,
+                            &primitives,
+                            &class_snapshot,
+                            &generic_types,
+                            types,
+                        )
+                    })
+                    .collect::<Option<Vec<TypeId>>>()
+                    .unwrap_or_default()
+            })
+            .collect();
     }
     for field in &parsed.field_declarations {
         // Primitive annotations first. Other annotations, such as T[],
@@ -1756,9 +1845,23 @@ pub fn apply_enum_method_call_facts(
     }
 }
 
+/// The generic instance of the nominal class type `nominal` with `arguments`, or
+/// `nominal` itself when there are no arguments.
+fn instance_or_nominal(types: &mut TypeArena, nominal: TypeId, arguments: &[TypeId]) -> TypeId {
+    if arguments.is_empty() {
+        return nominal;
+    }
+    let Some(TypeKind::Nominal(identity)) = types.get(nominal).map(|record| record.kind()) else {
+        return nominal;
+    };
+    let identity = identity.clone();
+    types.generic_instance(GenericTypeIdentity::new(identity, arguments.to_vec()))
+}
+
 pub fn apply_receiver_name_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
+    types: &mut TypeArena,
     report: &mut TypeCheckReport,
 ) {
     for function in parsed
@@ -1818,7 +1921,7 @@ pub fn apply_receiver_name_facts(
         }) {
             let type_id = if name.name == "super" {
                 class.superclass.as_deref().and_then(|superclass| {
-                    parsed
+                    let parent = parsed
                         .class_declarations
                         .iter()
                         .find(|candidate| candidate.name == superclass)
@@ -1827,8 +1930,14 @@ pub fn apply_receiver_name_facts(
                                 .classes
                                 .iter()
                                 .find(|class| class.declaration == candidate.declaration)
-                        })
-                        .map(|class| class.type_id)
+                        })?;
+                    // A superclass with type arguments is the instance it names, so
+                    // its members are typed with those arguments (ADR-0083).
+                    Some(instance_or_nominal(
+                        types,
+                        parent.type_id,
+                        &class.superclass_arguments,
+                    ))
                 })
             } else {
                 Some(class.type_id)

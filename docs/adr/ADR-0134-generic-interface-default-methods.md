@@ -3,6 +3,10 @@
 Status: Accepted; extends ADR-0133, which deferred default bodies in generic
 interfaces
 
+Revised: superclass `super.m()` calls that reach a generic interface default are
+accepted (see Super calls below). The qualified form `Iface.super.m()` remains
+deferred under ADR-0133.
+
 ## Question
 
 ADR-0133 accepts default methods for non-generic interfaces and rejects a
@@ -25,6 +29,16 @@ the erased representation of generic type parameters (ADR-0126)?
   dispatch through the interface as ADR-0133 requires. The call's result and
   arguments have the erased type of the interface's type parameter.
 
+### Super calls
+
+- `super.m(...)` in a subclass selects the superclass's view of `m`, including a
+  default that the superclass inherits. The superclass's type arguments are
+  substituted, as for any call on an instance of that superclass. The `super`
+  receiver therefore has the superclass's instance type, `Base<Int>` for
+  `class Child: Base<Int>`.
+- The default runs with `this` as the subclass instance, so its calls to
+  interface methods dispatch virtually (ADR-0133).
+
 ### Representation
 
 - An erased slot of a generic interface method is a 64-bit word (ADR-0126).
@@ -44,7 +58,7 @@ the erased representation of generic type parameters (ADR-0126)?
 
 This ADR does not add:
 
-- `super` calls to a default method. They remain a deferred diagnostic.
+- The qualified form `Iface.super.m()`, which ADR-0133 defers.
 - Generic methods declared on an interface, or interface-level type parameters
   beyond those of the interface itself.
 
