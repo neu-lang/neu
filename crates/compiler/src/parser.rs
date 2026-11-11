@@ -796,6 +796,12 @@ impl<'source> Parser<'source> {
             }
             if self.current_kind() == Some(TokenKind::RightBrace) {
                 self.advance();
+                if names.is_empty() {
+                    // `import {} from ...` names nothing; it is not a qualified import.
+                    self.diagnostic_at_previous_or_current(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                    );
+                }
             } else {
                 self.diagnostic_at_previous_or_current(DiagnosticKind::MalformedDeclarationHeader);
             }
