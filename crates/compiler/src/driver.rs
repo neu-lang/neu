@@ -30,18 +30,18 @@ use crate::{
         apply_bare_field_references, apply_class_type_facts, apply_control_flow_results,
         apply_direct_call_results, apply_enum_constructor_facts, apply_enum_function_facts,
         apply_enum_method_call_facts, apply_field_access_facts, apply_generic_instance_calls,
-        apply_generic_new_expressions, apply_intrinsic_call_facts, apply_method_call_facts,
-        apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
-        check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
-        check_return_expression_types_with_arena, check_straight_line_returns,
-        check_unsupported_executable_forms, diagnose_unresolved_types, infer_local_types,
-        merge_type_check_report, type_annotation_type, type_array_expressions_with_classes,
-        type_array_iterations, type_bind_function_values, type_class_types_in,
-        type_concurrency_operations, type_control_flow, type_dynamic_array_operations,
-        type_enum_whens, type_executable_core_in, type_executable_int_operators,
-        type_function_signatures_in_with_generics, type_lambda_expressions,
-        type_primitive_operators, type_string_operations, type_value_conditionals,
-        validate_compile_time_constants, validate_concurrency_structure,
+        apply_generic_instance_fields, apply_generic_new_expressions, apply_intrinsic_call_facts,
+        apply_method_call_facts, apply_receiver_name_facts, apply_receiver_signatures,
+        apply_value_conditional_results, check_constructor_calls, check_direct_calls,
+        check_entry_point, check_indirect_calls, check_return_expression_types_with_arena,
+        check_straight_line_returns, check_unsupported_executable_forms, diagnose_unresolved_types,
+        infer_local_types, merge_type_check_report, type_annotation_type,
+        type_array_expressions_with_classes, type_array_iterations, type_bind_function_values,
+        type_class_types_in, type_concurrency_operations, type_control_flow,
+        type_dynamic_array_operations, type_enum_whens, type_executable_core_in,
+        type_executable_int_operators, type_function_signatures_in_with_generics,
+        type_lambda_expressions, type_primitive_operators, type_string_operations,
+        type_value_conditionals, validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_intrinsic_calls,
         validate_task_member_cancellation_structure, validate_test_declarations,
     },
@@ -581,6 +581,7 @@ fn compile_source_with_entry(
     apply_enum_function_facts(&parsed, &class_types, &mut report, &mut types);
     let primitives = crate::type_check::PrimitiveTypeIds::module_owned(&mut types);
     apply_generic_new_expressions(&parsed, &class_types, &mut types, primitives, &mut report);
+    apply_generic_instance_fields(&parsed, &class_types, &mut types, &mut report);
     apply_generic_instance_calls(&parsed, &signatures, &mut types, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     type_lambda_expressions(&parsed, &mut types, &mut report);

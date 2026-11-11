@@ -1198,11 +1198,7 @@ fn lower_expression(
                 declared_field_type(source, member.receiver, function_declaration, &member.name);
             let decode = declared
                 .filter(|declared| erased_slot(source, *declared) && needs_erasure(source, ty));
-            let field_id = if decode.is_some() {
-                HirExpressionId::from_raw(output.len())
-            } else {
-                id
-            };
+            let field_id = HirExpressionId::from_raw(output.len());
             output.push(HirExpression::field_access(
                 field_id,
                 span,
@@ -1212,8 +1208,11 @@ fn lower_expression(
                 field_index_for_receiver(source, member.receiver, &member.name),
             ));
             if decode.is_some() {
-                output.push(HirExpression::erased_decode(id, span, ty, field_id));
+                let decoded = HirExpressionId::from_raw(output.len());
+                output.push(HirExpression::erased_decode(decoded, span, ty, field_id));
+                return Ok(decoded);
             }
+            return Ok(field_id);
         }
         return Ok(id);
     }

@@ -105,3 +105,25 @@ fn generic_class_holds_a_class_argument() {
         Some(7)
     );
 }
+
+#[test]
+fn generic_class_field_read_returns_the_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "field_read_int",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Int> = new Box<Int>(7);\n    return b.value;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_field_read_of_a_bool_argument_decodes_it() {
+    assert_eq!(
+        run_exit_code(
+            "field_read_bool",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Bool> = new Box<Bool>(true);\n    if (b.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
