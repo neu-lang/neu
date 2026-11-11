@@ -223,6 +223,7 @@ pub enum DriverError {
     ConstructorDiagnostics(Vec<ConstructorDiagnostic>),
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
     OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
+    UnknownNames(Vec<crate::unknown_names::UnknownName>),
     Hir(HirLoweringError),
     Mir(MirLoweringError),
     Backend(CraneliftLoweringError),
@@ -430,6 +431,10 @@ fn compile_source_with_entry(
     }
     if !parsed.diagnostics.is_empty() {
         return Err(DriverError::ParseDiagnostics(parsed.diagnostics.clone()));
+    }
+    let unknown_names = crate::unknown_names::find_unknown_names(&parsed);
+    if !unknown_names.is_empty() {
+        return Err(DriverError::UnknownNames(unknown_names));
     }
 
     if selected_entry.is_none() {

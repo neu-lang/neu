@@ -370,3 +370,45 @@ fn qualified_access_without_a_qualified_import_points_at_the_package_name() {
         "{rendered}"
     );
 }
+
+#[test]
+fn unknown_name_points_at_the_name_with_a_message() {
+    let project = Project::new(
+        "unknown_name",
+        &[(
+            "src/main.neu",
+            "public func main(): Int {\n    return missing;\n}\n",
+        )],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("error[unknown_name]"), "{rendered}");
+    assert!(rendered.contains("src/main.neu:2:12"), "{rendered}");
+    assert!(
+        rendered.contains("`missing` is not declared in this program"),
+        "{rendered}"
+    );
+    assert!(!rendered.contains("missing_type"), "{rendered}");
+}
+
+#[test]
+fn qualifier_without_a_package_points_at_the_qualifier() {
+    let project = Project::new(
+        "unknown_qualifier",
+        &[(
+            "src/main.neu",
+            "public func main(): Int {\n    return math.add();\n}\n",
+        )],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(rendered.contains("error[unknown_name]"), "{rendered}");
+    assert!(rendered.contains("src/main.neu:2:12"), "{rendered}");
+    assert!(
+        rendered.contains("`math` is not declared in this program"),
+        "{rendered}"
+    );
+    assert!(!rendered.contains("deferred"), "{rendered}");
+}

@@ -25,4 +25,5 @@ pub mod symbol;
 pub mod thread;
 pub mod type_check;
 pub mod types;
+pub mod unknown_names;
 pub mod unsafe_boundary;
