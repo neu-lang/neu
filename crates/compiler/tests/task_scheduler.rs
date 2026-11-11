@@ -504,3 +504,34 @@ fn float_operator_on_a_local_inferred_from_a_call_result_is_typed() {
     "#;
     assert_eq!(compile_and_run(source, "infer_float_operator"), 3);
 }
+
+#[test]
+fn byte_arithmetic_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func seven(): Byte { val b: Byte = 7; return b; }
+        func main(): Int {
+            val v = seven();
+            val three: Byte = 3;
+            val w = v - three;
+            val four: Byte = 4;
+            if w == four { return 1; }
+            return 2;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_byte_arithmetic"), 1);
+}
+
+#[test]
+fn byte_bitwise_operator_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func seven(): Byte { val b: Byte = 7; return b; }
+        func main(): Int {
+            val v = seven();
+            val three: Byte = 3;
+            val w = v & three;
+            if w == three { return 3; }
+            return 4;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_byte_bitwise"), 3);
+}
