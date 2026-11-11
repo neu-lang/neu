@@ -12,3 +12,9 @@ lto = "fat"
 codegen-units = 1
 strip = true
 opt-level = 3
+
+# cranelift-object 0.133.1 has no COFF (Windows) relocation for AArch64 page
+# references, so any Windows arm64 object that touches data fails to emit.
+# The local copy adds those two relocations. See third_party/README.md.
+[patch.crates-io]
+cranelift-object = { path = "third_party/cranelift-object" }

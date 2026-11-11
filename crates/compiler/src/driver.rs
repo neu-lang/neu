@@ -8,7 +8,7 @@ use target_lexicon::Triple;
 use crate::{
     backend::{CraneliftLoweringError, emit_mir_module_to_object},
     hir::{CheckedHirSource, HirLoweringError, lower_checked_hir_source},
-    linker::{LinkInvocationError, SystemLinkInvocation},
+    linker::{LinkInvocationError, SystemLinkInvocation, executable_path},
     mir::{MirLoweringError, lower_hir_to_mir},
     module::{
         ModuleName, PackageGraphDiagnostic, PackageNamespace, VirtualPackageGraph, VirtualSource,
@@ -565,6 +565,17 @@ fn compile_source_with_entry(
         type_lambda_expressions(&parsed, &mut types, &mut report);
         type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
         type_concurrency_operations(&parsed, &mut types, &mut report);
+        // A lambda body can be a `when`, whose type depends on the channel
+        // operations typed above, so `when` typing joins the fixed point.
+        // Only the types are kept here. Diagnostics from an early round can be
+        // stale, and the final `type_enum_whens` below reports the real ones.
+        let when_report =
+            type_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
+        for expression_type in when_report.expression_types() {
+            report.replace_expression_type(*expression_type);
+        }
+        // Locals initialized from spawn results need the spawn type from this round.
+        infer_local_types(&parsed, &mut report);
     }
     validate_concurrency_structure(&parsed, &mut report, &types);
     validate_task_member_cancellation_structure(&parsed, &mut report, &types);
@@ -671,7 +682,6 @@ fn compile_source_with_entry(
     }
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
-    diagnose_unresolved_types(&parsed, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
     let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
     merge_type_check_report(&mut report, indirect_calls);
@@ -704,6 +714,40 @@ fn compile_source_with_entry(
         ));
     }
     apply_direct_call_results(&mut report, &parsed, &calls);
+    // Calls to suspend functions get their result types here, and a spawn body can
+    // depend on them, so the same typing rounds run again.
+    for _ in 0..3 {
+        infer_local_types(&parsed, &mut report);
+        type_lambda_expressions(&parsed, &mut types, &mut report);
+        type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
+        type_concurrency_operations(&parsed, &mut types, &mut report);
+        // A lambda body can be a `when`, whose type depends on the channel
+        // operations typed above, so `when` typing joins the fixed point.
+        // Only the types are kept here. Diagnostics from an early round can be
+        // stale, and the final `type_enum_whens` below reports the real ones.
+        let when_report =
+            type_enum_whens(&parsed, report.expression_types(), &class_types, &mut types);
+        for expression_type in when_report.expression_types() {
+            report.replace_expression_type(*expression_type);
+        }
+        // Locals initialized from spawn results need the spawn type from this round.
+        infer_local_types(&parsed, &mut report);
+    }
+    // A deferred-call diagnostic recorded in an early round is stale once a later
+    // round types its node (for example, `cancel()` on a task whose spawn body
+    // is a suspend call), so it is dropped here.
+    let typed_nodes = report
+        .expression_types()
+        .iter()
+        .map(|expression_type| expression_type.expression())
+        .collect::<Vec<_>>();
+    report.retain_diagnostics(|diagnostic| {
+        !matches!(
+            diagnostic.rule(),
+            TypeRuleDiagnostic::DirectCallDeferred | TypeRuleDiagnostic::MemberExpressionDeferred
+        ) || !typed_nodes.contains(&diagnostic.node())
+    });
+    diagnose_unresolved_types(&parsed, &mut report);
     let intrinsic_diagnostics =
         validate_intrinsic_calls(&parsed, report.expression_types(), &types);
     if !intrinsic_diagnostics.is_empty() {
@@ -899,8 +943,9 @@ fn compile_source_with_entry(
         operation: "write object",
         path: object_path.clone(),
     })?;
+    let executable = executable_path(options.output());
     let invocation =
-        SystemLinkInvocation::new(&object_path, options.output()).map_err(DriverError::Link)?;
+        SystemLinkInvocation::new(&object_path, &executable).map_err(DriverError::Link)?;
     invocation.execute().map_err(DriverError::Link)?;
-    Ok(options.output().to_owned())
+    Ok(executable)
 }

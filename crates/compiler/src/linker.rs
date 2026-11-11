@@ -9,6 +9,16 @@ use object::{Object, ObjectSymbol};
 
 use crate::bootstrap::{BootstrapOutcome, map_main_result};
 
+/// The file the system linker writes for `output`. The Windows linker adds `.exe`
+/// to an output name that has no extension, so the driver names that file itself.
+pub fn executable_path(output: &Path) -> PathBuf {
+    if cfg!(windows) && output.extension().is_none() {
+        output.with_extension("exe")
+    } else {
+        output.to_owned()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LinkInvocationError {
     MissingObject,
@@ -36,6 +46,20 @@ pub enum ExecutableSmokeError {
     UnexpectedExit { expected: u8, actual: i32 },
 }
 
+/// The linker driver a link plan uses when `NEU_LINKER` is unset, and the
+/// driver arguments that come before the `-o` output and object path.
+///
+/// Windows arm64 uses LLVM's clang for the arm64 MSVC target. The `cc` on that
+/// runner is a GCC that cannot read ARM64 COFF objects, while clang drives the
+/// MSVC linker and libraries for the target named here.
+pub fn default_linker() -> (&'static str, &'static [&'static str]) {
+    if cfg!(all(windows, target_arch = "aarch64")) {
+        ("clang", &["--target=aarch64-pc-windows-msvc"][..])
+    } else {
+        ("cc", &[][..])
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SystemLinkInvocation {
     program: PathBuf,
@@ -53,16 +77,25 @@ impl SystemLinkInvocation {
         if !fs::metadata(object).is_ok_and(|metadata| metadata.is_file()) {
             return Err(LinkInvocationError::MissingObject);
         }
-        let output = output.as_ref().to_owned();
+        let output = executable_path(output.as_ref());
+        let (program, mut arguments) = match std::env::var_os("NEU_LINKER") {
+            Some(program) => (PathBuf::from(program), Vec::new()),
+            None => {
+                let (program, driver_arguments) = default_linker();
+                (
+                    PathBuf::from(program),
+                    driver_arguments.iter().map(OsString::from).collect(),
+                )
+            }
+        };
+        arguments.extend([
+            OsString::from("-o"),
+            output.as_os_str().to_owned(),
+            object.as_os_str().to_owned(),
+        ]);
         Ok(Self {
-            program: std::env::var_os("NEU_LINKER")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("cc")),
-            arguments: vec![
-                OsString::from("-o"),
-                output.as_os_str().to_owned(),
-                object.as_os_str().to_owned(),
-            ],
+            program,
+            arguments,
             entry_symbol: "main".to_owned(),
             output,
         })

@@ -292,6 +292,18 @@ pub enum MirInstruction {
         task: MirValueId,
         span: ByteSpan,
     },
+    /// Reads whether the running task has been cancelled (ADR-0122).
+    TaskCancelled {
+        output: MirValueId,
+        span: ByteSpan,
+    },
+    /// The zero value of `ty`. An unwinding frame returns it, and its caller
+    /// discards it after observing the cancellation (ADR-0122).
+    DefaultValue {
+        output: MirValueId,
+        ty: TypeId,
+        span: ByteSpan,
+    },
     ChannelCreate {
         output: MirValueId,
         capacity: MirValueId,
@@ -554,6 +566,8 @@ impl MirInstruction {
             | Self::ScopeExit { span }
             | Self::Suspend { span }
             | Self::Resume { span }
+            | Self::TaskCancelled { span, .. }
+            | Self::DefaultValue { span, .. }
             | Self::TaskSpawn { span, .. }
             | Self::TaskAwait { span, .. }
             | Self::TaskCancel { span, .. }
@@ -950,7 +964,74 @@ pub enum MirLoweringError {
     MissingReturn,
     UnsupportedRuntimeType,
 }
+/// Destroys owned locals, in declaration order for each kind, for a function's
+/// exit. Returns of owned objects skip it, since those values move to the caller.
+fn owned_local_cleanup(
+    function: &HirFunction,
+    types: &TypeArena,
+    cleanup_value: MirValueId,
+    unwinding: bool,
+) -> Vec<MirInstruction> {
+    let mut instructions = Vec::new();
+    // An unwinding frame returns a placeholder, so it always releases its locals.
+    if unwinding
+        || !matches!(
+            types
+                .get(function.return_type())
+                .map(|record| record.kind()),
+            Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_),)
+        )
+    {
+        // Reverse declaration order (ADR-0122). A local that was never initialized
+        // is null, and the backend skips destroying a null value.
+        for local in function.locals().iter().rev() {
+            let destroy = match types.get(local.ty()).map(|record| record.kind()) {
+                Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_)) => {
+                    MirInstruction::DestroyObject {
+                        value: cleanup_value,
+                        span: local.span(),
+                    }
+                }
+                Some(TypeKind::DynamicArray(_)) => MirInstruction::DestroyDynamicArray {
+                    value: cleanup_value,
+                    span: local.span(),
+                },
+                Some(TypeKind::Channel(_)) => MirInstruction::DestroyChannel {
+                    value: cleanup_value,
+                    span: local.span(),
+                },
+                _ => continue,
+            };
+            instructions.push(MirInstruction::LoadLocal {
+                output: cleanup_value,
+                local: MirLocalId::from_raw(local.id().index()),
+                span: local.span(),
+            });
+            instructions.push(destroy);
+        }
+    }
+    instructions
+}
+
+/// Whether an expression is a suspension point, or a direct call that may suspend.
+/// Such functions use the control-flow lowering, which observes cancellation (ADR-0122).
+fn may_suspend_expression(kind: &HirExpressionKind, suspend_callees: &HashSet<usize>) -> bool {
+    match kind {
+        HirExpressionKind::TaskAwait(_)
+        | HirExpressionKind::ChannelSend { .. }
+        | HirExpressionKind::ChannelReceive(_) => true,
+        HirExpressionKind::DirectCall(call) => call_may_suspend(call, suspend_callees),
+        _ => false,
+    }
+}
+
 pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule, MirLoweringError> {
+    let suspend_callees: HashSet<usize> = hir
+        .functions()
+        .iter()
+        .filter(|function| function.is_suspend())
+        .map(|function| function.id().index())
+        .collect();
     let mut functions = Vec::new();
     for function in hir.functions() {
         require_bootstrap_runtime_type(function.return_type(), types)?;
@@ -959,10 +1040,14 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 matches!(
                     expression.kind(),
                     HirExpressionKind::Conditional { .. } | HirExpressionKind::When { .. }
-                )
+                ) || may_suspend_expression(expression.kind(), &suspend_callees)
             })
         {
-            functions.push(lower_hir_function_with_control_flow(function, types)?);
+            functions.push(lower_hir_function_with_control_flow(
+                function,
+                types,
+                &suspend_callees,
+            )?);
             continue;
         }
         if function.expressions().iter().any(|expression| {
@@ -1506,63 +1591,12 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                 }
             }
         }
-        if !matches!(
-            types
-                .get(function.return_type())
-                .map(|record| record.kind()),
-            Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_) | TypeKind::DynamicArray(_),)
-        ) {
-            let cleanup_value =
-                MirValueId::from_raw(function.parameters().len() + function.expressions().len());
-            for local in function.locals().iter().filter(|local| {
-                matches!(
-                    types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Nominal(_) | TypeKind::GenericInstance(_),)
-                )
-            }) {
-                instructions.push(MirInstruction::LoadLocal {
-                    output: cleanup_value,
-                    local: MirLocalId::from_raw(local.id().index()),
-                    span: local.span(),
-                });
-                instructions.push(MirInstruction::DestroyObject {
-                    value: cleanup_value,
-                    span: local.span(),
-                });
-            }
-            for local in function.locals().iter().filter(|local| {
-                matches!(
-                    types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::DynamicArray(_))
-                )
-            }) {
-                instructions.push(MirInstruction::LoadLocal {
-                    output: cleanup_value,
-                    local: MirLocalId::from_raw(local.id().index()),
-                    span: local.span(),
-                });
-                instructions.push(MirInstruction::DestroyDynamicArray {
-                    value: cleanup_value,
-                    span: local.span(),
-                });
-            }
-            for local in function.locals().iter().filter(|local| {
-                matches!(
-                    types.get(local.ty()).map(|record| record.kind()),
-                    Some(TypeKind::Channel(_))
-                )
-            }) {
-                instructions.push(MirInstruction::LoadLocal {
-                    output: cleanup_value,
-                    local: MirLocalId::from_raw(local.id().index()),
-                    span: local.span(),
-                });
-                instructions.push(MirInstruction::DestroyChannel {
-                    value: cleanup_value,
-                    span: local.span(),
-                });
-            }
-        }
+        instructions.extend(owned_local_cleanup(
+            function,
+            types,
+            MirValueId::from_raw(function.parameters().len() + function.expressions().len()),
+            false,
+        ));
         let returned = function.returns().first();
         let is_void = matches!(
             types
@@ -1963,13 +1997,16 @@ impl<'a> ShortCircuitLowerer<'a> {
                 }
             }
             HirExpressionKind::DirectCall(call) => {
+                // Arguments are lowered before the call so their values exist when it is emitted.
+                let arguments = call
+                    .arguments()
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
                 self.push(mir_call_instruction(
                     call,
                     output,
-                    call.arguments()
-                        .iter()
-                        .map(|argument| mir_expression_value_id(self.function, *argument))
-                        .collect(),
+                    arguments,
                     expression.span(),
                 ));
             }
@@ -2349,10 +2386,30 @@ struct ControlFlowLowerer<'a> {
     expression_index: HashMap<HirExpressionId, HirExpression>,
     lowered: HashSet<HirExpressionId>,
     loops: Vec<(MirBlockId, MirBlockId)>,
+    /// Number of `scope` blocks entered in the current function and not yet exited.
+    scope_depth: usize,
+    /// `scope_depth` recorded at each active loop, parallel to `loops`.
+    loop_scope_depths: Vec<usize>,
+    /// Functions marked `suspend`, by callee index. A call to one may unwind.
+    suspend_callees: &'a HashSet<usize>,
+}
+
+/// Whether a call may suspend, so the caller must observe cancellation after it.
+/// Dynamic dispatch counts when any implementation the call can reach is `suspend`.
+fn call_may_suspend(call: &HirDirectCall, suspend_callees: &HashSet<usize>) -> bool {
+    suspend_callees.contains(&call.callee().index())
+        || call
+            .targets()
+            .iter()
+            .any(|target| suspend_callees.contains(&target.callee().index()))
 }
 
 impl<'a> ControlFlowLowerer<'a> {
-    fn new(function: &'a HirFunction, types: &'a TypeArena) -> Self {
+    fn new(
+        function: &'a HirFunction,
+        types: &'a TypeArena,
+        suspend_callees: &'a HashSet<usize>,
+    ) -> Self {
         let next_value = function.parameters().len()
             + function
                 .expressions()
@@ -2391,6 +2448,9 @@ impl<'a> ControlFlowLowerer<'a> {
                 .collect(),
             lowered: HashSet::new(),
             loops: Vec::new(),
+            scope_depth: 0,
+            loop_scope_depths: Vec::new(),
+            suspend_callees,
         }
     }
 
@@ -2428,6 +2488,70 @@ impl<'a> ControlFlowLowerer<'a> {
 
     fn is_terminated(&self) -> bool {
         self.blocks[self.current].terminator.is_some()
+    }
+
+    /// Destroys owned locals before control leaves the function, as the simple
+    /// lowering does at its exit.
+    fn emit_owned_cleanup(&mut self) {
+        let function = self.function;
+        let types = self.types;
+        let cleanup_value = self.fresh_value();
+        for instruction in owned_local_cleanup(function, types, cleanup_value, false) {
+            self.push(instruction);
+        }
+    }
+
+    /// Emits one `ScopeExit` per scope being left, innermost first, so each
+    /// scope joins its children before control leaves it. Each exit is an
+    /// observation point, so a cancelled task unwinds from there (ADR-0122).
+    fn emit_scope_exits(&mut self, count: usize, span: ByteSpan) {
+        for index in 0..count {
+            self.push(MirInstruction::ScopeExit { span });
+            self.emit_cancellation_check(self.scope_depth - index - 1, span);
+        }
+    }
+
+    /// Observes cancellation at a point that may suspend (ADR-0122). A cancelled
+    /// task leaves through an unwind path that joins the `open_scopes` still
+    /// open, runs owned cleanup, and returns. Control otherwise continues.
+    fn emit_cancellation_check(&mut self, open_scopes: usize, span: ByteSpan) {
+        let cancelled = self.fresh_value();
+        self.push(MirInstruction::TaskCancelled {
+            output: cancelled,
+            span,
+        });
+        let unwind = self.new_block();
+        let resume = self.new_block();
+        let unwind_id = self.blocks[unwind].id;
+        let resume_id = self.blocks[resume].id;
+        self.terminate(MirTerminator::BranchIf {
+            condition: cancelled,
+            then_target: unwind_id,
+            else_target: resume_id,
+            span,
+        });
+
+        self.current = unwind;
+        for _ in 0..open_scopes {
+            self.push(MirInstruction::ScopeExit { span });
+        }
+        let cleanup_value = self.fresh_value();
+        for instruction in owned_local_cleanup(self.function, self.types, cleanup_value, true) {
+            self.push(instruction);
+        }
+        let returned_type = self.function.return_type();
+        if self.is_unit(returned_type) {
+            self.terminate(MirTerminator::return_unit(span));
+        } else {
+            let placeholder = self.fresh_value();
+            self.push(MirInstruction::DefaultValue {
+                output: placeholder,
+                ty: returned_type,
+                span,
+            });
+            self.terminate(MirTerminator::return_value(placeholder, span));
+        }
+        self.current = resume;
     }
 
     fn lower_expression(&mut self, id: HirExpressionId) -> Result<MirValueId, MirLoweringError> {
@@ -2582,15 +2706,21 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
             }
             HirExpressionKind::DirectCall(call) => {
+                // Arguments are lowered before the call so their values exist when it is emitted.
+                let arguments = call
+                    .arguments()
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
                 self.push(mir_call_instruction(
                     call,
                     output,
-                    call.arguments()
-                        .iter()
-                        .map(|argument| mir_expression_value_id(self.function, *argument))
-                        .collect(),
+                    arguments,
                     expression.span(),
                 ));
+                if call_may_suspend(call, self.suspend_callees) {
+                    self.emit_cancellation_check(self.scope_depth, expression.span());
+                }
             }
             HirExpressionKind::TestAssert { condition, message } => {
                 self.push(MirInstruction::TestAssert {
@@ -2824,6 +2954,7 @@ impl<'a> ControlFlowLowerer<'a> {
                 self.push(MirInstruction::Resume {
                     span: expression.span(),
                 });
+                self.emit_cancellation_check(self.scope_depth, expression.span());
             }
             HirExpressionKind::TaskCancel(task) => {
                 let task = self.lower_expression(*task)?;
@@ -2861,6 +2992,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     element_type,
                     span: expression.span(),
                 });
+                self.emit_cancellation_check(self.scope_depth, expression.span());
             }
             HirExpressionKind::ChannelReceive(channel) => {
                 let channel_id = *channel;
@@ -2888,6 +3020,7 @@ impl<'a> ControlFlowLowerer<'a> {
                 self.push(MirInstruction::Resume {
                     span: expression.span(),
                 });
+                self.emit_cancellation_check(self.scope_depth, expression.span());
             }
             HirExpressionKind::ChannelClose(channel) => {
                 let channel = self.lower_expression(*channel)?;
@@ -2985,12 +3118,51 @@ impl<'a> ControlFlowLowerer<'a> {
                     return Err(MirLoweringError::UnsupportedExpression);
                 }
             }
-            HirExpressionKind::StringLiteral(_)
-            | HirExpressionKind::StringLength(_)
-            | HirExpressionKind::StringClone(_)
-            | HirExpressionKind::FieldAccess { .. }
-            | HirExpressionKind::NewObject { .. } => {
-                return Err(MirLoweringError::UnsupportedExpression);
+            HirExpressionKind::StringLiteral(bytes) => {
+                self.push(MirInstruction::StringConstant {
+                    output,
+                    bytes: bytes.clone(),
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::StringLength(value) => {
+                let value = self.lower_expression(*value)?;
+                self.push(MirInstruction::StringLength {
+                    output,
+                    value,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::StringClone(value) => {
+                let value = self.lower_expression(*value)?;
+                self.push(MirInstruction::StringClone {
+                    output,
+                    value,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::FieldAccess {
+                receiver, index, ..
+            } => {
+                let receiver = self.lower_expression(*receiver)?;
+                self.push(MirInstruction::FieldLoad {
+                    output,
+                    receiver,
+                    index: *index,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::NewObject { arguments, .. } => {
+                let arguments = arguments
+                    .iter()
+                    .map(|argument| self.lower_expression(*argument))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.push(MirInstruction::NewObject {
+                    output,
+                    type_id: expression.ty(),
+                    arguments,
+                    span: expression.span(),
+                });
             }
         }
         self.lowered.insert(id);
@@ -3023,9 +3195,12 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
                 HirControlFlow::Scope { body, span } => {
                     self.push(MirInstruction::ScopeEnter { span: *span });
+                    self.scope_depth += 1;
                     self.lower_sequence(body)?;
+                    self.scope_depth -= 1;
                     if !self.is_terminated() {
                         self.push(MirInstruction::ScopeExit { span: *span });
+                        self.emit_cancellation_check(self.scope_depth, *span);
                     }
                 }
                 HirControlFlow::Assignment(assignment) => {
@@ -3038,6 +3213,9 @@ impl<'a> ControlFlowLowerer<'a> {
                 }
                 HirControlFlow::Return(returned) => {
                     let value = self.lower_expression(returned.expression())?;
+                    // Leaving every enclosing scope joins its children before control leaves.
+                    self.emit_scope_exits(self.scope_depth, returned.span());
+                    self.emit_owned_cleanup();
                     if self.is_unit(self.function.return_type()) {
                         self.terminate(MirTerminator::return_unit(returned.span()));
                     } else {
@@ -3124,6 +3302,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     ));
                     self.loops
                         .push((self.blocks[exit].id, self.blocks[update].id));
+                    self.loop_scope_depths.push(self.scope_depth);
                     self.current = body_block;
                     self.lower_sequence(body)?;
                     if !self.is_terminated() {
@@ -3133,6 +3312,7 @@ impl<'a> ControlFlowLowerer<'a> {
                         });
                     }
                     self.loops.pop();
+                    self.loop_scope_depths.pop();
                     self.current = update;
                     let current_value = self.fresh_value();
                     self.push(MirInstruction::LoadLocal {
@@ -3239,6 +3419,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     ));
                     self.loops
                         .push((self.blocks[exit].id, self.blocks[update].id));
+                    self.loop_scope_depths.push(self.scope_depth);
                     self.current = body_block;
                     let element = self.fresh_value();
                     if is_dynamic {
@@ -3269,6 +3450,7 @@ impl<'a> ControlFlowLowerer<'a> {
                         });
                     }
                     self.loops.pop();
+                    self.loop_scope_depths.pop();
                     self.current = update;
                     let current = self.fresh_value();
                     self.push(MirInstruction::LoadLocal {
@@ -3303,6 +3485,12 @@ impl<'a> ControlFlowLowerer<'a> {
                         .last()
                         .copied()
                         .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let loop_depth = self
+                        .loop_scope_depths
+                        .last()
+                        .copied()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    self.emit_scope_exits(self.scope_depth - loop_depth, *span);
                     self.terminate(MirTerminator::Branch {
                         target,
                         span: *span,
@@ -3314,6 +3502,12 @@ impl<'a> ControlFlowLowerer<'a> {
                         .last()
                         .copied()
                         .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let loop_depth = self
+                        .loop_scope_depths
+                        .last()
+                        .copied()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    self.emit_scope_exits(self.scope_depth - loop_depth, *span);
                     self.terminate(MirTerminator::Branch {
                         target,
                         span: *span,
@@ -3353,8 +3547,9 @@ impl<'a> ControlFlowLowerer<'a> {
 fn lower_hir_function_with_control_flow(
     function: &HirFunction,
     types: &TypeArena,
+    suspend_callees: &HashSet<usize>,
 ) -> Result<MirFunction, MirLoweringError> {
-    let mut lowerer = ControlFlowLowerer::new(function, types);
+    let mut lowerer = ControlFlowLowerer::new(function, types, suspend_callees);
     if function.control_flow().is_empty() {
         for local in function.locals() {
             if let Some(initializer) = local.initializer() {
@@ -3373,6 +3568,11 @@ fn lower_hir_function_with_control_flow(
                 .returns()
                 .first()
                 .map_or(function.span(), |returned| returned.span());
+            // A unit body's trailing expression runs for its effect, as in the straight-line lowering.
+            if let Some(returned) = function.returns().first() {
+                lowerer.lower_expression(returned.expression())?;
+            }
+            lowerer.emit_owned_cleanup();
             lowerer.terminate(MirTerminator::return_unit(span));
         } else {
             let returned = function
@@ -3380,6 +3580,7 @@ fn lower_hir_function_with_control_flow(
                 .first()
                 .ok_or(MirLoweringError::MissingReturn)?;
             let value = lowerer.lower_expression(returned.expression())?;
+            lowerer.emit_owned_cleanup();
             lowerer.terminate(MirTerminator::return_value(value, returned.span()));
         }
     } else {
@@ -3387,6 +3588,7 @@ fn lower_hir_function_with_control_flow(
         if lowerer.blocks[lowerer.current].terminator.is_none()
             && lowerer.is_unit(function.return_type())
         {
+            lowerer.emit_owned_cleanup();
             lowerer.terminate(MirTerminator::return_unit(function.span()));
         }
     }

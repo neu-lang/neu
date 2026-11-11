@@ -30,7 +30,7 @@ fn compile_and_run(source: &str, name: &str) -> i32 {
 #[test]
 fn bounded_channel_preserves_fifo_and_message_payloads() {
     let source = r#"
-        public func main(): Int {
+        suspend func main(): Int {
             val queue = channel<Int>(2);
             send(queue, 3);
             send(queue, 4);
@@ -54,7 +54,7 @@ fn bounded_channel_preserves_fifo_and_message_payloads() {
 #[test]
 fn closed_channel_returns_closed_result_after_draining() {
     let source = r#"
-        public func main(): Int {
+        suspend func main(): Int {
             val queue = channel<Int>(1);
             close(queue);
             val result = receive(queue);
@@ -72,7 +72,7 @@ fn sending_a_move_only_value_consumes_the_source_binding() {
     let output = std::env::temp_dir().join(format!("neu-channel-send-move-{}", std::process::id()));
     let error = compiler::driver::compile_source_to_executable(
         r#"
-            public func main(): Int {
+            suspend func main(): Int {
                 val queue = channel<String>(1);
                 val message: String = "payload";
                 send(queue, message);
@@ -93,7 +93,7 @@ fn sending_a_move_only_value_consumes_the_source_binding() {
 #[test]
 fn sending_a_string_uses_the_opaque_channel_storage() {
     let source = r#"
-        public func main(): Int {
+        suspend func main(): Int {
             val queue = channel<String>(1);
             val message: String = "payload";
             send(queue, message);
@@ -106,7 +106,7 @@ fn sending_a_string_uses_the_opaque_channel_storage() {
 #[test]
 fn sending_a_copyable_value_leaves_the_source_usable() {
     let source = r#"
-        public func main(): Int {
+        suspend func main(): Int {
             val queue = channel<Int>(1);
             val value = 7;
             send(queue, value);
@@ -120,7 +120,7 @@ fn sending_a_copyable_value_leaves_the_source_usable() {
 fn channel_rejects_non_integer_capacity() {
     let output = std::env::temp_dir().join(format!("neu-channel-capacity-{}", std::process::id()));
     let error = compiler::driver::compile_source_to_executable(
-        "public func main(): Int { val queue = channel<Int>(true); return 0; }",
+        "suspend func main(): Int { val queue = channel<Int>(true); return 0; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(12002),
             ModuleName::parse("channel_capacity").unwrap(),
@@ -145,7 +145,7 @@ fn channel_operations_reject_non_channel_receivers_before_lowering() {
     let _ = fs::remove_file(&output);
     let _ = fs::remove_file(&object);
     let error = compiler::driver::compile_source_to_executable(
-        "public func main(): Int { send(7, 1); return 0; }",
+        "suspend func main(): Int { send(7, 1); return 0; }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(12004),
             ModuleName::parse("channel_invalid_receiver").unwrap(),
@@ -163,7 +163,7 @@ fn channel_operations_reject_non_channel_receivers_before_lowering() {
 #[test]
 fn closed_channel_can_be_received_repeatedly_without_messages() {
     let source = r#"
-        public func main(): Int {
+        suspend func main(): Int {
             val queue = channel<Int>(1);
             close(queue);
             val first = receive(queue);
@@ -196,4 +196,45 @@ fn spawned_producer_and_parent_consumer_share_a_channel() {
         }
     "#;
     assert_eq!(compile_and_run(source, "channel_producer_consumer"), 8);
+}
+
+#[test]
+fn channel_send_outside_suspend_is_rejected() {
+    // ADR-0122: send and receive are valid only inside suspend functions.
+    let output =
+        std::env::temp_dir().join(format!("neu-channel-send-plain-{}", std::process::id()));
+    let error = compiler::driver::compile_source_to_executable(
+        "public func main(): Int { val queue = channel<Int>(1); send(queue, 1); return 0; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(12010),
+            ModuleName::parse("channel_send_plain").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        format!("{error:?}").contains("ChannelOpOutsideSuspend"),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn channel_receive_outside_suspend_is_rejected() {
+    let output =
+        std::env::temp_dir().join(format!("neu-channel-recv-plain-{}", std::process::id()));
+    let error = compiler::driver::compile_source_to_executable(
+        "public func main(): Int { val queue = channel<Int>(1); val r = receive(queue); return 0; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(12011),
+            ModuleName::parse("channel_recv_plain").unwrap(),
+            PackageNamespace::root(),
+            &output,
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        format!("{error:?}").contains("ChannelOpOutsideSuspend"),
+        "{error:?}"
+    );
 }

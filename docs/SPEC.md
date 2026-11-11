@@ -1338,6 +1338,30 @@ ownership cleanup before completion. A cancelled task may be awaited once to
 observe its deterministic cancellation result. Cancellation does not introduce
 tokens, callbacks, timeouts, OS signals, or public runtime types.
 
+## ADR-0122: Cancellation Observation And Unwinding
+
+Revises ADR-0101 and ADR-0104. A task cancelled while it is started observes the
+cancellation at its next suspension point. Observation points are `await` of an
+unfinished task, scope exit while children are unfinished, and a channel `send`
+or `receive` that blocks. A task that does not suspend is not interrupted.
+
+A blocked task woken by cancellation returns from its wait, runs the cleanup of
+its owned locals in reverse declaration order, and completes as cancelled. Its
+remaining statements do not run. Cancellation propagates to unfinished children,
+and the cancelled task does not complete until they do.
+
+Channel `send` and `receive` are valid only inside `suspend` functions, because
+each can block. Using either elsewhere is the compile-time error
+`channel_op_outside_suspend`.
+
+A child that completes cancelled makes its scope fail. The scope cancels its
+other unfinished children, joins them, and then traps. A cancelled task does not
+trap on its own scope's failure, since it is already unwinding.
+
+Owned-local cleanup runs in reverse declaration order on every exit, including
+normal return. Neu has no user-defined destructors, so the order is not
+observable from source. An owned local that is not yet initialized is skipped.
+
 ## ADR-0103: Bounded Channel Contract
 
 `channel<T>(capacity)` creates an opaque bounded channel. `send`, `receive`, and

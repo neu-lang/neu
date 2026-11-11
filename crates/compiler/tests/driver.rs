@@ -13,6 +13,18 @@ use compiler::{
     source::SourceFileId,
 };
 
+/// A trap ends the process by signal on Unix. On Windows it is an illegal
+/// instruction, which the process reports as this exit code.
+const WINDOWS_ILLEGAL_INSTRUCTION: i32 = -1073741795;
+
+fn is_trap(code: Option<i32>) -> bool {
+    code.is_none() || code == Some(WINDOWS_ILLEGAL_INSTRUCTION)
+}
+
+fn trapped(status: std::process::ExitStatus) -> bool {
+    is_trap(status.code())
+}
+
 #[test]
 fn compiles_generic_enum_payload_patterns() {
     let workspace =
@@ -470,7 +482,11 @@ fn old_free_cancel_operation_is_rejected() {
 }
 
 #[test]
-fn unawaited_task_is_cleaned_up_at_scope_exit() {
+fn cancelled_unawaited_task_traps_at_scope_exit() {
+    // Owner decision (ADR-0101 child failure): a child that ends cancelled is a
+    // failure, so the scope joins its children and then traps instead of
+    // returning normally. This replaces the earlier exit-0 expectation.
+
     let workspace = std::env::temp_dir().join(format!("neu-task-cleanup-{}", std::process::id()));
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
@@ -485,7 +501,8 @@ fn unawaited_task_is_cleaned_up_at_scope_exit() {
         ),
     )
     .unwrap();
-    assert_eq!(Command::new(output).status().unwrap().code(), Some(0));
+    // A trap ends the process by signal, so there is no exit code.
+    assert!(trapped(Command::new(output).status().unwrap()));
     let _ = fs::remove_dir_all(workspace);
 }
 
@@ -576,72 +593,109 @@ fn compiles_current_example_to_host_executable_with_exit_status_seven() {
     let _ = fs::remove_dir_all(workspace);
 }
 
-#[test]
-fn compiles_current_control_flow_and_primitive_examples() {
+/// How long a compiled example may run before its test fails. A hang then fails
+/// only that example's test instead of blocking the whole group.
+const EXAMPLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Compiles `examples/current/{name}.neu` and checks the program's outcome.
+/// A negative `expected_status` means the example must trap.
+fn check_current_example(name: &str, expected_status: i32) {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for (name, expected_status) in [
-        ("control_flow", 7),
-        ("primitive_values", 7),
-        ("fixed_arrays", 7),
-        ("strings", 7),
-        ("classes", 7),
-        ("class_methods", 9),
-        ("interfaces", 11),
-        ("virtual_dispatch", 13),
-        ("dispatch_parameters", 10),
-        ("overloads", 10),
-        ("conditional_values", 10),
-        ("dynamic_arrays", 1),
-        ("nominal_arrays", 4),
-        ("optional_semicolons", 4),
-        ("enum_values", 7),
-        ("enum_when", 3),
-        ("enum_functions", 40),
-        ("lambdas", 7),
-        ("inferred_locals", 7),
-        ("optional_headers", 7),
-        ("array_iteration", 7),
-        ("static_class_functions", 7),
-        ("abstract_classes", 7),
-        ("move_only_captures", 7),
-        ("function_values", 7),
-        ("visibility_public", 7),
-        ("structured_scope", 7),
-        ("cancellation", 0),
-        ("spawn", 7),
-        ("await", 9),
-        ("task_results", 7),
-        ("cancel_task", 0),
-        ("runtime_entry", 7),
-        ("concurrency_diagnostics", 0),
-        ("channels", 7),
-        ("channel_receive", 9),
-        ("producer_consumer", 8),
-        ("concurrency_interfaces", 12),
-        ("concurrency_binary", 21),
-        ("concurrency_complete", 7),
-    ] {
-        let source_path = repo_root.join(format!("examples/current/{name}.neu"));
-        let source = fs::read_to_string(&source_path).unwrap();
-        let workspace =
-            std::env::temp_dir().join(format!("neu-example-driver-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&workspace);
-        fs::create_dir_all(&workspace).unwrap();
-        let executable = workspace.join("program");
-        let output = compile_source_to_executable(
-            &source,
-            SourceDriverOptions::new(
-                SourceFileId::from_raw(1002),
-                ModuleName::parse("examples.current").unwrap(),
-                PackageNamespace::parse("examples.current").unwrap(),
-                &executable,
-            ),
-        )
-        .unwrap_or_else(|error| panic!("example {name}: {error:?}"));
-        let status = Command::new(output).status().unwrap();
+    let source_path = repo_root.join(format!("examples/current/{name}.neu"));
+    let source = fs::read_to_string(&source_path).unwrap();
+    let workspace =
+        std::env::temp_dir().join(format!("neu-example-driver-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let output = compile_source_to_executable(
+        &source,
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(1002),
+            ModuleName::parse("examples.current").unwrap(),
+            PackageNamespace::parse("examples.current").unwrap(),
+            &executable,
+        ),
+    )
+    .unwrap_or_else(|error| panic!("example {name}: {error:?}"));
+    let status = wait_with_timeout(Command::new(output).spawn().unwrap(), name);
+    if expected_status < 0 {
+        // A trap ends the process by signal, so there is no exit code.
+        assert!(trapped(status), "example {name} should trap");
+    } else {
         assert_eq!(status.code(), Some(expected_status), "example {name}");
-        let _ = fs::remove_dir_all(workspace);
     }
+    let _ = fs::remove_dir_all(workspace);
+}
+
+fn wait_with_timeout(mut child: std::process::Child, name: &str) -> std::process::ExitStatus {
+    let deadline = std::time::Instant::now() + EXAMPLE_TIMEOUT;
+    loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            return status;
+        }
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("example {name} did not finish within {EXAMPLE_TIMEOUT:?}");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+macro_rules! current_example_tests {
+    ($($test:ident => $name:literal, $status:expr;)*) => {
+        $(
+            #[test]
+            fn $test() {
+                check_current_example($name, $status);
+            }
+        )*
+    };
+}
+
+current_example_tests! {
+    example_control_flow => "control_flow", 7;
+    example_primitive_values => "primitive_values", 7;
+    example_fixed_arrays => "fixed_arrays", 7;
+    example_strings => "strings", 7;
+    example_classes => "classes", 7;
+    example_class_methods => "class_methods", 9;
+    example_interfaces => "interfaces", 11;
+    example_virtual_dispatch => "virtual_dispatch", 13;
+    example_dispatch_parameters => "dispatch_parameters", 10;
+    example_overloads => "overloads", 10;
+    example_conditional_values => "conditional_values", 10;
+    example_dynamic_arrays => "dynamic_arrays", 1;
+    example_nominal_arrays => "nominal_arrays", 4;
+    example_optional_semicolons => "optional_semicolons", 4;
+    example_enum_values => "enum_values", 7;
+    example_enum_when => "enum_when", 3;
+    example_enum_functions => "enum_functions", 40;
+    example_lambdas => "lambdas", 7;
+    example_inferred_locals => "inferred_locals", 7;
+    example_optional_headers => "optional_headers", 7;
+    example_array_iteration => "array_iteration", 7;
+    example_static_class_functions => "static_class_functions", 7;
+    example_abstract_classes => "abstract_classes", 7;
+    example_move_only_captures => "move_only_captures", 7;
+    example_function_values => "function_values", 7;
+    example_visibility_public => "visibility_public", 7;
+    example_structured_scope => "structured_scope", 7;
+    // Negative: the example traps (ADR-0101 child failure, owner decision).
+    example_cancellation => "cancellation", -1;
+    example_spawn => "spawn", 7;
+    example_await => "await", 9;
+    example_task_results => "task_results", 7;
+    example_cancel_task => "cancel_task", -1;
+    example_runtime_entry => "runtime_entry", 7;
+    example_concurrency_diagnostics => "concurrency_diagnostics", -1;
+    example_channels => "channels", 7;
+    example_channel_receive => "channel_receive", 9;
+    example_producer_consumer => "producer_consumer", 8;
+    example_concurrency_interfaces => "concurrency_interfaces", 12;
+    example_concurrency_binary => "concurrency_binary", 21;
+    example_concurrency_complete => "concurrency_complete", -1;
 }
 
 #[test]
@@ -666,8 +720,10 @@ fn complete_concurrency_smoke_retains_entry_symbols_and_runtime_relocations() {
         ),
     )
     .unwrap();
-    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
-    assert_eq!(Command::new(&executable).status().unwrap().code(), Some(7));
+    // The example cancels a child inside its outer scope, so the scope traps
+    // (ADR-0101 child failure, owner decision).
+    assert!(trapped(Command::new(output).status().unwrap()));
+    assert!(trapped(Command::new(&executable).status().unwrap()));
 
     let object_bytes = fs::read(executable.with_extension("o")).unwrap();
     let object = object::File::parse(object_bytes.as_slice()).unwrap();

@@ -16,16 +16,32 @@ permissions:
   contents: read
   packages: write
 
-# One run per workflow and branch at a time. Runs that start while another is
-# in progress wait in the queue instead of cancelling it.
+# One run per workflow and branch at a time. A new run cancels the run that is
+# still in progress for the same branch, so superseded commits do not hold up
+# the queue.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
+  test-build:
+    name: Test & Build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64-unknown-linux-gnu
+            runner: ubuntu-26.04
+          - arch: aarch64-unknown-linux-gnu
+            runner: ubuntu-26.04-arm
+          - arch: aarch64-apple-darwin
+            runner: macos-26
+          - arch: x86_64-pc-windows-msvc
+            runner: windows-2025
+          - arch: aarch64-pc-windows-msvc
+            runner: windows-11-vs2026-arm
 
     steps:
       - uses: actions/checkout@v7
@@ -34,7 +50,13 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Run tests
-        run: cargo test --workspace --all-targets
+        run: cargo test --workspace --all-targets --no-fail-fast
+      - name: Build debug
+        if: github.event_name == 'pull_request'
+        run: cargo build --workspace
+      - name: Build release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+        run: cargo build --workspace --release
 
   codeql:
     name: CodeQL
@@ -55,33 +77,3 @@ jobs:
         uses: github/codeql-action/autobuild@v4
       - name: Analyze
         uses: github/codeql-action/analyze@v4
-
-  cargo-build:
-    name: Cargo Build (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    needs:
-      - test
-      - codeql
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86_64-unknown-linux-gnu
-            runner: ubuntu-26.04
-          - arch: aarch64-unknown-linux-gnu
-            runner: ubuntu-26.04-arm
-          - arch: aarch64-apple-darwin
-            runner: macos-26
-          - arch: x86_64-pc-windows-msvc
-            runner: windows-2025
-          - arch: aarch64-pc-windows-msvc
-            runner: windows-11-vs2026-arm
-
-    steps:
-      - uses: actions/checkout@v7
-      - name: Build debug
-        if: github.event_name == 'pull_request'
-        run: cargo build --workspace
-      - name: Build release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-        run: cargo build --workspace --release

@@ -803,3 +803,303 @@ fn mir_preserves_await_suspension_and_resume_boundaries() {
         MirInstruction::Resume { span: instruction_span } if *instruction_span == span
     )));
 }
+
+#[test]
+fn return_inside_scope_exits_the_scope_before_returning() {
+    // ADR-0101: returning from a scope performs the scope join before control
+    // leaves it, so the MIR must exit the scope ahead of the return terminator.
+    use compiler::hir::HirControlFlow;
+
+    let file = SourceFileId::from_raw(1120);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let hir = HirModule::new(
+        ModuleName::parse("scoped_return").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("scoped_return").unwrap(),
+                compiler::module::PackageNamespace::root(),
+                span,
+                false,
+                int,
+                vec![],
+                vec![],
+                vec![HirExpression::int_literal(
+                    HirExpressionId::from_raw(0),
+                    span,
+                    int,
+                    7,
+                )],
+                vec![],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_control_flow(vec![HirControlFlow::Scope {
+                body: vec![HirControlFlow::Return(HirReturn::new(
+                    span,
+                    HirExpressionId::from_raw(0),
+                ))],
+                span,
+            }]),
+        ],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let instructions = mir.functions()[0].blocks()[0].instructions();
+    let enter = instructions
+        .iter()
+        .position(|instruction| matches!(instruction, MirInstruction::ScopeEnter { .. }))
+        .expect("scope entry");
+    let exit = instructions
+        .iter()
+        .position(|instruction| matches!(instruction, MirInstruction::ScopeExit { .. }))
+        .expect("scope exit before return");
+    assert!(enter < exit, "{instructions:?}");
+    // The scope exit observes cancellation (ADR-0122), so block 0 branches. The
+    // path that is not cancelled continues to the return.
+    let blocks = mir.functions()[0].blocks();
+    let MirTerminator::BranchIf { else_target, .. } = blocks[0].terminator() else {
+        panic!(
+            "scope exit should observe cancellation: {:?}",
+            blocks[0].terminator()
+        );
+    };
+    let resume = blocks
+        .iter()
+        .find(|block| block.id() == else_target)
+        .expect("resume block");
+    assert!(matches!(resume.terminator(), MirTerminator::Return { .. }));
+}
+
+#[test]
+fn control_flow_returns_destroy_owned_locals() {
+    // Functions with control flow must run owned-local cleanup on every return
+    // path, not only in the simple straight-line lowering.
+    use compiler::hir::HirControlFlow;
+
+    let file = SourceFileId::from_raw(1130);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let boolean = types.insert(TypeRecord::primitive(PrimitiveType::Bool));
+    let channel = types.channel(int);
+    let hir = HirModule::new(
+        ModuleName::parse("control_flow_cleanup").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("control_flow_cleanup").unwrap(),
+                compiler::module::PackageNamespace::root(),
+                span,
+                false,
+                int,
+                vec![],
+                vec![HirLocal::new(
+                    compiler::hir::HirLocalId::from_raw(0),
+                    span,
+                    channel,
+                    false,
+                )],
+                vec![
+                    HirExpression::bool_literal(HirExpressionId::from_raw(0), span, boolean, true),
+                    HirExpression::int_literal(HirExpressionId::from_raw(1), span, int, 7),
+                ],
+                vec![],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_control_flow(vec![
+                HirControlFlow::If {
+                    condition: HirExpressionId::from_raw(0),
+                    then_body: vec![HirControlFlow::Return(HirReturn::new(
+                        span,
+                        HirExpressionId::from_raw(1),
+                    ))],
+                    else_body: vec![],
+                    span,
+                },
+                HirControlFlow::Return(HirReturn::new(span, HirExpressionId::from_raw(1))),
+            ]),
+        ],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let returning_blocks: Vec<_> = mir.functions()[0]
+        .blocks()
+        .iter()
+        .filter(|block| matches!(block.terminator(), MirTerminator::Return { .. }))
+        .collect();
+    assert_eq!(returning_blocks.len(), 2);
+    for block in returning_blocks {
+        assert!(
+            block
+                .instructions()
+                .iter()
+                .any(|instruction| matches!(instruction, MirInstruction::DestroyChannel { .. })),
+            "return block without cleanup: {:?}",
+            block.instructions()
+        );
+    }
+}
+
+#[test]
+fn owned_locals_are_destroyed_in_reverse_declaration_order() {
+    // ADR-0122: cleanup runs in reverse declaration order.
+    use compiler::hir::HirControlFlow;
+
+    let file = SourceFileId::from_raw(1140);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let channel = types.channel(int);
+    let hir = HirModule::new(
+        ModuleName::parse("cleanup_order").unwrap(),
+        vec![
+            HirFunction::new(
+                HirFunctionId::from_raw(0),
+                ModuleName::parse("cleanup_order").unwrap(),
+                compiler::module::PackageNamespace::root(),
+                span,
+                false,
+                int,
+                vec![],
+                vec![
+                    HirLocal::new(compiler::hir::HirLocalId::from_raw(0), span, channel, false),
+                    HirLocal::new(compiler::hir::HirLocalId::from_raw(1), span, channel, false),
+                ],
+                vec![HirExpression::int_literal(
+                    HirExpressionId::from_raw(0),
+                    span,
+                    int,
+                    7,
+                )],
+                vec![],
+                HirSafetyFacts::executable_subset_checked(),
+                vec![],
+            )
+            .with_control_flow(vec![HirControlFlow::Return(HirReturn::new(
+                span,
+                HirExpressionId::from_raw(0),
+            ))]),
+        ],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let instructions = mir.functions()[0].blocks()[0].instructions();
+    // Each destroy follows a load of the local it destroys; collect those locals in order.
+    let destroyed: Vec<usize> = instructions
+        .windows(2)
+        .filter_map(|pair| match (&pair[0], &pair[1]) {
+            (MirInstruction::LoadLocal { local, .. }, MirInstruction::DestroyChannel { .. }) => {
+                Some(local.index())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(destroyed, vec![1, 0], "{instructions:?}");
+}
+
+#[test]
+fn unwinding_releases_owned_locals_in_reverse_declaration_order() {
+    // ADR-0122: a cancelled suspend frame runs owned-local cleanup in reverse
+    // declaration order, then returns. The suspend call is the observation point.
+    use compiler::hir::{HirControlFlow, HirDirectCall, HirLocalId};
+
+    let file = SourceFileId::from_raw(1141);
+    let span = ByteSpan::new(file, 0, 8).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let channel = types.channel(int);
+    let callee = HirFunction::new(
+        HirFunctionId::from_raw(1),
+        ModuleName::parse("unwind_order").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        vec![],
+        vec![],
+        vec![HirExpression::int_literal(
+            HirExpressionId::from_raw(0),
+            span,
+            int,
+            1,
+        )],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    )
+    .with_suspend(true)
+    .with_control_flow(vec![HirControlFlow::Return(HirReturn::new(
+        span,
+        HirExpressionId::from_raw(0),
+    ))]);
+    let caller = HirFunction::new(
+        HirFunctionId::from_raw(0),
+        ModuleName::parse("unwind_order").unwrap(),
+        compiler::module::PackageNamespace::root(),
+        span,
+        false,
+        int,
+        vec![],
+        vec![
+            HirLocal::new(HirLocalId::from_raw(0), span, channel, false),
+            HirLocal::new(HirLocalId::from_raw(1), span, channel, false),
+        ],
+        vec![
+            HirExpression::direct_call(
+                HirExpressionId::from_raw(0),
+                span,
+                int,
+                HirDirectCall::new(HirFunctionId::from_raw(1), vec![]),
+            ),
+            HirExpression::int_literal(HirExpressionId::from_raw(1), span, int, 7),
+        ],
+        vec![],
+        HirSafetyFacts::executable_subset_checked(),
+        vec![],
+    )
+    .with_suspend(true)
+    .with_control_flow(vec![
+        HirControlFlow::Expression {
+            value: HirExpressionId::from_raw(0),
+            span,
+        },
+        HirControlFlow::Return(HirReturn::new(span, HirExpressionId::from_raw(1))),
+    ]);
+    let hir = HirModule::new(
+        ModuleName::parse("unwind_order").unwrap(),
+        vec![callee, caller],
+    );
+    let mir = lower_hir_to_mir(&hir, &types).unwrap();
+    let blocks = mir.functions()[1].blocks();
+
+    // The call is followed by a cancellation check that branches to the unwind path.
+    let MirTerminator::BranchIf { then_target, .. } = blocks[0].terminator() else {
+        panic!(
+            "suspend call should observe cancellation: {:?}",
+            blocks[0].terminator()
+        );
+    };
+    let unwind = blocks
+        .iter()
+        .find(|block| block.id() == then_target)
+        .expect("unwind block");
+    let instructions = unwind.instructions();
+    let destroyed: Vec<usize> = instructions
+        .windows(2)
+        .filter_map(|pair| match (&pair[0], &pair[1]) {
+            (MirInstruction::LoadLocal { local, .. }, MirInstruction::DestroyChannel { .. }) => {
+                Some(local.index())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(destroyed, vec![1, 0], "{instructions:?}");
+    assert!(
+        instructions
+            .iter()
+            .any(|instruction| matches!(instruction, MirInstruction::DefaultValue { .. })),
+        "{instructions:?}"
+    );
+    assert!(matches!(unwind.terminator(), MirTerminator::Return { .. }));
+}

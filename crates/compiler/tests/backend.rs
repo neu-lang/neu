@@ -1046,3 +1046,65 @@ fn lowers_checked_exponentiation() {
     assert!(ir.contains("trapnz"), "{ir}");
     assert!(ir.contains("trap user2"), "{ir}");
 }
+
+#[test]
+fn direct_call_with_a_missing_argument_value_is_rejected() {
+    // Issue #47: a call argument with no lowered value must be an error, not a
+    // silently shorter argument list.
+    let file = SourceFileId::from_raw(420);
+    let span = ByteSpan::new(file, 0, 10).unwrap();
+    let mut types = TypeArena::new();
+    let int = types.insert(TypeRecord::primitive(PrimitiveType::Int));
+    let module_name = compiler::module::ModuleName::parse("missing_argument").unwrap();
+    let package = compiler::module::PackageNamespace::root();
+    let callee = MirFunction::new(
+        MirFunctionId::from_raw(1),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::int_constant(
+                MirValueId::from_raw(0),
+                3,
+                span,
+            )],
+            MirTerminator::return_value(MirValueId::from_raw(0), span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(compiler::module::FunctionSymbolIdentity::new(
+        module_name.clone(),
+        package.clone(),
+        "callee",
+    ));
+    let caller = MirFunction::new(
+        MirFunctionId::from_raw(0),
+        span,
+        vec![],
+        int,
+        vec![],
+        vec![MirBasicBlock::new(
+            MirBlockId::from_raw(0),
+            vec![MirInstruction::DirectCall {
+                output: MirValueId::from_raw(1),
+                callee: MirFunctionId::from_raw(1),
+                arguments: vec![MirValueId::from_raw(7)],
+                span,
+            }],
+            MirTerminator::return_value(MirValueId::from_raw(1), span),
+        )],
+        MirCleanupBoundary::empty(),
+    )
+    .with_symbol_identity(compiler::module::FunctionSymbolIdentity::new(
+        module_name.clone(),
+        package,
+        "caller",
+    ));
+    let module = compiler::mir::MirModule::new(module_name, vec![caller, callee]);
+    assert_eq!(
+        lower_mir_module_to_cranelift(&module, &types),
+        Err(CraneliftLoweringError::MissingValue)
+    );
+}

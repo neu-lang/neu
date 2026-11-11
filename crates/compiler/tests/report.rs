@@ -111,7 +111,7 @@ fn parse_errors_report_file_line_column_and_kind() {
         )],
     );
 
-    let rendered = project.rendered();
+    let rendered = project.rendered().replace('\\', "/");
 
     assert!(rendered.contains("error["), "{rendered}");
     assert!(rendered.contains("src/main.neu:2:"), "{rendered}");
@@ -130,7 +130,7 @@ fn use_after_move_points_at_use_and_move_origin() {
         )],
     );
 
-    let rendered = project.rendered();
+    let rendered = project.rendered().replace('\\', "/");
 
     assert!(rendered.contains("error[use_after_move]"), "{rendered}");
     assert!(rendered.contains("src/main.neu:7:17"), "{rendered}");
@@ -148,7 +148,7 @@ fn return_type_mismatch_reports_location() {
         )],
     );
 
-    let rendered = project.rendered();
+    let rendered = project.rendered().replace('\\', "/");
 
     assert!(
         rendered.contains("error[return_type_mismatch]"),
@@ -173,7 +173,7 @@ fn errors_in_imported_files_report_the_imported_path() {
         ],
     );
 
-    let rendered = project.rendered();
+    let rendered = project.rendered().replace('\\', "/");
 
     assert!(rendered.contains("src/math/add.neu:4:12"), "{rendered}");
     assert!(rendered.contains("return \"seven\""), "{rendered}");
@@ -189,7 +189,7 @@ fn identical_diagnostics_are_reported_once() {
         )],
     );
 
-    let rendered = project.rendered();
+    let rendered = project.rendered().replace('\\', "/");
     let headers = rendered
         .lines()
         .filter(|line| line.starts_with("error["))

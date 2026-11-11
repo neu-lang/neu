@@ -12,8 +12,24 @@ fn linker_environment_lock() -> std::sync::MutexGuard<'static, ()> {
     LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
 }
 
+/// Compiles a C fixture with the link driver's own target, so the object and the
+/// libraries it links against agree on a machine type. A plain `cc` on Windows
+/// arm64 produces x64 objects, which conflict with the arm64 MSVC libraries.
+fn compile_fixture(source: &Path, object: &Path) {
+    let (driver, driver_arguments) = compiler::linker::default_linker();
+    let status = Command::new(driver)
+        .args(driver_arguments)
+        .arg("-c")
+        .arg(source)
+        .arg("-o")
+        .arg(object)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
 #[test]
-fn host_link_plan_uses_cc_and_preserves_object_order() {
+fn host_link_plan_uses_the_default_driver_and_preserves_object_order() {
     let _environment_lock = linker_environment_lock();
     let root = std::env::temp_dir().join(format!("neu-system-link-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
@@ -22,15 +38,27 @@ fn host_link_plan_uses_cc_and_preserves_object_order() {
     let output = root.join("program");
     fs::write(&object, b"object").unwrap();
 
+    let (driver, driver_arguments) = compiler::linker::default_linker();
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
-    assert_eq!(plan.program(), Path::new("cc"));
-    assert_eq!(plan.arguments()[0], "-o");
-    assert_eq!(plan.arguments()[1], output.as_os_str());
-    assert_eq!(plan.arguments()[2], object.as_os_str());
+    let base = driver_arguments.len();
+    assert_eq!(plan.program(), Path::new(driver));
+    let planned_driver_arguments: Vec<&str> = plan.arguments()[..base]
+        .iter()
+        .map(|argument| argument.to_str().unwrap())
+        .collect();
+    assert_eq!(planned_driver_arguments, driver_arguments);
+    assert_eq!(plan.arguments()[base], "-o");
+    assert_eq!(
+        plan.arguments()[base + 1],
+        compiler::linker::executable_path(&output).as_os_str()
+    );
+    assert_eq!(plan.arguments()[base + 2], object.as_os_str());
     assert_eq!(plan.entry_symbol(), "main");
     let _ = fs::remove_dir_all(root);
 }
 
+// Overrides the linker with /bin/echo, which exists only on Unix.
+#[cfg(unix)]
 #[test]
 fn neu_linker_overrides_cc() {
     let _environment_lock = linker_environment_lock();
@@ -73,18 +101,7 @@ fn host_linker_can_execute_a_compiled_program() {
     let object = root.join("main.o");
     let output = root.join("program");
     fs::write(&source, b"int main(void) { return 7; }\n").unwrap();
-    assert!(
-        Command::new("cc")
-            .args([
-                "-c",
-                source.to_str().unwrap(),
-                "-o",
-                object.to_str().unwrap()
-            ])
-            .status()
-            .unwrap()
-            .success()
-    );
+    compile_fixture(&source, &object);
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
     plan.execute().unwrap();
     assert_eq!(
@@ -108,18 +125,7 @@ fn host_link_rejects_missing_private_runtime_symbols_before_invoking_linker() {
         b"extern void neu_runtime_missing(void); int main(void) { neu_runtime_missing(); return 0; }\n",
     )
     .unwrap();
-    assert!(
-        Command::new("cc")
-            .args([
-                "-c",
-                source.to_str().unwrap(),
-                "-o",
-                object.to_str().unwrap()
-            ])
-            .status()
-            .unwrap()
-            .success()
-    );
+    compile_fixture(&source, &object);
     let plan = SystemLinkInvocation::new(&object, &output).unwrap();
     assert_eq!(
         plan.execute(),

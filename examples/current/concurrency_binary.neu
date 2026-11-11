@@ -1,4 +1,4 @@
-public func main(): Int {
+public suspend func main(): Int {
     val queue = channel<Int>(1);
     send(queue, 21);
     val result = receive(queue);

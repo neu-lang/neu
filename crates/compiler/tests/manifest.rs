@@ -3,6 +3,14 @@ use compiler::{
     module::{VirtualPackageGraph, VirtualSource},
 };
 
+/// A path as `/`-separated components, so expectations hold on every platform.
+fn slash(path: &std::path::Path) -> String {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 #[test]
 fn parses_and_expands_a_manifest_source_set() {
     let manifest = ProjectManifest::parse(
@@ -17,10 +25,7 @@ fn parses_and_expands_a_manifest_source_set() {
     .unwrap();
 
     assert_eq!(manifest.name(), "example.app");
-    assert_eq!(
-        manifest.entrypoint().unwrap().to_string_lossy(),
-        "src/main.neu"
-    );
+    assert_eq!(slash(manifest.entrypoint().unwrap()), "src/main.neu");
 }
 
 #[test]
@@ -69,11 +74,7 @@ fn expands_sorted_deduplicated_neu_globs_and_requires_entrypoint() {
     assert_eq!(
         files
             .iter()
-            .map(|path| path
-                .strip_prefix(&root)
-                .unwrap()
-                .to_string_lossy()
-                .into_owned())
+            .map(|path| slash(path.strip_prefix(&root).unwrap()))
             .collect::<Vec<_>>(),
         vec!["src/main.neu", "src/nested/a.neu", "src/z.neu"]
     );
@@ -96,7 +97,7 @@ fn expands_library_sources_from_project_root_without_an_entrypoint() {
     assert_eq!(
         sources
             .iter()
-            .map(|source| source.path().to_string_lossy().into_owned())
+            .map(|source| slash(source.path()))
             .collect::<Vec<_>>(),
         vec!["core/nested/result.neu", "core/option.neu"]
     );
@@ -112,7 +113,7 @@ fn stdlib_manifest_includes_sibling_collections_sources() {
     assert!(
         sources
             .iter()
-            .any(|source| { source.path().to_string_lossy() == "collections/vector.neu" })
+            .any(|source| slash(source.path()) == "collections/vector.neu")
     );
 }
 

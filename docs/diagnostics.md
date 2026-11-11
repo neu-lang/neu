@@ -64,3 +64,11 @@ Diagnostic snapshots must be stable enough for review. A snapshot should record:
 - source-of-truth citation
 
 Snapshots must not be used to encode guessed language behavior. If a compiler rule is not specified, the expected diagnostic is blocked until the specification or ADRs resolve it.
+
+## Concurrency Diagnostics
+
+- `channel_op_outside_suspend` (ADR-0122): a channel `send` or `receive` outside
+  a `suspend` function. Reported at the call expression.
+- Runtime deadlock (ADR-0101, ADR-0122): when no task can run, the program writes
+  `neu: deadlock: no task can run` to stderr and traps. This is a runtime message,
+  not a compile-time diagnostic.

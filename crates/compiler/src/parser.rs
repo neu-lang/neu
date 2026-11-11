@@ -1483,7 +1483,14 @@ impl<'source> Parser<'source> {
     fn parse_class_body(&mut self, owner: AstNodeId) -> Vec<AstNodeId> {
         let mut fields = Vec::new();
         self.advance();
+        // Guards against a body that makes no progress (see the no-progress check below).
+        let mut last_index = usize::MAX;
         while !self.is_eof() && self.current_kind() != Some(TokenKind::RightBrace) {
+            if self.index == last_index {
+                self.advance();
+                continue;
+            }
+            last_index = self.index;
             let method_with_visibility = self.is_visibility()
                 && (matches!(
                     self.peek_kind(),
@@ -1495,7 +1502,7 @@ impl<'source> Parser<'source> {
                             | TokenKind::KwFinal
                     )
                 ) || (self.peek_kind() == Some(TokenKind::Identifier)
-                    && matches!(self.peek_text(), Some("static" | "abstract"))));
+                    && matches!(self.peek_text(), Some("static" | "abstract" | "suspend"))));
             if self.current_kind() == Some(TokenKind::KwFunc)
                 || self.current_kind() == Some(TokenKind::KwFun)
                 || self.current_kind() == Some(TokenKind::KwOverride)
@@ -1505,6 +1512,7 @@ impl<'source> Parser<'source> {
                     && self.current_text() == Some("static"))
                 || (self.current_kind() == Some(TokenKind::Identifier)
                     && self.current_text() == Some("abstract"))
+                || self.is_suspend_modifier()
                 || method_with_visibility
             {
                 self.pending_method_visibility = "public".to_owned();
@@ -1520,6 +1528,7 @@ impl<'source> Parser<'source> {
                     )
                     || (self.current_kind() == Some(TokenKind::Identifier)
                         && matches!(self.current_text(), Some("static" | "abstract")))
+                    || self.is_suspend_modifier()
                 {
                     if self.is_visibility() {
                         if self.current_text() == Some("internal") {
@@ -1550,6 +1559,11 @@ impl<'source> Parser<'source> {
                                 if self.current_text() == Some("abstract") =>
                             {
                                 self.pending_method_abstract = true;
+                            }
+                            Some(TokenKind::Identifier)
+                                if self.current_text() == Some("suspend") =>
+                            {
+                                self.pending_method_suspend = true;
                             }
                             _ => {}
                         }
@@ -4256,6 +4270,24 @@ impl<'source> Parser<'source> {
             )
         ) || self.is_visibility()
             || self.is_unsupported_modifier()
+    }
+
+    /// `suspend` as a member modifier: an identifier `suspend` directly followed by
+    /// a method keyword or another modifier. Without this, a `suspend` member has no
+    /// modifier to consume and class-body parsing cannot advance past it.
+    fn is_suspend_modifier(&self) -> bool {
+        self.current_kind() == Some(TokenKind::Identifier)
+            && self.current_text() == Some("suspend")
+            && matches!(
+                self.peek_kind(),
+                Some(
+                    TokenKind::KwFunc
+                        | TokenKind::KwFun
+                        | TokenKind::KwOverride
+                        | TokenKind::KwOpen
+                        | TokenKind::KwFinal
+                )
+            )
     }
 
     fn is_visibility(&self) -> bool {
