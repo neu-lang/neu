@@ -1,0 +1,43 @@
+// Recoverable operation errors for the pure-Neu standard library (ADR-0135).
+//
+// `Error` is an interface with one required method. Concrete errors are classes
+// that implement it. Callers branch on `kind()` with an exhaustive `when`, not on
+// the concrete class.
+//
+// The `Send & Share` declaration on `Error` required by ADR-0136 is not written
+// yet: the bootstrap parser does not accept `&` in interface headers. It is added
+// together with that parser support.
+
+enum ErrorKind {
+    IndexOutOfBounds,
+    AllocationFailed,
+}
+
+interface Error {
+    func kind(): ErrorKind;
+}
+
+// Zero-field classes, so the runtime can represent them without allocation
+// (ADR-0137).
+class IndexOutOfBoundsError: Error {
+    func kind(): ErrorKind {
+        return ErrorKind.IndexOutOfBounds;
+    }
+}
+
+class AllocationFailedError: Error {
+    func kind(): ErrorKind {
+        return ErrorKind.AllocationFailed;
+    }
+}
+
+public test func index_out_of_bounds_error_reports_its_kind() {
+    val error: Error = new IndexOutOfBoundsError();
+    assert(
+        when (error.kind()) {
+            ErrorKind.IndexOutOfBounds -> true
+            ErrorKind.AllocationFailed -> false
+        },
+        "an index error reports IndexOutOfBounds"
+    );
+}

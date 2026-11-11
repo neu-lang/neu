@@ -11,6 +11,9 @@ ADR-0107 and ADR-0109:
 - `Result<T, E>`: `Ok(T)` and `Err(E)`;
 - `Ordering`: `Less`, `Equal`, and `Greater`.
 - explicit `Int` utilities: `min`, `max`, `clamp`, `abs`, and `sign`.
+- `Error` (interface), `ErrorKind` (closed enum), and the zero-field error classes
+  `IndexOutOfBoundsError` and `AllocationFailedError` (ADR-0135, ADR-0137). The
+  `Send & Share` declaration on `Error` (ADR-0136) waits for parser support.
 
 Operations are added only when their ownership, generic, error, and runtime
 contracts are accepted in `docs/SPEC.md` and the corresponding ADRs.

@@ -192,3 +192,31 @@ func main(): Int {
     );
     assert_semantic_rejection("error.move.only", &source);
 }
+
+/// The real `stdlib/core/error.neu`, without its test functions.
+fn stdlib_error_source() -> &'static str {
+    let source = include_str!("../../../stdlib/core/error.neu");
+    source
+        .split("public test func")
+        .next()
+        .expect("error declarations precede their test functions")
+}
+
+#[test]
+fn stdlib_error_declarations_compile_and_report_their_kind() {
+    // ADR-0135 and ADR-0137: the stdlib declarations compile and dispatch `kind()`.
+    let source = format!(
+        "{}\n{}",
+        stdlib_error_source(),
+        r#"
+func main(): Int {
+    val error: Error = new AllocationFailedError();
+    return when (error.kind()) {
+        ErrorKind.AllocationFailed -> 5
+        ErrorKind.IndexOutOfBounds -> 6
+    };
+}
+"#
+    );
+    assert_eq!(compile_and_run("stdlib.error.kinds", &source), Ok(Some(5)));
+}
