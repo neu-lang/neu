@@ -1,6 +1,6 @@
 # ADR-0112: Explicit Numeric Utility Contracts
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 

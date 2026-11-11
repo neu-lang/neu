@@ -1,6 +1,6 @@
 # ADR-0107: Foundational Standard-Library Contracts
 
-Status: Proposed
+Status: Accepted
 
 ## Question
 
