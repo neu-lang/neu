@@ -248,10 +248,14 @@ in the lambda body, `for` loop variables in the loop body, and pattern bindings
 in their match arm. A name used as the receiver of a member access, such as
 `Color.Red`, names a type when no local of that name is visible.
 
-Limits, recorded here so they are not mistaken for the rule: inherited fields,
-class constructor parameters, and generic parameters are not modeled by scope.
-A reference whose name is declared as one of them anywhere in the file is not
-reported. Built-in and primitive type names are never bound, as listed above.
+Member and generic names resolve by region rather than by lexical scope. A
+generic parameter is visible in its declaration, from its header through its
+body. A field is visible in its class and in every class that inherits from it.
+A promoted constructor parameter (`val` or `var`) is a field. A plain
+constructor parameter is visible in its class only. The region of a class runs
+from its header through its closing brace, and the region of a function runs
+from its header through its body. Built-in and primitive type names are never
+bound, as listed above.
 
 ## ADR-0027: Type Checking Core
 

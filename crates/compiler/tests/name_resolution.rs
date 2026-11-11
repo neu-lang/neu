@@ -11,8 +11,8 @@ use compiler::name_resolution::{
     bind_unqualified_function_references, bind_unqualified_type_references,
     build_all_local_bindings, build_declaration_index, build_enum_variant_index,
     build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
-    build_scoped_binding_index, build_scoped_local_binding_index, resolve_enum_parameter_types,
-    resolve_qualified_variant_arms,
+    build_scoped_binding_index, build_scoped_local_binding_index, declared_regions,
+    resolve_enum_parameter_types, resolve_qualified_variant_arms,
 };
 use compiler::parser::parse_source;
 use compiler::source::{ByteSpan, SourceFileId};
@@ -2165,6 +2165,7 @@ fn accepted_name_reference_binding_combines_expression_and_type_bindings() {
         &run.name_references,
         &run.type_name_references,
         &[],
+        &[],
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2208,6 +2209,7 @@ fn accepted_name_reference_binding_does_not_duplicate_package_qualified_type_dia
         &parsed.arena,
         &parsed.name_references,
         &parsed.type_name_references,
+        &[],
         &[],
         &scopes,
         locals.index(),
@@ -2253,6 +2255,7 @@ fn accepted_name_reference_binding_collects_expression_and_type_unresolved_diagn
         &parsed.name_references,
         &parsed.type_name_references,
         &[],
+        &[],
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2292,6 +2295,7 @@ fn bind_single_file(source: &str) -> compiler::name_resolution::AcceptedNameRefe
             .iter()
             .map(|member| member.receiver)
             .collect::<Vec<_>>(),
+        &declared_regions(&parsed, &parsed.arena),
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2375,4 +2379,34 @@ fn all_single_file_examples_bind_without_unresolved_names() {
         }
     }
     assert!(failures.is_empty(), "{failures:#?}");
+}
+
+#[test]
+fn generic_parameter_is_visible_in_its_declaration() {
+    let bound = bind_single_file("func id<T>(value: T): T {\n    return value;\n}\n");
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn generic_parameter_is_not_visible_outside_its_declaration() {
+    let bound = bind_single_file(
+        "func id<T>(value: T): T {\n    return value;\n}\nfunc other(): Int {\n    val x: T = 1;\n    return 0;\n}\n",
+    );
+    assert_eq!(bound.diagnostics().len(), 1, "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn inherited_field_is_visible_in_subclass_method() {
+    let bound = bind_single_file(
+        "class Base(val value: Int) {}\nclass Child: Base(23) {\n    func read(): Int {\n        return value;\n    }\n}\n",
+    );
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn field_is_not_visible_outside_its_class() {
+    let bound = bind_single_file(
+        "class Box(val value: Int) {}\nfunc read(): Int {\n    return value;\n}\n",
+    );
+    assert_eq!(bound.diagnostics().len(), 1, "{:?}", bound.diagnostics());
 }

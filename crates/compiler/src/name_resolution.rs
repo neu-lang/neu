@@ -1258,6 +1258,117 @@ pub const PRIMITIVE_TYPE_NAMES: &[&str] = &[
     "Array", "Bool", "Byte", "Channel", "Float", "Int", "Null", "String", "Task",
 ];
 
+/// A region of source in which a member or generic name is visible: a generic
+/// parameter inside its declaration, a field inside its class and the classes
+/// that inherit it, or a constructor parameter inside its class (issue 85).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeclaredRegion {
+    pub name: String,
+    pub span: ByteSpan,
+}
+
+/// Returns the regions in which generic parameters, fields, and constructor
+/// parameters of one source file are visible.
+pub fn declared_regions(parsed: &ParseOutput, arena: &AstArena) -> Vec<DeclaredRegion> {
+    let class_named = |name: &str| {
+        parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == name)
+    };
+    // Whether `class` inherits from `target` through its superclass names.
+    let inherits = |class: &crate::parser::ParsedClassDeclaration, target: AstNodeId| {
+        let mut current = class.superclass.as_deref();
+        for _ in 0..64 {
+            let Some(name) = current else {
+                return false;
+            };
+            let Some(parent) = class_named(name) else {
+                return false;
+            };
+            if parent.declaration == target {
+                return true;
+            }
+            current = parent.superclass.as_deref();
+        }
+        false
+    };
+    // A class declaration node covers only its header, so a class's extent is
+    // the span the parser recorded for the whole declaration.
+    // A function declaration node likewise covers only its header, so its
+    // extent runs through its body block.
+    let span_of = |node: AstNodeId| {
+        if let Some(class) = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.declaration == node)
+        {
+            return Some(class.span);
+        }
+        if let Some(function) = parsed
+            .function_declarations
+            .iter()
+            .find(|function| function.declaration == node)
+            && let Some(body) = function.body
+        {
+            let header = arena.node(node)?.span;
+            let body = arena.node(body)?.span;
+            return ByteSpan::new(header.file(), header.start(), body.end());
+        }
+        arena.node(node).map(|node| node.span)
+    };
+
+    let mut regions = Vec::new();
+    for parameter in &parsed.generic_parameters {
+        if let Some(span) = parameter.owner.and_then(span_of) {
+            regions.push(DeclaredRegion {
+                name: parameter.name.clone(),
+                span,
+            });
+        }
+    }
+    for field in &parsed.field_declarations {
+        for class in &parsed.class_declarations {
+            if (class.declaration == field.owner || inherits(class, field.owner))
+                && let Some(span) = span_of(class.declaration)
+            {
+                regions.push(DeclaredRegion {
+                    name: field.name.clone(),
+                    span,
+                });
+            }
+        }
+    }
+    for class in &parsed.class_declarations {
+        for parameter in &class.constructor_parameters {
+            // A promoted parameter (`val` or `var`) is a field, so subclasses
+            // inherit it. A plain parameter is visible in its class only.
+            for owner in &parsed.class_declarations {
+                let inherited = parameter.field && inherits(owner, class.declaration);
+                if owner.declaration != class.declaration && !inherited {
+                    continue;
+                }
+                if let Some(span) = span_of(owner.declaration) {
+                    regions.push(DeclaredRegion {
+                        name: parameter.name.clone(),
+                        span,
+                    });
+                }
+            }
+        }
+    }
+    regions
+}
+
+fn in_declared_region(regions: &[DeclaredRegion], name: &str, reference: ByteSpan) -> bool {
+    regions.iter().any(|region| {
+        region.name == name
+            && region.span.file() == reference.file()
+            && region.span.start() <= reference.start()
+            && reference.end() <= region.span.end()
+    })
+}
+
 /// Runs scope-aware name resolution over one parsed source file and returns
 /// the references that no lexical scope or package declaration provides
 /// (issue 85). The executable path runs this after the unknown-name check, so
@@ -1275,58 +1386,21 @@ pub fn unresolved_names(
         .iter()
         .map(|member| member.receiver)
         .collect();
+    let regions = declared_regions(parsed, &parsed.arena);
     bind_accepted_name_references(
         metadata,
         &parsed.arena,
         &parsed.name_references,
         &parsed.type_name_references,
         &receivers,
+        &regions,
         &scopes,
         locals.index(),
         declarations.index(),
         &mut interner,
     )
     .diagnostics()
-    .iter()
-    .filter(|diagnostic| {
-        // Inherited fields, constructor parameters, and generic parameters
-        // are not modeled by scope yet, so a name declared as one of them
-        // anywhere in the file is not reported.
-        let Some(name) = parsed
-            .name_references
-            .iter()
-            .find(|reference| reference.name_span == diagnostic.primary_span())
-            .map(|reference| reference.name.as_str())
-            .or_else(|| {
-                parsed
-                    .type_name_references
-                    .iter()
-                    .find(|reference| reference.name_span == diagnostic.primary_span())
-                    .map(|reference| reference.name.as_str())
-            })
-        else {
-            return true;
-        };
-        !declared_as_member_or_generic(parsed, name)
-    })
-    .copied()
-    .collect()
-}
-
-fn declared_as_member_or_generic(parsed: &ParseOutput, name: &str) -> bool {
-    parsed
-        .field_declarations
-        .iter()
-        .any(|field| field.name == name)
-        || parsed
-            .class_declarations
-            .iter()
-            .flat_map(|class| class.constructor_parameters.iter())
-            .any(|parameter| parameter.name == name)
-        || parsed
-            .generic_parameters
-            .iter()
-            .any(|parameter| parameter.name == name)
+    .to_vec()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1336,6 +1410,7 @@ pub fn bind_accepted_name_references(
     name_references: &[ParsedNameReference],
     type_name_references: &[ParsedTypeNameReference],
     member_receivers: &[AstNodeId],
+    declared_regions: &[DeclaredRegion],
     scopes: &LocalScopeTree,
     local_bindings: &LocalBindingIndex,
     declarations: &DeclarationIndex,
@@ -1382,9 +1457,25 @@ pub fn bind_accepted_name_references(
         }
     }
     let name_references = remaining;
+
+    // Generic parameters, fields, and constructor parameters resolve by
+    // region, not by scope (issue 85).
+    let mut name_references_left = Vec::new();
+    for reference in name_references {
+        if in_declared_region(declared_regions, &reference.name, reference.name_span) {
+            let symbol = interner.intern(&reference.name);
+            inserts.push(table.insert(ResolvedName::new(reference.reference, symbol)));
+        } else {
+            name_references_left.push(reference);
+        }
+    }
+    let name_references = name_references_left;
     let type_name_references: Vec<_> = type_name_references
         .iter()
         .filter(|reference| !PRIMITIVE_TYPE_NAMES.contains(&reference.name.as_str()))
+        .filter(|reference| {
+            !in_declared_region(declared_regions, &reference.name, reference.name_span)
+        })
         .cloned()
         .collect();
     let type_name_references = type_name_references.as_slice();

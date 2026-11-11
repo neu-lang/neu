@@ -119,6 +119,8 @@ pub struct ParsedImport {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedClassDeclaration {
     pub declaration: AstNodeId,
+    /// The whole declaration, from its header through its closing brace.
+    pub span: ByteSpan,
     pub name: String,
     pub visibility: String,
     pub is_final: bool,
@@ -1451,8 +1453,13 @@ impl<'source> Parser<'source> {
             let previous_class = self.current_class.replace(declaration);
             self.parse_enum_body(declaration);
             self.current_class = previous_class;
+            let span = self.span(
+                start,
+                self.previous_span().map_or(body_start, |span| span.end()),
+            );
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
+                span,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 visibility: self.pending_method_visibility.clone(),
                 is_final: true,
@@ -1468,8 +1475,13 @@ impl<'source> Parser<'source> {
             let previous_class = self.current_class.replace(declaration);
             let fields = self.parse_class_body(declaration);
             self.current_class = previous_class;
+            let span = self.span(
+                start,
+                self.previous_span().map_or(body_start, |span| span.end()),
+            );
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
+                span,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 visibility: self.pending_method_visibility.clone(),
                 is_final,
@@ -1488,8 +1500,13 @@ impl<'source> Parser<'source> {
             self.parse_declaration_body();
             self.current_class = previous_class;
             self.current_class_is_interface = previous_interface;
+            let span = self.span(
+                start,
+                self.previous_span().map_or(body_start, |span| span.end()),
+            );
             self.class_declarations.push(ParsedClassDeclaration {
                 declaration,
+                span,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 visibility: self.pending_method_visibility.clone(),
                 is_final: false,
