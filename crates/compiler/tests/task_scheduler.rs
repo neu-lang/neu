@@ -548,3 +548,46 @@ fn local_inferred_from_a_suspend_call_result_is_returned() {
     "#;
     assert_eq!(compile_and_run(source, "infer_suspend_return"), 7);
 }
+
+#[test]
+fn local_inferred_from_a_call_result_can_be_a_call_argument() {
+    let source = r#"
+        func produce(): Int { return 4; }
+        func double(x: Int): Int { return x * 2; }
+        func main(): Int {
+            val v = produce();
+            return double(v);
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_call_argument"), 8);
+}
+
+#[test]
+fn local_inferred_from_a_suspend_call_result_can_be_a_call_argument() {
+    let source = r#"
+        suspend func produce(): Int { return 4; }
+        func double(x: Int): Int { return x * 2; }
+        suspend func main(): Int {
+            val v = produce();
+            return double(v);
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_suspend_call_argument"), 8);
+}
+
+#[test]
+fn chained_call_results_through_locals_are_typed_in_order() {
+    // Each call's argument is the previous call's result, so the types arrive one
+    // step at a time across the typing rounds.
+    let source = r#"
+        func produce(): Int { return 3; }
+        func double(x: Int): Int { return x * 2; }
+        func main(): Int {
+            val a = produce();
+            val b = double(a);
+            val c = double(b);
+            return c;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_call_chain"), 12);
+}

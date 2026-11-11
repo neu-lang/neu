@@ -664,20 +664,38 @@ fn compile_source_with_entry(
         !function_typed_calls.contains(&diagnostic.node())
             || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
     });
-    let calls = check_direct_calls(&[ExecutableSourceTypes::new(
-        options.package(),
-        &parsed,
-        &signatures,
-        report.expression_types(),
-    )
-    .with_class_types(&class_types)
-    .with_type_arena(&types)]);
+    // A call's argument can be a local whose type comes from another call's
+    // result. Direct calls are therefore checked again after each round that
+    // types more of them, until a round resolves no new call. Only the last
+    // round's diagnostics are reported, because an early round can see an
+    // argument that is not typed yet.
+    let mut resolved_calls: Option<crate::type_check::DirectCallReport> = None;
+    for _ in 0..parsed.call_expressions.len() + 2 {
+        let calls = check_direct_calls(&[ExecutableSourceTypes::new(
+            options.package(),
+            &parsed,
+            &signatures,
+            report.expression_types(),
+        )
+        .with_class_types(&class_types)
+        .with_type_arena(&types)]);
+        apply_direct_call_results(&mut report, &parsed, &calls);
+        type_operators_in_round(&parsed, &types, &mut report);
+        infer_local_types(&parsed, &mut report);
+        let stable = resolved_calls.as_ref().is_some_and(|previous| {
+            previous.source_expression_types().len() == calls.source_expression_types().len()
+        });
+        resolved_calls = Some(calls);
+        if stable {
+            break;
+        }
+    }
+    let calls = resolved_calls.expect("at least one direct-call round runs");
     if !calls.diagnostics().is_empty() {
         return Err(DriverError::DirectCallDiagnostics(
             calls.diagnostics().to_vec(),
         ));
     }
-    apply_direct_call_results(&mut report, &parsed, &calls);
     // Calls to suspend functions get their result types here, and a spawn body can
     // depend on them, so the same typing rounds run again.
     for _ in 0..3 {
