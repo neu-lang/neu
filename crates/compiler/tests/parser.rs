@@ -1778,3 +1778,32 @@ fn named_imports_accept_a_trailing_comma() {
     assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
     assert_eq!(output.imports[0].names, vec!["add", "sub"]);
 }
+
+#[test]
+fn lambda_statement_bodies_report_once_at_the_statement() {
+    let statement_keyword = parse_source(
+        SourceFileId::from_raw(10050),
+        "func main() { val f = { -> val y = 3; y + 4 }; }",
+    );
+    let kinds: Vec<_> = statement_keyword
+        .diagnostics
+        .iter()
+        .map(|d| d.kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![DiagnosticKind::LambdaBodyNotSingleExpression],
+        "{kinds:?}"
+    );
+
+    let semicolon = parse_source(
+        SourceFileId::from_raw(10051),
+        "func main() { val f = { -> foo(); bar() }; }",
+    );
+    let kinds: Vec<_> = semicolon.diagnostics.iter().map(|d| d.kind).collect();
+    assert_eq!(
+        kinds,
+        vec![DiagnosticKind::LambdaBodyNotSingleExpression],
+        "{kinds:?}"
+    );
+}

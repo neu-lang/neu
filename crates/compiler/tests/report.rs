@@ -370,3 +370,23 @@ fn qualified_access_without_a_qualified_import_points_at_the_package_name() {
         "{rendered}"
     );
 }
+
+#[test]
+fn lambda_statement_body_is_rejected_with_a_clear_message() {
+    let project = Project::new(
+        "lambda_statement_body",
+        &[(
+            "src/main.neu",
+            "public func main(): Int {\n    val f: () -> Int = { -> val y = 3; y + 4 };\n    return f();\n}\n",
+        )],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(
+        rendered.contains("error[lambda_body_not_single_expression]"),
+        "{rendered}"
+    );
+    assert!(rendered.contains("src/main.neu:2:"), "{rendered}");
+    assert!(!rendered.contains("missing_expression"), "{rendered}");
+}

@@ -48,6 +48,7 @@ pub enum DiagnosticKind {
     MalformedIndexExpression,
     MalformedImportPath,
     NamedImportAlias,
+    LambdaBodyNotSingleExpression,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2876,12 +2877,43 @@ impl<'source> Parser<'source> {
             }
         }
         self.advance();
+        // Lambda bodies are a single expression (SPEC, Lambda Bodies). A
+        // statement here is reported at its first token, once.
+        if self.current().is_some_and(|token| {
+            matches!(
+                token.kind,
+                TokenKind::KwVal
+                    | TokenKind::KwVar
+                    | TokenKind::KwReturn
+                    | TokenKind::KwFor
+                    | TokenKind::KwWhile
+            )
+        }) {
+            let span = self
+                .current()
+                .map(|token| token.span)
+                .unwrap_or(self.span_at(start));
+            self.diagnostic(DiagnosticKind::LambdaBodyNotSingleExpression, span);
+            self.skip_past_lambda_body();
+            return None;
+        }
         let Some(body_span) = self.parse_expression() else {
             // The body already reported its root cause. Skip the rest of the
             // lambda so the enclosing statement does not re-read it.
             self.skip_past_lambda_body();
             return None;
         };
+        if self.current_kind() == Some(TokenKind::Semicolon)
+            && self.peek_kind() != Some(TokenKind::RightBrace)
+        {
+            let span = self
+                .current()
+                .map(|token| token.span)
+                .unwrap_or(self.span_at(start));
+            self.diagnostic(DiagnosticKind::LambdaBodyNotSingleExpression, span);
+            self.skip_past_lambda_body();
+            return None;
+        }
         let body = self.latest_expression_node_for_span(body_span)?;
         if self.current_kind() != Some(TokenKind::RightBrace) {
             self.diagnostic_current_or_span(DiagnosticKind::MalformedBlock, self.span_at(start));
