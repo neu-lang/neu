@@ -243,7 +243,7 @@ fn reports_for(error: &DriverError, context: &ManifestContext) -> Vec<Report> {
             .collect(),
         DriverError::ParseDiagnostics(diagnostics) => diagnostics
             .iter()
-            .map(|diagnostic| Report::kind(diagnostic.kind, span(diagnostic.span)))
+            .map(|diagnostic| parse_report(diagnostic.kind, span(diagnostic.span)))
             .collect(),
         DriverError::OutOfScopeNames(names) => names
             .iter()
@@ -326,6 +326,10 @@ fn reports_for(error: &DriverError, context: &ManifestContext) -> Vec<Report> {
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind(), span(diagnostic.span())))
             .collect(),
+        DriverError::DispatchDiagnostics(diagnostics) => diagnostics
+            .iter()
+            .map(|diagnostic| Report::kind(diagnostic.kind(), span(diagnostic.span())))
+            .collect(),
         DriverError::DirectCallDiagnostics(diagnostics) => diagnostics
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind(), span(diagnostic.span())))
@@ -400,7 +404,7 @@ fn package_graph_reports(
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind, Some(Location::Span(diagnostic.span))))
             .chain(parsed.diagnostics.iter().map(|diagnostic| {
-                Report::kind(diagnostic.kind, Some(Location::Span(diagnostic.span)))
+                parse_report(diagnostic.kind, Some(Location::Span(diagnostic.span)))
             }))
             .collect::<Vec<_>>();
         if !reports.is_empty() {
@@ -541,6 +545,18 @@ fn snake_case(name: &str) -> String {
         }
     }
     output.trim_end_matches('_').to_owned()
+}
+
+/// A parser diagnostic. The removed `override` modifier names its replacement.
+fn parse_report(kind: crate::parser::DiagnosticKind, location: Option<Location>) -> Report {
+    match kind {
+        crate::parser::DiagnosticKind::RemovedOverrideModifier => Report::new(
+            kind,
+            "`override` was removed; a replacement of an inherited method needs no marker (ADR-0127)",
+            location,
+        ),
+        kind => Report::kind(kind, location),
+    }
 }
 
 fn humanize(name: &str) -> String {

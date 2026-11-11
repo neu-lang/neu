@@ -2,6 +2,9 @@
 
 Status: Superseded by ADR-0100
 
+Superseded in part by ADR-0127: the `override` keyword is removed, and
+replacements of inherited methods need no marker.
+
 The first runnable program requires no Neu standard library and preserves the
 compiler-owned runtime boundary for entry, exit status, and bootstrap traps.
 ADR-0100 replaces the former bundled-startup design: Cranelift emits a host

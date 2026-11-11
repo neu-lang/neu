@@ -1,5 +1,8 @@
 # ADR-0094: Abstract Classes And Functions
 
+Superseded in part by ADR-0127: the `override` keyword is removed, and
+replacements of inherited methods need no marker.
+
 ## Status
 
 Accepted.

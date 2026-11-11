@@ -801,9 +801,8 @@ Classes may declare typed `val` or `var` fields and `func` methods. Visibility i
 `public`, `internal`, or `private` under ADR-0025; `protected` is deferred.
 Interfaces declare required methods. Default methods, interface state,
 extension methods, and operator overloading are deferred. Implementations must
-provide exactly one compatible method and use explicit `override` when
-replacing an inherited method. Field hiding and ambiguous interface methods are
-diagnostics.
+provide exactly one compatible method; no marker is written (ADR-0127). Field
+hiding and ambiguous interface methods are diagnostics.
 
 Instance methods have an implicit non-null `this`; `this.` is available for
 shadowing. Local names shadow members. `this` cannot be rebound or escape before
@@ -823,8 +822,9 @@ deferred.
 Neu uses one direct superclass and multiple interfaces. The `open`-gating and
 default-final wording in this historical section is superseded by ADR-0070;
 classes and methods are overridable by default and `final` opts out. Overrides
-require explicit `override` and compatible parameter types, return type,
-visibility, receiver effects, and capabilities. Private methods are not
+are replaced by name and parameter types, with no marker (ADR-0127). A
+replacement must have compatible return type, visibility, receiver effects, and
+capabilities. Private methods are not
 virtual. Field hiding is rejected, and there is no `protected` visibility.
 
 `super.method(...)` is valid only in a derived instance method or constructor,
@@ -922,10 +922,10 @@ lifecycle work.
 ## ADR-0070: Final-Only Runtime Dispatch
 
 Classes and methods are overridable by default. `final class` prevents
-subclassing, `final func` prevents overriding, and `override func` remains
-required for inherited replacements. `open` is not accepted in declaration
+subclassing, and `final func` prevents overriding. Inherited replacements need
+no marker; the `override` keyword is removed (ADR-0127). `open` is not accepted in declaration
 positions and is diagnosed rather than silently migrated. Interface methods and
-constructors cannot be `final` or `override`; private methods are non-virtual.
+constructors cannot be `final`; private methods are non-virtual.
 
 Class calls preserve compiler-private direct, virtual-class, interface, and
 static-super dispatch facts. Base-typed and interface-typed receivers select
@@ -1077,8 +1077,8 @@ capability, generic, overload, and value ABI rules without a receiver
 parameter.
 
 Derived classes inherit an unhidden static function for class-name lookup, but
-a same-named declaration hides it and is not an override. `override` is
-rejected for static functions; `final` is accepted as redundant metadata.
+a same-named declaration hides it and is not an override. `final` is accepted as
+redundant metadata.
 Static calls preserve class and function identity as direct calls through HIR,
 MIR, Cranelift, object emission, and linking. Class objects, static fields,
 reflection, dynamic lookup, public symbol/layout ABI, and FFI remain deferred.
@@ -1090,7 +1090,7 @@ fields, the primary constructor, concrete methods, and declaration-only
 `abstract func` instance methods. Abstract classes may inherit and implement
 interfaces, and may remain abstract through further subclasses. A concrete
 class is constructible only when every inherited abstract method identity has a
-compatible concrete `override`; incomplete classes and abstract construction
+compatible concrete replacement; incomplete classes and abstract construction
 are diagnosed before HIR lowering.
 
 Abstract methods have no bodies, no static form, and retain ordinary receiver,
@@ -1257,7 +1257,8 @@ diagnostics.
 ## ADR-0083: Generic Declaration Environments
 
 Top-level functions, classes, interfaces, enums, and accepted members may
-declare explicit generic parameters. A member environment is its enclosing
+declare explicit generic parameters. A type argument may itself be a generic
+instance or `Array<T>`, to any depth (ADR-0128). A member environment is its enclosing
 type parameters followed by its own parameters. Duplicate names in one list
 are rejected; member-level shadowing is allowed because parameter identity is
 the declaration node, not the spelling.

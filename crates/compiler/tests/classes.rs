@@ -176,21 +176,17 @@ fn associates_method_declarations_with_their_class() {
 fn preserves_method_dispatch_modifiers_and_visibility() {
     let parsed = parse_source(
         SourceFileId::from_raw(6805),
-        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } }",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert_eq!(parsed.function_declarations.len(), 2);
-    assert!(parsed.function_declarations[1].is_override);
     assert!(check_dispatch(&parsed).is_empty());
 
     let invalid = parse_source(
         SourceFileId::from_raw(6806),
         "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } }",
     );
-    assert_eq!(
-        check_dispatch(&invalid)[0].kind(),
-        DispatchDiagnosticKind::MissingOverrideMarker
-    );
+    assert!(check_dispatch(&invalid).is_empty());
 
     let incomplete = parse_source(
         SourceFileId::from_raw(6807),
@@ -220,7 +216,7 @@ fn preserves_method_dispatch_modifiers_and_visibility() {
 
     let incompatible = parse_source(
         SourceFileId::from_raw(6822),
-        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Bool { return true; } }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Bool { return true; } }",
     );
     assert!(
         check_dispatch(&incompatible)
@@ -346,7 +342,7 @@ fn concrete_class_completes_abstract_function() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let executable = workspace.join("program");
-    let source = "abstract class Base() { abstract func value(): Int; } class Child: Base() { override func value(): Int { return 7; } } public func main(): Int { val value: Base = new Child(); return value.value(); }";
+    let source = "abstract class Base() { abstract func value(): Int; } class Child: Base() { func value(): Int { return 7; } } public func main(): Int { val value: Base = new Child(); return value.value(); }";
     let output = compile_source_to_executable(
         source,
         SourceDriverOptions::new(
@@ -550,7 +546,7 @@ fn default_overridable_method_dispatches_through_a_base_type() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } } public func main(): Int { val base: Base = new Child(); return base.value(); }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } } public func main(): Int { val base: Base = new Child(); return base.value(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6831),
             ModuleName::parse("classes").unwrap(),
@@ -573,7 +569,7 @@ fn base_parameter_dispatches_to_the_most_derived_override() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 4; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { val child: Base = new Child(); return invoke(child); }",
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 4; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { val child: Base = new Child(); return invoke(child); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6834),
             ModuleName::parse("classes").unwrap(),
@@ -621,7 +617,7 @@ fn public_interface_dispatches_a_channel_operation_without_runtime_types() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "public interface ChannelReader { suspend func read(): Int; } class Reader: ChannelReader { override suspend func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public suspend func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
+        "public interface ChannelReader { suspend func read(): Int; } class Reader: ChannelReader { suspend func read(): Int { val channel = channel<Int>(1); send(channel, 12); receive(channel); return 12; } } public suspend func main(): Int { val reader: ChannelReader = new Reader(); return reader.read(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6850),
             ModuleName::parse("public_concurrency_interface").unwrap(),
@@ -667,7 +663,7 @@ fn resolves_overloaded_interface_methods_through_interface_dispatch() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "interface Choice { func pick(value: Int): Int; func pick(value: Bool): Int; } class Impl: Choice { override func pick(value: Int): Int { return 1; } override func pick(value: Bool): Int { return 9; } } public func main(): Int { val choice: Choice = new Impl(); return choice.pick(true); }",
+        "interface Choice { func pick(value: Int): Int; func pick(value: Bool): Int; } class Impl: Choice { func pick(value: Int): Int { return 1; } func pick(value: Bool): Int { return 9; } } public func main(): Int { val choice: Choice = new Impl(); return choice.pick(true); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6839),
             ModuleName::parse("classes").unwrap(),
@@ -711,7 +707,7 @@ fn final_class_is_accepted_and_final_method_cannot_be_overridden() {
 
     let invalid = parse_source(
         SourceFileId::from_raw(6833),
-        "class Base { final func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
+        "class Base { final func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } }",
     );
     assert!(!check_dispatch(&invalid).is_empty());
 }
@@ -722,7 +718,7 @@ fn class_method_can_call_immediate_super_method() {
     let _ = fs::remove_dir_all(&workspace);
     fs::create_dir_all(&workspace).unwrap();
     let output = compiler::driver::compile_source_to_executable(
-        "class Base { func value(): Int { return 2; } } class Child: Base() { override func value(): Int { return super.value() + 1; } } public func main(): Int { val child: Child = new Child(); return child.value(); }",
+        "class Base { func value(): Int { return 2; } } class Child: Base() { func value(): Int { return super.value() + 1; } } public func main(): Int { val child: Child = new Child(); return child.value(); }",
         compiler::driver::SourceDriverOptions::new(
             SourceFileId::from_raw(6816),
             ModuleName::parse("classes").unwrap(),
@@ -782,6 +778,223 @@ fn bare_field_name_assignment_writes_the_receiver_field() {
             .unwrap()
             .code(),
         Some(9)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn interface_method_return_type_must_match() {
+    let mismatched = parse_source(
+        SourceFileId::from_raw(6850),
+        "interface Readable { func read(): Int; } class Item: Readable { func read(): Bool { return true; } }",
+    );
+    assert!(
+        check_dispatch(&mismatched)
+            .iter()
+            .any(|diagnostic| diagnostic.kind()
+                == DispatchDiagnosticKind::IncompatibleInterfaceMethod)
+    );
+
+    let matching = parse_source(
+        SourceFileId::from_raw(6851),
+        "interface Readable { func read(): Int; } class Item: Readable { func read(): Int { return 1; } }",
+    );
+    assert!(check_dispatch(&matching).is_empty());
+
+    let generic_mismatched = parse_source(
+        SourceFileId::from_raw(6852),
+        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { func next(): Bool { return true; } }",
+    );
+    assert!(
+        check_dispatch(&generic_mismatched)
+            .iter()
+            .any(|diagnostic| diagnostic.kind()
+                == DispatchDiagnosticKind::IncompatibleInterfaceMethod)
+    );
+
+    let generic_matching = parse_source(
+        SourceFileId::from_raw(6853),
+        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { func next(): Int { return n; } }",
+    );
+    assert!(check_dispatch(&generic_matching).is_empty());
+}
+
+#[test]
+fn interface_implementation_compiles_without_override_and_missing_method_is_rejected() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-driver-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "interface Readable { func read(): Int; } class Item: Readable { func read(): Int { return 7; } } public func main(): Int { val r: Readable = new Item(); return r.read(); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6860),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(7)
+    );
+
+    let error = compile_source_to_executable(
+        "interface Readable { func read(): Int; } class Item: Readable {} public func main(): Int { return 7; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6861),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("missing"),
+        ),
+    )
+    .unwrap_err();
+    assert!(
+        format!("{error:?}").contains("MissingInterfaceMethod"),
+        "{error:?}"
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn unmarked_superclass_override_dispatches_to_the_child() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-unmarked-override-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { val child: Base = new Child(); return invoke(child); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6870),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(2)
+    );
+    let _ = fs::remove_dir_all(workspace);
+
+    let incompatible = parse_source(
+        SourceFileId::from_raw(6871),
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Bool { return true; } }",
+    );
+    assert!(
+        check_dispatch(&incompatible)
+            .iter()
+            .any(|diagnostic| diagnostic.kind() == DispatchDiagnosticKind::IncompatibleOverride)
+    );
+}
+
+#[test]
+fn override_keyword_is_rejected() {
+    let parsed = parse_source(
+        SourceFileId::from_raw(6872),
+        "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
+    );
+    assert!(
+        parsed.diagnostics.iter().any(|diagnostic| diagnostic.kind
+            == compiler::parser::DiagnosticKind::RemovedOverrideModifier),
+        "{:?}",
+        parsed.diagnostics
+    );
+}
+
+#[test]
+fn subclass_instance_is_accepted_as_a_base_argument() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-subclass-argument-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Child: Base() { func value(): Int { return 2; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { return invoke(new Child()); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6880),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(2)
+    );
+    let _ = fs::remove_dir_all(workspace);
+
+    let unrelated = compile_source_to_executable(
+        "class Base { func value(): Int { return 1; } } class Other { func value(): Int { return 3; } } func invoke(base: Base): Int { return base.value(); } public func main(): Int { return invoke(new Other()); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6881),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            std::env::temp_dir().join(format!("neu-subclass-argument-bad-{}", std::process::id())),
+        ),
+    );
+    assert!(unrelated.is_err());
+}
+
+#[test]
+fn implementing_instance_is_accepted_as_an_interface_argument() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-interface-argument-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "interface Counter { func next(): Int; } class Source(var n: Int): Counter { func next(): Int { return n; } } func take(c: Counter): Int { return c.next(); } public func main(): Int { return take(new Source(7)); }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6882),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(7)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn inherited_method_and_field_are_reached_through_a_subclass() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-inherited-member-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "class Base(var value: Int) { func get(): Int { return value; } } class Child(var extra: Int): Base(extra) {} public func main(): Int { val c: Child = new Child(5); return c.get() + c.value + 2; }",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6890),
+            ModuleName::parse("classes").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(12)
     );
     let _ = fs::remove_dir_all(workspace);
 }

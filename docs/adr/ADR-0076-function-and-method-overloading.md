@@ -2,6 +2,9 @@
 
 Status: Accepted by the main-task Chief Architect
 
+Superseded in part by ADR-0127: the `override` keyword is removed, and
+replacements of inherited methods need no marker.
+
 ## Question
 
 How should Neu resolve declarations that share a function or method name while

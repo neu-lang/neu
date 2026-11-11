@@ -180,3 +180,195 @@ fn field_assignment_through_a_generic_instance_inside_a_block_writes_the_field()
         Some(9)
     );
 }
+
+#[test]
+fn class_implements_a_generic_interface_with_a_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "generic_interface_direct",
+            "interface Counter<T> {\n    func next(): T;\n}\n\nclass Source(var n: Int): Counter<Int> {\n    func next(): Int {\n        return n;\n    }\n}\n\npublic func main(): Int {\n    val s: Source = new Source(7);\n    return s.next();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_superclass_method_returns_the_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_method",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child: Base<Int>(7) {\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    return c.get();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_superclass_field_read_decodes_the_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_field",
+            "class Base<T>(var value: T) {\n}\n\nclass Child: Base<Bool>(true) {\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    if (c.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_superclass_override_with_the_substituted_return_type_is_accepted() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_override",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child: Base<Int>(7) {\n    func get(): Int {\n        return 3;\n    }\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    return c.get();\n}\n",
+        ),
+        Some(3)
+    );
+}
+
+#[test]
+fn generic_superclass_bool_result_is_decoded() {
+    assert_eq!(
+        run_exit_code(
+            "superclass_bool_result",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child: Base<Bool>(true) {\n}\n\npublic func main(): Int {\n    val c: Child = new Child();\n    if (c.get()) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_subclass_inherits_a_method_with_its_own_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "generic_subclass",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child<U>(var extra: U): Base<U>(extra) {\n}\n\npublic func main(): Int {\n    val c: Child<Int> = new Child<Int>(7);\n    return c.get();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn superclass_type_argument_mismatch_is_rejected() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-superclass-mismatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "class Base<T>(var value: T) {} class Child: Base<Int>(true) {} public func main(): Int { return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(81995),
+            ModuleName::parse("generic.class").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn constructor_argument_forwards_through_a_three_level_chain() {
+    assert_eq!(
+        run_exit_code(
+            "chain_forward",
+            "class A<T>(var value: T) {\n}\n\nclass B<U>(var extra: U): A<U>(extra) {\n}\n\nclass C: B<Int>(7) {\n}\n\npublic func main(): Int {\n    val c: C = new C();\n    return c.value;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn bool_argument_forwards_through_a_chain_and_is_decoded() {
+    assert_eq!(
+        run_exit_code(
+            "chain_bool",
+            "class A<T>(var value: T) {\n}\n\nclass B<U>(var extra: U): A<U>(extra) {\n}\n\nclass C(var flag: Bool): B<Bool>(flag) {\n}\n\npublic func main(): Int {\n    val c: C = new C(true);\n    if (c.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn bool_literal_through_a_chain_is_decoded() {
+    assert_eq!(
+        run_exit_code(
+            "chain_bool_literal",
+            "class A<T>(var value: T) {\n}\n\nclass B<U>(var extra: U): A<U>(extra) {\n}\n\nclass C: B<Bool>(true) {\n}\n\npublic func main(): Int {\n    val c: C = new C();\n    if (c.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn nested_generic_argument_in_a_new_expression_and_method() {
+    assert_eq!(
+        run_exit_code(
+            "nested_new",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    var items: Array<Int> = new Int[];\n    items.add(7);\n    val boxed: Box<Array<Int>> = new Box<Array<Int>>(items);\n    val inner: Array<Int> = boxed.get();\n    return inner[0];\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn nested_generic_superclass_argument_forwards_a_nested_value() {
+    assert_eq!(
+        run_exit_code(
+            "nested_superclass",
+            "class Base<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\nclass Child(var items: Array<Int>): Base<Array<Int>>(items) {\n}\n\npublic func main(): Int {\n    var items: Array<Int> = new Int[];\n    items.add(7);\n    val c: Child = new Child(items);\n    val inner: Array<Int> = c.get();\n    return inner[0];\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn box_of_box_reads_the_inner_value() {
+    assert_eq!(
+        run_exit_code(
+            "box_of_box",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val boxed: Box<Box<Int>> = new Box<Box<Int>>(new Box<Int>(7));\n    val inner: Box<Int> = boxed.get();\n    return inner.get();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn nested_generic_annotation_must_match_its_value() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-nested-mismatch-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "class Box<T>(var value: T) {} public func main(): Int { val b: Box<Array<Int>> = new Box<Int>(3); return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(81996),
+            ModuleName::parse("generic.class").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn nested_generic_arguments_are_invariant() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-nested-invariant-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "class Box<T>(var value: T) {} public func main(): Int { var bools: Array<Bool> = new Bool[]; val b: Box<Array<Int>> = new Box<Array<Bool>>(bools); return 7; }",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(81997),
+            ModuleName::parse("generic.class").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
+    let _ = fs::remove_dir_all(workspace);
+}

@@ -2,6 +2,9 @@
 
 Status: Accepted
 
+Superseded in part by ADR-0127: the `override` keyword is removed, and
+replacements of inherited methods need no marker.
+
 ## Question
 
 What foundational nominal, member, visibility, receiver, nullability, and

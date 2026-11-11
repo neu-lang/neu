@@ -243,6 +243,13 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
             if member.is_some_and(|member| receiver_is_generic_instance(source, member.receiver)) {
                 continue;
             }
+            // A call to a method inherited from a superclass is typed and targeted
+            // by members.rs, which substitutes the superclass's type arguments.
+            if member.is_some_and(|member| {
+                receiver_inherits_method(source, member.receiver, &target_name)
+            }) {
+                continue;
+            }
             if member.is_some_and(|member| {
                 source
                     .parsed
@@ -1005,10 +1012,46 @@ pub(crate) fn call_path_exists(
     false
 }
 
+/// Whether a class instance may be passed where `expected` is required: the same
+/// class, a superclass, or an interface the class or a superclass implements.
+pub(crate) fn class_value_assignable(
+    classes: &ClassTypeReport,
+    actual: TypeId,
+    expected: TypeId,
+) -> bool {
+    if actual == expected {
+        return true;
+    }
+    let Some(actual_class) = classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == actual)
+    else {
+        return false;
+    };
+    if let Some(expected_class) = classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == expected)
+        && expected_class.interface
+        && actual_class.interfaces.contains(&expected_class.name)
+    {
+        return true;
+    }
+    actual_class.superclass.as_deref().is_some_and(|parent| {
+        classes
+            .classes()
+            .iter()
+            .find(|class| class.name == parent)
+            .is_some_and(|parent| class_value_assignable(classes, parent.type_id, expected))
+    })
+}
+
 pub fn check_indirect_calls(
     parsed: &ParseOutput,
     known_expression_types: &[ExpressionType],
     types: &TypeArena,
+    classes: &ClassTypeReport,
 ) -> TypeCheckReport {
     let mut report = TypeCheckReport::new();
     for expression_type in known_expression_types {
@@ -1040,7 +1083,7 @@ pub fn check_indirect_calls(
                 valid = false;
                 continue;
             };
-            if actual != *expected {
+            if actual != *expected && !class_value_assignable(classes, actual, *expected) {
                 report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
                     *argument, *expected, actual,
                 ));
@@ -1058,6 +1101,38 @@ pub fn check_indirect_calls(
 }
 
 /// Whether an expression's type is a generic class instance.
+/// Whether a receiver's class inherits the instance method `name` from a superclass.
+pub(crate) fn receiver_inherits_method(
+    source: &ExecutableSourceTypes<'_>,
+    receiver: AstNodeId,
+    name: &str,
+) -> bool {
+    let Some(classes) = source.class_types else {
+        return false;
+    };
+    let Some(receiver_type) = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression == receiver)
+        .map(|typed| typed.ty)
+    else {
+        return false;
+    };
+    classes
+        .classes()
+        .iter()
+        .find(|class| class.type_id == receiver_type)
+        .is_some_and(|class| {
+            crate::type_check::classes::inherited_method_owner(
+                source.parsed,
+                classes,
+                class.declaration,
+                name,
+            )
+            .is_some()
+        })
+}
+
 pub(crate) fn receiver_is_generic_instance(
     source: &ExecutableSourceTypes<'_>,
     receiver: AstNodeId,

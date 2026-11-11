@@ -388,6 +388,16 @@ pub(crate) fn resolve_annotation_type(
     classes: &[ClassTypeRecord],
     arena: &mut TypeArena,
 ) -> Option<TypeId> {
+    if let Some(ty) = super::generics::resolve_type_reference(
+        type_name_references,
+        annotation,
+        primitives,
+        classes,
+        &[],
+        arena,
+    ) {
+        return Some(ty);
+    }
     if let Some(reference) = type_name_references
         .iter()
         .find(|reference| reference.reference == annotation)
@@ -1214,17 +1224,12 @@ pub fn type_primitive_local_declaration_initializers(
 /// ADR-0059 allows no implicit conversion between `Byte` and `Int`. This runs once
 /// the types have settled, since a name initializer can be typed after the first
 /// declaration pass, which would otherwise skip the check.
-pub(crate) fn diagnose_primitive_local_mismatches(
+pub(crate) fn diagnose_local_initializer_mismatches(
     parsed: &ParseOutput,
     types: &TypeArena,
+    classes: &ClassTypeReport,
     report: &mut TypeCheckReport,
 ) {
-    let primitive = |ty: TypeId| {
-        matches!(
-            types.get(ty).map(|record| record.kind()),
-            Some(TypeKind::Primitive(_))
-        )
-    };
     for declaration in &parsed.local_declarations {
         let Some(initializer) = declaration.initializer else {
             continue;
@@ -1235,9 +1240,29 @@ pub(crate) fn diagnose_primitive_local_mismatches(
         let Some(value) = report.expression_type(initializer) else {
             continue;
         };
+        // A nullable local is checked by the flow analysis, which knows refinements.
+        let nullable_or_null = |ty: TypeId| {
+            matches!(
+                types.get(ty).map(|record| record.kind()),
+                Some(TypeKind::Nullable(_) | TypeKind::Primitive(PrimitiveType::Null))
+            )
+        };
+        // A generic enum's constructor is typed as the plain enum, so its
+        // instance cannot be compared here.
+        let plain_of_same_generic = matches!(
+            (
+                types.get(annotation).map(|record| record.kind()),
+                types.get(value).map(|record| record.kind()),
+            ),
+            (Some(TypeKind::GenericInstance(instance)), Some(TypeKind::Nominal(identity)))
+                if instance.declaration().declaration() == identity.declaration()
+        );
         if annotation == value
-            || !primitive(annotation)
-            || !primitive(value)
+            || plain_of_same_generic
+            || nullable_or_null(annotation)
+            || nullable_or_null(value)
+            || crate::type_check::flow::assignment_compatible(annotation, value, types)
+            || crate::type_check::calls::class_value_assignable(classes, value, annotation)
             || report
                 .assignment_checks()
                 .iter()

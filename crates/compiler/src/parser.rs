@@ -9,6 +9,7 @@ pub enum DiagnosticKind {
     MisplacedImportDeclaration,
     DuplicateVisibilityModifier,
     UnsupportedDeclarationModifier,
+    RemovedOverrideModifier,
     ObsoleteFunctionKeyword,
     MissingDeclarationName,
     MalformedDeclarationHeader,
@@ -127,7 +128,11 @@ pub struct ParsedClassDeclaration {
     pub is_abstract: bool,
     pub superclass: Option<String>,
     pub superclass_arguments: Vec<AstNodeId>,
+    /// The type arguments written on the superclass, as in `Base<Int>()`.
+    pub superclass_type_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
+    /// The type arguments of each entry in `interfaces`, in the same order.
+    pub interface_arguments: Vec<Vec<AstNodeId>>,
     pub fields: Vec<AstNodeId>,
     pub constructor_parameters: Vec<ParsedConstructorParameter>,
     pub interface: bool,
@@ -185,7 +190,6 @@ pub struct ParsedFunctionDeclaration {
     pub owner: Option<AstNodeId>,
     pub name: String,
     pub visibility: String,
-    pub is_override: bool,
     pub is_final: bool,
     pub is_abstract: bool,
     pub body: Option<AstNodeId>,
@@ -265,8 +269,9 @@ pub struct ParsedNewExpression {
     pub expression: AstNodeId,
     pub type_name: String,
     pub type_span: ByteSpan,
-    /// Explicit type argument names, as in `new Box<Int>(...)` (ADR-0083).
-    pub type_arguments: Vec<String>,
+    /// Explicit type arguments, as in `new Box<Array<Int>>(...)` (ADR-0083,
+    /// ADR-0128): the named-type reference of each argument.
+    pub type_argument_references: Vec<AstNodeId>,
     pub arguments: Vec<AstNodeId>,
     pub dynamic_array: bool,
     pub span: ByteSpan,
@@ -345,6 +350,9 @@ pub struct ParsedTypeNameReference {
     pub name_span: ByteSpan,
     pub generic_arguments: Vec<AstNodeId>,
     pub generic_argument_names: Vec<String>,
+    /// The named-type reference of each generic argument, in order. Nested
+    /// arguments are resolved through these (ADR-0128).
+    pub generic_argument_references: Vec<AstNodeId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -647,7 +655,6 @@ struct Parser<'source> {
     current_class: Option<AstNodeId>,
     current_class_is_interface: bool,
     pending_method_visibility: String,
-    pending_method_override: bool,
     pending_method_final: bool,
     pending_method_abstract: bool,
     pending_method_static: bool,
@@ -713,7 +720,6 @@ impl<'source> Parser<'source> {
             current_class: None,
             current_class_is_interface: false,
             pending_method_visibility: "public".to_owned(),
-            pending_method_override: false,
             pending_method_final: false,
             pending_method_abstract: false,
             pending_method_static: false,
@@ -1078,7 +1084,6 @@ impl<'source> Parser<'source> {
                     owner: self.current_class,
                     name: method_name.clone(),
                     visibility: self.pending_method_visibility.clone(),
-                    is_override: self.pending_method_override,
                     is_final: self.pending_method_final,
                     is_abstract: self.pending_method_abstract,
                     body: None,
@@ -1122,7 +1127,6 @@ impl<'source> Parser<'source> {
                     owner: self.current_class,
                     name: method_name,
                     visibility: self.pending_method_visibility.clone(),
-                    is_override: self.pending_method_override,
                     is_final: self.pending_method_final,
                     is_abstract: self.pending_method_abstract,
                     body,
@@ -1341,7 +1345,9 @@ impl<'source> Parser<'source> {
 
         let mut superclass = None;
         let mut superclass_arguments = Vec::new();
+        let mut superclass_type_arguments: Vec<AstNodeId> = Vec::new();
         let mut interfaces = Vec::new();
+        let mut interface_arguments: Vec<Vec<AstNodeId>> = Vec::new();
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
             loop {
@@ -1363,6 +1369,17 @@ impl<'source> Parser<'source> {
                 }
                 let name = self.text[reference.span.start()..reference.span.end()].to_owned();
                 self.advance();
+                let type_arguments = if self.current_kind() == Some(TokenKind::Less) {
+                    match self.parse_new_type_arguments() {
+                        Some(arguments) => arguments,
+                        None => {
+                            self.skip_to_declaration_boundary(in_body);
+                            return;
+                        }
+                    }
+                } else {
+                    Vec::new()
+                };
                 let is_superclass = self.current_kind() == Some(TokenKind::LeftParen);
                 if is_superclass {
                     self.advance();
@@ -1413,8 +1430,10 @@ impl<'source> Parser<'source> {
                 }
                 if is_superclass && superclass.is_none() {
                     superclass = Some(name);
+                    superclass_type_arguments = type_arguments;
                 } else {
                     interfaces.push(name);
+                    interface_arguments.push(type_arguments);
                 }
                 if self.current_kind() != Some(TokenKind::Comma) {
                     break;
@@ -1468,7 +1487,9 @@ impl<'source> Parser<'source> {
                 is_abstract: false,
                 superclass: None,
                 superclass_arguments: Vec::new(),
+                superclass_type_arguments: Vec::new(),
                 interfaces: Vec::new(),
+                interface_arguments: Vec::new(),
                 fields: Vec::new(),
                 constructor_parameters,
                 interface: false,
@@ -1490,7 +1511,9 @@ impl<'source> Parser<'source> {
                 is_abstract,
                 superclass,
                 superclass_arguments,
+                superclass_type_arguments,
                 interfaces,
+                interface_arguments,
                 fields,
                 constructor_parameters,
                 interface: false,
@@ -1515,7 +1538,9 @@ impl<'source> Parser<'source> {
                 is_abstract: false,
                 superclass,
                 superclass_arguments: Vec::new(),
+                superclass_type_arguments: Vec::new(),
                 interfaces,
+                interface_arguments,
                 fields: Vec::new(),
                 constructor_parameters: Vec::new(),
                 interface: true,
@@ -1536,13 +1561,30 @@ impl<'source> Parser<'source> {
                 continue;
             }
             last_index = self.index;
+            // `override` was removed (ADR-0127). Report it once and parse the
+            // method that follows as if the word were absent.
+            if self.current_kind() == Some(TokenKind::Identifier)
+                && self.current_text() == Some("override")
+                && matches!(
+                    self.peek_kind(),
+                    Some(
+                        TokenKind::KwFunc
+                            | TokenKind::KwFun
+                            | TokenKind::KwFinal
+                            | TokenKind::KwOpen
+                    ) | Some(TokenKind::Identifier)
+                )
+            {
+                self.diagnostic_current(DiagnosticKind::RemovedOverrideModifier);
+                self.advance();
+                continue;
+            }
             let method_with_visibility = self.is_visibility()
                 && (matches!(
                     self.peek_kind(),
                     Some(
                         TokenKind::KwFunc
                             | TokenKind::KwFun
-                            | TokenKind::KwOverride
                             | TokenKind::KwOpen
                             | TokenKind::KwFinal
                     )
@@ -1550,7 +1592,6 @@ impl<'source> Parser<'source> {
                     && matches!(self.peek_text(), Some("static" | "abstract" | "suspend"))));
             if self.current_kind() == Some(TokenKind::KwFunc)
                 || self.current_kind() == Some(TokenKind::KwFun)
-                || self.current_kind() == Some(TokenKind::KwOverride)
                 || self.current_kind() == Some(TokenKind::KwOpen)
                 || self.current_kind() == Some(TokenKind::KwFinal)
                 || (self.current_kind() == Some(TokenKind::Identifier)
@@ -1561,7 +1602,6 @@ impl<'source> Parser<'source> {
                 || method_with_visibility
             {
                 self.pending_method_visibility = "public".to_owned();
-                self.pending_method_override = false;
                 self.pending_method_final = false;
                 self.pending_method_abstract = false;
                 self.pending_method_static = false;
@@ -1569,7 +1609,7 @@ impl<'source> Parser<'source> {
                 while self.is_visibility()
                     || matches!(
                         self.current_kind(),
-                        Some(TokenKind::KwOverride | TokenKind::KwOpen | TokenKind::KwFinal)
+                        Some(TokenKind::KwOpen | TokenKind::KwFinal)
                     )
                     || (self.current_kind() == Some(TokenKind::Identifier)
                         && matches!(self.current_text(), Some("static" | "abstract")))
@@ -1588,7 +1628,6 @@ impl<'source> Parser<'source> {
                             self.current_text().unwrap_or("public").to_owned();
                     } else {
                         match self.current_kind() {
-                            Some(TokenKind::KwOverride) => self.pending_method_override = true,
                             Some(TokenKind::KwOpen) => {
                                 self.diagnostic_current(
                                     DiagnosticKind::UnsupportedDeclarationModifier,
@@ -2958,36 +2997,29 @@ impl<'source> Parser<'source> {
 
     /// Parses `<A, B>` after a constructed class name. Each argument is a
     /// simple name; nested type arguments are not parsed here.
-    fn parse_new_type_arguments(&mut self) -> Option<Vec<String>> {
-        let start = self.current()?.span.start();
-        self.advance();
-        let mut names = Vec::new();
-        loop {
-            let token = self.current()?.clone();
-            if token.kind != TokenKind::Identifier {
-                self.diagnostic_current_or_span(
-                    DiagnosticKind::MalformedGenericArgumentList,
-                    self.span_at(start),
-                );
-                return None;
-            }
-            names.push(self.text[token.span.start()..token.span.end()].to_owned());
-            self.advance();
-            match self.current_kind() {
-                Some(TokenKind::Comma) => self.advance(),
-                Some(TokenKind::Greater) => {
-                    self.advance();
-                    return Some(names);
-                }
-                _ => {
-                    self.diagnostic_current_or_span(
-                        DiagnosticKind::MalformedGenericArgumentList,
-                        self.span_at(start),
-                    );
-                    return None;
-                }
-            }
-        }
+    /// The type arguments of `new C<...>` or a class header, each a named-type
+    /// reference. Arguments may nest (ADR-0128).
+    fn parse_new_type_arguments(&mut self) -> Option<Vec<AstNodeId>> {
+        let (_, arguments) = self.parse_generic_arguments()?;
+        Some(
+            arguments
+                .into_iter()
+                .filter_map(|argument| self.reference_for_argument(argument))
+                .collect(),
+        )
+    }
+
+    /// The named-type reference of a generic argument, found by the argument's span.
+    fn reference_for_argument(&self, argument: AstNodeId) -> Option<AstNodeId> {
+        let span = self.arena.node(argument)?.span;
+        self.type_name_references
+            .iter()
+            .find(|reference| {
+                self.arena
+                    .node(reference.reference)
+                    .is_some_and(|node| node.span == span)
+            })
+            .map(|reference| reference.reference)
     }
 
     fn parse_new_expression(&mut self) -> Option<ByteSpan> {
@@ -3003,7 +3035,7 @@ impl<'source> Parser<'source> {
         }
         let type_name = self.text[type_token.span.start()..type_token.span.end()].to_owned();
         self.advance();
-        let type_arguments = if self.current_kind() == Some(TokenKind::Less) {
+        let type_argument_references = if self.current_kind() == Some(TokenKind::Less) {
             self.parse_new_type_arguments()?
         } else {
             Vec::new()
@@ -3020,7 +3052,7 @@ impl<'source> Parser<'source> {
                 expression,
                 type_name,
                 type_span: type_token.span,
-                type_arguments: Vec::new(),
+                type_argument_references: Vec::new(),
                 arguments: Vec::new(),
                 dynamic_array: true,
                 span,
@@ -3059,7 +3091,7 @@ impl<'source> Parser<'source> {
             expression,
             type_name,
             type_span: type_token.span,
-            type_arguments,
+            type_argument_references,
             arguments,
             dynamic_array: false,
             span,
@@ -3881,6 +3913,10 @@ impl<'source> Parser<'source> {
                     .map(|reference| reference.name.clone())
             })
             .collect();
+        let generic_argument_references = generic_arguments
+            .iter()
+            .filter_map(|argument| self.reference_for_argument(*argument))
+            .collect();
         let span = self.span(start, end);
         let reference = self.arena.add_named_type(span);
         self.type_name_references.insert(
@@ -3891,6 +3927,7 @@ impl<'source> Parser<'source> {
                 name_span: self.span(start, name_end),
                 generic_arguments,
                 generic_argument_names,
+                generic_argument_references,
             },
         );
         Some(span)
@@ -4400,13 +4437,7 @@ impl<'source> Parser<'source> {
             && self.current_text() == Some("suspend")
             && matches!(
                 self.peek_kind(),
-                Some(
-                    TokenKind::KwFunc
-                        | TokenKind::KwFun
-                        | TokenKind::KwOverride
-                        | TokenKind::KwOpen
-                        | TokenKind::KwFinal
-                )
+                Some(TokenKind::KwFunc | TokenKind::KwFun | TokenKind::KwOpen | TokenKind::KwFinal)
             )
     }
 

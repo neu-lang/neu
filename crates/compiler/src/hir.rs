@@ -1227,13 +1227,16 @@ fn lower_expression(
             output.push(HirExpression::dynamic_array_new(id, span, ty));
             return Ok(id);
         }
-        let mut argument_nodes = Vec::new();
-        append_superclass_argument_nodes(
+        let inherited_arguments = inherited_argument_chain(
             source.parsed,
             &new_expression.type_name,
-            &mut argument_nodes,
+            &new_expression.arguments,
         );
-        let inherited = argument_nodes.len();
+        let inherited = inherited_arguments.len();
+        let mut argument_nodes: Vec<crate::ast::AstNodeId> = inherited_arguments
+            .iter()
+            .map(|argument| argument.node)
+            .collect();
         argument_nodes.extend(new_expression.arguments.iter().copied());
         // Constructor parameters are erased slots where their class is generic
         // (ADR-0126). The declared types are the promoted fields'.
@@ -1247,9 +1250,18 @@ fn lower_expression(
                 local_bindings,
                 output,
             )?;
-            let parameter = index
-                .checked_sub(inherited)
-                .and_then(|own| declared.get(own).copied().flatten());
+            // A superclass argument is an erased slot of the superclass's own
+            // constructor parameter, when that parameter is generic (ADR-0126).
+            let parameter = match index.checked_sub(inherited) {
+                Some(own) => declared.get(own).copied().flatten(),
+                None => {
+                    let inherited_argument = &inherited_arguments[index];
+                    constructor_declared_types(source, &inherited_argument.parent)
+                        .get(inherited_argument.position)
+                        .copied()
+                        .flatten()
+                }
+            };
             arguments.push(match parameter {
                 Some(parameter) => erase_argument(source, *argument, lowered, parameter, output),
                 None => lowered,
@@ -2107,22 +2119,65 @@ fn conditional_branch_expression(
         })
 }
 
-fn append_superclass_argument_nodes(
+/// A superclass constructor argument of a class being constructed: the expression
+/// that supplies it, and the superclass constructor parameter it fills.
+struct InheritedArgument {
+    node: crate::ast::AstNodeId,
+    parent: String,
+    position: usize,
+}
+
+/// The superclass constructor arguments of `class_name`, outermost ancestor first.
+/// An argument that names a constructor parameter of the class that writes it takes
+/// the value that the class's own constructor receives for that parameter, so a
+/// value forwarded through several classes is written once, from the `new`
+/// expression's argument.
+fn inherited_argument_chain(
     parsed: &ParseOutput,
     class_name: &str,
-    output: &mut Vec<crate::ast::AstNodeId>,
-) {
-    let Some(class) = parsed
+    own_arguments: &[crate::ast::AstNodeId],
+) -> Vec<InheritedArgument> {
+    let mut levels: Vec<Vec<InheritedArgument>> = Vec::new();
+    let mut class = parsed
         .class_declarations
         .iter()
-        .find(|class| class.name == class_name)
-    else {
-        return;
-    };
-    if let Some(superclass) = class.superclass.as_deref() {
-        append_superclass_argument_nodes(parsed, superclass, output);
+        .find(|class| class.name == class_name);
+    let mut incoming: Vec<crate::ast::AstNodeId> = own_arguments.to_vec();
+    while let Some(current) = class {
+        let Some(parent_name) = current.superclass.clone() else {
+            break;
+        };
+        let level: Vec<InheritedArgument> = current
+            .superclass_arguments
+            .iter()
+            .enumerate()
+            .map(|(position, argument)| {
+                let forwarded = parsed
+                    .name_references
+                    .iter()
+                    .find(|name| name.reference == *argument)
+                    .and_then(|name| {
+                        current
+                            .constructor_parameters
+                            .iter()
+                            .position(|parameter| parameter.name == name.name)
+                    })
+                    .and_then(|parameter| incoming.get(parameter).copied());
+                InheritedArgument {
+                    node: forwarded.unwrap_or(*argument),
+                    parent: parent_name.clone(),
+                    position,
+                }
+            })
+            .collect();
+        incoming = level.iter().map(|argument| argument.node).collect();
+        levels.push(level);
+        class = parsed
+            .class_declarations
+            .iter()
+            .find(|class| class.name == parent_name);
     }
-    output.extend(class.superclass_arguments.iter().copied());
+    levels.into_iter().rev().flatten().collect()
 }
 
 fn field_index_for_receiver(

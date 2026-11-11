@@ -30,11 +30,12 @@ use crate::{
         apply_bare_field_references, apply_class_type_facts, apply_control_flow_results,
         apply_direct_call_results, apply_enum_constructor_facts, apply_enum_function_facts,
         apply_enum_method_call_facts, apply_field_access_facts, apply_generic_instance_calls,
-        apply_generic_instance_fields, apply_generic_new_expressions, apply_intrinsic_call_facts,
-        apply_method_call_facts, apply_receiver_name_facts, apply_receiver_signatures,
-        apply_value_conditional_results, check_constructor_calls, check_direct_calls,
-        check_entry_point, check_indirect_calls, check_return_expression_types_with_arena,
-        check_straight_line_returns, check_unsupported_executable_forms, diagnose_unresolved_types,
+        apply_generic_instance_fields, apply_generic_new_expressions, apply_inherited_calls,
+        apply_inherited_field_types, apply_intrinsic_call_facts, apply_method_call_facts,
+        apply_receiver_name_facts, apply_receiver_signatures, apply_value_conditional_results,
+        check_constructor_calls, check_direct_calls, check_entry_point, check_indirect_calls,
+        check_return_expression_types_with_arena, check_straight_line_returns,
+        check_superclass_arguments, check_unsupported_executable_forms, diagnose_unresolved_types,
         infer_local_types, merge_type_check_report, type_annotation_type,
         type_array_expressions_with_classes, type_array_iterations, type_bind_function_values,
         type_class_types_in, type_concurrency_operations, type_control_flow,
@@ -222,6 +223,7 @@ pub enum DriverError {
     TestDiagnostics(Vec<TestDiagnostic>),
     IntrinsicDiagnostics(Vec<IntrinsicDiagnostic>),
     ConstructorDiagnostics(Vec<ConstructorDiagnostic>),
+    DispatchDiagnostics(Vec<crate::type_check::DispatchDiagnostic>),
     DirectCallDiagnostics(Vec<DirectCallDiagnostic>),
     OwnershipDiagnostics(Vec<crate::ownership::OwnershipDiagnostic>),
     UnknownNames(Vec<crate::unknown_names::UnknownName>),
@@ -490,6 +492,10 @@ fn compile_source_with_entry(
     if !constructor_diagnostics.is_empty() {
         return Err(DriverError::ConstructorDiagnostics(constructor_diagnostics));
     }
+    let dispatch_diagnostics = crate::type_check::check_dispatch(&parsed);
+    if !dispatch_diagnostics.is_empty() {
+        return Err(DriverError::DispatchDiagnostics(dispatch_diagnostics));
+    }
     let mut signatures = type_function_signatures_in_with_generics(
         &mut types,
         &parsed.function_declarations,
@@ -575,6 +581,7 @@ fn compile_source_with_entry(
     type_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
     apply_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
+    apply_inherited_field_types(&parsed, &class_types, &mut types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
     apply_enum_constructor_facts(&parsed, &class_types, &mut report, &mut types);
     apply_enum_method_call_facts(&parsed, &class_types, &mut report, &types);
@@ -583,6 +590,7 @@ fn compile_source_with_entry(
     apply_generic_new_expressions(&parsed, &class_types, &mut types, primitives, &mut report);
     apply_generic_instance_fields(&parsed, &class_types, &mut types, &mut report);
     apply_generic_instance_calls(&parsed, &signatures, &mut types, &mut report);
+    apply_inherited_calls(&parsed, &signatures, &class_types, &mut types, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     type_lambda_expressions(&parsed, &mut types, &mut report);
     let array_iterations = type_array_iterations(&parsed, report.expression_types(), &types);
@@ -661,6 +669,8 @@ fn compile_source_with_entry(
     });
     apply_receiver_name_facts(&parsed, &class_types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
+    apply_inherited_field_types(&parsed, &class_types, &mut types, &mut report);
+    check_superclass_arguments(&parsed, &class_types, &mut types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
     apply_enum_method_call_facts(&parsed, &class_types, &mut report, &types);
     report.retain_diagnostics(|diagnostic| {
@@ -675,7 +685,8 @@ fn compile_source_with_entry(
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
-    let indirect_calls = check_indirect_calls(&parsed, report.expression_types(), &types);
+    let indirect_calls =
+        check_indirect_calls(&parsed, report.expression_types(), &types, &class_types);
     merge_type_check_report(&mut report, indirect_calls);
     let function_typed_calls = parsed
         .call_expressions
@@ -711,6 +722,7 @@ fn compile_source_with_entry(
         // Member calls on generic instances are typed after the direct-call
         // results, which know nothing about type arguments (ADR-0126).
         apply_generic_instance_calls(&parsed, &signatures, &mut types, &mut report);
+        apply_inherited_calls(&parsed, &signatures, &class_types, &mut types, &mut report);
         type_operators_in_round(&parsed, &types, &mut report);
         infer_local_types(&parsed, &mut report);
         let stable = resolved_calls.as_ref().is_some_and(|previous| {
@@ -763,7 +775,12 @@ fn compile_source_with_entry(
             TypeRuleDiagnostic::DirectCallDeferred | TypeRuleDiagnostic::MemberExpressionDeferred
         ) || !typed_nodes.contains(&diagnostic.node())
     });
-    crate::type_check::diagnose_primitive_local_mismatches(&parsed, &types, &mut report);
+    crate::type_check::diagnose_local_initializer_mismatches(
+        &parsed,
+        &types,
+        &class_types,
+        &mut report,
+    );
     diagnose_unresolved_types(&parsed, &mut report);
     let intrinsic_diagnostics =
         validate_intrinsic_calls(&parsed, report.expression_types(), &types);
@@ -935,6 +952,12 @@ fn compile_source_with_entry(
     let mut call_targets = calls.resolved_declarations().to_vec();
     call_targets.extend(crate::type_check::generic_instance_call_targets(
         &parsed, &types, &report,
+    ));
+    call_targets.extend(crate::type_check::inherited_call_targets(
+        &parsed,
+        &class_types,
+        &types,
+        &report,
     ));
     let hir = lower_checked_hir_source({
         let source = CheckedHirSource::new(

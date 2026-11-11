@@ -3,7 +3,7 @@ public interface ChannelReader {
 }
 
 class Reader: ChannelReader {
-    override suspend func read(): Int {
+    suspend func read(): Int {
         val queue = channel<Int>(1);
         send(queue, 12);
         receive(queue);
