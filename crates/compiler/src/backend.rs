@@ -14,7 +14,7 @@ use cranelift_codegen::{
     verify_function,
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
+use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use target_lexicon::Triple;
 
@@ -30,6 +30,9 @@ use crate::{
 
 const INVALID_SHIFT_COUNT_TRAP: TrapCode = TrapCode::unwrap_user(1);
 const NEGATIVE_EXPONENT_TRAP: TrapCode = TrapCode::unwrap_user(2);
+/// Trap for a runtime division or remainder whose divisor is zero (SPEC, ADR-0043).
+const DIVISION_BY_ZERO_TRAP: TrapCode = TrapCode::unwrap_user(18);
+const DIVISION_BY_ZERO_MESSAGE: &[u8] = b"neu: division by zero\n";
 
 /// Channel header: capacity, length, head, tail, closed flag, data pointer,
 /// then the receiver and sender FIFO queues used for suspension.
@@ -61,6 +64,8 @@ struct RuntimeFunctions {
     memcpy: FuncId,
     memcmp: FuncId,
     write: FuncId,
+    /// The `neu: division by zero` message, written before a zero-divisor trap.
+    division_by_zero_message: DataId,
     call_conv: CallConv,
     /// Task scheduler functions; present only where the host runtime supports them.
     scheduler: Option<scheduler::SchedulerFunctions>,
@@ -628,6 +633,14 @@ fn declare_runtime_functions(
     let write = module
         .declare_function("write", Linkage::Import, &write_signature)
         .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let division_by_zero_message = module
+        .declare_data("neu_division_by_zero_message", Linkage::Local, false, false)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
+    let mut message_data = DataDescription::new();
+    message_data.define(DIVISION_BY_ZERO_MESSAGE.to_vec().into_boxed_slice());
+    module
+        .define_data(division_by_zero_message, &message_data)
+        .map_err(|_| CraneliftLoweringError::ObjectDefinitionFailed)?;
     let mut context = cranelift_codegen::Context::new();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, free.as_u32()), malloc_signature);
@@ -662,6 +675,7 @@ fn declare_runtime_functions(
         memcpy,
         memcmp,
         write,
+        division_by_zero_message,
         call_conv: CallConv::triple_default(target),
         scheduler,
     })
@@ -795,6 +809,35 @@ fn task_result_type(ty: TypeId, type_arena: &TypeArena) -> Option<TypeId> {
         Some(TypeKind::Task(task)) => Some(task.result()),
         _ => None,
     }
+}
+
+/// Writes `neu: division by zero` to stderr and traps when a divisor is zero. It
+/// runs before the divide, so the message comes before the process stops.
+fn emit_division_by_zero_check(
+    builder: &mut FunctionBuilder<'_>,
+    module: &mut ObjectModule,
+    runtime: &RuntimeFunctions,
+    divisor: Value,
+) {
+    let zero = builder.ins().icmp_imm(IntCC::Equal, divisor, 0);
+    let trap_block = builder.create_block();
+    let proceed = builder.create_block();
+    builder.ins().brif(zero, trap_block, &[], proceed, &[]);
+
+    builder.switch_to_block(trap_block);
+    let global = module.declare_data_in_func(runtime.division_by_zero_message, builder.func);
+    let address = builder.ins().global_value(types::I64, global);
+    let stderr = builder.ins().iconst(types::I64, 2);
+    let length = builder
+        .ins()
+        .iconst(types::I64, DIVISION_BY_ZERO_MESSAGE.len() as i64);
+    let write = runtime.reference(builder.func, runtime.write, true);
+    builder.ins().call(write, &[stderr, address, length]);
+    builder.ins().trap(DIVISION_BY_ZERO_TRAP);
+    builder.seal_block(trap_block);
+
+    builder.switch_to_block(proceed);
+    builder.seal_block(proceed);
 }
 
 fn lower_basic_arithmetic(
@@ -2858,6 +2901,11 @@ fn lower_instruction(
                 .get(right)
                 .copied()
                 .ok_or(CraneliftLoweringError::MissingValue)?;
+            if matches!(operation, MirArithmetic::Divide | MirArithmetic::Remainder)
+                && let (Some(module), Some(runtime)) = (module.as_deref_mut(), context.runtime)
+            {
+                emit_division_by_zero_check(builder, module, runtime, right);
+            }
             let value = lower_basic_arithmetic(*operation, left, right, builder);
             values.insert(*output, value);
             Ok(())
