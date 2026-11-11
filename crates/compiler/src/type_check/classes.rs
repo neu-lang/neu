@@ -318,25 +318,6 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             index.entry(owner).or_default().push(function);
             index
         });
-    let parameter_types_by_function: HashMap<AstNodeId, Vec<_>> = parsed
-        .function_declarations
-        .iter()
-        .map(|function| {
-            (
-                function.declaration,
-                parsed
-                    .function_parameters
-                    .iter()
-                    .filter(|parameter| parameter.function == function.declaration)
-                    .map(|parameter| type_annotation_name(parsed, Some(parameter.annotation)))
-                    .collect(),
-            )
-        })
-        .collect();
-    let same_parameters = |left: &ParsedFunctionDeclaration, right: &ParsedFunctionDeclaration| {
-        parameter_types_by_function.get(&left.declaration)
-            == parameter_types_by_function.get(&right.declaration)
-    };
     let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
         if function.is_final
@@ -385,20 +366,8 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                         .owner
                         .map(|owner| inherited_name_mapping(parsed, child, owner))
                         .unwrap_or_default();
-                    let mapped: Vec<Option<String>> = parameter_types_by_function
-                        .get(&target.declaration)
-                        .into_iter()
-                        .flatten()
-                        .map(|name| {
-                            name.as_ref().map(|name| {
-                                mapping
-                                    .iter()
-                                    .find(|(parameter, _)| parameter == name)
-                                    .map_or_else(|| name.clone(), |(_, argument)| argument.clone())
-                            })
-                        })
-                        .collect();
-                    parameter_types_by_function.get(&method.declaration) == Some(&mapped)
+                    parameter_texts(parsed, target.declaration, &mapping)
+                        == parameter_texts(parsed, method.declaration, &[])
                 })
                 .collect::<Vec<_>>();
             let Some(parent_method) = targets.first().copied() else {
@@ -427,7 +396,7 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 let arguments = child
                     .interface_arguments
                     .get(index)
-                    .cloned()
+                    .map(|nodes| argument_texts(parsed, nodes))
                     .unwrap_or_default();
                 Some((interface, arguments))
             }) {
@@ -439,12 +408,9 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                         .owner
                         .map(|owner| inherited_name_mapping(parsed, child, owner))
                         .unwrap_or_default();
-                    type_annotation_name(parsed, parent_method.return_annotation).map(|name| {
-                        mapping
-                            .iter()
-                            .find(|(parameter, _)| *parameter == name)
-                            .map_or(name, |(_, argument)| argument.clone())
-                    })
+                    parent_method
+                        .return_annotation
+                        .map(|annotation| type_text_with(parsed, annotation, &mapping))
                 }
             };
             let return_compatible =
@@ -452,7 +418,7 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             // An interface requirement's return type is checked by the
             // conformance check above, so only superclass replacements are here.
             if !parent_is_interface
-                && (!return_compatible || !same_parameters(method, parent_method))
+                && !return_compatible
                 && let Some(node) = parsed.arena.node(method.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
@@ -518,8 +484,10 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             let arguments = class
                 .interface_arguments
                 .get(index)
-                .cloned()
+                .map(|nodes| argument_texts(parsed, nodes))
                 .unwrap_or_default();
+            let interface_mapping =
+                interface_parameter_mapping(parsed, interface.declaration, &arguments);
             for required in parsed
                 .function_declarations
                 .iter()
@@ -530,7 +498,8 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 let implementation = parsed.function_declarations.iter().find(|method| {
                     method.owner == Some(class.declaration)
                         && method.name == required.name
-                        && same_function_parameter_types(parsed, method, required)
+                        && parameter_texts(parsed, required.declaration, &interface_mapping)
+                            == parameter_texts(parsed, method.declaration, &[])
                 });
                 let Some(node) = parsed.arena.node(class.declaration) else {
                     continue;
@@ -641,16 +610,74 @@ pub(crate) fn interface_return_name(
     arguments: &[String],
     method: &ParsedFunctionDeclaration,
 ) -> Option<String> {
-    let name = type_annotation_name(parsed, method.return_annotation)?;
-    let position = parsed
+    let annotation = method.return_annotation?;
+    let mapping = interface_parameter_mapping(parsed, interface.declaration, arguments);
+    Some(type_text_with(parsed, annotation, &mapping))
+}
+
+/// The canonical spelling of each parameter of `function`, under `mapping`.
+pub(crate) fn parameter_texts(
+    parsed: &ParseOutput,
+    function: AstNodeId,
+    mapping: &[(String, String)],
+) -> Vec<String> {
+    parsed
+        .function_parameters
+        .iter()
+        .filter(|parameter| parameter.function == function)
+        .map(|parameter| type_text_with(parsed, parameter.annotation, mapping))
+        .collect()
+}
+
+/// The canonical spelling of each type argument, in order (ADR-0128).
+pub(crate) fn argument_texts(parsed: &ParseOutput, arguments: &[AstNodeId]) -> Vec<String> {
+    arguments
+        .iter()
+        .map(|argument| type_text_with(parsed, *argument, &[]))
+        .collect()
+}
+
+/// The mapping from the type parameters of `declaration` to the given arguments.
+fn interface_parameter_mapping(
+    parsed: &ParseOutput,
+    declaration: AstNodeId,
+    arguments: &[String],
+) -> Vec<(String, String)> {
+    parsed
         .generic_parameters
         .iter()
-        .filter(|parameter| parameter.owner == Some(interface.declaration))
-        .position(|parameter| parameter.name == name);
-    Some(match position {
-        Some(position) => arguments.get(position).cloned().unwrap_or(name),
-        None => name,
-    })
+        .filter(|parameter| parameter.owner == Some(declaration))
+        .map(|parameter| parameter.name.clone())
+        .zip(arguments.iter().cloned())
+        .collect()
+}
+
+/// The canonical spelling of a type annotation, with each name in `mapping`
+/// replaced by its spelling. `Box<T>` under `T = Int` is `Box<Int>` (ADR-0128).
+pub(crate) fn type_text_with(
+    parsed: &ParseOutput,
+    annotation: AstNodeId,
+    mapping: &[(String, String)],
+) -> String {
+    let Some(reference) = parsed
+        .type_name_references
+        .iter()
+        .find(|reference| reference.reference == annotation)
+    else {
+        return String::new();
+    };
+    if reference.generic_argument_references.is_empty() {
+        return mapping
+            .iter()
+            .find(|(parameter, _)| *parameter == reference.name)
+            .map_or_else(|| reference.name.clone(), |(_, text)| text.clone());
+    }
+    let arguments: Vec<String> = reference
+        .generic_argument_references
+        .iter()
+        .map(|argument| type_text_with(parsed, *argument, mapping))
+        .collect();
+    format!("{}<{}>", reference.name, arguments.join(","))
 }
 
 pub(crate) fn type_annotation_name(
@@ -661,8 +688,8 @@ pub(crate) fn type_annotation_name(
         parsed
             .type_name_references
             .iter()
-            .find(|reference| reference.reference == annotation)
-            .map(|reference| reference.name.clone())
+            .any(|reference| reference.reference == annotation)
+            .then(|| type_text_with(parsed, annotation, &[]))
     })
 }
 
@@ -708,7 +735,7 @@ pub(crate) fn inherited_name_mapping(
         let arguments = child
             .interface_arguments
             .get(index)
-            .cloned()
+            .map(|nodes| argument_texts(parsed, nodes))
             .unwrap_or_default();
         return parameter_names(owner).into_iter().zip(arguments).collect();
     }
@@ -726,12 +753,7 @@ pub(crate) fn inherited_name_mapping(
         let arguments: Vec<String> = current
             .superclass_type_arguments
             .iter()
-            .map(|argument| {
-                mapping
-                    .iter()
-                    .find(|(parameter, _)| parameter == argument)
-                    .map_or_else(|| argument.clone(), |(_, name)| name.clone())
-            })
+            .map(|argument| type_text_with(parsed, *argument, &mapping))
             .collect();
         mapping = parameter_names(parent.declaration)
             .into_iter()
@@ -889,11 +911,7 @@ pub fn type_class_types_in(
             })
             .collect()
     };
-    let class_names: Vec<(String, TypeId)> = report
-        .classes
-        .iter()
-        .map(|class| (class.name.clone(), class.type_id))
-        .collect();
+    let class_snapshot = report.classes.clone();
     for record in &mut report.classes {
         record.generic_parameters = class_generic_types(record.declaration)
             .into_iter()
@@ -910,19 +928,15 @@ pub fn type_class_types_in(
         let arguments: Option<Vec<TypeId>> = declaration
             .superclass_type_arguments
             .iter()
-            .map(|name| {
-                primitives.type_for_primitive_name(name).or_else(|| {
-                    generic_types
-                        .iter()
-                        .find(|(parameter, _)| *parameter == name.as_str())
-                        .map(|(_, ty)| *ty)
-                        .or_else(|| {
-                            class_names
-                                .iter()
-                                .find(|(class, _)| class == name)
-                                .map(|(_, ty)| *ty)
-                        })
-                })
+            .map(|argument| {
+                resolve_type_reference(
+                    &parsed.type_name_references,
+                    *argument,
+                    &primitives,
+                    &class_snapshot,
+                    &generic_types,
+                    types,
+                )
             })
             .collect();
         record.superclass_arguments = arguments.unwrap_or_default();
@@ -1123,7 +1137,7 @@ pub fn apply_class_type_facts(
         ));
     }
     for expression in &parsed.new_expressions {
-        if !expression.type_arguments.is_empty() {
+        if !expression.type_argument_references.is_empty() {
             continue;
         }
         if let Some(class) = classes.classes.iter().find(|class| {

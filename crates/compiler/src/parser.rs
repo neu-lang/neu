@@ -129,10 +129,10 @@ pub struct ParsedClassDeclaration {
     pub superclass: Option<String>,
     pub superclass_arguments: Vec<AstNodeId>,
     /// The type arguments written on the superclass, as in `Base<Int>()`.
-    pub superclass_type_arguments: Vec<String>,
+    pub superclass_type_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
     /// The type arguments of each entry in `interfaces`, in the same order.
-    pub interface_arguments: Vec<Vec<String>>,
+    pub interface_arguments: Vec<Vec<AstNodeId>>,
     pub fields: Vec<AstNodeId>,
     pub constructor_parameters: Vec<ParsedConstructorParameter>,
     pub interface: bool,
@@ -269,8 +269,9 @@ pub struct ParsedNewExpression {
     pub expression: AstNodeId,
     pub type_name: String,
     pub type_span: ByteSpan,
-    /// Explicit type argument names, as in `new Box<Int>(...)` (ADR-0083).
-    pub type_arguments: Vec<String>,
+    /// Explicit type arguments, as in `new Box<Array<Int>>(...)` (ADR-0083,
+    /// ADR-0128): the named-type reference of each argument.
+    pub type_argument_references: Vec<AstNodeId>,
     pub arguments: Vec<AstNodeId>,
     pub dynamic_array: bool,
     pub span: ByteSpan,
@@ -349,6 +350,9 @@ pub struct ParsedTypeNameReference {
     pub name_span: ByteSpan,
     pub generic_arguments: Vec<AstNodeId>,
     pub generic_argument_names: Vec<String>,
+    /// The named-type reference of each generic argument, in order. Nested
+    /// arguments are resolved through these (ADR-0128).
+    pub generic_argument_references: Vec<AstNodeId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1341,9 +1345,9 @@ impl<'source> Parser<'source> {
 
         let mut superclass = None;
         let mut superclass_arguments = Vec::new();
-        let mut superclass_type_arguments: Vec<String> = Vec::new();
+        let mut superclass_type_arguments: Vec<AstNodeId> = Vec::new();
         let mut interfaces = Vec::new();
-        let mut interface_arguments: Vec<Vec<String>> = Vec::new();
+        let mut interface_arguments: Vec<Vec<AstNodeId>> = Vec::new();
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
             loop {
@@ -2993,36 +2997,29 @@ impl<'source> Parser<'source> {
 
     /// Parses `<A, B>` after a constructed class name. Each argument is a
     /// simple name; nested type arguments are not parsed here.
-    fn parse_new_type_arguments(&mut self) -> Option<Vec<String>> {
-        let start = self.current()?.span.start();
-        self.advance();
-        let mut names = Vec::new();
-        loop {
-            let token = self.current()?.clone();
-            if token.kind != TokenKind::Identifier {
-                self.diagnostic_current_or_span(
-                    DiagnosticKind::MalformedGenericArgumentList,
-                    self.span_at(start),
-                );
-                return None;
-            }
-            names.push(self.text[token.span.start()..token.span.end()].to_owned());
-            self.advance();
-            match self.current_kind() {
-                Some(TokenKind::Comma) => self.advance(),
-                Some(TokenKind::Greater) => {
-                    self.advance();
-                    return Some(names);
-                }
-                _ => {
-                    self.diagnostic_current_or_span(
-                        DiagnosticKind::MalformedGenericArgumentList,
-                        self.span_at(start),
-                    );
-                    return None;
-                }
-            }
-        }
+    /// The type arguments of `new C<...>` or a class header, each a named-type
+    /// reference. Arguments may nest (ADR-0128).
+    fn parse_new_type_arguments(&mut self) -> Option<Vec<AstNodeId>> {
+        let (_, arguments) = self.parse_generic_arguments()?;
+        Some(
+            arguments
+                .into_iter()
+                .filter_map(|argument| self.reference_for_argument(argument))
+                .collect(),
+        )
+    }
+
+    /// The named-type reference of a generic argument, found by the argument's span.
+    fn reference_for_argument(&self, argument: AstNodeId) -> Option<AstNodeId> {
+        let span = self.arena.node(argument)?.span;
+        self.type_name_references
+            .iter()
+            .find(|reference| {
+                self.arena
+                    .node(reference.reference)
+                    .is_some_and(|node| node.span == span)
+            })
+            .map(|reference| reference.reference)
     }
 
     fn parse_new_expression(&mut self) -> Option<ByteSpan> {
@@ -3038,7 +3035,7 @@ impl<'source> Parser<'source> {
         }
         let type_name = self.text[type_token.span.start()..type_token.span.end()].to_owned();
         self.advance();
-        let type_arguments = if self.current_kind() == Some(TokenKind::Less) {
+        let type_argument_references = if self.current_kind() == Some(TokenKind::Less) {
             self.parse_new_type_arguments()?
         } else {
             Vec::new()
@@ -3055,7 +3052,7 @@ impl<'source> Parser<'source> {
                 expression,
                 type_name,
                 type_span: type_token.span,
-                type_arguments: Vec::new(),
+                type_argument_references: Vec::new(),
                 arguments: Vec::new(),
                 dynamic_array: true,
                 span,
@@ -3094,7 +3091,7 @@ impl<'source> Parser<'source> {
             expression,
             type_name,
             type_span: type_token.span,
-            type_arguments,
+            type_argument_references,
             arguments,
             dynamic_array: false,
             span,
@@ -3916,6 +3913,10 @@ impl<'source> Parser<'source> {
                     .map(|reference| reference.name.clone())
             })
             .collect();
+        let generic_argument_references = generic_arguments
+            .iter()
+            .filter_map(|argument| self.reference_for_argument(*argument))
+            .collect();
         let span = self.span(start, end);
         let reference = self.arena.add_named_type(span);
         self.type_name_references.insert(
@@ -3926,6 +3927,7 @@ impl<'source> Parser<'source> {
                 name_span: self.span(start, name_end),
                 generic_arguments,
                 generic_argument_names,
+                generic_argument_references,
             },
         );
         Some(span)

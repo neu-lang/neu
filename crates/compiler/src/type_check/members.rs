@@ -83,7 +83,7 @@ pub(crate) fn apply_generic_new_expressions(
     report: &mut TypeCheckReport,
 ) {
     for new in &parsed.new_expressions {
-        if new.type_arguments.is_empty() {
+        if new.type_argument_references.is_empty() {
             continue;
         }
         let Some(class) = classes
@@ -100,16 +100,17 @@ pub(crate) fn apply_generic_new_expressions(
             continue;
         };
         let arguments: Option<Vec<TypeId>> = new
-            .type_arguments
+            .type_argument_references
             .iter()
-            .map(|name| {
-                primitives.type_for_primitive_name(name).or_else(|| {
-                    classes
-                        .classes()
-                        .iter()
-                        .find(|class| class.name() == name)
-                        .map(|class| class.type_id())
-                })
+            .map(|argument| {
+                super::generics::resolve_type_reference(
+                    &parsed.type_name_references,
+                    *argument,
+                    &primitives,
+                    classes.classes(),
+                    &[],
+                    types,
+                )
             })
             .collect();
         let Some(arguments) = arguments else {

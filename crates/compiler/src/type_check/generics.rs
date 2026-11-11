@@ -592,6 +592,16 @@ pub(crate) fn resolve_annotation_type_with_generics(
     arena: &mut TypeArena,
     generic_types: &[(&str, TypeId)],
 ) -> Option<TypeId> {
+    if let Some(ty) = resolve_type_reference(
+        type_name_references,
+        annotation,
+        primitives,
+        classes,
+        generic_types,
+        arena,
+    ) {
+        return Some(ty);
+    }
     if let Some(reference) = type_name_references
         .iter()
         .find(|reference| reference.reference == annotation)
@@ -709,4 +719,57 @@ pub(crate) fn resolve_enum_payload_type(
             .find(|(parameter, _)| *parameter == name)
             .map(|(_, ty)| *ty)
     })
+}
+
+/// Resolves a named-type reference to a type, with its generic arguments resolved
+/// recursively (ADR-0128). A type argument may itself be a generic instance or an
+/// `Array<T>`. `None` when a name is not a primitive, a generic parameter in scope,
+/// a user class, or the built-in `Array`.
+pub(crate) fn resolve_type_reference(
+    references: &[ParsedTypeNameReference],
+    node: AstNodeId,
+    primitives: &PrimitiveTypeIds,
+    classes: &[ClassTypeRecord],
+    generic_types: &[(&str, TypeId)],
+    arena: &mut TypeArena,
+) -> Option<TypeId> {
+    let reference = references
+        .iter()
+        .find(|reference| reference.reference == node)?;
+    if reference.generic_argument_references.is_empty() {
+        return generic_types
+            .iter()
+            .find(|(name, _)| *name == reference.name)
+            .map(|(_, ty)| *ty)
+            .or_else(|| primitives.type_for_primitive_name(&reference.name))
+            .or_else(|| {
+                classes
+                    .iter()
+                    .find(|class| class.name == reference.name)
+                    .map(|class| class.type_id)
+            });
+    }
+    let arguments = reference
+        .generic_argument_references
+        .iter()
+        .map(|argument| {
+            resolve_type_reference(
+                references,
+                *argument,
+                primitives,
+                classes,
+                generic_types,
+                arena,
+            )
+        })
+        .collect::<Option<Vec<_>>>()?;
+    if reference.name == "Array" && arguments.len() == 1 {
+        return Some(arena.dynamic_array(arguments[0]));
+    }
+    let class = classes.iter().find(|class| class.name == reference.name)?;
+    let identity = match arena.get(class.type_id)?.kind() {
+        TypeKind::Nominal(identity) => identity.clone(),
+        _ => return None,
+    };
+    Some(arena.generic_instance(GenericTypeIdentity::new(identity, arguments)))
 }
