@@ -1076,3 +1076,67 @@ fn private_constructor_parameter_needs_val_or_var() {
     .unwrap_err();
     assert!(error.contains("MalformedDeclarationHeader"), "{error}");
 }
+
+const COUNTER: &str = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Seven(var n: Int): Counter { func value(): Int { return 7; } } ";
+
+#[test]
+fn default_method_is_inherited_by_an_implementing_class() {
+    let source = format!(
+        "{COUNTER}public func main(): Int {{ val c: Counter = new Seven(1); return c.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("default_inherit", &source, 6910),
+        Ok(Some(14))
+    );
+}
+
+#[test]
+fn default_method_is_inherited_on_a_class_typed_receiver() {
+    let source = format!(
+        "{COUNTER}public func main(): Int {{ val s: Seven = new Seven(1); return s.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("default_class_receiver", &source, 6911),
+        Ok(Some(14))
+    );
+}
+
+#[test]
+fn class_method_replaces_the_default() {
+    let source = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Three: Counter { func value(): Int { return 7; } func twice(): Int { return 3; } } public func main(): Int { val c: Counter = new Three(); return c.twice(); }";
+    assert_eq!(
+        compile_private_case("default_replaced", source, 6912),
+        Ok(Some(3))
+    );
+}
+
+#[test]
+fn superclass_method_wins_over_the_default() {
+    let source = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Base { func twice(): Int { return 5; } } class Child: Base(), Counter { func value(): Int { return 7; } } public func main(): Int { val c: Counter = new Child(); return c.twice(); }";
+    assert_eq!(
+        compile_private_case("default_superclass", source, 6913),
+        Ok(Some(5))
+    );
+}
+
+#[test]
+fn same_method_from_two_interfaces_is_ambiguous() {
+    let error = compile_private_case(
+        "default_ambiguous",
+        "interface A { func twice(): Int { return 1; } } interface B { func twice(): Int { return 2; } } class C: A, B {} public func main(): Int { return 7; }",
+        6914,
+    )
+    .unwrap_err();
+    assert!(error.contains("AmbiguousInterfaceMethod"), "{error}");
+}
+
+#[test]
+fn default_method_of_a_generic_interface_is_deferred() {
+    let error = compile_private_case(
+        "default_generic",
+        "interface Box<T> { func get(): T; func twice(): T { return this.get(); } } public func main(): Int { return 7; }",
+        6915,
+    )
+    .unwrap_err();
+    assert!(error.contains("GenericInterfaceDefault"), "{error}");
+}

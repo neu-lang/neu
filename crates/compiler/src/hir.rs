@@ -2411,6 +2411,36 @@ fn bare_field_exists(
         })
 }
 
+/// The declaration that a call to `name` on a receiver of interface `interface`
+/// lowers against: the interface's own default body when it has one (ADR-0133),
+/// otherwise the first implementing class's method. The call itself dispatches
+/// through the interface at run time.
+fn interface_method_declaration(
+    source: &CheckedHirSource<'_>,
+    interface: &crate::parser::ParsedClassDeclaration,
+    name: &str,
+) -> Option<crate::ast::AstNodeId> {
+    if let Some(default) = source.parsed.function_declarations.iter().find(|function| {
+        function.owner == Some(interface.declaration)
+            && function.name == name
+            && function.body.is_some()
+    }) {
+        return Some(default.declaration);
+    }
+    source
+        .class_types?
+        .classes()
+        .iter()
+        .find(|candidate| {
+            !candidate.is_interface()
+                && candidate
+                    .interfaces()
+                    .iter()
+                    .any(|implemented| implemented == &interface.name)
+        })
+        .and_then(|candidate| method_owner_declaration(source, candidate.name(), name))
+}
+
 fn method_declaration_index(
     source: &CheckedHirSource<'_>,
     callee: crate::ast::AstNodeId,
@@ -2486,20 +2516,7 @@ fn method_declaration_index(
             .iter()
             .find(|class| class.name == element_reference.name)?;
         let declaration = if class.interface {
-            source
-                .class_types?
-                .classes()
-                .iter()
-                .find(|candidate| {
-                    !candidate.is_interface()
-                        && candidate
-                            .interfaces()
-                            .iter()
-                            .any(|name| name == &class.name)
-                })
-                .and_then(|candidate| {
-                    method_owner_declaration(source, candidate.name(), &member.name)
-                })?
+            interface_method_declaration(source, class, &member.name)?
         } else {
             source
                 .parsed
@@ -2581,6 +2598,15 @@ fn method_declaration_index(
             .class_declarations
             .iter()
             .find(|class| class.name == class_name)?;
+        if class.interface {
+            let declaration = interface_method_declaration(source, class, &member.name)?;
+            return source
+                .parsed
+                .function_declarations
+                .iter()
+                .position(|function| function.declaration == declaration)
+                .and_then(|index| hir_function_index(source.parsed, index));
+        }
         return source
             .parsed
             .function_declarations
@@ -2606,20 +2632,7 @@ fn method_declaration_index(
             .iter()
             .find(|class| class.name == class_name)?;
         let declaration = if class.interface {
-            source
-                .class_types?
-                .classes()
-                .iter()
-                .find(|candidate| {
-                    !candidate.is_interface()
-                        && candidate
-                            .interfaces()
-                            .iter()
-                            .any(|name| name == &class.name)
-                })
-                .and_then(|candidate| {
-                    method_owner_declaration(source, candidate.name(), &member.name)
-                })?
+            interface_method_declaration(source, class, &member.name)?
         } else {
             source
                 .parsed
@@ -2713,6 +2726,8 @@ fn method_declaration_index(
 }
 
 fn hir_function_index(parsed: &ParseOutput, parsed_index: usize) -> Option<usize> {
+    // A bodyless declaration (an abstract or interface method) has no HIR function.
+    parsed.function_declarations.get(parsed_index)?.body?;
     parsed
         .function_declarations
         .iter()
@@ -3023,8 +3038,37 @@ fn method_owner_declaration_for_signature(
     }) {
         return Some(function.declaration);
     }
-    class.superclass.as_deref().and_then(|parent| {
+    // A superclass declaration (including one inherited from its own interfaces)
+    // wins over this class's interface defaults (ADR-0133).
+    if let Some(declaration) = class.superclass.as_deref().and_then(|parent| {
         method_owner_declaration_for_signature(source, parent, method_name, parameter_types)
+    }) {
+        return Some(declaration);
+    }
+    class.interfaces.iter().find_map(|interface_name| {
+        let interface = source
+            .parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.interface && candidate.name == *interface_name)?;
+        source
+            .parsed
+            .function_declarations
+            .iter()
+            .find(|function| {
+                function.owner == Some(interface.declaration)
+                    && function.name == method_name
+                    && function.body.is_some()
+                    && !function.is_static
+                    && source
+                        .signatures
+                        .iter()
+                        .find(|signature| signature.declaration() == function.declaration)
+                        .is_some_and(|signature| {
+                            signature.parameter_types().get(1..) == parameter_types.get(1..)
+                        })
+            })
+            .map(|function| function.declaration)
     })
 }
 

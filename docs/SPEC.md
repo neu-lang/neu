@@ -801,10 +801,10 @@ deferred.
 
 Classes may declare typed `val` or `var` fields and `func` methods. Visibility is
 `public`, `internal`, or `private` under ADR-0025; `protected` is deferred.
-Interfaces declare required methods. Default methods, interface state,
-extension methods, and operator overloading are deferred. Implementations must
-provide exactly one compatible method; no marker is written (ADR-0127). Field
-hiding and ambiguous interface methods are diagnostics.
+Interfaces declare required methods and may declare default methods (ADR-0133).
+Interface state, extension methods, and operator overloading are deferred.
+Implementations must provide exactly one compatible method; no marker is written
+(ADR-0127). Field hiding and ambiguous interface methods are diagnostics.
 
 Instance methods have an implicit non-null `this`; `this.` is available for
 shadowing. Local names shadow members. `this` cannot be rebound or escape before
@@ -834,8 +834,7 @@ selects the immediate superclass implementation, and cannot be stored,
 returned, or used to bypass visibility. Unqualified lookup uses the current
 receiver and local bindings shadow members; `this.member` qualifies receiver
 lookup. A class must satisfy every required interface method exactly once.
-Default-method conflict rules are deferred because default methods are
-deferred.
+Default-method inheritance and conflicts follow ADR-0133.
 
 Non-overridden or final methods use compiler-private direct dispatch.
 Overridable class methods use compiler-private virtual metadata and interface calls use
@@ -846,6 +845,18 @@ capabilities, and ownership-effect metadata, not target-specific table
 layouts. Downcasts, runtime type tests, nullable dispatch beyond existing flow
 typing, reflection,
 multiple dispatch, dynamic loading, and FFI vtables are deferred.
+
+## ADR-0133: Default Interface Methods
+
+An interface method with a body is a default method. A class that implements the
+interface inherits it, and calls to it dispatch through the interface. A class
+method with the same name and parameter types replaces the default (ADR-0127). A
+superclass method with the same name and parameter types wins over the default.
+A default is not `final`; `final` on an interface method remains a diagnostic.
+
+A class that inherits the same name and parameter types from two interfaces, and
+declares no such method itself, is an ambiguous interface method. Defaults of
+generic interfaces and `super` calls to a default are deferred diagnostics.
 
 ## ADR-0067: Object Lifecycle And ABI
 
@@ -911,8 +922,8 @@ Class fields use an optional `public`, `internal`, or `private` modifier,
 followed by `val` or `var`, a name, `:`, and a declared type, terminated by
 `;`. `protected` is rejected. Fields have no declaration-time default
 initializer in this foundation; the primary constructor initializes every
-field under ADR-0067. Interface bodies contain required method declarations;
-default methods and interface fields are deferred.
+field under ADR-0067. Interface bodies contain required method declarations and
+default methods (ADR-0133); interface fields are deferred.
 
 Field access is `receiver.field`. In an instance method or constructor, a bare
 field name means `this.field`; explicit `this.field` disambiguates a shadowed

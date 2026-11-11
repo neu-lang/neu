@@ -290,6 +290,7 @@ pub enum DispatchDiagnosticKind {
     InterfaceMethodFinal,
     MissingInterfaceMethod,
     AmbiguousInterfaceMethod,
+    GenericInterfaceDefault,
     IncompatibleOverride,
     IncompatibleInterfaceMethod,
 }
@@ -310,6 +311,30 @@ impl DispatchDiagnostic {
 }
 
 pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
+    let mut generic_default_diagnostics = Vec::new();
+    for interface in parsed
+        .class_declarations
+        .iter()
+        .filter(|class| class.interface)
+    {
+        let generic = parsed
+            .generic_parameters
+            .iter()
+            .any(|parameter| parameter.owner == Some(interface.declaration));
+        let has_default = parsed
+            .function_declarations
+            .iter()
+            .any(|method| method.owner == Some(interface.declaration) && method.body.is_some());
+        if generic
+            && has_default
+            && let Some(node) = parsed.arena.node(interface.declaration)
+        {
+            generic_default_diagnostics.push(DispatchDiagnostic {
+                kind: DispatchDiagnosticKind::GenericInterfaceDefault,
+                span: node.span,
+            });
+        }
+    }
     let methods_by_owner: HashMap<AstNodeId, Vec<&ParsedFunctionDeclaration>> = parsed
         .function_declarations
         .iter()
@@ -318,7 +343,7 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             index.entry(owner).or_default().push(function);
             index
         });
-    let mut diagnostics = Vec::new();
+    let mut diagnostics = generic_default_diagnostics;
     for function in &parsed.function_declarations {
         if function.is_final
             && function.owner.is_some_and(|owner| {
@@ -459,12 +484,14 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             }
         }
         for (index, method) in interface_methods.iter().enumerate() {
+            let parameters = parameter_texts(parsed, method.declaration, &[]);
             if interface_methods[index + 1..].iter().any(|other| {
                 other.name == method.name
+                    && other.owner != method.owner
                     && same_function_parameter_types(parsed, method, other)
-                    && type_annotation_name(parsed, method.return_annotation)
-                        != type_annotation_name(parsed, other.return_annotation)
-            }) && let Some(node) = parsed.arena.node(class.declaration)
+            }) && !class_declares_method(parsed, class, &method.name, &parameters)
+                && !superclass_concrete_method(parsed, class, &method.name, &parameters)
+                && let Some(node) = parsed.arena.node(class.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
                     kind: DispatchDiagnosticKind::AmbiguousInterfaceMethod,
@@ -504,7 +531,15 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 let Some(node) = parsed.arena.node(class.declaration) else {
                     continue;
                 };
+                let parameters = parameter_texts(parsed, required.declaration, &interface_mapping);
                 match implementation {
+                    None if required.body.is_some()
+                        || superclass_concrete_method(
+                            parsed,
+                            class,
+                            &required.name,
+                            &parameters,
+                        ) => {}
                     None => diagnostics.push(DispatchDiagnostic {
                         kind: DispatchDiagnosticKind::MissingInterfaceMethod,
                         span: node.span,
@@ -766,8 +801,56 @@ pub(crate) fn inherited_name_mapping(
     }
 }
 
-/// The nearest ancestor of `class` that declares the instance method `name`, when
-/// `class` itself does not declare it. Such a call is an inherited call.
+/// Whether `class` itself declares an instance method `name` with these parameter
+/// spellings.
+pub(crate) fn class_declares_method(
+    parsed: &ParseOutput,
+    class: &ParsedClassDeclaration,
+    name: &str,
+    parameters: &[String],
+) -> bool {
+    parsed.function_declarations.iter().any(|method| {
+        method.owner == Some(class.declaration)
+            && method.name == name
+            && parameter_texts(parsed, method.declaration, &[]) == parameters
+    })
+}
+
+/// Whether a superclass of `class`, at any depth, provides a concrete (bodied)
+/// method `name` with these parameter spellings (ADR-0133: a class's superclass
+/// method wins over an interface default).
+pub(crate) fn superclass_concrete_method(
+    parsed: &ParseOutput,
+    class: &ParsedClassDeclaration,
+    name: &str,
+    parameters: &[String],
+) -> bool {
+    let mut superclass = class.superclass.as_deref();
+    while let Some(parent_name) = superclass {
+        let Some(parent) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == parent_name)
+        else {
+            return false;
+        };
+        if parsed.function_declarations.iter().any(|method| {
+            method.owner == Some(parent.declaration)
+                && method.name == name
+                && method.body.is_some()
+                && parameter_texts(parsed, method.declaration, &[]) == parameters
+        }) {
+            return true;
+        }
+        superclass = parent.superclass.as_deref();
+    }
+    false
+}
+
+/// The nearest ancestor of `class` that declares the instance method `name`, or,
+/// failing that, the interface whose default body supplies it (ADR-0133). A
+/// superclass declaration wins over an interface default. `None` when `class`
+/// declares the method itself, or no ancestor or interface supplies it.
 pub(crate) fn inherited_method_owner(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
@@ -783,20 +866,43 @@ pub(crate) fn inherited_method_owner(
     if declares(class) {
         return None;
     }
-    let mut current = classes
+    let receiver = classes
         .classes()
         .iter()
         .find(|candidate| candidate.declaration == class)?;
-    loop {
-        let parent = classes
-            .classes()
-            .iter()
-            .find(|candidate| Some(candidate.name.as_str()) == current.superclass.as_deref())?;
+    let mut lineage = vec![receiver];
+    let mut current = receiver;
+    while let Some(parent) = classes
+        .classes()
+        .iter()
+        .find(|candidate| Some(candidate.name.as_str()) == current.superclass.as_deref())
+    {
         if declares(parent.declaration) {
             return Some(parent.declaration);
         }
+        lineage.push(parent);
         current = parent;
     }
+    for record in lineage {
+        for interface_name in &record.interfaces {
+            let Some(interface) = classes
+                .classes()
+                .iter()
+                .find(|candidate| candidate.interface && candidate.name == *interface_name)
+            else {
+                continue;
+            };
+            if parsed.function_declarations.iter().any(|method| {
+                method.owner == Some(interface.declaration)
+                    && method.name == name
+                    && method.body.is_some()
+                    && !method.is_static
+            }) {
+                return Some(interface.declaration);
+            }
+        }
+    }
+    None
 }
 
 /// The mapping from the type parameters of `owner`, an ancestor of the class
@@ -808,6 +914,13 @@ pub(crate) fn inherited_parameter_types(
     receiver: AstNodeId,
     owner: AstNodeId,
 ) -> Option<Vec<(TypeId, TypeId)>> {
+    if classes
+        .classes()
+        .iter()
+        .any(|candidate| candidate.declaration == owner && candidate.interface)
+    {
+        return Some(Vec::new());
+    }
     let mut current = classes
         .classes()
         .iter()

@@ -1,6 +1,6 @@
 # ADR-0133: Default Interface Methods
 
-Status: Proposed; would extend ADR-0065, which deferred default method bodies
+Status: Accepted; extends ADR-0065, which deferred default method bodies
 
 ## Question
 
