@@ -43,7 +43,21 @@ Deferred, not in the set:
 - Iterators and slices: gated on ADR-0118's borrow and iterator wiring.
 
 Open points for approval:
-- B1. `E` is undefined. ADR-0110 says the error payload must be accepted before the public API is frozen. Proposed: `enum CollectionError { IndexOutOfBounds, AllocationFailed }`.
+- B1. **Decided by the project owner:** `E` is `stdlib` `Error`, an interface. The concrete
+  errors are classes that implement it, starting with `IndexOutOfBoundsError` and
+  `AllocationFailedError`. This replaces the earlier proposed `enum CollectionError`.
+  Implementation is blocked until the following are accepted in an ADR:
+  1. **Interface-typed `Err` payloads.** `Result<T, Error>` holds an interface value. Nothing
+     accepted covers an interface-typed payload in a generic enum (ADR-0033 defers generic
+     enums and interfaces at bootstrap).
+  2. **How callers tell errors apart.** ADR-0079 forbids enums from implementing interfaces,
+     and SPEC defers downcasts and runtime type tests. A caller holding `Error` therefore
+     cannot branch on `IndexOutOfBoundsError` versus `AllocationFailedError`. Proposed fix:
+     `Error` declares `func kind(): ErrorKind`, where `ErrorKind` is a closed enum, so
+     callers can use exhaustive `when`.
+  3. **`Send`/`Share` of interface values.** ADR-0111 says `Err(E)` carries the properties of
+     `E`. Accepted ADRs don't say whether an interface value is `Send` or `Share`
+     (ADR-0014).
 - B2. Capacity. Keep it hidden (ADR-0073), or expose a query under a new ADR?
 - B3. `get` on move-only `T`. Option (a): `get` requires a copy bound. Option (b): defer `get`, `first`, and `last` until a borrowed-return rule exists.
 
