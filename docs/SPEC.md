@@ -978,6 +978,10 @@ deferred.
 
 ## ADR-0118: Pure-Neu Collection Foundation
 
+Any generic class may hold a collection, including `Array<T>`, in a private
+field, by ADR-0126. A `Vector<T>` is copyable exactly when its element type is.
+Slices and explicit clone remain deferred as stated in ADR-0126.
+
 The first `neu.collections` surface is ordinary Neu code in the unified
 stdlib manifest. `Vector<T>` is an owning ordered sequence, `Slice<T>` is an
 immutable ordered view, and `Iterator<T>` is a single-pass protocol whose
