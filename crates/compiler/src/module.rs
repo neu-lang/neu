@@ -795,6 +795,7 @@ impl VirtualPackageGraph {
                     queue.push(member);
                 }
             }
+            let mut named_names = BTreeSet::new();
             for import in &parsed.imports {
                 if import.names.is_empty() {
                     continue;
@@ -840,14 +841,19 @@ impl VirtualPackageGraph {
                             .map(|function| function.name.clone())
                     })
                     .collect();
-                let mut seen = BTreeSet::new();
                 for (index, name) in import.names.iter().enumerate() {
                     let name_span = import.name_spans.get(index).copied();
-                    if !seen.insert(name.clone())
-                        || parsed
-                            .declaration_names
-                            .iter()
-                            .any(|declaration| declaration.name == *name)
+                    if !named_names.insert(name.clone()) {
+                        diagnostics.push(PackageGraphDiagnostic {
+                            span: name_span,
+                            kind: PackageGraphDiagnosticKind::ImportQualifierCollision,
+                            path: file_path.clone(),
+                            detail: format!("`{name}` is imported more than once"),
+                        });
+                    } else if parsed
+                        .declaration_names
+                        .iter()
+                        .any(|declaration| declaration.name == *name)
                     {
                         diagnostics.push(PackageGraphDiagnostic {
                             span: name_span,

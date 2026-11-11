@@ -294,3 +294,27 @@ fn named_import_collision_points_at_the_imported_name() {
         "{rendered}"
     );
 }
+
+#[test]
+fn duplicate_named_import_across_statements_is_rejected() {
+    let project = Project::new(
+        "duplicate_named_import",
+        &[
+            (
+                "src/main.neu",
+                "import {add} from \"./math\"\nimport {add} from \"./math\"\n\npublic func main(): Int {\n    return 1\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\npublic func add(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered();
+
+    assert!(
+        rendered.contains("`add` is imported more than once"),
+        "{rendered}"
+    );
+}
