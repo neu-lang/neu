@@ -238,9 +238,10 @@ pub(crate) fn generic_instance_call_targets(
     targets
 }
 
-/// Types a field read on a generic instance by substituting the receiver's type
-/// arguments for the class's type parameters in the field's type (ADR-0126).
-/// Method calls and assignment targets are typed by their own passes.
+/// Types a field read or assignment target on a generic instance by substituting
+/// the receiver's type arguments for the class's type parameters in the field's
+/// type (ADR-0126). A `val` field is not assignable. Method calls are typed by
+/// their own pass.
 pub(crate) fn apply_generic_instance_fields(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
@@ -252,10 +253,6 @@ pub(crate) fn apply_generic_instance_fields(
             .call_expressions
             .iter()
             .any(|call| call.callee == member.expression)
-            || parsed
-                .assignment_statements
-                .iter()
-                .any(|assignment| assignment.target == member.expression)
         {
             continue;
         }
@@ -294,5 +291,16 @@ pub(crate) fn apply_generic_instance_fields(
         }
         let specialized = substitution.apply(field_type, types);
         report.replace_expression_type(ExpressionType::new(member.expression, specialized));
+        if parsed
+            .assignment_statements
+            .iter()
+            .any(|assignment| assignment.target == member.expression)
+            && !field.mutable()
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ImmutableFieldMutation,
+                member.expression,
+            ));
+        }
     }
 }

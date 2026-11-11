@@ -3392,6 +3392,47 @@ fn lower_control_flow_block(
             .iter()
             .find(|assignment| assignment.statement == statement.statement)
         {
+            if let Some(member) = source
+                .parsed
+                .member_expressions
+                .iter()
+                .find(|member| member.expression == assignment.target)
+            {
+                let receiver = lower_expression(
+                    source,
+                    function_declaration,
+                    member.receiver,
+                    local_bindings,
+                    expressions,
+                )?;
+                let value = lower_expression(
+                    source,
+                    function_declaration,
+                    assignment.value,
+                    local_bindings,
+                    expressions,
+                )?;
+                let value = match declared_field_type(
+                    source,
+                    member.receiver,
+                    function_declaration,
+                    &member.name,
+                ) {
+                    Some(declared) => {
+                        erase_argument(source, assignment.value, value, declared, expressions)
+                    }
+                    None => value,
+                };
+                output.push(HirControlFlow::FieldAssignment(
+                    HirAssignment::field_assignment(
+                        statement.span,
+                        receiver,
+                        field_index_for_receiver(source, member.receiver, &member.name),
+                        value,
+                    ),
+                ));
+                continue;
+            }
             let (target, index) = if let Some(index) = source
                 .parsed
                 .index_expressions
@@ -4496,6 +4537,7 @@ pub enum HirControlFlow {
         span: ByteSpan,
     },
     Assignment(HirAssignment),
+    FieldAssignment(HirAssignment),
     Return(HirReturn),
     If {
         condition: HirExpressionId,

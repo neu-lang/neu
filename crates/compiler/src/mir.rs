@@ -3366,6 +3366,19 @@ impl<'a> ControlFlowLowerer<'a> {
                         self.emit_cancellation_check(self.scope_depth, *span);
                     }
                 }
+                HirControlFlow::FieldAssignment(assignment) => {
+                    let (receiver, index) = assignment
+                        .field()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let receiver = self.lower_expression(receiver)?;
+                    let value = self.lower_expression(assignment.value())?;
+                    self.push(MirInstruction::FieldStore {
+                        receiver,
+                        index,
+                        value,
+                        span: assignment.span(),
+                    });
+                }
                 HirControlFlow::Assignment(assignment) => {
                     let value = self.lower_expression(assignment.value())?;
                     self.push(MirInstruction::StoreLocal {
