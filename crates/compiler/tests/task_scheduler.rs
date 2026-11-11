@@ -448,3 +448,31 @@ fn cancelled_awaiter_unwinds_instead_of_deadlocking() {
     assert!(is_trap(code), "{stderr}");
     assert!(!stderr.contains("deadlock"), "{stderr}");
 }
+
+#[test]
+fn operators_on_a_local_inferred_from_a_suspend_call_result_are_typed() {
+    // A local inferred from a suspend call's result must have that type when a
+    // later initializer uses it in an operator, as it does for an ordinary call.
+    let source = r#"
+        suspend func produce(): Int { return 2; }
+        suspend func main(): Int {
+            val v = produce();
+            val w = v + 1;
+            return w;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_suspend_operator"), 3);
+}
+
+#[test]
+fn operators_on_a_local_inferred_from_a_call_result_are_typed() {
+    let source = r#"
+        func produce(): Int { return 2; }
+        func main(): Int {
+            val v = produce();
+            val w = v + 1;
+            return w;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_call_operator"), 3);
+}

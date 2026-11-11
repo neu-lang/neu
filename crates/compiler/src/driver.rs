@@ -642,44 +642,7 @@ fn compile_source_with_entry(
                     | TypeRuleDiagnostic::MemberExpressionDeferred
             )
     });
-    if let Some(int_type) = types
-        .records()
-        .iter()
-        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
-        .map(|record| record.id())
-    {
-        let int_unary = parsed
-            .unary_expressions
-            .iter()
-            .filter(|expression| {
-                report
-                    .expression_type(expression.operand)
-                    .is_none_or(|ty| ty == int_type)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let int_binary = parsed
-            .binary_expressions
-            .iter()
-            .filter(|expression| {
-                report
-                    .expression_type(expression.left)
-                    .is_none_or(|ty| ty == int_type)
-                    || report
-                        .expression_type(expression.right)
-                        .is_none_or(|ty| ty == int_type)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let inferred_operators = type_executable_int_operators(
-            &int_unary,
-            &int_binary,
-            &parsed.grouped_expressions,
-            report.expression_types(),
-            int_type,
-        );
-        merge_type_check_report(&mut report, inferred_operators);
-    }
+    type_int_operators(&parsed, &types, &mut report);
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
@@ -717,6 +680,9 @@ fn compile_source_with_entry(
     // Calls to suspend functions get their result types here, and a spawn body can
     // depend on them, so the same typing rounds run again.
     for _ in 0..3 {
+        // Operators on locals whose types come from call results need those call
+        // types, which exist only after the direct-call results above.
+        type_int_operators(&parsed, &types, &mut report);
         infer_local_types(&parsed, &mut report);
         type_lambda_expressions(&parsed, &mut types, &mut report);
         type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
@@ -948,4 +914,53 @@ fn compile_source_with_entry(
         SystemLinkInvocation::new(&object_path, &executable).map_err(DriverError::Link)?;
     invocation.execute().map_err(DriverError::Link)?;
     Ok(executable)
+}
+
+/// Types integer unary and binary operators whose operands are known or not yet
+/// typed. An operand's type can arrive from a later pass (a call result), so
+/// this runs again in the typing rounds, not only once.
+fn type_int_operators(
+    parsed: &parser::ParseOutput,
+    types: &TypeArena,
+    report: &mut crate::type_check::TypeCheckReport,
+) {
+    let Some(int_type) = types
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
+        .map(|record| record.id())
+    else {
+        return;
+    };
+    let int_unary = parsed
+        .unary_expressions
+        .iter()
+        .filter(|expression| {
+            report
+                .expression_type(expression.operand)
+                .is_none_or(|ty| ty == int_type)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let int_binary = parsed
+        .binary_expressions
+        .iter()
+        .filter(|expression| {
+            report
+                .expression_type(expression.left)
+                .is_none_or(|ty| ty == int_type)
+                || report
+                    .expression_type(expression.right)
+                    .is_none_or(|ty| ty == int_type)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let inferred_operators = type_executable_int_operators(
+        &int_unary,
+        &int_binary,
+        &parsed.grouped_expressions,
+        report.expression_types(),
+        int_type,
+    );
+    merge_type_check_report(report, inferred_operators);
 }
