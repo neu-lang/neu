@@ -229,6 +229,17 @@ The compiler records same-module visibility metadata but does not enforce visibi
 
 Resolution diagnostics include `unresolved_name`, `duplicate_name`, `ambiguous_name`, `unsupported_import_resolution`, `unsupported_cross_module_lookup`, and `unsupported_member_resolution`. Each diagnostic follows ADR-0015 and ADR-0026 primary span, recovery action, source-of-truth citation, and safe suggestion policy requirements.
 
+Unknown names on the executable path (issue 50). A simple name reference is
+reported as `unknown_name` at the name when the program declares nothing with
+that name: no declaration, local binding, parameter, lambda parameter, field,
+class, constructor parameter, enum variant, loop variable, generic parameter,
+or built-in. Built-ins are `assert`, `await`, `cancel`, `channel`, `clone`,
+`close`, `fail`, `length`, `precondition`, `receive`, `send`, `spawn`, `super`,
+and `this`. The check is conservative: a name declared anywhere in the program
+is never reported, so scope-sensitive misuse of a declared name is not covered
+here. A qualifier whose package does not exist is an unknown name at the
+qualifier.
+
 ## ADR-0027: Type Checking Core
 
 The compiler defines a small bootstrap type checker with primitive type-checking identities, literal typing, resolved name expression typing, explicit nullable wrappers, and exact assignment compatibility.
