@@ -249,6 +249,39 @@ fn byte_local_is_not_implicitly_converted_to_int() {
 }
 
 #[test]
+fn primitive_equality_across_types_is_a_primitive_type_mismatch() {
+    let cases = [
+        (
+            "byte_int",
+            "public func main(): Int { val s: Byte = 7; if (s == 7) { return 7; } return 1; }",
+        ),
+        (
+            "bool_int",
+            "public func main(): Int { val flag: Bool = true; if (flag == 1) { return 7; } return 1; }",
+        ),
+        (
+            "float_int",
+            "public func main(): Int { val f: Float = 2.0; if (f != 2) { return 7; } return 1; }",
+        ),
+    ];
+    for (name, source) in cases {
+        let workspace = std::env::temp_dir().join(format!(
+            "neu-primitive-mismatch-{name}-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&workspace);
+        fs::create_dir_all(&workspace).unwrap();
+        let error =
+            compile_source_to_executable(source, options(&workspace.join("program"))).unwrap_err();
+        assert!(
+            format!("{error:?}").contains("PrimitiveTypeMismatch"),
+            "{name}: {error:?}"
+        );
+        let _ = fs::remove_dir_all(workspace);
+    }
+}
+
+#[test]
 fn string_index_is_not_implicitly_converted_to_int() {
     let workspace =
         std::env::temp_dir().join(format!("neu-string-byte-mismatch-{}", std::process::id()));

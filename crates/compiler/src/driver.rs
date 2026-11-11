@@ -547,6 +547,10 @@ fn compile_source_with_entry(
         .collect::<Vec<_>>();
     signatures.extend(missing_function_signatures);
     apply_receiver_signatures(&parsed, &class_types, &mut signatures);
+    // HIR lowers against erased signatures for generic interface implementations
+    // (ADR-0134); type checking above used the declared signatures.
+    let lowering_signatures =
+        crate::type_check::erased_interface_signatures(&parsed, &types, &signatures);
     let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
@@ -579,7 +583,7 @@ fn compile_source_with_entry(
     type_array_expressions_with_classes(&mut types, &parsed, &mut report, class_types.classes());
     type_dynamic_array_operations(&parsed, &mut report, &types);
     type_string_operations(&parsed, &mut report, &mut types, &parsed.array_types);
-    apply_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_receiver_name_facts(&parsed, &class_types, &mut types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_inherited_field_types(&parsed, &class_types, &mut types, &mut report);
     apply_method_call_facts(&parsed, &class_types, &mut report);
@@ -667,7 +671,7 @@ fn compile_source_with_entry(
                     | TypeRuleDiagnostic::MemberExpressionDeferred
             )
     });
-    apply_receiver_name_facts(&parsed, &class_types, &mut report);
+    apply_receiver_name_facts(&parsed, &class_types, &mut types, &mut report);
     apply_field_access_facts(&parsed, &class_types, &mut report);
     apply_inherited_field_types(&parsed, &class_types, &mut types, &mut report);
     check_superclass_arguments(&parsed, &class_types, &mut types, &mut report);
@@ -781,6 +785,7 @@ fn compile_source_with_entry(
         &class_types,
         &mut report,
     );
+    crate::type_check::diagnose_primitive_comparisons(&parsed, &types, &mut report);
     diagnose_unresolved_types(&parsed, &mut report);
     let intrinsic_diagnostics =
         validate_intrinsic_calls(&parsed, report.expression_types(), &types);
@@ -964,7 +969,7 @@ fn compile_source_with_entry(
             options.module().clone(),
             options.package().clone(),
             &parsed,
-            &signatures,
+            &lowering_signatures,
             report.expression_types(),
             true,
         )

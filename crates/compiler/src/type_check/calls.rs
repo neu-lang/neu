@@ -274,30 +274,33 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
                                 && member.is_none_or(|member| {
                                     let class_name_receiver =
                                         is_class_name_receiver(source, member.receiver);
-                                    member_receiver_class_name(
-                                        source,
-                                        member.receiver,
-                                        call.function,
-                                    )
-                                    .and_then(|class_name| {
-                                        function.owner.and_then(|owner| {
-                                            if class_name_receiver {
-                                                Some(class_static_owner_matches(
-                                                    candidate.parsed,
-                                                    owner,
-                                                    &class_name,
-                                                ))
-                                            } else {
-                                                candidate
-                                                    .parsed
-                                                    .class_declarations
-                                                    .iter()
-                                                    .find(|class| class.declaration == owner)
-                                                    .map(|class| class.name == class_name)
-                                            }
+                                    default_method_receiver(source, member.receiver, &target_name)
+                                        .or_else(|| {
+                                            member_receiver_class_name(
+                                                source,
+                                                member.receiver,
+                                                call.function,
+                                            )
                                         })
-                                    })
-                                    .unwrap_or(true)
+                                        .and_then(|class_name| {
+                                            function.owner.and_then(|owner| {
+                                                if class_name_receiver {
+                                                    Some(class_static_owner_matches(
+                                                        candidate.parsed,
+                                                        owner,
+                                                        &class_name,
+                                                    ))
+                                                } else {
+                                                    candidate
+                                                        .parsed
+                                                        .class_declarations
+                                                        .iter()
+                                                        .find(|class| class.declaration == owner)
+                                                        .map(|class| class.name == class_name)
+                                                }
+                                            })
+                                        })
+                                        .unwrap_or(true)
                                         && function.is_static == class_name_receiver
                                 })
                         })
@@ -323,8 +326,14 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
                     if index == 0
                         && let Some(member) = member
                         && !is_class_name_receiver(source, member.receiver)
-                        && let Some(class_name) =
+                        && let Some(class_name) = default_method_receiver(
+                            source,
+                            member.receiver,
+                            &target_name,
+                        )
+                        .or_else(|| {
                             member_receiver_class_name(source, member.receiver, call.function)
+                        })
                         && let Some(class_type) = source.class_types.and_then(|classes| {
                             classes
                                 .classes
@@ -767,6 +776,38 @@ pub(crate) fn is_class_name_receiver(
             .class_declarations
             .iter()
             .any(|class| class.name == name.name)
+}
+
+/// The interface that a call to the default method `name` on `receiver` resolves
+/// against, when the receiver's static type is that interface and the interface
+/// itself declares `name` with a body (ADR-0133). `None` otherwise, so ordinary
+/// receivers keep their existing resolution.
+pub(crate) fn default_method_receiver(
+    source: &ExecutableSourceTypes<'_>,
+    receiver: AstNodeId,
+    name: &str,
+) -> Option<String> {
+    let classes = source.class_types?;
+    let receiver_type = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression == receiver)
+        .map(|typed| typed.ty)?;
+    let interface = classes
+        .classes
+        .iter()
+        .find(|class| class.type_id == receiver_type && class.interface)?;
+    source
+        .parsed
+        .function_declarations
+        .iter()
+        .any(|method| {
+            method.owner == Some(interface.declaration)
+                && method.name == name
+                && method.body.is_some()
+                && !method.is_static
+        })
+        .then(|| interface.name.clone())
 }
 
 pub(crate) fn member_receiver_class_name(

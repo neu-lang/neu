@@ -18,6 +18,8 @@ pub struct ClassTypeRecord {
     pub(crate) generic_parameters: Vec<TypeId>,
     /// The type arguments written on the superclass, resolved to types.
     pub(crate) superclass_arguments: Vec<TypeId>,
+    /// The type arguments written on each entry of `interfaces`, in the same order.
+    pub(crate) interface_arguments: Vec<Vec<TypeId>>,
 }
 
 impl ClassTypeRecord {
@@ -459,12 +461,14 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             }
         }
         for (index, method) in interface_methods.iter().enumerate() {
+            let parameters = parameter_texts(parsed, method.declaration, &[]);
             if interface_methods[index + 1..].iter().any(|other| {
                 other.name == method.name
+                    && other.owner != method.owner
                     && same_function_parameter_types(parsed, method, other)
-                    && type_annotation_name(parsed, method.return_annotation)
-                        != type_annotation_name(parsed, other.return_annotation)
-            }) && let Some(node) = parsed.arena.node(class.declaration)
+            }) && !class_declares_method(parsed, class, &method.name, &parameters)
+                && !superclass_concrete_method(parsed, class, &method.name, &parameters)
+                && let Some(node) = parsed.arena.node(class.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
                     kind: DispatchDiagnosticKind::AmbiguousInterfaceMethod,
@@ -504,7 +508,15 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 let Some(node) = parsed.arena.node(class.declaration) else {
                     continue;
                 };
+                let parameters = parameter_texts(parsed, required.declaration, &interface_mapping);
                 match implementation {
+                    None if required.body.is_some()
+                        || superclass_concrete_method(
+                            parsed,
+                            class,
+                            &required.name,
+                            &parameters,
+                        ) => {}
                     None => diagnostics.push(DispatchDiagnostic {
                         kind: DispatchDiagnosticKind::MissingInterfaceMethod,
                         span: node.span,
@@ -638,7 +650,7 @@ pub(crate) fn argument_texts(parsed: &ParseOutput, arguments: &[AstNodeId]) -> V
 }
 
 /// The mapping from the type parameters of `declaration` to the given arguments.
-fn interface_parameter_mapping(
+pub(crate) fn interface_parameter_mapping(
     parsed: &ParseOutput,
     declaration: AstNodeId,
     arguments: &[String],
@@ -678,6 +690,141 @@ pub(crate) fn type_text_with(
         .map(|argument| type_text_with(parsed, *argument, mapping))
         .collect();
     format!("{}<{}>", reference.name, arguments.join(","))
+}
+
+/// Whether the class `class_name`, or a superclass of it, implements the interface
+/// named by `annotation`, with the same spelling including type arguments
+/// (ADR-0134). Only an interface type annotation can be satisfied this way.
+pub(crate) fn class_implements_annotated_interface(
+    parsed: &ParseOutput,
+    class_name: &str,
+    annotation: Option<AstNodeId>,
+) -> bool {
+    let Some(annotated) = type_annotation_name(parsed, annotation) else {
+        return false;
+    };
+    let mut current = parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name);
+    while let Some(class) = current {
+        let implemented = class.interfaces.iter().enumerate().any(|(index, name)| {
+            let spelling = match class.interface_arguments.get(index) {
+                Some(arguments) if !arguments.is_empty() => {
+                    format!("{name}<{}>", argument_texts(parsed, arguments).join(","))
+                }
+                _ => name.clone(),
+            };
+            spelling == annotated
+                && parsed
+                    .class_declarations
+                    .iter()
+                    .any(|candidate| candidate.interface && candidate.name == *name)
+        });
+        if implemented {
+            return true;
+        }
+        current = class.superclass.as_deref().and_then(|parent| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == parent)
+        });
+    }
+    false
+}
+
+/// The signatures that HIR lowers against (ADR-0134). An implementation of a
+/// generic interface method keeps a word at each slot that the interface declares
+/// with its type parameter, so that one interface call can invoke any
+/// implementation. A `Bool`, `Byte`, or `Float` slot is narrower than a word, so it
+/// takes the interface's erased word in the implementation's signature. Type
+/// checking keeps the declared signatures.
+pub(crate) fn erased_interface_signatures(
+    parsed: &ParseOutput,
+    types: &TypeArena,
+    signatures: &[FunctionSignature],
+) -> Vec<FunctionSignature> {
+    let is_erased = |ty: TypeId| {
+        matches!(
+            types.get(ty).map(|record| record.kind()),
+            Some(TypeKind::GenericParameter(_))
+        )
+    };
+    let is_narrow = |ty: TypeId| {
+        matches!(
+            types.get(ty).map(|record| record.kind()),
+            Some(TypeKind::Primitive(
+                PrimitiveType::Bool | PrimitiveType::Byte | PrimitiveType::Float
+            ))
+        )
+    };
+    let mut result = signatures.to_vec();
+    for class in parsed
+        .class_declarations
+        .iter()
+        .filter(|class| !class.interface)
+    {
+        for (index, interface_name) in class.interfaces.iter().enumerate() {
+            let Some(interface) = parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.interface && candidate.name == *interface_name)
+            else {
+                continue;
+            };
+            let arguments = class
+                .interface_arguments
+                .get(index)
+                .map(|arguments| argument_texts(parsed, arguments))
+                .unwrap_or_default();
+            let mapping = interface_parameter_mapping(parsed, interface.declaration, &arguments);
+            for required in parsed
+                .function_declarations
+                .iter()
+                .filter(|function| function.owner == Some(interface.declaration))
+            {
+                let Some(required_signature) = signatures
+                    .iter()
+                    .find(|signature| signature.declaration == required.declaration)
+                else {
+                    continue;
+                };
+                let required_parameters = parameter_texts(parsed, required.declaration, &mapping);
+                for method in parsed.function_declarations.iter().filter(|function| {
+                    function.owner == Some(class.declaration) && function.name == required.name
+                }) {
+                    if parameter_texts(parsed, method.declaration, &[]) != required_parameters {
+                        continue;
+                    }
+                    let (Some(own), Some(erased)) = (
+                        signatures
+                            .iter()
+                            .find(|signature| signature.declaration == method.declaration),
+                        result
+                            .iter_mut()
+                            .find(|signature| signature.declaration == method.declaration),
+                    ) else {
+                        continue;
+                    };
+                    for ((slot, declared), required_slot) in own
+                        .parameter_types
+                        .iter()
+                        .enumerate()
+                        .zip(&required_signature.parameter_types)
+                    {
+                        if is_erased(*required_slot) && is_narrow(*declared) {
+                            erased.parameter_types[slot] = *required_slot;
+                        }
+                    }
+                    if is_erased(required_signature.return_type) && is_narrow(own.return_type) {
+                        erased.return_type = required_signature.return_type;
+                    }
+                }
+            }
+        }
+    }
+    result
 }
 
 pub(crate) fn type_annotation_name(
@@ -766,8 +913,56 @@ pub(crate) fn inherited_name_mapping(
     }
 }
 
-/// The nearest ancestor of `class` that declares the instance method `name`, when
-/// `class` itself does not declare it. Such a call is an inherited call.
+/// Whether `class` itself declares an instance method `name` with these parameter
+/// spellings.
+pub(crate) fn class_declares_method(
+    parsed: &ParseOutput,
+    class: &ParsedClassDeclaration,
+    name: &str,
+    parameters: &[String],
+) -> bool {
+    parsed.function_declarations.iter().any(|method| {
+        method.owner == Some(class.declaration)
+            && method.name == name
+            && parameter_texts(parsed, method.declaration, &[]) == parameters
+    })
+}
+
+/// Whether a superclass of `class`, at any depth, provides a concrete (bodied)
+/// method `name` with these parameter spellings (ADR-0133: a class's superclass
+/// method wins over an interface default).
+pub(crate) fn superclass_concrete_method(
+    parsed: &ParseOutput,
+    class: &ParsedClassDeclaration,
+    name: &str,
+    parameters: &[String],
+) -> bool {
+    let mut superclass = class.superclass.as_deref();
+    while let Some(parent_name) = superclass {
+        let Some(parent) = parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.name == parent_name)
+        else {
+            return false;
+        };
+        if parsed.function_declarations.iter().any(|method| {
+            method.owner == Some(parent.declaration)
+                && method.name == name
+                && method.body.is_some()
+                && parameter_texts(parsed, method.declaration, &[]) == parameters
+        }) {
+            return true;
+        }
+        superclass = parent.superclass.as_deref();
+    }
+    false
+}
+
+/// The nearest ancestor of `class` that declares the instance method `name`, or,
+/// failing that, the interface whose default body supplies it (ADR-0133). A
+/// superclass declaration wins over an interface default. `None` when `class`
+/// declares the method itself, or no ancestor or interface supplies it.
 pub(crate) fn inherited_method_owner(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
@@ -783,18 +978,106 @@ pub(crate) fn inherited_method_owner(
     if declares(class) {
         return None;
     }
-    let mut current = classes
+    let receiver = classes
         .classes()
         .iter()
         .find(|candidate| candidate.declaration == class)?;
-    loop {
-        let parent = classes
-            .classes()
-            .iter()
-            .find(|candidate| Some(candidate.name.as_str()) == current.superclass.as_deref())?;
+    let mut lineage = vec![receiver];
+    let mut current = receiver;
+    while let Some(parent) = classes
+        .classes()
+        .iter()
+        .find(|candidate| Some(candidate.name.as_str()) == current.superclass.as_deref())
+    {
         if declares(parent.declaration) {
             return Some(parent.declaration);
         }
+        lineage.push(parent);
+        current = parent;
+    }
+    for record in lineage {
+        for interface_name in &record.interfaces {
+            let Some(interface) = classes
+                .classes()
+                .iter()
+                .find(|candidate| candidate.interface && candidate.name == *interface_name)
+            else {
+                continue;
+            };
+            if parsed.function_declarations.iter().any(|method| {
+                method.owner == Some(interface.declaration)
+                    && method.name == name
+                    && method.body.is_some()
+                    && !method.is_static
+            }) {
+                return Some(interface.declaration);
+            }
+        }
+    }
+    None
+}
+
+/// The mapping from the type parameters of `interface` to the types that the class
+/// `receiver` implements it with, through its own interfaces or those of an
+/// ancestor (ADR-0134). Empty when the interface is not generic.
+fn interface_parameter_types(
+    classes: &ClassTypeReport,
+    receiver: AstNodeId,
+    interface: &ClassTypeRecord,
+) -> Option<Vec<(TypeId, TypeId)>> {
+    let mut current = classes
+        .classes()
+        .iter()
+        .find(|class| class.declaration == receiver)?;
+    // Maps the parameters of `current` to the types the receiver gives them. The
+    // receiver's own parameters map to themselves, so the mapping starts empty.
+    let mut mapping: Vec<(TypeId, TypeId)> = Vec::new();
+    let substitute = |mapping: &[(TypeId, TypeId)], ty: TypeId| {
+        mapping
+            .iter()
+            .find(|(parameter, _)| *parameter == ty)
+            .map_or(ty, |(_, argument)| *argument)
+    };
+    loop {
+        if let Some(index) = current
+            .interfaces
+            .iter()
+            .position(|name| *name == interface.name)
+        {
+            let arguments: Vec<TypeId> = current
+                .interface_arguments
+                .get(index)
+                .map(|arguments| {
+                    arguments
+                        .iter()
+                        .map(|argument| substitute(&mapping, *argument))
+                        .collect()
+                })
+                .unwrap_or_default();
+            return Some(
+                interface
+                    .generic_parameters
+                    .iter()
+                    .copied()
+                    .zip(arguments)
+                    .collect(),
+            );
+        }
+        let parent = classes
+            .classes()
+            .iter()
+            .find(|class| Some(class.name.as_str()) == current.superclass.as_deref())?;
+        let arguments: Vec<TypeId> = current
+            .superclass_arguments
+            .iter()
+            .map(|argument| substitute(&mapping, *argument))
+            .collect();
+        mapping = parent
+            .generic_parameters
+            .iter()
+            .copied()
+            .zip(arguments)
+            .collect();
         current = parent;
     }
 }
@@ -808,6 +1091,13 @@ pub(crate) fn inherited_parameter_types(
     receiver: AstNodeId,
     owner: AstNodeId,
 ) -> Option<Vec<(TypeId, TypeId)>> {
+    if let Some(interface) = classes
+        .classes()
+        .iter()
+        .find(|candidate| candidate.declaration == owner && candidate.interface)
+    {
+        return interface_parameter_types(classes, receiver, interface);
+    }
     let mut current = classes
         .classes()
         .iter()
@@ -890,6 +1180,7 @@ pub fn type_class_types_in(
             constructor_parameter_count: declaration.constructor_parameters.len(),
             generic_parameters: Vec::new(),
             superclass_arguments: Vec::new(),
+            interface_arguments: Vec::new(),
         });
     }
     // Generic parameter types are built over the whole list, in declaration
@@ -941,6 +1232,27 @@ pub fn type_class_types_in(
             })
             .collect();
         record.superclass_arguments = arguments.unwrap_or_default();
+        record.interface_arguments = declaration
+            .interface_arguments
+            .iter()
+            .map(|arguments| {
+                arguments
+                    .iter()
+                    .map(|argument| {
+                        resolve_type_reference(
+                            &parsed.type_name_references,
+                            &parsed.array_types,
+                            *argument,
+                            &primitives,
+                            &class_snapshot,
+                            &generic_types,
+                            types,
+                        )
+                    })
+                    .collect::<Option<Vec<TypeId>>>()
+                    .unwrap_or_default()
+            })
+            .collect();
     }
     for field in &parsed.field_declarations {
         // Primitive annotations first. Other annotations, such as T[],
@@ -1204,23 +1516,10 @@ pub fn apply_class_type_facts(
         if diagnostic.rule() != AmbiguousTypeRule::AssignmentCompatibility {
             return true;
         }
-        let Some(declaration) = parsed
-            .local_declarations
-            .iter()
-            .find(|declaration| declaration.declaration == diagnostic.node())
-        else {
-            return true;
-        };
-        let Some(interface_name) = declaration
-            .annotation
-            .and_then(|annotation| {
-                parsed
-                    .type_name_references
-                    .iter()
-                    .find(|reference| reference.reference == annotation)
-            })
-            .map(|reference| reference.name.as_str())
-        else {
+        let Some(declaration) = parsed.local_declarations.iter().find(|declaration| {
+            declaration.declaration == diagnostic.node()
+                || declaration.initializer == Some(diagnostic.node())
+        }) else {
             return true;
         };
         let Some(initializer) = declaration.initializer.and_then(|initializer| {
@@ -1231,21 +1530,11 @@ pub fn apply_class_type_facts(
         }) else {
             return true;
         };
-        let Some(concrete) = parsed
-            .class_declarations
-            .iter()
-            .find(|class| class.name == initializer.type_name)
-        else {
-            return true;
-        };
-        !(concrete
-            .interfaces
-            .iter()
-            .any(|interface| interface == interface_name)
-            && parsed
-                .class_declarations
-                .iter()
-                .any(|class| class.interface && class.name == interface_name))
+        !class_implements_annotated_interface(
+            parsed,
+            &initializer.type_name,
+            declaration.annotation,
+        )
     });
     report.retain_diagnostics(|diagnostic| {
         !matches!(diagnostic.rule(), TypeRuleDiagnostic::MissingAnnotationType)
@@ -1556,9 +1845,23 @@ pub fn apply_enum_method_call_facts(
     }
 }
 
+/// The generic instance of the nominal class type `nominal` with `arguments`, or
+/// `nominal` itself when there are no arguments.
+fn instance_or_nominal(types: &mut TypeArena, nominal: TypeId, arguments: &[TypeId]) -> TypeId {
+    if arguments.is_empty() {
+        return nominal;
+    }
+    let Some(TypeKind::Nominal(identity)) = types.get(nominal).map(|record| record.kind()) else {
+        return nominal;
+    };
+    let identity = identity.clone();
+    types.generic_instance(GenericTypeIdentity::new(identity, arguments.to_vec()))
+}
+
 pub fn apply_receiver_name_facts(
     parsed: &ParseOutput,
     classes: &ClassTypeReport,
+    types: &mut TypeArena,
     report: &mut TypeCheckReport,
 ) {
     for function in parsed
@@ -1618,7 +1921,7 @@ pub fn apply_receiver_name_facts(
         }) {
             let type_id = if name.name == "super" {
                 class.superclass.as_deref().and_then(|superclass| {
-                    parsed
+                    let parent = parsed
                         .class_declarations
                         .iter()
                         .find(|candidate| candidate.name == superclass)
@@ -1627,8 +1930,14 @@ pub fn apply_receiver_name_facts(
                                 .classes
                                 .iter()
                                 .find(|class| class.declaration == candidate.declaration)
-                        })
-                        .map(|class| class.type_id)
+                        })?;
+                    // A superclass with type arguments is the instance it names, so
+                    // its members are typed with those arguments (ADR-0083).
+                    Some(instance_or_nominal(
+                        types,
+                        parent.type_id,
+                        &class.superclass_arguments,
+                    ))
                 })
             } else {
                 Some(class.type_id)

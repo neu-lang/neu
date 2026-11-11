@@ -485,6 +485,13 @@ pub fn lower_checked_hir_source(
                     &local_bindings,
                     &mut expressions,
                 )?;
+                let expression = erase_return(
+                    &source,
+                    function.declaration,
+                    value,
+                    expression,
+                    &mut expressions,
+                );
                 returns.push(HirReturn::new(statement.span, expression));
                 continue;
             }
@@ -1400,21 +1407,36 @@ fn lower_expression(
             .filter(|parameter| parameter.function == function_declaration)
             .position(|parameter| parameter.name == name.name)
     {
+        let hir_index = parameter_index
+            + usize::from(
+                source
+                    .parsed
+                    .function_declarations
+                    .iter()
+                    .find(|function| function.declaration == function_declaration)
+                    .is_some_and(|function| function.owner.is_some()),
+            );
+        // A parameter whose slot is an erased word is decoded to its concrete type
+        // (ADR-0134), as a generic method's argument is decoded at its call site.
+        if let Some(slot) = parameter_slot_type(source, function_declaration, hir_index)
+            && erased_slot(source, slot)
+            && needs_erasure(source, ty)
+        {
+            output.push(HirExpression::parameter_read(
+                id,
+                span,
+                slot,
+                HirParameterId::from_raw(hir_index),
+            ));
+            let decoded = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::erased_decode(decoded, span, ty, id));
+            return Ok(decoded);
+        }
         output.push(HirExpression::parameter_read(
             id,
             span,
             ty,
-            HirParameterId::from_raw(
-                parameter_index
-                    + usize::from(
-                        source
-                            .parsed
-                            .function_declarations
-                            .iter()
-                            .find(|function| function.declaration == function_declaration)
-                            .is_some_and(|function| function.owner.is_some()),
-                    ),
-            ),
+            HirParameterId::from_raw(hir_index),
         ));
         return Ok(id);
     }
@@ -2411,6 +2433,36 @@ fn bare_field_exists(
         })
 }
 
+/// The declaration that a call to `name` on a receiver of interface `interface`
+/// lowers against: the interface's own default body when it has one (ADR-0133),
+/// otherwise the first implementing class's method. The call itself dispatches
+/// through the interface at run time.
+fn interface_method_declaration(
+    source: &CheckedHirSource<'_>,
+    interface: &crate::parser::ParsedClassDeclaration,
+    name: &str,
+) -> Option<crate::ast::AstNodeId> {
+    if let Some(default) = source.parsed.function_declarations.iter().find(|function| {
+        function.owner == Some(interface.declaration)
+            && function.name == name
+            && function.body.is_some()
+    }) {
+        return Some(default.declaration);
+    }
+    source
+        .class_types?
+        .classes()
+        .iter()
+        .find(|candidate| {
+            !candidate.is_interface()
+                && candidate
+                    .interfaces()
+                    .iter()
+                    .any(|implemented| implemented == &interface.name)
+        })
+        .and_then(|candidate| method_owner_declaration(source, candidate.name(), name))
+}
+
 fn method_declaration_index(
     source: &CheckedHirSource<'_>,
     callee: crate::ast::AstNodeId,
@@ -2486,20 +2538,7 @@ fn method_declaration_index(
             .iter()
             .find(|class| class.name == element_reference.name)?;
         let declaration = if class.interface {
-            source
-                .class_types?
-                .classes()
-                .iter()
-                .find(|candidate| {
-                    !candidate.is_interface()
-                        && candidate
-                            .interfaces()
-                            .iter()
-                            .any(|name| name == &class.name)
-                })
-                .and_then(|candidate| {
-                    method_owner_declaration(source, candidate.name(), &member.name)
-                })?
+            interface_method_declaration(source, class, &member.name)?
         } else {
             source
                 .parsed
@@ -2581,6 +2620,15 @@ fn method_declaration_index(
             .class_declarations
             .iter()
             .find(|class| class.name == class_name)?;
+        if class.interface {
+            let declaration = interface_method_declaration(source, class, &member.name)?;
+            return source
+                .parsed
+                .function_declarations
+                .iter()
+                .position(|function| function.declaration == declaration)
+                .and_then(|index| hir_function_index(source.parsed, index));
+        }
         return source
             .parsed
             .function_declarations
@@ -2606,20 +2654,7 @@ fn method_declaration_index(
             .iter()
             .find(|class| class.name == class_name)?;
         let declaration = if class.interface {
-            source
-                .class_types?
-                .classes()
-                .iter()
-                .find(|candidate| {
-                    !candidate.is_interface()
-                        && candidate
-                            .interfaces()
-                            .iter()
-                            .any(|name| name == &class.name)
-                })
-                .and_then(|candidate| {
-                    method_owner_declaration(source, candidate.name(), &member.name)
-                })?
+            interface_method_declaration(source, class, &member.name)?
         } else {
             source
                 .parsed
@@ -2713,6 +2748,8 @@ fn method_declaration_index(
 }
 
 fn hir_function_index(parsed: &ParseOutput, parsed_index: usize) -> Option<usize> {
+    // A bodyless declaration (an abstract or interface method) has no HIR function.
+    parsed.function_declarations.get(parsed_index)?.body?;
     parsed
         .function_declarations
         .iter()
@@ -3023,8 +3060,37 @@ fn method_owner_declaration_for_signature(
     }) {
         return Some(function.declaration);
     }
-    class.superclass.as_deref().and_then(|parent| {
+    // A superclass declaration (including one inherited from its own interfaces)
+    // wins over this class's interface defaults (ADR-0133).
+    if let Some(declaration) = class.superclass.as_deref().and_then(|parent| {
         method_owner_declaration_for_signature(source, parent, method_name, parameter_types)
+    }) {
+        return Some(declaration);
+    }
+    class.interfaces.iter().find_map(|interface_name| {
+        let interface = source
+            .parsed
+            .class_declarations
+            .iter()
+            .find(|candidate| candidate.interface && candidate.name == *interface_name)?;
+        source
+            .parsed
+            .function_declarations
+            .iter()
+            .find(|function| {
+                function.owner == Some(interface.declaration)
+                    && function.name == method_name
+                    && function.body.is_some()
+                    && !function.is_static
+                    && source
+                        .signatures
+                        .iter()
+                        .find(|signature| signature.declaration() == function.declaration)
+                        .is_some_and(|signature| {
+                            signature.parameter_types().get(1..) == parameter_types.get(1..)
+                        })
+            })
+            .map(|function| function.declaration)
     })
 }
 
@@ -3147,6 +3213,54 @@ fn needs_erasure(source: &CheckedHirSource<'_>, ty: TypeId) -> bool {
                 )
             )
         })
+}
+
+/// The declared slot type of the HIR parameter `hir_index` of `function_declaration`,
+/// including the receiver at index 0 for an instance method.
+fn parameter_slot_type(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    hir_index: usize,
+) -> Option<TypeId> {
+    source
+        .signatures
+        .iter()
+        .find(|signature| signature.declaration() == function_declaration)?
+        .parameter_types()
+        .get(hir_index)
+        .copied()
+}
+
+/// Encodes a returned value when the function returns an erased word for it
+/// (ADR-0134), as an argument is encoded for an erased parameter.
+fn erase_return(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    value: crate::ast::AstNodeId,
+    lowered: HirExpressionId,
+    output: &mut Vec<HirExpression>,
+) -> HirExpressionId {
+    let return_slot = source
+        .signatures
+        .iter()
+        .find(|signature| signature.declaration() == function_declaration)
+        .map(|signature| signature.return_type());
+    let value_type = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression() == value)
+        .map(|typed| typed.ty());
+    match (return_slot, value_type) {
+        (Some(slot), Some(ty)) if erased_slot(source, slot) && needs_erasure(source, ty) => {
+            let Some(span) = source.parsed.arena.node(value).map(|node| node.span) else {
+                return lowered;
+            };
+            let id = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::erased_encode(id, span, slot, lowered));
+            id
+        }
+        _ => lowered,
+    }
 }
 
 /// Encodes an argument for an erased parameter when its concrete type needs it.
@@ -3536,15 +3650,23 @@ fn lower_control_flow_block(
             .iter()
             .find(|returned| returned.statement == statement.statement)
         {
+            let returned_value = returned
+                .value
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
             let value = lower_expression(
                 source,
                 function_declaration,
-                returned
-                    .value
-                    .ok_or(HirLoweringError::UnsupportedExpression)?,
+                returned_value,
                 local_bindings,
                 expressions,
             )?;
+            let value = erase_return(
+                source,
+                function_declaration,
+                returned_value,
+                value,
+                expressions,
+            );
             output.push(HirControlFlow::Return(HirReturn::new(
                 statement.span,
                 value,

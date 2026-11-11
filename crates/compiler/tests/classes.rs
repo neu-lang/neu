@@ -1076,3 +1076,224 @@ fn private_constructor_parameter_needs_val_or_var() {
     .unwrap_err();
     assert!(error.contains("MalformedDeclarationHeader"), "{error}");
 }
+
+const COUNTER: &str = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Seven(var n: Int): Counter { func value(): Int { return 7; } } ";
+
+#[test]
+fn default_method_is_inherited_by_an_implementing_class() {
+    let source = format!(
+        "{COUNTER}public func main(): Int {{ val c: Counter = new Seven(1); return c.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("default_inherit", &source, 6910),
+        Ok(Some(14))
+    );
+}
+
+#[test]
+fn default_method_is_inherited_on_a_class_typed_receiver() {
+    let source = format!(
+        "{COUNTER}public func main(): Int {{ val s: Seven = new Seven(1); return s.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("default_class_receiver", &source, 6911),
+        Ok(Some(14))
+    );
+}
+
+#[test]
+fn class_method_replaces_the_default() {
+    let source = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Three: Counter { func value(): Int { return 7; } func twice(): Int { return 3; } } public func main(): Int { val c: Counter = new Three(); return c.twice(); }";
+    assert_eq!(
+        compile_private_case("default_replaced", source, 6912),
+        Ok(Some(3))
+    );
+}
+
+#[test]
+fn superclass_method_wins_over_the_default() {
+    let source = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Base { func twice(): Int { return 5; } } class Child: Base(), Counter { func value(): Int { return 7; } } public func main(): Int { val c: Counter = new Child(); return c.twice(); }";
+    assert_eq!(
+        compile_private_case("default_superclass", source, 6913),
+        Ok(Some(5))
+    );
+}
+
+#[test]
+fn same_method_from_two_interfaces_is_ambiguous() {
+    let error = compile_private_case(
+        "default_ambiguous",
+        "interface A { func twice(): Int { return 1; } } interface B { func twice(): Int { return 2; } } class C: A, B {} public func main(): Int { return 7; }",
+        6914,
+    )
+    .unwrap_err();
+    assert!(error.contains("AmbiguousInterfaceMethod"), "{error}");
+}
+
+const BOX: &str = "interface Box<T> { func get(): T; func twice(): T { return this.get(); } } ";
+
+#[test]
+fn generic_default_is_inherited_by_an_int_implementation() {
+    let source = format!(
+        "{BOX}class IntBox: Box<Int> {{ func get(): Int {{ return 4; }} }} public func main(): Int {{ val b: Box<Int> = new IntBox(); return b.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_int", &source, 6920),
+        Ok(Some(4))
+    );
+}
+
+#[test]
+fn generic_default_is_inherited_by_a_bool_implementation() {
+    let source = format!(
+        "{BOX}class FlagBox: Box<Bool> {{ func get(): Bool {{ return true; }} }} public func main(): Int {{ val b: Box<Bool> = new FlagBox(); if (b.twice()) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_bool", &source, 6921),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn generic_default_is_inherited_by_a_float_implementation() {
+    let source = format!(
+        "{BOX}class Half: Box<Float> {{ func get(): Float {{ return 2.5; }} }} public func main(): Int {{ val b: Box<Float> = new Half(); val f: Float = b.twice(); if (f > 2.0) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_float", &source, 6922),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn generic_default_passes_a_bool_argument_through_the_interface() {
+    let source = "interface Sink<T> { func put(value: T): Int; func putTwice(value: T): Int { return this.put(value) + this.put(value); } } class Flags: Sink<Bool> { func put(value: Bool): Int { if (value) { return 3; } return 4; } } public func main(): Int { val s: Sink<Bool> = new Flags(); return s.putTwice(true); }";
+    assert_eq!(
+        compile_private_case("generic_default_argument", source, 6923),
+        Ok(Some(6))
+    );
+}
+
+#[test]
+fn class_method_replaces_a_generic_default() {
+    let source = format!(
+        "{BOX}class Own: Box<Int> {{ func get(): Int {{ return 4; }} func twice(): Int {{ return 9; }} }} public func main(): Int {{ val b: Box<Int> = new Own(); return b.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_replaced", &source, 6924),
+        Ok(Some(9))
+    );
+}
+
+#[test]
+fn superclass_method_wins_over_a_generic_default() {
+    let source = format!(
+        "{BOX}class Base {{ func twice(): Int {{ return 5; }} }} class Child: Base(), Box<Int> {{ func get(): Int {{ return 4; }} }} public func main(): Int {{ val b: Box<Int> = new Child(); return b.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_superclass", &source, 6925),
+        Ok(Some(5))
+    );
+}
+
+#[test]
+fn concrete_call_on_a_bool_implementation_of_a_generic_interface() {
+    let source = "interface Sink<T> { func put(value: T): Int; func putTwice(value: T): Int { return this.put(value) + this.put(value); } } class Flags: Sink<Bool> { func put(value: Bool): Int { if (value) { return 3; } return 4; } } public func main(): Int { val f: Flags = new Flags(); return f.put(true); }";
+    assert_eq!(
+        compile_private_case("generic_concrete_bool", source, 6927),
+        Ok(Some(3))
+    );
+}
+
+#[test]
+fn generic_default_is_inherited_through_a_superclass_with_a_bool_type_argument() {
+    let source = format!(
+        "{BOX}class Base: Box<Bool> {{ func get(): Bool {{ return true; }} }} class Child: Base() {{}} public func main(): Int {{ val b: Box<Bool> = new Child(); if (b.twice()) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_superclass_bool", &source, 6928),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn generic_default_returns_a_byte_through_the_interface() {
+    let source = format!(
+        "{BOX}class Seven: Box<Byte> {{ func get(): Byte {{ val seven: Byte = 7; return seven; }} }} public func main(): Int {{ val b: Box<Byte> = new Seven(); val x: Byte = b.twice(); val seven: Byte = 7; if (x == seven) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_byte", &source, 6929),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn super_call_to_a_generic_default_substitutes_the_superclass_argument() {
+    let source = format!(
+        "{BOX}class Base: Box<Int> {{ func get(): Int {{ return 4; }} }} class Child: Base() {{ func twice(): Int {{ return super.twice() + 1; }} }} public func main(): Int {{ val c: Child = new Child(); return c.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("super_generic_default_int", &source, 6930),
+        Ok(Some(5))
+    );
+}
+
+#[test]
+fn super_call_to_a_generic_default_with_a_bool_argument() {
+    let source = format!(
+        "{BOX}class Base: Box<Bool> {{ func get(): Bool {{ return true; }} }} class Child: Base() {{ func twice(): Bool {{ return super.twice(); }} }} public func main(): Int {{ val c: Child = new Child(); if (c.twice()) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("super_generic_default_bool", &source, 6931),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn super_call_to_a_default_dispatches_on_this() {
+    let source = "interface Counter { func value(): Int; func twice(): Int { return this.value() + this.value(); } } class Base: Counter { func value(): Int { return 3; } } class Child: Base() { func value(): Int { return 5; } func twice(): Int { return super.twice(); } } public func main(): Int { val c: Child = new Child(); return c.twice(); }";
+    assert_eq!(
+        compile_private_case("super_default_this", source, 6932),
+        Ok(Some(10))
+    );
+}
+
+#[test]
+fn super_call_to_a_generic_superclass_method_substitutes_its_argument() {
+    let source = "class Base<T>(var value: T) { func get(): T { return value; } } class Child: Base<Int>(7) { func get2(): Int { return super.get(); } } public func main(): Int { val c: Child = new Child(); return c.get2(); }";
+    assert_eq!(
+        compile_private_case("super_generic_method", source, 6933),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn super_call_through_a_generic_chain_uses_the_inherited_argument() {
+    let source = "class Base<T>(var value: T) { func get(): T { return value; } } class Mid<U>(var extra: U): Base<U>(extra) { func get2(): U { return super.get(); } } class Child: Mid<Int>(9) {} public func main(): Int { val c: Child = new Child(); return c.get2(); }";
+    assert_eq!(
+        compile_private_case("super_generic_chain", source, 6934),
+        Ok(Some(9))
+    );
+}
+
+#[test]
+fn concrete_class_receiver_substitutes_a_generic_interface_default() {
+    let source = format!(
+        "{BOX}class IntBox: Box<Int> {{ func get(): Int {{ return 4; }} }} public func main(): Int {{ val c: IntBox = new IntBox(); return c.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("concrete_generic_default", &source, 6935),
+        Ok(Some(4))
+    );
+}
+
+#[test]
+fn int_and_bool_implementations_share_one_generic_default() {
+    let source = format!(
+        "{BOX}class IntBox: Box<Int> {{ func get(): Int {{ return 4; }} }} class FlagBox: Box<Bool> {{ func get(): Bool {{ return true; }} }} public func main(): Int {{ val a: Box<Int> = new IntBox(); val f: Box<Bool> = new FlagBox(); if (f.twice()) {{ return a.twice(); }} return 0; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_mixed", &source, 6926),
+        Ok(Some(4))
+    );
+}
