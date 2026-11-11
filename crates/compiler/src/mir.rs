@@ -424,6 +424,17 @@ pub enum MirInstruction {
         index: MirValueId,
         span: ByteSpan,
     },
+    ErasedEncode {
+        output: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    ErasedDecode {
+        output: MirValueId,
+        value: MirValueId,
+        type_id: TypeId,
+        span: ByteSpan,
+    },
     StringClone {
         output: MirValueId,
         value: MirValueId,
@@ -462,6 +473,12 @@ pub enum MirInstruction {
         output: MirValueId,
         array: MirValueId,
         index: MirValueId,
+        span: ByteSpan,
+    },
+    DynamicArrayStore {
+        local: MirLocalId,
+        index: MirValueId,
+        value: MirValueId,
         span: ByteSpan,
     },
     DynamicArrayAdd {
@@ -598,6 +615,8 @@ impl MirInstruction {
             | Self::StringLength { span, .. }
             | Self::StringIndex { span, .. }
             | Self::ArrayElementLoad { span, .. }
+            | Self::ErasedEncode { span, .. }
+            | Self::ErasedDecode { span, .. }
             | Self::StringClone { span, .. }
             | Self::StringConcat { span, .. }
             | Self::StringCompare { span, .. } => *span,
@@ -605,6 +624,7 @@ impl MirInstruction {
             Self::DynamicArrayNew { span, .. } => *span,
             Self::DynamicArraySize { span, .. }
             | Self::DynamicArrayLoad { span, .. }
+            | Self::DynamicArrayStore { span, .. }
             | Self::DynamicArrayAdd { span, .. }
             | Self::DynamicArrayRemove { span, .. } => *span,
             Self::FieldLoad { span, .. } => *span,
@@ -1320,6 +1340,21 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                         span: expression.span(),
                     });
                 }
+                HirExpressionKind::ErasedEncode(value) => {
+                    instructions.push(MirInstruction::ErasedEncode {
+                        output,
+                        value: mir_expression_value_id(function, *value),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ErasedDecode(value) => {
+                    instructions.push(MirInstruction::ErasedDecode {
+                        output,
+                        value: mir_expression_value_id(function, *value),
+                        type_id: expression.ty(),
+                        span: expression.span(),
+                    });
+                }
                 HirExpressionKind::Index { array, index } => {
                     let array_expression = function
                         .expressions()
@@ -1588,12 +1623,14 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     )
                 {
                     if let Some(index) = assignment.index() {
-                        instructions.push(MirInstruction::ArrayStore {
-                            local: MirLocalId::from_raw(assignment.target().index()),
-                            index: mir_expression_value_id(function, index),
-                            value: output,
-                            span: assignment.span(),
-                        });
+                        instructions.push(indexed_store_instruction(
+                            function,
+                            types,
+                            assignment.target(),
+                            mir_expression_value_id(function, index),
+                            output,
+                            assignment.span(),
+                        ));
                     } else {
                         instructions.push(MirInstruction::StoreLocal {
                             local: MirLocalId::from_raw(assignment.target().index()),
@@ -2303,6 +2340,8 @@ impl<'a> ShortCircuitLowerer<'a> {
             HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
+            | HirExpressionKind::ErasedEncode(_)
+            | HirExpressionKind::ErasedDecode(_)
             | HirExpressionKind::FieldAccess { .. }
             | HirExpressionKind::NewObject { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
@@ -3221,7 +3260,16 @@ impl<'a> ControlFlowLowerer<'a> {
                     .map(|candidate| candidate.ty())
                     .and_then(|ty| self.types.get(ty))
                     .map(|record| record.kind());
-                if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
+                if matches!(array_type, Some(TypeKind::Primitive(PrimitiveType::String))) {
+                    let value = self.lower_expression(*array)?;
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::StringIndex {
+                        output,
+                        value,
+                        index,
+                        span: expression.span(),
+                    });
+                } else if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
                     let array = self.lower_expression(*array)?;
                     let index = self.lower_expression(*index)?;
                     self.push(MirInstruction::DynamicArrayLoad {
@@ -3231,7 +3279,24 @@ impl<'a> ControlFlowLowerer<'a> {
                         span: expression.span(),
                     });
                 } else {
-                    return Err(MirLoweringError::UnsupportedExpression);
+                    // A fixed array is read through its local, as in straight-line code.
+                    let local = match self
+                        .function
+                        .expressions()
+                        .iter()
+                        .find(|candidate| candidate.id() == *array)
+                        .map(|candidate| candidate.kind())
+                    {
+                        Some(HirExpressionKind::LocalRead(local)) => *local,
+                        _ => return Err(MirLoweringError::UnsupportedExpression),
+                    };
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::ArrayLoad {
+                        output,
+                        local: MirLocalId::from_raw(local.index()),
+                        index,
+                        span: expression.span(),
+                    });
                 }
             }
             HirExpressionKind::StringLiteral(bytes) => {
@@ -3257,6 +3322,23 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::ErasedEncode(value) => {
+                let value = self.lower_expression(*value)?;
+                self.push(MirInstruction::ErasedEncode {
+                    output,
+                    value,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ErasedDecode(value) => {
+                let value = self.lower_expression(*value)?;
+                self.push(MirInstruction::ErasedDecode {
+                    output,
+                    value,
+                    type_id: expression.ty(),
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::FieldAccess {
                 receiver, index, ..
             } => {
@@ -3275,7 +3357,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     .collect::<Result<Vec<_>, _>>()?;
                 self.push(MirInstruction::NewObject {
                     output,
-                    type_id: expression.ty(),
+                    type_id: class_tag_type(expression.ty(), self.types),
                     arguments,
                     span: expression.span(),
                 });
@@ -3319,13 +3401,43 @@ impl<'a> ControlFlowLowerer<'a> {
                         self.emit_cancellation_check(self.scope_depth, *span);
                     }
                 }
-                HirControlFlow::Assignment(assignment) => {
+                HirControlFlow::FieldAssignment(assignment) => {
+                    let (receiver, index) = assignment
+                        .field()
+                        .ok_or(MirLoweringError::UnsupportedExpression)?;
+                    let receiver = self.lower_expression(receiver)?;
                     let value = self.lower_expression(assignment.value())?;
-                    self.push(MirInstruction::StoreLocal {
-                        local: MirLocalId::from_raw(assignment.target().index()),
+                    self.push(MirInstruction::FieldStore {
+                        receiver,
+                        index,
                         value,
                         span: assignment.span(),
                     });
+                }
+                HirControlFlow::Assignment(assignment) => {
+                    let index = assignment
+                        .index()
+                        .map(|index| self.lower_expression(index))
+                        .transpose()?;
+                    let value = self.lower_expression(assignment.value())?;
+                    match index {
+                        Some(index) => {
+                            let store = indexed_store_instruction(
+                                self.function,
+                                self.types,
+                                assignment.target(),
+                                index,
+                                value,
+                                assignment.span(),
+                            );
+                            self.push(store);
+                        }
+                        None => self.push(MirInstruction::StoreLocal {
+                            local: MirLocalId::from_raw(assignment.target().index()),
+                            value,
+                            span: assignment.span(),
+                        }),
+                    }
                 }
                 HirControlFlow::Return(returned) => {
                     let value = self.lower_expression(returned.expression())?;
@@ -3835,6 +3947,40 @@ fn lower_unary(operator: HirUnaryOperator) -> Result<MirUnary, MirLoweringError>
         HirUnaryOperator::Minus => MirUnary::Negate,
         HirUnaryOperator::BitwiseNot => MirUnary::BitwiseNot,
     })
+}
+
+/// The store for `local[index] = value`: an element of a dynamic array is stored
+/// through the array's storage, and a fixed array element in its local slot.
+fn indexed_store_instruction(
+    function: &HirFunction,
+    types: &TypeArena,
+    target: HirLocalId,
+    index: MirValueId,
+    value: MirValueId,
+    span: ByteSpan,
+) -> MirInstruction {
+    let local = MirLocalId::from_raw(target.index());
+    let dynamic = function
+        .locals()
+        .iter()
+        .find(|candidate| candidate.id() == target)
+        .and_then(|candidate| types.get(candidate.ty()))
+        .is_some_and(|record| matches!(record.kind(), TypeKind::DynamicArray(_)));
+    if dynamic {
+        MirInstruction::DynamicArrayStore {
+            local,
+            index,
+            value,
+            span,
+        }
+    } else {
+        MirInstruction::ArrayStore {
+            local,
+            index,
+            value,
+            span,
+        }
+    }
 }
 
 /// The runtime tag of an object. Every instance of a generic class shares its

@@ -1209,3 +1209,50 @@ pub fn type_primitive_local_declaration_initializers(
 
     (arena, report)
 }
+
+/// Reports a local whose annotation and initializer are different primitive types.
+/// ADR-0059 allows no implicit conversion between `Byte` and `Int`. This runs once
+/// the types have settled, since a name initializer can be typed after the first
+/// declaration pass, which would otherwise skip the check.
+pub(crate) fn diagnose_primitive_local_mismatches(
+    parsed: &ParseOutput,
+    types: &TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    let primitive = |ty: TypeId| {
+        matches!(
+            types.get(ty).map(|record| record.kind()),
+            Some(TypeKind::Primitive(_))
+        )
+    };
+    for declaration in &parsed.local_declarations {
+        let Some(initializer) = declaration.initializer else {
+            continue;
+        };
+        let Some(annotation) = report.declaration_signature(declaration.declaration) else {
+            continue;
+        };
+        let Some(value) = report.expression_type(initializer) else {
+            continue;
+        };
+        if annotation == value
+            || !primitive(annotation)
+            || !primitive(value)
+            || report
+                .assignment_checks()
+                .iter()
+                .any(|check| check.statement == declaration.declaration)
+            || report
+                .diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.node() == initializer)
+        {
+            continue;
+        }
+        report.record_diagnostic(TypeCheckDiagnostic::type_mismatch(
+            initializer,
+            annotation,
+            value,
+        ));
+    }
+}

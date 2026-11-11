@@ -72,3 +72,111 @@ fn generic_class_with_an_array_field_stores_and_counts_elements() {
         Some(2)
     );
 }
+
+#[test]
+fn generic_class_holds_a_bool_argument() {
+    assert_eq!(
+        run_exit_code(
+            "bool_argument",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val b: Box<Bool> = new Box<Bool>(true);\n    if (b.get()) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_holds_a_float_argument() {
+    assert_eq!(
+        run_exit_code(
+            "float_argument",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val b: Box<Float> = new Box<Float>(2.5);\n    val f: Float = b.get();\n    if (f > 2.0) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_holds_a_class_argument() {
+    assert_eq!(
+        run_exit_code(
+            "class_argument",
+            "class Cell(var n: Int) {\n}\n\nclass Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val c: Cell = new Cell(7);\n    val b: Box<Cell> = new Box<Cell>(c);\n    return b.get().n;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_field_read_returns_the_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "field_read_int",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Int> = new Box<Int>(7);\n    return b.value;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_field_read_of_a_bool_argument_decodes_it() {
+    assert_eq!(
+        run_exit_code(
+            "field_read_bool",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Bool> = new Box<Bool>(true);\n    if (b.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn field_assignment_through_a_generic_instance_writes_the_field() {
+    assert_eq!(
+        run_exit_code(
+            "field_write_int",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Int> = new Box<Int>(1);\n    b.value = 9;\n    return b.value;\n}\n",
+        ),
+        Some(9)
+    );
+}
+
+#[test]
+fn field_assignment_through_a_generic_instance_encodes_a_bool() {
+    assert_eq!(
+        run_exit_code(
+            "field_write_bool",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Bool> = new Box<Bool>(false);\n    b.value = true;\n    if (b.value) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn field_assignment_through_a_generic_instance_rejects_a_val_field() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-generic-class-readonly-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let error = compile_source_to_executable(
+        "class Box<T>(val value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Int> = new Box<Int>(1);\n    b.value = 9;\n    return 0;\n}\n",
+        SourceDriverOptions::new(
+            SourceFileId::from_raw(81990),
+            ModuleName::parse("generic.class").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap_err();
+    assert!(format!("{error:?}").contains("ImmutableFieldMutation"));
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn field_assignment_through_a_generic_instance_inside_a_block_writes_the_field() {
+    assert_eq!(
+        run_exit_code(
+            "field_write_in_block",
+            "class Box<T>(var value: T) {\n}\n\npublic func main(): Int {\n    val b: Box<Int> = new Box<Int>(1);\n    if (b.value == 1) {\n        b.value = 9;\n    }\n    return b.value;\n}\n",
+        ),
+        Some(9)
+    );
+}

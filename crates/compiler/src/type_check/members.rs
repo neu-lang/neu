@@ -237,3 +237,70 @@ pub(crate) fn generic_instance_call_targets(
     }
     targets
 }
+
+/// Types a field read or assignment target on a generic instance by substituting
+/// the receiver's type arguments for the class's type parameters in the field's
+/// type (ADR-0126). A `val` field is not assignable. Method calls are typed by
+/// their own pass.
+pub(crate) fn apply_generic_instance_fields(
+    parsed: &ParseOutput,
+    classes: &ClassTypeReport,
+    types: &mut TypeArena,
+    report: &mut TypeCheckReport,
+) {
+    for member in &parsed.member_expressions {
+        if parsed
+            .call_expressions
+            .iter()
+            .any(|call| call.callee == member.expression)
+        {
+            continue;
+        }
+        let Some(receiver_type) = report.expression_type(member.receiver) else {
+            continue;
+        };
+        let Some(TypeKind::GenericInstance(identity)) =
+            types.get(receiver_type).map(|record| record.kind().clone())
+        else {
+            continue;
+        };
+        let class = identity.declaration().declaration();
+        let Some(field) = classes.fields().iter().find(|field| {
+            field.name() == member.name
+                && class_or_superclass_owns_field(parsed, class, field.owner())
+        }) else {
+            continue;
+        };
+        let field_type = field.type_id();
+        let mut symbols = SymbolInterner::new();
+        let parameter_types =
+            build_generic_parameter_types(&parsed.generic_parameters, &mut symbols, types);
+        let mut substitution = GenericSubstitution::new();
+        for (parameter, argument) in parsed
+            .generic_parameters
+            .iter()
+            .filter(|parameter| parameter.owner == Some(class))
+            .filter_map(|parameter| {
+                parameter_types
+                    .iter()
+                    .find(|record| record.parameter() == parameter.parameter)
+            })
+            .zip(identity.arguments().iter().copied())
+        {
+            substitution.insert(parameter.ty(), argument);
+        }
+        let specialized = substitution.apply(field_type, types);
+        report.replace_expression_type(ExpressionType::new(member.expression, specialized));
+        if parsed
+            .assignment_statements
+            .iter()
+            .any(|assignment| assignment.target == member.expression)
+            && !field.mutable()
+        {
+            report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                TypeRuleDiagnostic::ImmutableFieldMutation,
+                member.expression,
+            ));
+        }
+    }
+}

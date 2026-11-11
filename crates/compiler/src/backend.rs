@@ -2319,6 +2319,41 @@ fn lower_instruction(
             );
             Ok(())
         }
+        MirInstruction::DynamicArrayStore {
+            local,
+            index,
+            value,
+            ..
+        } => {
+            // Same bounds check and trap as a read; the element is stored as a word.
+            let variable = locals
+                .get(local)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let pointer = builder.use_var(variable);
+            let index = values
+                .get(index)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let word = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let length = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 0);
+            let invalid = builder
+                .ins()
+                .icmp(IntCC::UnsignedGreaterThanOrEqual, index, length);
+            builder.ins().trapnz(invalid, TrapCode::unwrap_user(7));
+            let data = builder
+                .ins()
+                .load(types::I64, MemFlagsData::new(), pointer, 16);
+            let offset = builder.ins().imul_imm(index, 8);
+            let address = builder.ins().iadd(data, offset);
+            builder.ins().store(MemFlagsData::new(), word, address, 0);
+            Ok(())
+        }
         MirInstruction::DynamicArrayAdd {
             array,
             value,
@@ -2721,6 +2756,43 @@ fn lower_instruction(
                 );
             }
             values.insert(*output, pointer);
+            Ok(())
+        }
+        MirInstruction::ErasedEncode { output, value, .. } => {
+            // A concrete scalar stored in an erased generic slot is a machine
+            // word: an i8 is widened, and an f64 keeps its bits (ADR-0126).
+            let source = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let word = match builder.func.dfg.value_type(source) {
+                types::I64 => source,
+                types::F64 => builder
+                    .ins()
+                    .bitcast(types::I64, MemFlagsData::new(), source),
+                _ => builder.ins().uextend(types::I64, source),
+            };
+            values.insert(*output, word);
+            Ok(())
+        }
+        MirInstruction::ErasedDecode {
+            output,
+            value,
+            type_id,
+            ..
+        } => {
+            let word = values
+                .get(value)
+                .copied()
+                .ok_or(CraneliftLoweringError::MissingValue)?;
+            let concrete = cranelift_type(*type_id, context.type_arena)
+                .ok_or(CraneliftLoweringError::UnsupportedRuntimeType)?;
+            let decoded = match concrete {
+                types::I8 => builder.ins().ireduce(types::I8, word),
+                types::F64 => builder.ins().bitcast(types::F64, MemFlagsData::new(), word),
+                _ => word,
+            };
+            values.insert(*output, decoded);
             Ok(())
         }
         MirInstruction::StringLength { output, value, .. } => {
