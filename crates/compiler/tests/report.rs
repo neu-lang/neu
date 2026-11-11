@@ -432,3 +432,22 @@ fn qualifier_without_a_package_points_at_the_qualifier() {
     );
     assert!(!rendered.contains("deferred"), "{rendered}");
 }
+
+#[test]
+fn lambda_parameter_without_a_type_needs_context() {
+    let project = Project::new(
+        "lambda_parameter_type",
+        &[(
+            "src/main.neu",
+            "public func main(): Int {\n    val f = { x -> x + 1 };\n    return 1;\n}\n",
+        )],
+    );
+
+    let rendered = project.rendered().replace('\\', "/");
+
+    assert!(
+        rendered.contains("lambda parameter type required"),
+        "{rendered}"
+    );
+    assert!(rendered.contains("src/main.neu:2:"), "{rendered}");
+}

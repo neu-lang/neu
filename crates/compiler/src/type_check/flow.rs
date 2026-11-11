@@ -1,6 +1,7 @@
 //! Local inference, flow refinements for null tests, control flow, enum `when`, and assignments.
 
 use super::*;
+use crate::name_resolution::DeclarationKind;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RefinementRecord {
@@ -189,6 +190,44 @@ impl EligibleNullTestRefinement {
     }
 }
 
+/// The function type a lambda argument must have, from the annotated
+/// parameter of the callee (ADR-0125). An overloaded callee has no single
+/// signature to read, so it provides no context.
+fn argument_context_type(
+    parsed: &ParseOutput,
+    lambda: AstNodeId,
+    types: &mut TypeArena,
+) -> Option<TypeId> {
+    let call = parsed
+        .call_expressions
+        .iter()
+        .find(|call| call.arguments.contains(&lambda))?;
+    let index = call
+        .arguments
+        .iter()
+        .position(|argument| *argument == lambda)?;
+    let callee = parsed
+        .name_references
+        .iter()
+        .find(|reference| reference.reference == call.callee)?
+        .name
+        .as_str();
+    let mut functions = parsed.declaration_names.iter().filter(|declaration| {
+        declaration.kind == DeclarationKind::Function && declaration.name == callee
+    });
+    let function = functions.next()?;
+    if functions.next().is_some() {
+        return None;
+    }
+    let annotation = parsed
+        .function_parameters
+        .iter()
+        .filter(|parameter| parameter.function == function.declaration)
+        .nth(index)?
+        .annotation;
+    type_annotation_type(parsed, annotation, types, &[])
+}
+
 pub fn type_lambda_expressions(
     parsed: &ParseOutput,
     types: &mut TypeArena,
@@ -200,7 +239,8 @@ pub fn type_lambda_expressions(
             .iter()
             .find(|declaration| declaration.initializer == Some(lambda.expression))
             .and_then(|declaration| declaration.annotation)
-            .and_then(|annotation| type_annotation_type(parsed, annotation, types, &[]));
+            .and_then(|annotation| type_annotation_type(parsed, annotation, types, &[]))
+            .or_else(|| argument_context_type(parsed, lambda.expression, types));
         let expected_parameters = expected_type.and_then(|expected| {
             types.get(expected).and_then(|record| match record.kind() {
                 TypeKind::Function(function) => Some(function.parameters().to_vec()),
@@ -283,6 +323,18 @@ pub fn type_lambda_expressions(
             })
             .collect::<Option<Vec<_>>>()
         else {
+            // A parameter with no annotation and no context has no type
+            // (ADR-0125). Report it at the lambda and stop typing it.
+            if lambda
+                .parameters
+                .iter()
+                .any(|parameter| parameter.annotation.is_none())
+            {
+                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
+                    TypeRuleDiagnostic::LambdaParameterTypeRequired,
+                    lambda.expression,
+                ));
+            }
             continue;
         };
         for (parameter, parameter_type) in lambda.parameters.iter().zip(&parameter_types) {
