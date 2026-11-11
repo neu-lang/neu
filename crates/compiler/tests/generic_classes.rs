@@ -180,3 +180,14 @@ fn field_assignment_through_a_generic_instance_inside_a_block_writes_the_field()
         Some(9)
     );
 }
+
+#[test]
+fn class_implements_a_generic_interface_with_a_type_argument() {
+    assert_eq!(
+        run_exit_code(
+            "generic_interface_direct",
+            "interface Counter<T> {\n    func next(): T;\n}\n\nclass Source(var n: Int): Counter<Int> {\n    func next(): Int {\n        return n;\n    }\n}\n\npublic func main(): Int {\n    val s: Source = new Source(7);\n    return s.next();\n}\n",
+        ),
+        Some(7)
+    );
+}

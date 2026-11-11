@@ -128,6 +128,8 @@ pub struct ParsedClassDeclaration {
     pub superclass: Option<String>,
     pub superclass_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
+    /// The type arguments of each entry in `interfaces`, in the same order.
+    pub interface_arguments: Vec<Vec<String>>,
     pub fields: Vec<AstNodeId>,
     pub constructor_parameters: Vec<ParsedConstructorParameter>,
     pub interface: bool,
@@ -1342,6 +1344,7 @@ impl<'source> Parser<'source> {
         let mut superclass = None;
         let mut superclass_arguments = Vec::new();
         let mut interfaces = Vec::new();
+        let mut interface_arguments: Vec<Vec<String>> = Vec::new();
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
             loop {
@@ -1363,7 +1366,27 @@ impl<'source> Parser<'source> {
                 }
                 let name = self.text[reference.span.start()..reference.span.end()].to_owned();
                 self.advance();
+                let type_arguments = if self.current_kind() == Some(TokenKind::Less) {
+                    match self.parse_new_type_arguments() {
+                        Some(arguments) => arguments,
+                        None => {
+                            self.skip_to_declaration_boundary(in_body);
+                            return;
+                        }
+                    }
+                } else {
+                    Vec::new()
+                };
                 let is_superclass = self.current_kind() == Some(TokenKind::LeftParen);
+                if is_superclass && !type_arguments.is_empty() {
+                    // A generic superclass has no accepted contract yet.
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedDeclarationHeader,
+                        reference.span,
+                    );
+                    self.skip_to_declaration_boundary(in_body);
+                    return;
+                }
                 if is_superclass {
                     self.advance();
                     if self.current_kind() != Some(TokenKind::RightParen) {
@@ -1415,6 +1438,7 @@ impl<'source> Parser<'source> {
                     superclass = Some(name);
                 } else {
                     interfaces.push(name);
+                    interface_arguments.push(type_arguments);
                 }
                 if self.current_kind() != Some(TokenKind::Comma) {
                     break;
@@ -1469,6 +1493,7 @@ impl<'source> Parser<'source> {
                 superclass: None,
                 superclass_arguments: Vec::new(),
                 interfaces: Vec::new(),
+                interface_arguments: Vec::new(),
                 fields: Vec::new(),
                 constructor_parameters,
                 interface: false,
@@ -1491,6 +1516,7 @@ impl<'source> Parser<'source> {
                 superclass,
                 superclass_arguments,
                 interfaces,
+                interface_arguments,
                 fields,
                 constructor_parameters,
                 interface: false,
@@ -1516,6 +1542,7 @@ impl<'source> Parser<'source> {
                 superclass,
                 superclass_arguments: Vec::new(),
                 interfaces,
+                interface_arguments,
                 fields: Vec::new(),
                 constructor_parameters: Vec::new(),
                 interface: true,
