@@ -209,3 +209,26 @@ fn statically_invalid_string_index_is_rejected() {
     );
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn string_index_inside_a_block_reads_a_byte() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-string-block-index-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = workspace.join("program");
+    let source = r#"
+        public func main(): Int {
+            val text: String = "abc";
+            val index: Int = 1;
+            if (true) {
+                val byte: Byte = text[index];
+                return 7;
+            }
+            return 1;
+        }
+    "#;
+    let output = compile_source_to_executable(source, options(&executable)).unwrap();
+    assert_eq!(Command::new(output).status().unwrap().code(), Some(7));
+    let _ = fs::remove_dir_all(workspace);
+}

@@ -3251,7 +3251,16 @@ impl<'a> ControlFlowLowerer<'a> {
                     .map(|candidate| candidate.ty())
                     .and_then(|ty| self.types.get(ty))
                     .map(|record| record.kind());
-                if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
+                if matches!(array_type, Some(TypeKind::Primitive(PrimitiveType::String))) {
+                    let value = self.lower_expression(*array)?;
+                    let index = self.lower_expression(*index)?;
+                    self.push(MirInstruction::StringIndex {
+                        output,
+                        value,
+                        index,
+                        span: expression.span(),
+                    });
+                } else if matches!(array_type, Some(TypeKind::DynamicArray(_))) {
                     let array = self.lower_expression(*array)?;
                     let index = self.lower_expression(*index)?;
                     self.push(MirInstruction::DynamicArrayLoad {
