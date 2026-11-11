@@ -3374,7 +3374,7 @@ fn is_function_typed_call(
                 .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
     }) || source.parsed.local_binding_names.iter().any(|binding| {
         binding.name == name
-            && source
+            && (source
                 .parsed
                 .local_declarations
                 .iter()
@@ -3382,6 +3382,7 @@ fn is_function_typed_call(
                 .and_then(|declaration| declaration.annotation)
                 .and_then(|annotation| source.parsed.arena.node(annotation))
                 .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+                || crate::type_check::initialized_by_lambda(source.parsed, binding.binding))
     })
 }
 

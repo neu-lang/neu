@@ -89,3 +89,36 @@ fn lambda_argument_is_callable_with_a_single_expression_body() {
         Some(7)
     );
 }
+
+#[test]
+fn unannotated_lambda_local_is_callable() {
+    assert_eq!(
+        run_exit_code(
+            "unannotated_lambda",
+            "public func main(): Int {\n    val f = { -> 7 };\n    return f();\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn unannotated_lambda_local_infers_its_return_type_from_the_body() {
+    assert_eq!(
+        run_exit_code(
+            "inferred_return",
+            "public func main(): Int {\n    val f = { x: Int -> x + 1 };\n    return f(6);\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn lambda_parameter_type_is_inferred_from_the_call_argument() {
+    assert_eq!(
+        run_exit_code(
+            "argument_context",
+            "func apply(g: (Int) -> Int, v: Int): Int { return g(v); }\npublic func main(): Int {\n    return apply({ x -> x + 2 }, 5);\n}\n",
+        ),
+        Some(7)
+    );
+}

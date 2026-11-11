@@ -616,7 +616,24 @@ pub(crate) fn is_function_typed_local_or_parameter(
                 .and_then(|declaration| declaration.annotation)
                 .and_then(|annotation| source.parsed.arena.node(annotation))
                 .is_some_and(|node| node.kind == AstNodeKind::FunctionType)
+            || initialized_by_lambda(source.parsed, binding.binding)
     })
+}
+
+/// Whether a local binding's initializer is a lambda expression. Such a local
+/// is function-typed even without an annotation (ADR-0125).
+pub(crate) fn initialized_by_lambda(parsed: &ParseOutput, binding: AstNodeId) -> bool {
+    parsed
+        .local_declarations
+        .iter()
+        .find(|declaration| declaration.declaration == binding)
+        .and_then(|declaration| declaration.initializer)
+        .is_some_and(|initializer| {
+            parsed
+                .lambda_expressions
+                .iter()
+                .any(|lambda| lambda.expression == initializer)
+        })
 }
 
 pub(crate) fn is_enum_variant_call(
