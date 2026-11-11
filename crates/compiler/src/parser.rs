@@ -9,6 +9,7 @@ pub enum DiagnosticKind {
     MisplacedImportDeclaration,
     DuplicateVisibilityModifier,
     UnsupportedDeclarationModifier,
+    RemovedOverrideModifier,
     ObsoleteFunctionKeyword,
     MissingDeclarationName,
     MalformedDeclarationHeader,
@@ -1558,6 +1559,24 @@ impl<'source> Parser<'source> {
                 continue;
             }
             last_index = self.index;
+            // `override` was removed (ADR-0127). Report it once and parse the
+            // method that follows as if the word were absent.
+            if self.current_kind() == Some(TokenKind::Identifier)
+                && self.current_text() == Some("override")
+                && matches!(
+                    self.peek_kind(),
+                    Some(
+                        TokenKind::KwFunc
+                            | TokenKind::KwFun
+                            | TokenKind::KwFinal
+                            | TokenKind::KwOpen
+                    ) | Some(TokenKind::Identifier)
+                )
+            {
+                self.diagnostic_current(DiagnosticKind::RemovedOverrideModifier);
+                self.advance();
+                continue;
+            }
             let method_with_visibility = self.is_visibility()
                 && (matches!(
                     self.peek_kind(),

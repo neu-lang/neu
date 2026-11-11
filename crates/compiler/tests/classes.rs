@@ -902,7 +902,12 @@ fn override_keyword_is_rejected() {
         SourceFileId::from_raw(6872),
         "class Base { func value(): Int { return 1; } } class Child: Base() { override func value(): Int { return 2; } }",
     );
-    assert!(!parsed.diagnostics.is_empty());
+    assert!(
+        parsed.diagnostics.iter().any(|diagnostic| diagnostic.kind
+            == compiler::parser::DiagnosticKind::RemovedOverrideModifier),
+        "{:?}",
+        parsed.diagnostics
+    );
 }
 
 #[test]
