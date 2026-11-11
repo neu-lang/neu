@@ -448,3 +448,146 @@ fn cancelled_awaiter_unwinds_instead_of_deadlocking() {
     assert!(is_trap(code), "{stderr}");
     assert!(!stderr.contains("deadlock"), "{stderr}");
 }
+
+#[test]
+fn operators_on_a_local_inferred_from_a_suspend_call_result_are_typed() {
+    // A local inferred from a suspend call's result must have that type when a
+    // later initializer uses it in an operator, as it does for an ordinary call.
+    let source = r#"
+        suspend func produce(): Int { return 2; }
+        suspend func main(): Int {
+            val v = produce();
+            val w = v + 1;
+            return w;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_suspend_operator"), 3);
+}
+
+#[test]
+fn operators_on_a_local_inferred_from_a_call_result_are_typed() {
+    let source = r#"
+        func produce(): Int { return 2; }
+        func main(): Int {
+            val v = produce();
+            val w = v + 1;
+            return w;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_call_operator"), 3);
+}
+
+#[test]
+fn bool_operator_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func is_big(): Bool { return true; }
+        func main(): Int {
+            val b = is_big();
+            val c = !b;
+            if c { return 1; }
+            return 2;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_bool_operator"), 2);
+}
+
+#[test]
+fn float_operator_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func half(): Float { return 1.5; }
+        func main(): Int {
+            val f = half();
+            val g = f + 1.0;
+            if g == 2.5 { return 3; }
+            return 4;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_float_operator"), 3);
+}
+
+#[test]
+fn byte_arithmetic_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func seven(): Byte { val b: Byte = 7; return b; }
+        func main(): Int {
+            val v = seven();
+            val three: Byte = 3;
+            val w = v - three;
+            val four: Byte = 4;
+            if w == four { return 1; }
+            return 2;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_byte_arithmetic"), 1);
+}
+
+#[test]
+fn byte_bitwise_operator_on_a_local_inferred_from_a_call_result_is_typed() {
+    let source = r#"
+        func seven(): Byte { val b: Byte = 7; return b; }
+        func main(): Int {
+            val v = seven();
+            val three: Byte = 3;
+            val w = v & three;
+            if w == three { return 3; }
+            return 4;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_byte_bitwise"), 3);
+}
+
+#[test]
+fn local_inferred_from_a_suspend_call_result_is_returned() {
+    // The issue 48 repro: the local takes the suspend call's type and is returned.
+    let source = r#"
+        suspend func produce(): Int { return 7; }
+        suspend func main(): Int {
+            val done = produce();
+            return done;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_suspend_return"), 7);
+}
+
+#[test]
+fn local_inferred_from_a_call_result_can_be_a_call_argument() {
+    let source = r#"
+        func produce(): Int { return 4; }
+        func double(x: Int): Int { return x * 2; }
+        func main(): Int {
+            val v = produce();
+            return double(v);
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_call_argument"), 8);
+}
+
+#[test]
+fn local_inferred_from_a_suspend_call_result_can_be_a_call_argument() {
+    let source = r#"
+        suspend func produce(): Int { return 4; }
+        func double(x: Int): Int { return x * 2; }
+        suspend func main(): Int {
+            val v = produce();
+            return double(v);
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_suspend_call_argument"), 8);
+}
+
+#[test]
+fn chained_call_results_through_locals_are_typed_in_order() {
+    // Each call's argument is the previous call's result, so the types arrive one
+    // step at a time across the typing rounds.
+    let source = r#"
+        func produce(): Int { return 3; }
+        func double(x: Int): Int { return x * 2; }
+        func main(): Int {
+            val a = produce();
+            val b = double(a);
+            val c = double(b);
+            return c;
+        }
+    "#;
+    assert_eq!(compile_and_run(source, "infer_call_chain"), 12);
+}

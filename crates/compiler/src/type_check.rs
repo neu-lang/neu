@@ -2957,7 +2957,9 @@ pub fn apply_direct_call_results(
         else {
             continue;
         };
-        report.record_expression_type(ExpressionType::new(call.expression, ty));
+        // Direct calls are applied once per typing round, so a call's type replaces
+        // any earlier one rather than adding a duplicate.
+        report.replace_expression_type(ExpressionType::new(call.expression, ty));
         report.diagnostics.retain(|diagnostic| {
             !matches!(
                 diagnostic.rule(),

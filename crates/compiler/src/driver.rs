@@ -38,8 +38,9 @@ use crate::{
         type_array_iterations, type_bind_function_values, type_class_types_in,
         type_concurrency_operations, type_control_flow, type_dynamic_array_operations,
         type_enum_whens, type_executable_core_in, type_executable_int_operators,
-        type_function_signatures_in_with_generics, type_lambda_expressions, type_string_operations,
-        type_value_conditionals, validate_compile_time_constants, validate_concurrency_structure,
+        type_function_signatures_in_with_generics, type_lambda_expressions,
+        type_primitive_operators, type_string_operations, type_value_conditionals,
+        validate_compile_time_constants, validate_concurrency_structure,
         validate_inferred_assignments, validate_intrinsic_calls,
         validate_task_member_cancellation_structure, validate_test_declarations,
     },
@@ -642,44 +643,7 @@ fn compile_source_with_entry(
                     | TypeRuleDiagnostic::MemberExpressionDeferred
             )
     });
-    if let Some(int_type) = types
-        .records()
-        .iter()
-        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
-        .map(|record| record.id())
-    {
-        let int_unary = parsed
-            .unary_expressions
-            .iter()
-            .filter(|expression| {
-                report
-                    .expression_type(expression.operand)
-                    .is_none_or(|ty| ty == int_type)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let int_binary = parsed
-            .binary_expressions
-            .iter()
-            .filter(|expression| {
-                report
-                    .expression_type(expression.left)
-                    .is_none_or(|ty| ty == int_type)
-                    || report
-                        .expression_type(expression.right)
-                        .is_none_or(|ty| ty == int_type)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let inferred_operators = type_executable_int_operators(
-            &int_unary,
-            &int_binary,
-            &parsed.grouped_expressions,
-            report.expression_types(),
-            int_type,
-        );
-        merge_type_check_report(&mut report, inferred_operators);
-    }
+    type_operators_in_round(&parsed, &types, &mut report);
     infer_local_types(&parsed, &mut report);
     type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
     validate_inferred_assignments(&parsed, &mut report, &types);
@@ -700,23 +664,44 @@ fn compile_source_with_entry(
         !function_typed_calls.contains(&diagnostic.node())
             || diagnostic.rule() != TypeRuleDiagnostic::DirectCallDeferred
     });
-    let calls = check_direct_calls(&[ExecutableSourceTypes::new(
-        options.package(),
-        &parsed,
-        &signatures,
-        report.expression_types(),
-    )
-    .with_class_types(&class_types)
-    .with_type_arena(&types)]);
+    // A call's argument can be a local whose type comes from another call's
+    // result. Direct calls are therefore checked again after each round that
+    // types more of them, until a round resolves no new call. Only the last
+    // round's diagnostics are reported, because an early round can see an
+    // argument that is not typed yet.
+    let mut resolved_calls: Option<crate::type_check::DirectCallReport> = None;
+    for _ in 0..parsed.call_expressions.len() + 2 {
+        let calls = check_direct_calls(&[ExecutableSourceTypes::new(
+            options.package(),
+            &parsed,
+            &signatures,
+            report.expression_types(),
+        )
+        .with_class_types(&class_types)
+        .with_type_arena(&types)]);
+        apply_direct_call_results(&mut report, &parsed, &calls);
+        type_operators_in_round(&parsed, &types, &mut report);
+        infer_local_types(&parsed, &mut report);
+        let stable = resolved_calls.as_ref().is_some_and(|previous| {
+            previous.source_expression_types().len() == calls.source_expression_types().len()
+        });
+        resolved_calls = Some(calls);
+        if stable {
+            break;
+        }
+    }
+    let calls = resolved_calls.expect("at least one direct-call round runs");
     if !calls.diagnostics().is_empty() {
         return Err(DriverError::DirectCallDiagnostics(
             calls.diagnostics().to_vec(),
         ));
     }
-    apply_direct_call_results(&mut report, &parsed, &calls);
     // Calls to suspend functions get their result types here, and a spawn body can
     // depend on them, so the same typing rounds run again.
     for _ in 0..3 {
+        // Operators on locals whose types come from call results need those call
+        // types, which exist only after the direct-call results above.
+        type_operators_in_round(&parsed, &types, &mut report);
         infer_local_types(&parsed, &mut report);
         type_lambda_expressions(&parsed, &mut types, &mut report);
         type_bind_function_values(&parsed, &signatures, &mut types, &mut report);
@@ -948,4 +933,88 @@ fn compile_source_with_entry(
         SystemLinkInvocation::new(&object_path, &executable).map_err(DriverError::Link)?;
     invocation.execute().map_err(DriverError::Link)?;
     Ok(executable)
+}
+
+/// Types integer, `Bool`, `Float`, and `Byte` unary and binary operators whose
+/// operands are known or not yet typed. An operand's type can arrive from a
+/// later pass (a call result), so this runs again in the typing rounds, not only
+/// once.
+fn type_operators_in_round(
+    parsed: &parser::ParseOutput,
+    types: &TypeArena,
+    report: &mut crate::type_check::TypeCheckReport,
+) {
+    let Some(int_type) = types
+        .records()
+        .iter()
+        .find(|record| record.kind() == &TypeKind::Primitive(PrimitiveType::Int))
+        .map(|record| record.id())
+    else {
+        return;
+    };
+    let int_unary = parsed
+        .unary_expressions
+        .iter()
+        .filter(|expression| {
+            report
+                .expression_type(expression.operand)
+                .is_none_or(|ty| ty == int_type)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let int_binary = parsed
+        .binary_expressions
+        .iter()
+        .filter(|expression| {
+            report
+                .expression_type(expression.left)
+                .is_none_or(|ty| ty == int_type)
+                || report
+                    .expression_type(expression.right)
+                    .is_none_or(|ty| ty == int_type)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let inferred_operators = type_executable_int_operators(
+        &int_unary,
+        &int_binary,
+        &parsed.grouped_expressions,
+        report.expression_types(),
+        int_type,
+    );
+    merge_type_check_report(report, inferred_operators);
+
+    let primitive = |kind: PrimitiveType| {
+        types
+            .records()
+            .iter()
+            .find(|record| record.kind() == &TypeKind::Primitive(kind))
+            .map(|record| record.id())
+    };
+    if let (Some(bool_id), Some(float_id), Some(byte_id), Some(void_id)) = (
+        primitive(PrimitiveType::Bool),
+        primitive(PrimitiveType::Float),
+        primitive(PrimitiveType::Byte),
+        primitive(PrimitiveType::Void),
+    ) {
+        let primitive_report = type_primitive_operators(
+            &parsed.unary_expressions,
+            &parsed.binary_expressions,
+            report.expression_types(),
+            bool_id,
+            float_id,
+            byte_id,
+            void_id,
+        );
+        // Only new expression types are kept. The report repeats the known types,
+        // and the core pass already reported this operator's diagnostics.
+        for expression_type in primitive_report.expression_types() {
+            if report
+                .expression_type(expression_type.expression())
+                .is_none()
+            {
+                report.record_expression_type(*expression_type);
+            }
+        }
+    }
 }
