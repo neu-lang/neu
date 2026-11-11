@@ -245,6 +245,16 @@ fn reports_for(error: &DriverError, context: &ManifestContext) -> Vec<Report> {
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind, span(diagnostic.span)))
             .collect(),
+        DriverError::UnknownNames(names) => names
+            .iter()
+            .map(|name| {
+                Report::new(
+                    "UnknownName",
+                    format!("`{}` is not declared in this program", name.name),
+                    span(name.span),
+                )
+            })
+            .collect(),
         DriverError::EntryPointDiagnostics(diagnostics) => diagnostics
             .iter()
             .map(|diagnostic| match diagnostic.location() {
