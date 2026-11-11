@@ -1255,6 +1255,17 @@ pub(crate) fn diagnose_local_initializer_mismatches(
             || nullable_or_null(value)
             || crate::type_check::flow::assignment_compatible(annotation, value, types)
             || crate::type_check::calls::class_value_assignable(classes, value, annotation)
+            || classes
+                .classes()
+                .iter()
+                .find(|class| class.type_id == value)
+                .is_some_and(|class| {
+                    crate::type_check::classes::class_implements_annotated_interface(
+                        parsed,
+                        &class.name,
+                        declaration.annotation,
+                    )
+                })
             || report
                 .assignment_checks()
                 .iter()

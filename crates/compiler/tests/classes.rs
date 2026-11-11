@@ -1130,13 +1130,110 @@ fn same_method_from_two_interfaces_is_ambiguous() {
     assert!(error.contains("AmbiguousInterfaceMethod"), "{error}");
 }
 
+const BOX: &str = "interface Box<T> { func get(): T; func twice(): T { return this.get(); } } ";
+
 #[test]
-fn default_method_of_a_generic_interface_is_deferred() {
-    let error = compile_private_case(
-        "default_generic",
-        "interface Box<T> { func get(): T; func twice(): T { return this.get(); } } public func main(): Int { return 7; }",
-        6915,
-    )
-    .unwrap_err();
-    assert!(error.contains("GenericInterfaceDefault"), "{error}");
+fn generic_default_is_inherited_by_an_int_implementation() {
+    let source = format!(
+        "{BOX}class IntBox: Box<Int> {{ func get(): Int {{ return 4; }} }} public func main(): Int {{ val b: Box<Int> = new IntBox(); return b.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_int", &source, 6920),
+        Ok(Some(4))
+    );
+}
+
+#[test]
+fn generic_default_is_inherited_by_a_bool_implementation() {
+    let source = format!(
+        "{BOX}class FlagBox: Box<Bool> {{ func get(): Bool {{ return true; }} }} public func main(): Int {{ val b: Box<Bool> = new FlagBox(); if (b.twice()) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_bool", &source, 6921),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn generic_default_is_inherited_by_a_float_implementation() {
+    let source = format!(
+        "{BOX}class Half: Box<Float> {{ func get(): Float {{ return 2.5; }} }} public func main(): Int {{ val b: Box<Float> = new Half(); val f: Float = b.twice(); if (f > 2.0) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_float", &source, 6922),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn generic_default_passes_a_bool_argument_through_the_interface() {
+    let source = "interface Sink<T> { func put(value: T): Int; func putTwice(value: T): Int { return this.put(value) + this.put(value); } } class Flags: Sink<Bool> { func put(value: Bool): Int { if (value) { return 3; } return 4; } } public func main(): Int { val s: Sink<Bool> = new Flags(); return s.putTwice(true); }";
+    assert_eq!(
+        compile_private_case("generic_default_argument", source, 6923),
+        Ok(Some(6))
+    );
+}
+
+#[test]
+fn class_method_replaces_a_generic_default() {
+    let source = format!(
+        "{BOX}class Own: Box<Int> {{ func get(): Int {{ return 4; }} func twice(): Int {{ return 9; }} }} public func main(): Int {{ val b: Box<Int> = new Own(); return b.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_replaced", &source, 6924),
+        Ok(Some(9))
+    );
+}
+
+#[test]
+fn superclass_method_wins_over_a_generic_default() {
+    let source = format!(
+        "{BOX}class Base {{ func twice(): Int {{ return 5; }} }} class Child: Base(), Box<Int> {{ func get(): Int {{ return 4; }} }} public func main(): Int {{ val b: Box<Int> = new Child(); return b.twice(); }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_superclass", &source, 6925),
+        Ok(Some(5))
+    );
+}
+
+#[test]
+fn concrete_call_on_a_bool_implementation_of_a_generic_interface() {
+    let source = "interface Sink<T> { func put(value: T): Int; func putTwice(value: T): Int { return this.put(value) + this.put(value); } } class Flags: Sink<Bool> { func put(value: Bool): Int { if (value) { return 3; } return 4; } } public func main(): Int { val f: Flags = new Flags(); return f.put(true); }";
+    assert_eq!(
+        compile_private_case("generic_concrete_bool", source, 6927),
+        Ok(Some(3))
+    );
+}
+
+#[test]
+fn generic_default_is_inherited_through_a_superclass_with_a_bool_type_argument() {
+    let source = format!(
+        "{BOX}class Base: Box<Bool> {{ func get(): Bool {{ return true; }} }} class Child: Base() {{}} public func main(): Int {{ val b: Box<Bool> = new Child(); if (b.twice()) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_superclass_bool", &source, 6928),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn generic_default_returns_a_byte_through_the_interface() {
+    let source = format!(
+        "{BOX}class Seven: Box<Byte> {{ func get(): Byte {{ val seven: Byte = 7; return seven; }} }} public func main(): Int {{ val b: Box<Byte> = new Seven(); val x: Byte = b.twice(); val seven: Byte = 7; if (x == seven) {{ return 7; }} return 1; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_byte", &source, 6929),
+        Ok(Some(7))
+    );
+}
+
+#[test]
+fn int_and_bool_implementations_share_one_generic_default() {
+    let source = format!(
+        "{BOX}class IntBox: Box<Int> {{ func get(): Int {{ return 4; }} }} class FlagBox: Box<Bool> {{ func get(): Bool {{ return true; }} }} public func main(): Int {{ val a: Box<Int> = new IntBox(); val f: Box<Bool> = new FlagBox(); if (f.twice()) {{ return a.twice(); }} return 0; }}"
+    );
+    assert_eq!(
+        compile_private_case("generic_default_mixed", &source, 6926),
+        Ok(Some(4))
+    );
 }

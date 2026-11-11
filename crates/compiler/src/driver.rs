@@ -547,6 +547,10 @@ fn compile_source_with_entry(
         .collect::<Vec<_>>();
     signatures.extend(missing_function_signatures);
     apply_receiver_signatures(&parsed, &class_types, &mut signatures);
+    // HIR lowers against erased signatures for generic interface implementations
+    // (ADR-0134); type checking above used the declared signatures.
+    let lowering_signatures =
+        crate::type_check::erased_interface_signatures(&parsed, &types, &signatures);
     let mut report = type_executable_core_in(
         &mut types,
         &parsed.arena,
@@ -964,7 +968,7 @@ fn compile_source_with_entry(
             options.module().clone(),
             options.package().clone(),
             &parsed,
-            &signatures,
+            &lowering_signatures,
             report.expression_types(),
             true,
         )

@@ -2,6 +2,8 @@
 
 Status: Accepted; extends ADR-0065, which deferred default method bodies
 
+Revised by ADR-0134: default bodies in generic interfaces are accepted.
+
 ## Question
 
 ADR-0065 declares interfaces with required methods only, and defers default

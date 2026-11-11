@@ -485,6 +485,13 @@ pub fn lower_checked_hir_source(
                     &local_bindings,
                     &mut expressions,
                 )?;
+                let expression = erase_return(
+                    &source,
+                    function.declaration,
+                    value,
+                    expression,
+                    &mut expressions,
+                );
                 returns.push(HirReturn::new(statement.span, expression));
                 continue;
             }
@@ -1400,21 +1407,36 @@ fn lower_expression(
             .filter(|parameter| parameter.function == function_declaration)
             .position(|parameter| parameter.name == name.name)
     {
+        let hir_index = parameter_index
+            + usize::from(
+                source
+                    .parsed
+                    .function_declarations
+                    .iter()
+                    .find(|function| function.declaration == function_declaration)
+                    .is_some_and(|function| function.owner.is_some()),
+            );
+        // A parameter whose slot is an erased word is decoded to its concrete type
+        // (ADR-0134), as a generic method's argument is decoded at its call site.
+        if let Some(slot) = parameter_slot_type(source, function_declaration, hir_index)
+            && erased_slot(source, slot)
+            && needs_erasure(source, ty)
+        {
+            output.push(HirExpression::parameter_read(
+                id,
+                span,
+                slot,
+                HirParameterId::from_raw(hir_index),
+            ));
+            let decoded = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::erased_decode(decoded, span, ty, id));
+            return Ok(decoded);
+        }
         output.push(HirExpression::parameter_read(
             id,
             span,
             ty,
-            HirParameterId::from_raw(
-                parameter_index
-                    + usize::from(
-                        source
-                            .parsed
-                            .function_declarations
-                            .iter()
-                            .find(|function| function.declaration == function_declaration)
-                            .is_some_and(|function| function.owner.is_some()),
-                    ),
-            ),
+            HirParameterId::from_raw(hir_index),
         ));
         return Ok(id);
     }
@@ -3193,6 +3215,54 @@ fn needs_erasure(source: &CheckedHirSource<'_>, ty: TypeId) -> bool {
         })
 }
 
+/// The declared slot type of the HIR parameter `hir_index` of `function_declaration`,
+/// including the receiver at index 0 for an instance method.
+fn parameter_slot_type(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    hir_index: usize,
+) -> Option<TypeId> {
+    source
+        .signatures
+        .iter()
+        .find(|signature| signature.declaration() == function_declaration)?
+        .parameter_types()
+        .get(hir_index)
+        .copied()
+}
+
+/// Encodes a returned value when the function returns an erased word for it
+/// (ADR-0134), as an argument is encoded for an erased parameter.
+fn erase_return(
+    source: &CheckedHirSource<'_>,
+    function_declaration: crate::ast::AstNodeId,
+    value: crate::ast::AstNodeId,
+    lowered: HirExpressionId,
+    output: &mut Vec<HirExpression>,
+) -> HirExpressionId {
+    let return_slot = source
+        .signatures
+        .iter()
+        .find(|signature| signature.declaration() == function_declaration)
+        .map(|signature| signature.return_type());
+    let value_type = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression() == value)
+        .map(|typed| typed.ty());
+    match (return_slot, value_type) {
+        (Some(slot), Some(ty)) if erased_slot(source, slot) && needs_erasure(source, ty) => {
+            let Some(span) = source.parsed.arena.node(value).map(|node| node.span) else {
+                return lowered;
+            };
+            let id = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::erased_encode(id, span, slot, lowered));
+            id
+        }
+        _ => lowered,
+    }
+}
+
 /// Encodes an argument for an erased parameter when its concrete type needs it.
 /// The encode wrapper keeps the argument's own span, so it never shares a span
 /// with the enclosing call or constructor.
@@ -3580,15 +3650,23 @@ fn lower_control_flow_block(
             .iter()
             .find(|returned| returned.statement == statement.statement)
         {
+            let returned_value = returned
+                .value
+                .ok_or(HirLoweringError::UnsupportedExpression)?;
             let value = lower_expression(
                 source,
                 function_declaration,
-                returned
-                    .value
-                    .ok_or(HirLoweringError::UnsupportedExpression)?,
+                returned_value,
                 local_bindings,
                 expressions,
             )?;
+            let value = erase_return(
+                source,
+                function_declaration,
+                returned_value,
+                value,
+                expressions,
+            );
             output.push(HirControlFlow::Return(HirReturn::new(
                 statement.span,
                 value,

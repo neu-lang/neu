@@ -290,7 +290,6 @@ pub enum DispatchDiagnosticKind {
     InterfaceMethodFinal,
     MissingInterfaceMethod,
     AmbiguousInterfaceMethod,
-    GenericInterfaceDefault,
     IncompatibleOverride,
     IncompatibleInterfaceMethod,
 }
@@ -311,30 +310,6 @@ impl DispatchDiagnostic {
 }
 
 pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
-    let mut generic_default_diagnostics = Vec::new();
-    for interface in parsed
-        .class_declarations
-        .iter()
-        .filter(|class| class.interface)
-    {
-        let generic = parsed
-            .generic_parameters
-            .iter()
-            .any(|parameter| parameter.owner == Some(interface.declaration));
-        let has_default = parsed
-            .function_declarations
-            .iter()
-            .any(|method| method.owner == Some(interface.declaration) && method.body.is_some());
-        if generic
-            && has_default
-            && let Some(node) = parsed.arena.node(interface.declaration)
-        {
-            generic_default_diagnostics.push(DispatchDiagnostic {
-                kind: DispatchDiagnosticKind::GenericInterfaceDefault,
-                span: node.span,
-            });
-        }
-    }
     let methods_by_owner: HashMap<AstNodeId, Vec<&ParsedFunctionDeclaration>> = parsed
         .function_declarations
         .iter()
@@ -343,7 +318,7 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             index.entry(owner).or_default().push(function);
             index
         });
-    let mut diagnostics = generic_default_diagnostics;
+    let mut diagnostics = Vec::new();
     for function in &parsed.function_declarations {
         if function.is_final
             && function.owner.is_some_and(|owner| {
@@ -673,7 +648,7 @@ pub(crate) fn argument_texts(parsed: &ParseOutput, arguments: &[AstNodeId]) -> V
 }
 
 /// The mapping from the type parameters of `declaration` to the given arguments.
-fn interface_parameter_mapping(
+pub(crate) fn interface_parameter_mapping(
     parsed: &ParseOutput,
     declaration: AstNodeId,
     arguments: &[String],
@@ -713,6 +688,141 @@ pub(crate) fn type_text_with(
         .map(|argument| type_text_with(parsed, *argument, mapping))
         .collect();
     format!("{}<{}>", reference.name, arguments.join(","))
+}
+
+/// Whether the class `class_name`, or a superclass of it, implements the interface
+/// named by `annotation`, with the same spelling including type arguments
+/// (ADR-0134). Only an interface type annotation can be satisfied this way.
+pub(crate) fn class_implements_annotated_interface(
+    parsed: &ParseOutput,
+    class_name: &str,
+    annotation: Option<AstNodeId>,
+) -> bool {
+    let Some(annotated) = type_annotation_name(parsed, annotation) else {
+        return false;
+    };
+    let mut current = parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name);
+    while let Some(class) = current {
+        let implemented = class.interfaces.iter().enumerate().any(|(index, name)| {
+            let spelling = match class.interface_arguments.get(index) {
+                Some(arguments) if !arguments.is_empty() => {
+                    format!("{name}<{}>", argument_texts(parsed, arguments).join(","))
+                }
+                _ => name.clone(),
+            };
+            spelling == annotated
+                && parsed
+                    .class_declarations
+                    .iter()
+                    .any(|candidate| candidate.interface && candidate.name == *name)
+        });
+        if implemented {
+            return true;
+        }
+        current = class.superclass.as_deref().and_then(|parent| {
+            parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.name == parent)
+        });
+    }
+    false
+}
+
+/// The signatures that HIR lowers against (ADR-0134). An implementation of a
+/// generic interface method keeps a word at each slot that the interface declares
+/// with its type parameter, so that one interface call can invoke any
+/// implementation. A `Bool`, `Byte`, or `Float` slot is narrower than a word, so it
+/// takes the interface's erased word in the implementation's signature. Type
+/// checking keeps the declared signatures.
+pub(crate) fn erased_interface_signatures(
+    parsed: &ParseOutput,
+    types: &TypeArena,
+    signatures: &[FunctionSignature],
+) -> Vec<FunctionSignature> {
+    let is_erased = |ty: TypeId| {
+        matches!(
+            types.get(ty).map(|record| record.kind()),
+            Some(TypeKind::GenericParameter(_))
+        )
+    };
+    let is_narrow = |ty: TypeId| {
+        matches!(
+            types.get(ty).map(|record| record.kind()),
+            Some(TypeKind::Primitive(
+                PrimitiveType::Bool | PrimitiveType::Byte | PrimitiveType::Float
+            ))
+        )
+    };
+    let mut result = signatures.to_vec();
+    for class in parsed
+        .class_declarations
+        .iter()
+        .filter(|class| !class.interface)
+    {
+        for (index, interface_name) in class.interfaces.iter().enumerate() {
+            let Some(interface) = parsed
+                .class_declarations
+                .iter()
+                .find(|candidate| candidate.interface && candidate.name == *interface_name)
+            else {
+                continue;
+            };
+            let arguments = class
+                .interface_arguments
+                .get(index)
+                .map(|arguments| argument_texts(parsed, arguments))
+                .unwrap_or_default();
+            let mapping = interface_parameter_mapping(parsed, interface.declaration, &arguments);
+            for required in parsed
+                .function_declarations
+                .iter()
+                .filter(|function| function.owner == Some(interface.declaration))
+            {
+                let Some(required_signature) = signatures
+                    .iter()
+                    .find(|signature| signature.declaration == required.declaration)
+                else {
+                    continue;
+                };
+                let required_parameters = parameter_texts(parsed, required.declaration, &mapping);
+                for method in parsed.function_declarations.iter().filter(|function| {
+                    function.owner == Some(class.declaration) && function.name == required.name
+                }) {
+                    if parameter_texts(parsed, method.declaration, &[]) != required_parameters {
+                        continue;
+                    }
+                    let (Some(own), Some(erased)) = (
+                        signatures
+                            .iter()
+                            .find(|signature| signature.declaration == method.declaration),
+                        result
+                            .iter_mut()
+                            .find(|signature| signature.declaration == method.declaration),
+                    ) else {
+                        continue;
+                    };
+                    for ((slot, declared), required_slot) in own
+                        .parameter_types
+                        .iter()
+                        .enumerate()
+                        .zip(&required_signature.parameter_types)
+                    {
+                        if is_erased(*required_slot) && is_narrow(*declared) {
+                            erased.parameter_types[slot] = *required_slot;
+                        }
+                    }
+                    if is_erased(required_signature.return_type) && is_narrow(own.return_type) {
+                        erased.return_type = required_signature.return_type;
+                    }
+                }
+            }
+        }
+    }
+    result
 }
 
 pub(crate) fn type_annotation_name(
@@ -1317,23 +1427,10 @@ pub fn apply_class_type_facts(
         if diagnostic.rule() != AmbiguousTypeRule::AssignmentCompatibility {
             return true;
         }
-        let Some(declaration) = parsed
-            .local_declarations
-            .iter()
-            .find(|declaration| declaration.declaration == diagnostic.node())
-        else {
-            return true;
-        };
-        let Some(interface_name) = declaration
-            .annotation
-            .and_then(|annotation| {
-                parsed
-                    .type_name_references
-                    .iter()
-                    .find(|reference| reference.reference == annotation)
-            })
-            .map(|reference| reference.name.as_str())
-        else {
+        let Some(declaration) = parsed.local_declarations.iter().find(|declaration| {
+            declaration.declaration == diagnostic.node()
+                || declaration.initializer == Some(diagnostic.node())
+        }) else {
             return true;
         };
         let Some(initializer) = declaration.initializer.and_then(|initializer| {
@@ -1344,21 +1441,11 @@ pub fn apply_class_type_facts(
         }) else {
             return true;
         };
-        let Some(concrete) = parsed
-            .class_declarations
-            .iter()
-            .find(|class| class.name == initializer.type_name)
-        else {
-            return true;
-        };
-        !(concrete
-            .interfaces
-            .iter()
-            .any(|interface| interface == interface_name)
-            && parsed
-                .class_declarations
-                .iter()
-                .any(|class| class.interface && class.name == interface_name))
+        !class_implements_annotated_interface(
+            parsed,
+            &initializer.type_name,
+            declaration.annotation,
+        )
     });
     report.retain_diagnostics(|diagnostic| {
         !matches!(diagnostic.rule(), TypeRuleDiagnostic::MissingAnnotationType)
