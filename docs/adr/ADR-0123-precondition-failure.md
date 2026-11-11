@@ -1,6 +1,7 @@
 # ADR-0123: Precondition Failure
 
-Status: Accepted; revises ADR-0111 for precondition failures
+Status: Accepted; revises ADR-0111 for precondition failures. Its compile-time
+follow-up is decided by ADR-0124.
 
 ## Question
 

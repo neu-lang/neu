@@ -1449,6 +1449,15 @@ The runtime message carries no source span. It is not removed or moved past its
 arguments' evaluation. ADR-0111 still governs `panic`, `abort`, `assert`,
 `debug_assert`, `unreachable`, `todo`, and `unimplemented`.
 
+## ADR-0124: Compile-Time Precondition Violations
+
+A call is diagnosed as `precondition_violation`, at the call expression, when the
+callee's first statement is `precondition(condition, _)`, the call is a plain
+call, the condition uses only parameters, every argument it uses is a constant
+(integer or `Bool` literals, and negated, grouped, or arithmetic combinations of
+them, with overflow not decided), and the condition evaluates to `false`. Any
+other call is checked at run time, as ADR-0123 specifies.
+
 ## Proposed ADR-0113: Collection Protocol Contracts
 
 `Eq<T>`, `Ord<T>`, `Hash<T>`, `Clone<T>`, and `Default<T>` are ordinary

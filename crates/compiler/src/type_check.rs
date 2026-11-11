@@ -2113,6 +2113,8 @@ pub enum DirectCallDiagnosticKind {
     ArgumentCountMismatch,
     ArgumentTypeMismatch,
     RecursiveCallUnsupported,
+    /// A call whose leading `precondition` fails for constant arguments (ADR-0124).
+    PreconditionViolation,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -2593,6 +2595,27 @@ pub fn check_direct_calls(sources: &[ExecutableSourceTypes<'_>]) -> DirectCallRe
                 .node(call.expression)
                 .expect("parsed call expression")
                 .span;
+            // A plain call's arguments line up with the callee's parameters. A member
+            // call inserts its receiver, which is not checked here.
+            let is_plain_call = !source
+                .parsed
+                .member_expressions
+                .iter()
+                .any(|member| member.expression == call.callee);
+            if is_plain_call
+                && crate::precondition::leading_precondition_fails(
+                    sources[target_source_index].parsed,
+                    target.declaration,
+                    source.parsed,
+                    &call.arguments,
+                ) == Some(true)
+            {
+                report.diagnostics.push(DirectCallDiagnostic::new(
+                    DirectCallDiagnosticKind::PreconditionViolation,
+                    call_span,
+                ));
+                continue;
+            }
             report
                 .expression_types
                 .push(ExpressionType::new(call.expression, target.return_type));
