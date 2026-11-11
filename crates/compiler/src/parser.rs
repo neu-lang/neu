@@ -131,11 +131,19 @@ pub struct ParsedClassDeclaration {
     /// The type arguments written on the superclass, as in `Base<Int>()`.
     pub superclass_type_arguments: Vec<AstNodeId>,
     pub interfaces: Vec<String>,
+    /// The capabilities an interface declares in its header, as in
+    /// `interface Error: Send & Share` (ADR-0136). Empty for other declarations.
+    pub capabilities: Vec<ParsedCapabilityBound>,
     /// The type arguments of each entry in `interfaces`, in the same order.
     pub interface_arguments: Vec<Vec<AstNodeId>>,
     pub fields: Vec<AstNodeId>,
     pub constructor_parameters: Vec<ParsedConstructorParameter>,
     pub interface: bool,
+}
+
+/// The capability names an interface header may declare (ADR-0037, ADR-0136).
+fn is_capability_name(name: &str) -> bool {
+    matches!(name, "Send" | "Share")
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1352,6 +1360,8 @@ impl<'source> Parser<'source> {
         let mut superclass_type_arguments: Vec<AstNodeId> = Vec::new();
         let mut interfaces = Vec::new();
         let mut interface_arguments: Vec<Vec<AstNodeId>> = Vec::new();
+        let mut capabilities: Vec<ParsedCapabilityBound> = Vec::new();
+        let mut in_capability_list = false;
         if self.current_kind() == Some(TokenKind::Colon) {
             self.advance();
             loop {
@@ -1432,13 +1442,46 @@ impl<'source> Parser<'source> {
                     }
                     self.advance();
                 }
+                let is_capability = kind == AstNodeKind::InterfaceDeclaration
+                    && !is_superclass
+                    && is_capability_name(&name);
+                if in_capability_list && !is_capability {
+                    // After `&`, only capability names may follow (ADR-0023, ADR-0136).
+                    self.diagnostic_current_or_span(
+                        DiagnosticKind::MalformedCapabilityBound,
+                        reference.span,
+                    );
+                    self.skip_to_declaration_boundary(in_body);
+                    return;
+                }
                 if is_superclass && superclass.is_none() {
                     superclass = Some(name);
                     superclass_type_arguments = type_arguments;
+                } else if is_capability {
+                    capabilities.push(ParsedCapabilityBound {
+                        bound: self.arena.add_capability_bound(reference.span),
+                        name,
+                        name_span: reference.span,
+                    });
                 } else {
                     interfaces.push(name);
                     interface_arguments.push(type_arguments);
                 }
+                if self.current_kind() == Some(TokenKind::Amp) {
+                    // `&` joins capability names, and only in an interface header.
+                    if !is_capability {
+                        self.diagnostic_current_or_span(
+                            DiagnosticKind::MalformedCapabilityBound,
+                            reference.span,
+                        );
+                        self.skip_to_declaration_boundary(in_body);
+                        return;
+                    }
+                    in_capability_list = true;
+                    self.advance();
+                    continue;
+                }
+                in_capability_list = false;
                 if self.current_kind() != Some(TokenKind::Comma) {
                     break;
                 }
@@ -1494,6 +1537,7 @@ impl<'source> Parser<'source> {
                 superclass_type_arguments: Vec::new(),
                 interfaces: Vec::new(),
                 interface_arguments: Vec::new(),
+                capabilities: Vec::new(),
                 fields: Vec::new(),
                 constructor_parameters,
                 interface: false,
@@ -1518,6 +1562,7 @@ impl<'source> Parser<'source> {
                 superclass_type_arguments,
                 interfaces,
                 interface_arguments,
+                capabilities: Vec::new(),
                 fields,
                 constructor_parameters,
                 interface: false,
@@ -1545,6 +1590,7 @@ impl<'source> Parser<'source> {
                 superclass_type_arguments: Vec::new(),
                 interfaces,
                 interface_arguments,
+                capabilities,
                 fields: Vec::new(),
                 constructor_parameters: Vec::new(),
                 interface: true,

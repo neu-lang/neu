@@ -2,18 +2,15 @@
 //
 // `Error` is an interface with one required method. Concrete errors are classes
 // that implement it. Callers branch on `kind()` with an exhaustive `when`, not on
-// the concrete class.
-//
-// The `Send & Share` declaration on `Error` required by ADR-0136 is not written
-// yet: the bootstrap parser does not accept `&` in interface headers. It is added
-// together with that parser support.
+// the concrete class. `Error` declares `Send` and `Share` (ADR-0136), so every
+// implementing class must satisfy both.
 
 enum ErrorKind {
     IndexOutOfBounds,
     AllocationFailed,
 }
 
-interface Error {
+interface Error: Send & Share {
     func kind(): ErrorKind;
 }
 

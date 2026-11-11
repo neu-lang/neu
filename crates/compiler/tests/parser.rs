@@ -1809,3 +1809,75 @@ fn lambda_statement_bodies_report_once_at_the_statement() {
         "{kinds:?}"
     );
 }
+
+#[test]
+fn interface_header_accepts_an_ampersand_joined_capability_list() {
+    // ADR-0136 syntax: an interface header may declare `Send & Share`.
+    let output = parse_source(
+        SourceFileId::from_raw(137_400),
+        "interface Error: Send & Share { func kind(): Int; }",
+    );
+    assert!(
+        output.lex_diagnostics.is_empty(),
+        "{:?}",
+        output.lex_diagnostics
+    );
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+}
+
+#[test]
+fn ampersand_is_not_a_class_header_separator() {
+    // ADR-0136 limits `&` to interface headers. A class header must still reject it.
+    let output = parse_source(
+        SourceFileId::from_raw(137_401),
+        "class Box: Send & Share { }",
+    );
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == DiagnosticKind::MalformedDeclarationHeader })
+    );
+}
+
+#[test]
+fn interface_header_records_its_capabilities_separately_from_extensions() {
+    let output = parse_source(
+        SourceFileId::from_raw(137_402),
+        "interface Error: Send & Share { func kind(): Int; }",
+    );
+    let declaration = &output.class_declarations[0];
+    let names: Vec<&str> = declaration
+        .capabilities
+        .iter()
+        .map(|bound| bound.name.as_str())
+        .collect();
+    assert_eq!(names, ["Send", "Share"]);
+    assert!(declaration.interfaces.is_empty());
+}
+
+#[test]
+fn ampersand_may_not_join_a_non_capability_name() {
+    let output = parse_source(
+        SourceFileId::from_raw(137_403),
+        "interface Mixed: Send & Hash { func kind(): Int; }",
+    );
+    assert!(
+        output
+            .diagnostics
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == DiagnosticKind::MalformedCapabilityBound })
+    );
+}
+
+#[test]
+fn comma_separated_interface_extensions_are_unchanged() {
+    let output = parse_source(
+        SourceFileId::from_raw(137_404),
+        "interface Shape: Named, Sized { func area(): Int; }",
+    );
+    assert!(output.diagnostics.is_empty(), "{:?}", output.diagnostics);
+    let declaration = &output.class_declarations[0];
+    assert_eq!(declaration.interfaces, ["Named", "Sized"]);
+    assert!(declaration.capabilities.is_empty());
+}
