@@ -52,8 +52,6 @@ fn compile_and_run(source: &str, name: &str) -> i32 {
     )
     .unwrap();
     let status = Command::new(&executable).status().unwrap();
-    // Temporary: report the exit status (a signal on Unix) for macOS diagnosis.
-    eprintln!("DIAG {name} exit {status:?}");
     let code = status.code().unwrap_or(-1);
     let _ = fs::remove_dir_all(workspace);
     code

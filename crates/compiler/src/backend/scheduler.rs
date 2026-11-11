@@ -17,8 +17,8 @@
 use cranelift_codegen::{
     ir::{
         AbiParam, BlockArg, ExtFuncData, ExternalName, FuncRef, Function, InstBuilder,
-        MemFlagsData, Signature, StackSlotData, StackSlotKind, TrapCode, UserExternalName,
-        UserFuncName, Value, condcodes::IntCC, types,
+        MemFlagsData, Signature, TrapCode, UserExternalName, UserFuncName, Value, condcodes::IntCC,
+        types,
     },
     isa::CallConv,
 };
@@ -139,8 +139,6 @@ pub(super) const TRAP_DEADLOCK: u8 = 40;
 pub(super) const TRAP_SPAWN_OUTSIDE_SCOPE: u8 = 41;
 pub(super) const TRAP_ALLOCATION: u8 = 42;
 const TRAP_UNREACHABLE: u8 = 43;
-/// `getcontext` or `swapcontext` reported failure.
-const TRAP_CONTEXT_FAILED: u8 = 45;
 pub(super) const TRAP_CHILD_FAILED: u8 = 44;
 
 /// Written to stderr right before a deadlock trap, so the failure is explained.
@@ -186,7 +184,6 @@ pub(super) struct SchedulerFunctions {
     layout: ContextLayout,
     write: FuncId,
     deadlock_message: DataId,
-    trace: DataId,
 }
 
 fn signature(call_conv: CallConv, parameters: usize, returns: usize) -> Signature {
@@ -300,12 +297,6 @@ pub(super) fn declare_scheduler(
     module
         .define_data(deadlock_message, &message_data)
         .map_err(definition)?;
-    let trace = module
-        .declare_data("neu_sched_trace", Linkage::Local, false, false)
-        .map_err(definition)?;
-    let mut trace_data = DataDescription::new();
-    trace_data.define(b"BFWS\n".to_vec().into_boxed_slice());
-    module.define_data(trace, &trace_data).map_err(definition)?;
 
     let mut declare = |name: &str, parameters: usize| {
         module
@@ -333,7 +324,6 @@ pub(super) fn declare_scheduler(
         layout,
         write,
         deadlock_message,
-        trace,
     };
     define_scheduler_bodies(module, &scheduler, call_conv)?;
     Ok(Some(scheduler))
@@ -438,30 +428,6 @@ fn state_base(
 
 fn trap_if_zero(builder: &mut FunctionBuilder<'_>, value: Value, code: u8) {
     builder.ins().trapz(value, TrapCode::unwrap_user(code));
-}
-
-/// Traps when a `ucontext` call reports failure (`-1`). The signatures declare
-/// `int` results as 64-bit, so only the low 32 bits are compared.
-fn trap_if_context_failed(builder: &mut FunctionBuilder<'_>, result: Value, code: u8) {
-    let status = builder.ins().ireduce(types::I32, result);
-    let failed = builder.ins().icmp_imm(IntCC::Equal, status, -1);
-    builder.ins().trapnz(failed, TrapCode::unwrap_user(code));
-}
-
-/// Writes one tag byte to stderr: 0 block, 1 finish, 2 wake, 3 switch.
-fn emit_trace(
-    builder: &mut FunctionBuilder<'_>,
-    module: &mut ObjectModule,
-    scheduler: &SchedulerFunctions,
-    offset: i64,
-) -> Result<(), CraneliftLoweringError> {
-    let global = module.declare_data_in_func(scheduler.trace, builder.func);
-    let base = builder.ins().global_value(types::I64, global);
-    let address = builder.ins().iadd_imm(base, offset);
-    let fd = builder.ins().iconst(types::I64, 2);
-    let one = builder.ins().iconst(types::I64, 1);
-    call(builder, module, scheduler.write, &[fd, address, one])?;
-    Ok(())
 }
 
 fn define_scheduler_bodies(
@@ -581,7 +547,6 @@ fn define_scheduler_bodies(
         s.block,
         signature(call_conv, 0, 1),
         move |b, m, _| {
-            emit_trace(b, m, &s, 0)?;
             let me = call_value(b, m, s.current, &[])?;
             let ready_queue_addr = ready_queue(b, m, ready);
             let next = call_value(b, m, s.dequeue, &[ready_queue_addr])?;
@@ -597,7 +562,6 @@ fn define_scheduler_bodies(
             b.switch_to_block(switch);
             let st = state_base(b, m, s.state);
             store_word(b, next, st, STATE_CURRENT);
-            emit_trace(b, m, &s, 3)?;
             emit_switch(b, m, &s, me, next)?;
             let zero = b.ins().iconst(types::I64, 0);
             b.ins().return_(&[zero]);
@@ -866,7 +830,6 @@ fn define_scheduler_bodies(
         s.finish,
         signature(call_conv, 0, 1),
         move |b, m, _| {
-            emit_trace(b, m, &s, 1)?;
             let me = call_value(b, m, s.current, &[])?;
             let one = b.ins().iconst(types::I64, 1);
             store_word(b, one, me, TASK_DONE);
@@ -942,7 +905,6 @@ fn define_scheduler_bodies(
             b.switch_to_block(switch);
             let st = state_base(b, m, s.state);
             store_word(b, next, st, STATE_CURRENT);
-            emit_trace(b, m, &s, 3)?;
             emit_jump(b, m, &s, next)?;
             b.ins().trap(TrapCode::unwrap_user(TRAP_UNREACHABLE));
             Ok(())
@@ -1041,7 +1003,6 @@ fn define_scheduler_bodies(
         s.wake_one,
         signature(call_conv, 1, 1),
         move |b, m, p| {
-            emit_trace(b, m, &s, 2)?;
             let waiter = call_value(b, m, s.dequeue, &[p[0]])?;
             let clear = b.create_block();
             let done = b.create_block();
@@ -1213,8 +1174,7 @@ fn emit_child_context(
             store_word(builder, stack, task, TASK_STACK);
             let context = builder.ins().iadd_imm(task, TASK_CONTEXT as i64);
             emit_mcontext(builder, scheduler, context);
-            let got = call_value(builder, module, getcontext, &[context])?;
-            trap_if_context_failed(builder, got, TRAP_CONTEXT_FAILED);
+            call(builder, module, getcontext, &[context])?;
             let layout = scheduler.layout;
             store_word(builder, stack, context, layout.stack_sp);
             store_word(builder, stack_bytes, context, layout.stack_size);
@@ -1230,86 +1190,6 @@ fn emit_child_context(
     Ok(())
 }
 
-/// TEMPORARY DIAGNOSTIC: offset of the saved stack pointer and program counter
-/// inside a Darwin arm64 `__darwin_mcontext64`.
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-const MCONTEXT_SP: i32 = (std::mem::offset_of!(libc::__darwin_mcontext64, __ss)
-    + std::mem::offset_of!(libc::__darwin_arm_thread_state64, __sp))
-    as i32;
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-const MCONTEXT_PC: i32 = (std::mem::offset_of!(libc::__darwin_mcontext64, __ss)
-    + std::mem::offset_of!(libc::__darwin_arm_thread_state64, __pc))
-    as i32;
-
-/// TEMPORARY DIAGNOSTIC: writes `tag`, then each word as a space and 16 hex
-/// digits, then a newline, to stderr.
-fn emit_switch_trace(
-    builder: &mut FunctionBuilder<'_>,
-    module: &mut ObjectModule,
-    scheduler: &SchedulerFunctions,
-    tag: u8,
-    words: &[Value],
-) -> Result<(), CraneliftLoweringError> {
-    let length = 2 + 17 * words.len() as u32;
-    let slot =
-        builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, length, 0));
-    let base = builder.ins().stack_addr(types::I64, slot, 0);
-    let tag_byte = builder.ins().iconst(types::I8, i64::from(tag));
-    builder.ins().store(MemFlagsData::new(), tag_byte, base, 0);
-    let space = builder.ins().iconst(types::I8, i64::from(b' '));
-    let newline = builder.ins().iconst(types::I8, i64::from(b'\n'));
-    let digit_zero = builder.ins().iconst(types::I64, i64::from(b'0'));
-    let letter_offset = builder
-        .ins()
-        .iconst(types::I64, i64::from(b'a' - b'0' - 10));
-    let no_offset = builder.ins().iconst(types::I64, 0);
-    for (index, word) in words.iter().enumerate() {
-        let start = 1 + 17 * index as i32;
-        builder.ins().store(MemFlagsData::new(), space, base, start);
-        for digit in 0..16 {
-            let shift = (15 - digit) * 4;
-            let nibble = builder.ins().ushr_imm(*word, i64::from(shift));
-            let nibble = builder.ins().band_imm(nibble, 15);
-            let is_letter = builder
-                .ins()
-                .icmp_imm(IntCC::UnsignedGreaterThan, nibble, 9);
-            let offset = builder.ins().select(is_letter, letter_offset, no_offset);
-            let character = builder.ins().iadd(nibble, offset);
-            let character = builder.ins().iadd(character, digit_zero);
-            let byte = builder.ins().ireduce(types::I8, character);
-            builder
-                .ins()
-                .store(MemFlagsData::new(), byte, base, start + 1 + digit);
-        }
-    }
-    builder
-        .ins()
-        .store(MemFlagsData::new(), newline, base, (length - 1) as i32);
-    let stderr = builder.ins().iconst(types::I64, 2);
-    let length = builder.ins().iconst(types::I64, i64::from(length));
-    call(builder, module, scheduler.write, &[stderr, base, length])?;
-    Ok(())
-}
-
-/// TEMPORARY DIAGNOSTIC: the saved program counter and stack pointer of the
-/// context at `context`. Zero where the target's context has no such storage.
-fn emit_saved_pc_sp(
-    builder: &mut FunctionBuilder<'_>,
-    scheduler: &SchedulerFunctions,
-    context: Value,
-) -> (Value, Value) {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    if let Some((pointer_offset, _)) = scheduler.layout.mcontext {
-        let storage = load_word(builder, context, pointer_offset);
-        let pc = load_word(builder, storage, MCONTEXT_PC);
-        let sp = load_word(builder, storage, MCONTEXT_SP);
-        return (pc, sp);
-    }
-    let _ = (scheduler, context);
-    let zero = builder.ins().iconst(types::I64, 0);
-    (zero, zero)
-}
-
 /// Saves the running task and resumes `to`. Returns when something switches back.
 fn emit_switch(
     builder: &mut FunctionBuilder<'_>,
@@ -1322,13 +1202,7 @@ fn emit_switch(
         ContextFunctions::Ucontext { swapcontext, .. } => {
             let from_context = builder.ins().iadd_imm(from, TASK_CONTEXT as i64);
             let to_context = builder.ins().iadd_imm(to, TASK_CONTEXT as i64);
-            // TEMPORARY DIAGNOSTIC: the target's saved pc and sp before the switch.
-            let (pc, sp) = emit_saved_pc_sp(builder, scheduler, to_context);
-            emit_switch_trace(builder, module, scheduler, b'S', &[from, to, pc, sp])?;
-            let switched = call_value(builder, module, swapcontext, &[from_context, to_context])?;
-            trap_if_context_failed(builder, switched, TRAP_CONTEXT_FAILED);
-            // TEMPORARY DIAGNOSTIC: this task has been switched back to.
-            emit_switch_trace(builder, module, scheduler, b'R', &[from])?;
+            call(builder, module, swapcontext, &[from_context, to_context])?;
         }
         ContextFunctions::Fiber {
             switch_to_fiber, ..
@@ -1350,9 +1224,6 @@ fn emit_jump(
     match scheduler.context {
         ContextFunctions::Ucontext { setcontext, .. } => {
             let to_context = builder.ins().iadd_imm(to, TASK_CONTEXT as i64);
-            // TEMPORARY DIAGNOSTIC: the target's saved pc and sp before the jump.
-            let (pc, sp) = emit_saved_pc_sp(builder, scheduler, to_context);
-            emit_switch_trace(builder, module, scheduler, b'J', &[to, pc, sp])?;
             call(builder, module, setcontext, &[to_context])?;
         }
         ContextFunctions::Fiber {
