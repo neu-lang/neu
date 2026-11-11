@@ -290,6 +290,7 @@ pub enum DispatchDiagnosticKind {
     MissingInterfaceMethod,
     AmbiguousInterfaceMethod,
     IncompatibleOverride,
+    IncompatibleInterfaceMethod,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -407,8 +408,28 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                     span: node.span,
                 });
             }
-            let return_compatible = type_annotation_name(parsed, method.return_annotation)
-                == type_annotation_name(parsed, parent_method.return_annotation);
+            let parent_interface = parsed.class_declarations.iter().find(|candidate| {
+                candidate.interface && Some(candidate.declaration) == parent_method.owner
+            });
+            let parent_return = match parent_interface.and_then(|interface| {
+                let index = child
+                    .interfaces
+                    .iter()
+                    .position(|name| *name == interface.name)?;
+                let arguments = child
+                    .interface_arguments
+                    .get(index)
+                    .cloned()
+                    .unwrap_or_default();
+                Some((interface, arguments))
+            }) {
+                Some((interface, arguments)) => {
+                    interface_return_name(parsed, interface, &arguments, parent_method)
+                }
+                None => type_annotation_name(parsed, parent_method.return_annotation),
+            };
+            let return_compatible =
+                type_annotation_name(parsed, method.return_annotation) == parent_return;
             if method.is_override
                 && (!return_compatible || !same_parameters(method, parent_method))
                 && let Some(node) = parsed.arena.node(method.declaration)
@@ -465,7 +486,7 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 break;
             }
         }
-        for interface_name in &class.interfaces {
+        for (index, interface_name) in class.interfaces.iter().enumerate() {
             let Some(interface) = parsed
                 .class_declarations
                 .iter()
@@ -473,21 +494,41 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             else {
                 continue;
             };
+            let arguments = class
+                .interface_arguments
+                .get(index)
+                .cloned()
+                .unwrap_or_default();
             for required in parsed
                 .function_declarations
                 .iter()
                 .filter(|method| method.owner == Some(interface.declaration))
             {
-                let implemented = parsed.function_declarations.iter().any(|method| {
+                let required_return =
+                    interface_return_name(parsed, interface, &arguments, required);
+                let implementation = parsed.function_declarations.iter().find(|method| {
                     method.owner == Some(class.declaration)
                         && method.name == required.name
                         && same_function_parameter_types(parsed, method, required)
                 });
-                if !implemented && let Some(node) = parsed.arena.node(class.declaration) {
-                    diagnostics.push(DispatchDiagnostic {
+                let Some(node) = parsed.arena.node(class.declaration) else {
+                    continue;
+                };
+                match implementation {
+                    None => diagnostics.push(DispatchDiagnostic {
                         kind: DispatchDiagnosticKind::MissingInterfaceMethod,
                         span: node.span,
-                    });
+                    }),
+                    Some(method)
+                        if type_annotation_name(parsed, method.return_annotation)
+                            != required_return =>
+                    {
+                        diagnostics.push(DispatchDiagnostic {
+                            kind: DispatchDiagnosticKind::IncompatibleInterfaceMethod,
+                            span: node.span,
+                        });
+                    }
+                    Some(_) => {}
                 }
             }
         }
@@ -568,6 +609,27 @@ pub(crate) fn collect_interface_method_targets<'a>(
     for parent in &interface.interfaces {
         collect_interface_method_targets(parsed, parent, method_name, targets);
     }
+}
+
+/// The return type name of an interface method, with the interface's type
+/// parameters replaced by the type arguments of the implementing class
+/// (ADR-0083). A `T` return of `Counter<Int>` is `Int`.
+pub(crate) fn interface_return_name(
+    parsed: &ParseOutput,
+    interface: &ParsedClassDeclaration,
+    arguments: &[String],
+    method: &ParsedFunctionDeclaration,
+) -> Option<String> {
+    let name = type_annotation_name(parsed, method.return_annotation)?;
+    let position = parsed
+        .generic_parameters
+        .iter()
+        .filter(|parameter| parameter.owner == Some(interface.declaration))
+        .position(|parameter| parameter.name == name);
+    Some(match position {
+        Some(position) => arguments.get(position).cloned().unwrap_or(name),
+        None => name,
+    })
 }
 
 pub(crate) fn type_annotation_name(

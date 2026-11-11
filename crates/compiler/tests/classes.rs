@@ -785,3 +785,40 @@ fn bare_field_name_assignment_writes_the_receiver_field() {
     );
     let _ = fs::remove_dir_all(workspace);
 }
+
+#[test]
+fn interface_method_return_type_must_match() {
+    let mismatched = parse_source(
+        SourceFileId::from_raw(6850),
+        "interface Readable { func read(): Int; } class Item: Readable { override func read(): Bool { return true; } }",
+    );
+    assert!(
+        check_dispatch(&mismatched)
+            .iter()
+            .any(|diagnostic| diagnostic.kind()
+                == DispatchDiagnosticKind::IncompatibleInterfaceMethod)
+    );
+
+    let matching = parse_source(
+        SourceFileId::from_raw(6851),
+        "interface Readable { func read(): Int; } class Item: Readable { override func read(): Int { return 1; } }",
+    );
+    assert!(check_dispatch(&matching).is_empty());
+
+    let generic_mismatched = parse_source(
+        SourceFileId::from_raw(6852),
+        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { override func next(): Bool { return true; } }",
+    );
+    assert!(
+        check_dispatch(&generic_mismatched)
+            .iter()
+            .any(|diagnostic| diagnostic.kind()
+                == DispatchDiagnosticKind::IncompatibleInterfaceMethod)
+    );
+
+    let generic_matching = parse_source(
+        SourceFileId::from_raw(6853),
+        "interface Counter<T> { func next(): T; } class Source(var n: Int): Counter<Int> { override func next(): Int { return n; } }",
+    );
+    assert!(check_dispatch(&generic_matching).is_empty());
+}
