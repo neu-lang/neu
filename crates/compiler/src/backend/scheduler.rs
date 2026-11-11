@@ -74,11 +74,31 @@ const FIBER_LAYOUT: ContextLayout = ContextLayout {
     mcontext: None,
 };
 
+/// Bytes of machine-context storage a Darwin `ucontext_t` points at.
+#[cfg(target_os = "macos")]
+const MCONTEXT_BYTES: i64 = std::mem::size_of::<libc::__darwin_mcontext64>() as i64;
+
+/// Where the Darwin machine context lives inside a context record, after the
+/// public `ucontext_t` fields, rounded up to 16 bytes for its 128-bit fields.
+#[cfg(target_os = "macos")]
+const MCONTEXT_INLINE_OFFSET: i32 =
+    (std::mem::size_of::<libc::ucontext_t>().div_ceil(16) * 16) as i32;
+
+/// Bytes a Darwin context record needs. Darwin's `getcontext` stores the machine
+/// context inside the `ucontext_t` it is given, past the public fields, and may
+/// repoint `uc_mcontext` at that storage. The record reserves that region plus
+/// slack, so the write stays inside the task record.
+#[cfg(target_os = "macos")]
+const UCONTEXT_BYTES: i64 = MCONTEXT_INLINE_OFFSET as i64 + MCONTEXT_BYTES + 64;
+
 /// Layout of the host's `ucontext_t`. The compiler emits code only for the host
 /// (the driver rejects other targets), so the host's libc struct is the right one.
+#[cfg(all(unix, not(target_os = "macos")))]
+const UCONTEXT_BYTES: i64 = std::mem::size_of::<libc::ucontext_t>() as i64;
+
 #[cfg(unix)]
 const UCONTEXT_LAYOUT: ContextLayout = ContextLayout {
-    bytes: std::mem::size_of::<libc::ucontext_t>() as i64,
+    bytes: UCONTEXT_BYTES,
     link: std::mem::offset_of!(libc::ucontext_t, uc_link) as i32,
     stack_sp: std::mem::offset_of!(libc::ucontext_t, uc_stack.ss_sp) as i32,
     stack_size: std::mem::offset_of!(libc::ucontext_t, uc_stack.ss_size) as i32,
@@ -90,10 +110,6 @@ const UCONTEXT_LAYOUT: ContextLayout = ContextLayout {
     #[cfg(not(target_os = "macos"))]
     mcontext: None,
 };
-
-/// Bytes of machine-context storage a Darwin `ucontext_t` points at.
-#[cfg(target_os = "macos")]
-const MCONTEXT_BYTES: i64 = std::mem::size_of::<libc::__darwin_mcontext64>() as i64;
 
 /// Size of a task record for the given context layout.
 fn task_bytes(layout: ContextLayout) -> i64 {
@@ -1126,32 +1142,31 @@ fn emit_deadlock_message(
     Ok(())
 }
 
-/// Gives a `ucontext` its own machine-context storage on targets that need it
-/// (Darwin). `uc_mcontext` is a pointer there, and `getcontext` and `swapcontext`
-/// write through it. Left unset, those calls write into whatever memory the
-/// pointer holds, which corrupts the scheduler's records.
+/// Points a Darwin `ucontext` at the machine-context storage inside its own
+/// record, before `getcontext` writes to it. `uc_mcontext` is a pointer there,
+/// and `getcontext` and `swapcontext` write through it. The storage is part of
+/// the record (see `UCONTEXT_BYTES`), so no separate allocation is needed.
 fn emit_mcontext(
     builder: &mut FunctionBuilder<'_>,
-    module: &mut ObjectModule,
     scheduler: &SchedulerFunctions,
     context: Value,
-) -> Result<(), CraneliftLoweringError> {
+) {
     let Some((pointer_offset, size_offset)) = scheduler.layout.mcontext else {
-        return Ok(());
+        return;
     };
     #[cfg(target_os = "macos")]
     {
+        let storage = builder
+            .ins()
+            .iadd_imm(context, i64::from(MCONTEXT_INLINE_OFFSET));
         let bytes = builder.ins().iconst(types::I64, MCONTEXT_BYTES);
-        let storage = call_value(builder, module, scheduler.malloc, &[bytes])?;
-        trap_if_zero(builder, storage, TRAP_ALLOCATION);
         store_word(builder, storage, context, pointer_offset);
         store_word(builder, bytes, context, size_offset);
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (builder, module, context, pointer_offset, size_offset);
+        let _ = (builder, context, pointer_offset, size_offset);
     }
-    Ok(())
 }
 
 /// Makes the root task's context refer to the thread that runs the program.
@@ -1171,7 +1186,7 @@ fn emit_root_context(
     }
     if let ContextFunctions::Ucontext { .. } = scheduler.context {
         let context = builder.ins().iadd_imm(root, TASK_CONTEXT as i64);
-        emit_mcontext(builder, module, scheduler, context)?;
+        emit_mcontext(builder, scheduler, context);
     }
     Ok(())
 }
@@ -1197,7 +1212,7 @@ fn emit_child_context(
             trap_if_zero(builder, stack, TRAP_ALLOCATION);
             store_word(builder, stack, task, TASK_STACK);
             let context = builder.ins().iadd_imm(task, TASK_CONTEXT as i64);
-            emit_mcontext(builder, module, scheduler, context)?;
+            emit_mcontext(builder, scheduler, context);
             let got = call_value(builder, module, getcontext, &[context])?;
             trap_if_context_failed(builder, got, TRAP_CONTEXT_FAILED);
             let layout = scheduler.layout;
