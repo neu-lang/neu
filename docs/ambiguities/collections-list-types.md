@@ -46,7 +46,8 @@ Open points for approval:
 - B1. **Decided by the project owner:** `E` is `stdlib` `Error`, an interface. The concrete
   errors are classes that implement it, starting with `IndexOutOfBoundsError` and
   `AllocationFailedError`. This replaces the earlier proposed `enum CollectionError`.
-  Implementation is blocked until the following are accepted in an ADR:
+  Drafted in `docs/adr/ADR-0135-stdlib-error-interface.md` (Proposed). Implementation is blocked
+  until the following are accepted in that ADR:
   1. **Interface-typed `Err` payloads.** `Result<T, Error>` holds an interface value. Nothing
      accepted covers an interface-typed payload in a generic enum (ADR-0033 defers generic
      enums and interfaces at bootstrap).
