@@ -219,3 +219,27 @@ fn non_source_errors_render_without_debug_syntax() {
     assert!(rendered.contains("src/main.neu"), "{rendered}");
     assert!(!rendered.contains("Io {"), "{rendered}");
 }
+
+#[test]
+fn duplicate_named_import_across_statements_is_rejected() {
+    let project = Project::new(
+        "duplicate_named_import",
+        &[
+            (
+                "src/main.neu",
+                "import {add} from \"./math\"\nimport {add} from \"./math\"\n\npublic func main(): Int {\n    return 1\n}\n",
+            ),
+            (
+                "src/math/add.neu",
+                "package math\n\npublic func add(): Int {\n    return 7\n}\n",
+            ),
+        ],
+    );
+
+    let rendered = project.rendered();
+
+    assert!(
+        rendered.contains("`add` is imported more than once"),
+        "{rendered}"
+    );
+}
