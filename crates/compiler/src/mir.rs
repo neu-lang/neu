@@ -2359,9 +2359,16 @@ impl<'a> ShortCircuitLowerer<'a> {
             MirCleanupBoundary::for_function(self.function, self.types),
         )
         .with_entry(self.function.is_entry())
-        .with_suspend(self.function.is_suspend());
+        .with_suspend(self.function.is_suspend())
+        .with_captures(self.function.captures().to_vec());
         if let Some(contract) = self.function.effect_contract() {
             mir = mir.with_effect_contract(contract.clone());
+        }
+        if let Some(identity) = self.function.specialization_identity() {
+            mir = mir.with_specialization_identity(identity.clone());
+        }
+        if let Some(identity) = self.function.symbol_identity() {
+            mir = mir.with_symbol_identity(identity.clone());
         }
         Ok(mir)
     }
@@ -2666,6 +2673,68 @@ impl<'a> ControlFlowLowerer<'a> {
                         span: expression.span(),
                     });
                 }
+            }
+            HirExpressionKind::Binary(binary)
+                if matches!(
+                    binary.operator(),
+                    HirBinaryOperator::LogicalAnd | HirBinaryOperator::LogicalOr
+                ) =>
+            {
+                // The right operand runs only when the left one does not decide the
+                // result: `&&` skips it when the left is false, `||` when it is true.
+                let left = self.lower_expression(binary.left())?;
+                let result_local = self.fresh_local(expression.ty(), expression.span());
+                let rhs_block = self.new_block();
+                let short_block = self.new_block();
+                let merge_block = self.new_block();
+                let (then_target, else_target) = match binary.operator() {
+                    HirBinaryOperator::LogicalAnd => {
+                        (self.blocks[rhs_block].id, self.blocks[short_block].id)
+                    }
+                    _ => (self.blocks[short_block].id, self.blocks[rhs_block].id),
+                };
+                self.terminate(MirTerminator::branch_if(
+                    left,
+                    then_target,
+                    else_target,
+                    expression.span(),
+                ));
+
+                self.current = rhs_block;
+                let right = self.lower_expression(binary.right())?;
+                self.push(MirInstruction::StoreLocal {
+                    local: result_local,
+                    value: right,
+                    span: expression.span(),
+                });
+                self.terminate(MirTerminator::Branch {
+                    target: self.blocks[merge_block].id,
+                    span: expression.span(),
+                });
+
+                self.current = short_block;
+                let short_value = self.fresh_value();
+                self.push(MirInstruction::bool_constant(
+                    short_value,
+                    matches!(binary.operator(), HirBinaryOperator::LogicalOr),
+                    expression.span(),
+                ));
+                self.push(MirInstruction::StoreLocal {
+                    local: result_local,
+                    value: short_value,
+                    span: expression.span(),
+                });
+                self.terminate(MirTerminator::Branch {
+                    target: self.blocks[merge_block].id,
+                    span: expression.span(),
+                });
+
+                self.current = merge_block;
+                self.push(MirInstruction::LoadLocal {
+                    output,
+                    local: result_local,
+                    span: expression.span(),
+                });
             }
             HirExpressionKind::Binary(binary) => {
                 let left = self.lower_expression(binary.left())?;
