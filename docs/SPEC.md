@@ -755,7 +755,7 @@ stdlib, printing, or scheduler behavior is added.
 ## ADR-0092: Array Element Iteration
 
 `for (value in array)` and the equivalent unparenthesized header iterate fixed
-`T[N]` and compiler-managed `T[]` values exactly once, in ascending index
+`T[N]` and compiler-managed dynamic values exactly once, in ascending index
 order. Empty arrays execute no iterations. The loop binding is an immutable
 compiler-inferred read-only binding: copyable elements are copied, while
 move-only elements are implicitly shared-borrowed and do not consume the array.
@@ -966,9 +966,8 @@ unchanged. The old spelling is retained only in historical ADR text.
 
 ## ADR-0073: Bootstrap Dynamic Arrays
 
-`T[]` is a compiler-managed dynamic array distinct from fixed `T[N]`. The
-spelling `Array<T>` is superseded by ADR-0129.
-`new T[]` creates an empty array when `T` is determined by the declared type.
+The built-in dynamic array of ADR-0073 is superseded by ADR-0131: runtime-sized
+storage is the library type `Buffer<T>`, whose slots have type `T?`.
 The bootstrap scalar element set is `Bool`, `Int`, `Float`, and `Byte`.
 Mutable `var` bindings support `add`, indexed `add`, `remove`, and `size`; `val`
 rejects mutation. Dynamic arrays are move-only, opaque, compiler-managed
@@ -980,7 +979,7 @@ deferred.
 
 ## ADR-0118: Pure-Neu Collection Foundation
 
-Any generic class may hold a collection, including `T[]`, in a private
+Any generic class may hold a collection, including `Buffer<T?>`, in a private
 field, by ADR-0126. A `Vector<T>` is copyable exactly when its element type is.
 Slices and explicit clone remain deferred as stated in ADR-0126.
 
@@ -1260,7 +1259,7 @@ diagnostics.
 
 Top-level functions, classes, interfaces, enums, and accepted members may
 declare explicit generic parameters. A type argument may itself be a generic
-instance or `T[]`, to any depth (ADR-0128). A member environment is its enclosing
+instance, to any depth (ADR-0128). A member environment is its enclosing
 type parameters followed by its own parameters. Duplicate names in one list
 are rejected; member-level shadowing is allowed because parameter identity is
 the declaration node, not the spelling.
