@@ -72,3 +72,36 @@ fn generic_class_with_an_array_field_stores_and_counts_elements() {
         Some(2)
     );
 }
+
+#[test]
+fn generic_class_holds_a_bool_argument() {
+    assert_eq!(
+        run_exit_code(
+            "bool_argument",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val b: Box<Bool> = new Box<Bool>(true);\n    if (b.get()) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_holds_a_float_argument() {
+    assert_eq!(
+        run_exit_code(
+            "float_argument",
+            "class Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val b: Box<Float> = new Box<Float>(2.5);\n    val f: Float = b.get();\n    if (f > 2.0) {\n        return 7;\n    }\n    return 1;\n}\n",
+        ),
+        Some(7)
+    );
+}
+
+#[test]
+fn generic_class_holds_a_class_argument() {
+    assert_eq!(
+        run_exit_code(
+            "class_argument",
+            "class Cell(var n: Int) {\n}\n\nclass Box<T>(var value: T) {\n    func get(): T {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val c: Cell = new Cell(7);\n    val b: Box<Cell> = new Box<Cell>(c);\n    return b.get().n;\n}\n",
+        ),
+        Some(7)
+    );
+}

@@ -348,6 +348,38 @@ pub fn lower_checked_hir_source(
                 .iter()
                 .find(|assignment| assignment.statement == statement.statement)
             {
+                // A bare field name in a method assigns the receiver's field, as
+                // `this.name = ...` does (ADR-0068).
+                if let Some(name) = source
+                    .parsed
+                    .name_references
+                    .iter()
+                    .find(|name| name.reference == assignment.target)
+                    && let Some((receiver_type, field_index)) =
+                        bare_field_for_method(&source, function.declaration, &name.name)
+                {
+                    let receiver = HirExpressionId::from_raw(expressions.len());
+                    expressions.push(HirExpression::parameter_read(
+                        receiver,
+                        statement.span,
+                        receiver_type,
+                        HirParameterId::from_raw(0),
+                    ));
+                    let value = lower_expression(
+                        &source,
+                        function.declaration,
+                        assignment.value,
+                        &local_bindings,
+                        &mut expressions,
+                    )?;
+                    assignments.push(HirAssignment::field_assignment(
+                        statement.span,
+                        receiver,
+                        field_index,
+                        value,
+                    ));
+                    continue;
+                }
                 if let Some(member) = source
                     .parsed
                     .member_expressions
@@ -368,6 +400,21 @@ pub fn lower_checked_hir_source(
                         &local_bindings,
                         &mut expressions,
                     )?;
+                    let value = match declared_field_type(
+                        &source,
+                        member.receiver,
+                        function.declaration,
+                        &member.name,
+                    ) {
+                        Some(declared) => erase_argument(
+                            &source,
+                            assignment.value,
+                            value,
+                            declared,
+                            &mut expressions,
+                        ),
+                        None => value,
+                    };
                     assignments.push(HirAssignment::field_assignment(
                         statement.span,
                         receiver,
@@ -784,6 +831,14 @@ fn lower_expression(
         .node(expression)
         .ok_or(HirLoweringError::UnsupportedExpression)?
         .span;
+    // A decode wrapper stands for the value of the call or field it decodes,
+    // and shares that expression's span, so it is the value to reuse. Encode
+    // wrappers share the span of an argument and never stand for it.
+    if let Some(wrapper) = output.iter().rev().find(|candidate| {
+        candidate.span() == span && matches!(candidate.kind(), HirExpressionKind::ErasedDecode(_))
+    }) {
+        return Ok(wrapper.id());
+    }
     if let Some(existing) = output.iter().find(|candidate| candidate.span() == span) {
         return Ok(existing.id());
     }
@@ -1137,14 +1192,28 @@ fn lower_expression(
         if member.name == "length" {
             output.push(HirExpression::string_length(id, span, ty, receiver));
         } else {
+            // A field of an erased generic slot is read as a word, then decoded to
+            // the concrete scalar type of the expression (ADR-0126).
+            let declared =
+                declared_field_type(source, member.receiver, function_declaration, &member.name);
+            let decode = declared
+                .filter(|declared| erased_slot(source, *declared) && needs_erasure(source, ty));
+            let field_id = if decode.is_some() {
+                HirExpressionId::from_raw(output.len())
+            } else {
+                id
+            };
             output.push(HirExpression::field_access(
-                id,
+                field_id,
                 span,
-                ty,
+                decode.unwrap_or(ty),
                 receiver,
                 member.name.clone(),
                 field_index_for_receiver(source, member.receiver, &member.name),
             ));
+            if decode.is_some() {
+                output.push(HirExpression::erased_decode(id, span, ty, field_id));
+            }
         }
         return Ok(id);
     }
@@ -1165,19 +1234,28 @@ fn lower_expression(
             &new_expression.type_name,
             &mut argument_nodes,
         );
+        let inherited = argument_nodes.len();
         argument_nodes.extend(new_expression.arguments.iter().copied());
-        let arguments = argument_nodes
-            .iter()
-            .map(|argument| {
-                lower_expression(
-                    source,
-                    function_declaration,
-                    *argument,
-                    local_bindings,
-                    output,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        // Constructor parameters are erased slots where their class is generic
+        // (ADR-0126). The declared types are the promoted fields'.
+        let declared = constructor_declared_types(source, &new_expression.type_name);
+        let mut arguments = Vec::new();
+        for (index, argument) in argument_nodes.iter().enumerate() {
+            let lowered = lower_expression(
+                source,
+                function_declaration,
+                *argument,
+                local_bindings,
+                output,
+            )?;
+            let parameter = index
+                .checked_sub(inherited)
+                .and_then(|own| declared.get(own).copied().flatten());
+            arguments.push(match parameter {
+                Some(parameter) => erase_argument(source, *argument, lowered, parameter, output),
+                None => lowered,
+            });
+        }
         let id = HirExpressionId::from_raw(output.len());
         output.push(HirExpression::new_object(
             id,
@@ -1845,30 +1923,47 @@ fn lower_expression(
                 )?);
             }
         }
-        arguments.extend(
-            call.arguments
-                .iter()
-                .map(|argument| {
-                    lower_expression(
-                        source,
-                        function_declaration,
-                        *argument,
-                        local_bindings,
-                        output,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        );
+        // A generic method's declared parameters and result are erased words
+        // (ADR-0126). Concrete scalars are encoded on the way in and decoded on
+        // the way out.
+        let declared = callee_declared_types(source, declaration);
+        // The receiver, when pushed, is already the first argument.
+        let receiver_slots = arguments.len();
+        for (index, argument) in call.arguments.iter().enumerate() {
+            let lowered = lower_expression(
+                source,
+                function_declaration,
+                *argument,
+                local_bindings,
+                output,
+            )?;
+            let declared_parameter = declared
+                .as_ref()
+                .and_then(|(parameters, _)| parameters.get(index + receiver_slots).copied());
+            let lowered = match declared_parameter {
+                Some(parameter) => erase_argument(source, *argument, lowered, parameter, output),
+                None => lowered,
+            };
+            arguments.push(lowered);
+        }
         let id = HirExpressionId::from_raw(output.len());
         let (dispatch, targets) =
             method_dispatch_facts(source, call.callee, function_declaration, declaration);
+        let declared_result = declared.map(|(_, result)| result);
+        let decode = declared_result
+            .filter(|result| erased_slot(source, *result) && needs_erasure(source, ty));
         output.push(HirExpression::direct_call(
             id,
             span,
-            ty,
+            decode.unwrap_or(ty),
             HirDirectCall::new(HirFunctionId::from_raw(declaration), arguments)
                 .with_dispatch(dispatch, targets),
         ));
+        if decode.is_some() {
+            let decoded = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::erased_decode(decoded, span, ty, id));
+            return Ok(decoded);
+        }
         return Ok(id);
     }
     Err(HirLoweringError::UnsupportedExpression)
@@ -2902,6 +2997,132 @@ fn method_owner_declaration(
         .and_then(|parent| method_owner_declaration(source, parent, method_name))
 }
 
+/// The declared parameter and result types of a lowered function, including
+/// the receiver as the first parameter of an instance method.
+fn callee_declared_types(
+    source: &CheckedHirSource<'_>,
+    hir_index: usize,
+) -> Option<(Vec<TypeId>, TypeId)> {
+    let parsed = parsed_function_for_hir(source.parsed, hir_index)?;
+    let signature = source
+        .signatures
+        .iter()
+        .find(|signature| signature.declaration() == parsed.declaration)?;
+    Some((
+        signature.parameter_types().to_vec(),
+        signature.return_type(),
+    ))
+}
+
+/// The declared type of a field read or written through a receiver.
+fn declared_field_type(
+    source: &CheckedHirSource<'_>,
+    receiver: crate::ast::AstNodeId,
+    function_declaration: crate::ast::AstNodeId,
+    field_name: &str,
+) -> Option<TypeId> {
+    let class_name = receiver_class_name(source, receiver, function_declaration)?;
+    let class = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name)?;
+    source
+        .class_types?
+        .fields()
+        .iter()
+        .find(|field| {
+            field.name() == field_name
+                && crate::type_check::class_or_superclass_owns_field(
+                    source.parsed,
+                    class.declaration,
+                    field.owner(),
+                )
+        })
+        .map(|field| field.type_id())
+}
+
+/// The declared types of a class's constructor parameters, where each is a
+/// promoted field. A plain parameter has no field and no erased slot.
+fn constructor_declared_types(
+    source: &CheckedHirSource<'_>,
+    class_name: &str,
+) -> Vec<Option<TypeId>> {
+    let Some(class) = source
+        .parsed
+        .class_declarations
+        .iter()
+        .find(|class| class.name == class_name)
+    else {
+        return Vec::new();
+    };
+    class
+        .constructor_parameters
+        .iter()
+        .map(|parameter| {
+            source.class_types.and_then(|classes| {
+                classes
+                    .fields()
+                    .iter()
+                    .find(|field| field.declaration() == parameter.parameter)
+                    .map(|field| field.type_id())
+            })
+        })
+        .collect()
+}
+
+/// Whether a type is an erased generic type parameter at run time (ADR-0126).
+fn erased_slot(source: &CheckedHirSource<'_>, ty: TypeId) -> bool {
+    source
+        .type_arena
+        .and_then(|arena| arena.get(ty))
+        .is_some_and(|record| matches!(record.kind(), TypeKind::GenericParameter(_)))
+}
+
+/// Whether a concrete type is a scalar that is stored as a narrower word than
+/// an erased slot, so it must be encoded (ADR-0126).
+fn needs_erasure(source: &CheckedHirSource<'_>, ty: TypeId) -> bool {
+    source
+        .type_arena
+        .and_then(|arena| arena.get(ty))
+        .is_some_and(|record| {
+            matches!(
+                record.kind(),
+                TypeKind::Primitive(
+                    PrimitiveType::Bool | PrimitiveType::Byte | PrimitiveType::Float
+                )
+            )
+        })
+}
+
+/// Encodes an argument for an erased parameter when its concrete type needs it.
+/// The encode wrapper keeps the argument's own span, so it never shares a span
+/// with the enclosing call or constructor.
+fn erase_argument(
+    source: &CheckedHirSource<'_>,
+    argument: crate::ast::AstNodeId,
+    lowered: HirExpressionId,
+    parameter: TypeId,
+    output: &mut Vec<HirExpression>,
+) -> HirExpressionId {
+    let argument_type = source
+        .expression_types
+        .iter()
+        .find(|typed| typed.expression() == argument)
+        .map(|typed| typed.ty());
+    match argument_type {
+        Some(ty) if erased_slot(source, parameter) && needs_erasure(source, ty) => {
+            let Some(span) = source.parsed.arena.node(argument).map(|node| node.span) else {
+                return lowered;
+            };
+            let id = HirExpressionId::from_raw(output.len());
+            output.push(HirExpression::erased_encode(id, span, parameter, lowered));
+            id
+        }
+        _ => lowered,
+    }
+}
+
 fn parsed_function_for_hir(
     parsed: &ParseOutput,
     hir_index: usize,
@@ -3700,6 +3921,12 @@ pub enum HirExpressionKind {
     StringLiteral(Vec<u8>),
     StringLength(HirExpressionId),
     StringClone(HirExpressionId),
+    /// A concrete scalar stored in an erased generic slot, as a machine word
+    /// (ADR-0126).
+    ErasedEncode(HirExpressionId),
+    /// A machine word read from an erased generic slot, as the concrete scalar
+    /// type of the expression (ADR-0126).
+    ErasedDecode(HirExpressionId),
     TaskSpawn {
         callable: HirExpressionId,
         captures: Vec<HirExpressionId>,
@@ -4199,6 +4426,34 @@ impl HirExpression {
             span,
             ty,
             kind: HirExpressionKind::StringClone(value),
+        }
+    }
+
+    pub fn erased_encode(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        value: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ErasedEncode(value),
+        }
+    }
+
+    pub fn erased_decode(
+        id: HirExpressionId,
+        span: ByteSpan,
+        ty: TypeId,
+        value: HirExpressionId,
+    ) -> Self {
+        Self {
+            id,
+            span,
+            ty,
+            kind: HirExpressionKind::ErasedDecode(value),
         }
     }
     pub fn id(&self) -> HirExpressionId {

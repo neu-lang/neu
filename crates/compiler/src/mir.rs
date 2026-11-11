@@ -424,6 +424,17 @@ pub enum MirInstruction {
         index: MirValueId,
         span: ByteSpan,
     },
+    ErasedEncode {
+        output: MirValueId,
+        value: MirValueId,
+        span: ByteSpan,
+    },
+    ErasedDecode {
+        output: MirValueId,
+        value: MirValueId,
+        type_id: TypeId,
+        span: ByteSpan,
+    },
     StringClone {
         output: MirValueId,
         value: MirValueId,
@@ -598,6 +609,8 @@ impl MirInstruction {
             | Self::StringLength { span, .. }
             | Self::StringIndex { span, .. }
             | Self::ArrayElementLoad { span, .. }
+            | Self::ErasedEncode { span, .. }
+            | Self::ErasedDecode { span, .. }
             | Self::StringClone { span, .. }
             | Self::StringConcat { span, .. }
             | Self::StringCompare { span, .. } => *span,
@@ -1317,6 +1330,21 @@ pub fn lower_hir_to_mir(hir: &HirModule, types: &TypeArena) -> Result<MirModule,
                     instructions.push(MirInstruction::StringClone {
                         output,
                         value: mir_expression_value_id(function, *value),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ErasedEncode(value) => {
+                    instructions.push(MirInstruction::ErasedEncode {
+                        output,
+                        value: mir_expression_value_id(function, *value),
+                        span: expression.span(),
+                    });
+                }
+                HirExpressionKind::ErasedDecode(value) => {
+                    instructions.push(MirInstruction::ErasedDecode {
+                        output,
+                        value: mir_expression_value_id(function, *value),
+                        type_id: expression.ty(),
                         span: expression.span(),
                     });
                 }
@@ -2303,6 +2331,8 @@ impl<'a> ShortCircuitLowerer<'a> {
             HirExpressionKind::StringLiteral(_)
             | HirExpressionKind::StringLength(_)
             | HirExpressionKind::StringClone(_)
+            | HirExpressionKind::ErasedEncode(_)
+            | HirExpressionKind::ErasedDecode(_)
             | HirExpressionKind::FieldAccess { .. }
             | HirExpressionKind::NewObject { .. } => {
                 return Err(MirLoweringError::UnsupportedExpression);
@@ -3257,6 +3287,23 @@ impl<'a> ControlFlowLowerer<'a> {
                     span: expression.span(),
                 });
             }
+            HirExpressionKind::ErasedEncode(value) => {
+                let value = self.lower_expression(*value)?;
+                self.push(MirInstruction::ErasedEncode {
+                    output,
+                    value,
+                    span: expression.span(),
+                });
+            }
+            HirExpressionKind::ErasedDecode(value) => {
+                let value = self.lower_expression(*value)?;
+                self.push(MirInstruction::ErasedDecode {
+                    output,
+                    value,
+                    type_id: expression.ty(),
+                    span: expression.span(),
+                });
+            }
             HirExpressionKind::FieldAccess {
                 receiver, index, ..
             } => {
@@ -3275,7 +3322,7 @@ impl<'a> ControlFlowLowerer<'a> {
                     .collect::<Result<Vec<_>, _>>()?;
                 self.push(MirInstruction::NewObject {
                     output,
-                    type_id: expression.ty(),
+                    type_id: class_tag_type(expression.ty(), self.types),
                     arguments,
                     span: expression.span(),
                 });

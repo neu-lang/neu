@@ -759,3 +759,29 @@ fn lifecycle_orders_superclass_fields_before_derived_fields() {
     assert_eq!(lifecycle[1].initialization_order(), ["base", "child"]);
     assert_eq!(lifecycle[1].destruction_order(), ["child", "base"]);
 }
+
+#[test]
+fn bare_field_name_assignment_writes_the_receiver_field() {
+    let workspace =
+        std::env::temp_dir().join(format!("neu-bare-field-assign-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&workspace);
+    fs::create_dir_all(&workspace).unwrap();
+    let executable = compile_source_to_executable(
+        "class Cell(var value: Int) {\n    func put(next: Int) {\n        value = next;\n    }\n    func get(): Int {\n        return value;\n    }\n}\n\npublic func main(): Int {\n    val c: Cell = new Cell(1);\n    c.put(9);\n    return c.get();\n}\n",
+        compiler::driver::SourceDriverOptions::new(
+            SourceFileId::from_raw(6900),
+            ModuleName::parse("bare.field").unwrap(),
+            PackageNamespace::root(),
+            workspace.join("program"),
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        std::process::Command::new(executable)
+            .status()
+            .unwrap()
+            .code(),
+        Some(9)
+    );
+    let _ = fs::remove_dir_all(workspace);
+}
