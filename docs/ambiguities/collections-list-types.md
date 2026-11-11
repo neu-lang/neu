@@ -7,9 +7,11 @@ ADRs listed under "Resolutions". No code has been written.
 
 - A1 (growth failure): `Result`. Amend ADR-0073 and ADR-0114 so that growth-requiring
   `add` on `T[]` returns a recoverable `Result` and leaves the list unchanged on failure.
-  Requires a compiler growth primitive that reports failure.
+  Requires a compiler growth primitive that reports failure. Drafted in
+  `docs/adr/ADR-0138-dynamic-array-growth-results.md` (Proposed).
 - A2 (move-only removal): move-out `remove(index)` returns the owned element as `T`
   inside a bounds `Result` (ADR-0110). Revises ADR-0073's `Unit`-returning `remove`.
+  Drafted in `docs/adr/ADR-0139-dynamic-array-move-out-removal.md` (Proposed).
 - A3 (generic collection fields): ADR-0126 supersedes the ADR-0119 clause deferring
   generic collection fields.
 - A4 (`LinkedList`): deferred. Not implemented in this phase.
