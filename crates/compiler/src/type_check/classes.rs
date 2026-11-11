@@ -280,9 +280,6 @@ pub(crate) fn append_inherited_field_order(
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DispatchDiagnosticKind {
-    OverrideWithoutSuperclass,
-    OverrideWithoutTarget,
-    MissingOverrideMarker,
     OpenAndFinalMethod,
     FinalClassInheritance,
     FinalMethodOverride,
@@ -381,32 +378,13 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
                 .filter(|target| same_parameters(method, target))
                 .collect::<Vec<_>>();
             let Some(parent_method) = targets.first().copied() else {
-                if method.is_override
-                    && let Some(node) = parsed.arena.node(method.declaration)
-                {
-                    diagnostics.push(DispatchDiagnostic {
-                        kind: DispatchDiagnosticKind::OverrideWithoutTarget,
-                        span: node.span,
-                    });
-                }
                 continue;
             };
-            // Implementing an interface method needs no `override` marker. Only
-            // replacing a superclass method does.
+            // A replacement is recognized by name and parameter types alone.
             let parent_is_interface = parsed.class_declarations.iter().any(|candidate| {
                 candidate.interface && Some(candidate.declaration) == parent_method.owner
             });
-            if !method.is_override
-                && !parent_is_interface
-                && let Some(node) = parsed.arena.node(method.declaration)
-            {
-                diagnostics.push(DispatchDiagnostic {
-                    kind: DispatchDiagnosticKind::MissingOverrideMarker,
-                    span: node.span,
-                });
-            }
-            if method.is_override
-                && parent_method.is_final
+            if parent_method.is_final
                 && let Some(node) = parsed.arena.node(method.declaration)
             {
                 diagnostics.push(DispatchDiagnostic {
@@ -436,7 +414,9 @@ pub fn check_dispatch(parsed: &ParseOutput) -> Vec<DispatchDiagnostic> {
             };
             let return_compatible =
                 type_annotation_name(parsed, method.return_annotation) == parent_return;
-            if method.is_override
+            // An interface requirement's return type is checked by the
+            // conformance check above, so only superclass replacements are here.
+            if !parent_is_interface
                 && (!return_compatible || !same_parameters(method, parent_method))
                 && let Some(node) = parsed.arena.node(method.declaration)
             {
@@ -1340,12 +1320,6 @@ pub fn apply_receiver_name_facts(
             continue;
         };
         if function.is_static {
-            if function.is_override {
-                report.record_diagnostic(TypeCheckDiagnostic::unsupported_type_rule(
-                    TypeRuleDiagnostic::StaticFunctionOverride,
-                    function.declaration,
-                ));
-            }
             for name in parsed.name_references.iter().filter(|name| {
                 matches!(name.name.as_str(), "this" | "super")
                     && name.name_span.file() == body.file()

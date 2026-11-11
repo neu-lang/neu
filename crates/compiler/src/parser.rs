@@ -187,7 +187,6 @@ pub struct ParsedFunctionDeclaration {
     pub owner: Option<AstNodeId>,
     pub name: String,
     pub visibility: String,
-    pub is_override: bool,
     pub is_final: bool,
     pub is_abstract: bool,
     pub body: Option<AstNodeId>,
@@ -649,7 +648,6 @@ struct Parser<'source> {
     current_class: Option<AstNodeId>,
     current_class_is_interface: bool,
     pending_method_visibility: String,
-    pending_method_override: bool,
     pending_method_final: bool,
     pending_method_abstract: bool,
     pending_method_static: bool,
@@ -715,7 +713,6 @@ impl<'source> Parser<'source> {
             current_class: None,
             current_class_is_interface: false,
             pending_method_visibility: "public".to_owned(),
-            pending_method_override: false,
             pending_method_final: false,
             pending_method_abstract: false,
             pending_method_static: false,
@@ -1080,7 +1077,6 @@ impl<'source> Parser<'source> {
                     owner: self.current_class,
                     name: method_name.clone(),
                     visibility: self.pending_method_visibility.clone(),
-                    is_override: self.pending_method_override,
                     is_final: self.pending_method_final,
                     is_abstract: self.pending_method_abstract,
                     body: None,
@@ -1124,7 +1120,6 @@ impl<'source> Parser<'source> {
                     owner: self.current_class,
                     name: method_name,
                     visibility: self.pending_method_visibility.clone(),
-                    is_override: self.pending_method_override,
                     is_final: self.pending_method_final,
                     is_abstract: self.pending_method_abstract,
                     body,
@@ -1569,7 +1564,6 @@ impl<'source> Parser<'source> {
                     Some(
                         TokenKind::KwFunc
                             | TokenKind::KwFun
-                            | TokenKind::KwOverride
                             | TokenKind::KwOpen
                             | TokenKind::KwFinal
                     )
@@ -1577,7 +1571,6 @@ impl<'source> Parser<'source> {
                     && matches!(self.peek_text(), Some("static" | "abstract" | "suspend"))));
             if self.current_kind() == Some(TokenKind::KwFunc)
                 || self.current_kind() == Some(TokenKind::KwFun)
-                || self.current_kind() == Some(TokenKind::KwOverride)
                 || self.current_kind() == Some(TokenKind::KwOpen)
                 || self.current_kind() == Some(TokenKind::KwFinal)
                 || (self.current_kind() == Some(TokenKind::Identifier)
@@ -1588,7 +1581,6 @@ impl<'source> Parser<'source> {
                 || method_with_visibility
             {
                 self.pending_method_visibility = "public".to_owned();
-                self.pending_method_override = false;
                 self.pending_method_final = false;
                 self.pending_method_abstract = false;
                 self.pending_method_static = false;
@@ -1596,7 +1588,7 @@ impl<'source> Parser<'source> {
                 while self.is_visibility()
                     || matches!(
                         self.current_kind(),
-                        Some(TokenKind::KwOverride | TokenKind::KwOpen | TokenKind::KwFinal)
+                        Some(TokenKind::KwOpen | TokenKind::KwFinal)
                     )
                     || (self.current_kind() == Some(TokenKind::Identifier)
                         && matches!(self.current_text(), Some("static" | "abstract")))
@@ -1615,7 +1607,6 @@ impl<'source> Parser<'source> {
                             self.current_text().unwrap_or("public").to_owned();
                     } else {
                         match self.current_kind() {
-                            Some(TokenKind::KwOverride) => self.pending_method_override = true,
                             Some(TokenKind::KwOpen) => {
                                 self.diagnostic_current(
                                     DiagnosticKind::UnsupportedDeclarationModifier,
@@ -4427,13 +4418,7 @@ impl<'source> Parser<'source> {
             && self.current_text() == Some("suspend")
             && matches!(
                 self.peek_kind(),
-                Some(
-                    TokenKind::KwFunc
-                        | TokenKind::KwFun
-                        | TokenKind::KwOverride
-                        | TokenKind::KwOpen
-                        | TokenKind::KwFinal
-                )
+                Some(TokenKind::KwFunc | TokenKind::KwFun | TokenKind::KwOpen | TokenKind::KwFinal)
             )
     }
 

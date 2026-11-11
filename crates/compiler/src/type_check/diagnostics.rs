@@ -81,7 +81,6 @@ pub enum TypeRuleDiagnostic {
     InferredInitializerRequired,
     InferredTypeUnavailable,
     StaticFunctionInstanceAccess,
-    StaticFunctionOverride,
     AbstractDeclarationInvalid,
     DuplicateField,
     FieldHiding,

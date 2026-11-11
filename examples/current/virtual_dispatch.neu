@@ -7,7 +7,7 @@ class Base {
 }
 
 class Derived: Base() {
-    override func value(): Int {
+    func value(): Int {
         return 13;
     }
 }

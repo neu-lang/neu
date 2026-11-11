@@ -5,7 +5,7 @@ abstract class Base() {
 }
 
 class Child: Base() {
-    override func value(): Int {
+    func value(): Int {
         return 7;
     }
 }
