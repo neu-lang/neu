@@ -9,9 +9,10 @@ use compiler::name_resolution::{
     analyze_match_exhaustiveness, analyze_when_subjects, bind_accepted_name_references,
     bind_local_name_references, bind_package_qualified_type_references,
     bind_unqualified_function_references, bind_unqualified_type_references,
-    build_declaration_index, build_enum_variant_index, build_function_parameter_binding_index,
-    build_local_binding_index, build_local_scope_tree, build_scoped_binding_index,
-    build_scoped_local_binding_index, resolve_enum_parameter_types, resolve_qualified_variant_arms,
+    build_all_local_bindings, build_declaration_index, build_enum_variant_index,
+    build_function_parameter_binding_index, build_local_binding_index, build_local_scope_tree,
+    build_scoped_binding_index, build_scoped_local_binding_index, resolve_enum_parameter_types,
+    resolve_qualified_variant_arms,
 };
 use compiler::parser::parse_source;
 use compiler::source::{ByteSpan, SourceFileId};
@@ -2163,6 +2164,7 @@ fn accepted_name_reference_binding_combines_expression_and_type_bindings() {
         &run.arena,
         &run.name_references,
         &run.type_name_references,
+        &[],
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2206,6 +2208,7 @@ fn accepted_name_reference_binding_does_not_duplicate_package_qualified_type_dia
         &parsed.arena,
         &parsed.name_references,
         &parsed.type_name_references,
+        &[],
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2249,6 +2252,7 @@ fn accepted_name_reference_binding_collects_expression_and_type_unresolved_diagn
         &parsed.arena,
         &parsed.name_references,
         &parsed.type_name_references,
+        &[],
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2277,17 +2281,17 @@ fn bind_single_file(source: &str) -> compiler::name_resolution::AcceptedNameRefe
     let scopes = build_local_scope_tree(&parsed.arena);
     let mut interner = SymbolInterner::new();
     let declarations = build_declaration_index(&metadata, &parsed.declaration_names, &mut interner);
-    let locals = build_scoped_local_binding_index(
-        &parsed.arena,
-        &parsed.local_binding_names,
-        &scopes,
-        &mut interner,
-    );
+    let locals = build_all_local_bindings(&parsed.arena, &parsed, &scopes, &mut interner);
     bind_accepted_name_references(
         &metadata,
         &parsed.arena,
         &parsed.name_references,
         &parsed.type_name_references,
+        &parsed
+            .member_expressions
+            .iter()
+            .map(|member| member.receiver)
+            .collect::<Vec<_>>(),
         &scopes,
         locals.index(),
         declarations.index(),
@@ -2301,4 +2305,74 @@ fn language_provided_names_and_primitive_types_are_not_unresolved() {
         "func run(): Int {\n    val s: String = \"x\";\n    assert(true);\n    return 1;\n}\n",
     );
     assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn function_parameter_is_bound_in_its_body() {
+    let bound = bind_single_file("func apply(value: Int): Int {\n    return value;\n}\n");
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn lambda_parameter_is_bound_in_its_body() {
+    let bound = bind_single_file(
+        "func run(): Int {\n    val f: (Int) -> Int = { x: Int -> x + 1 };\n    return 1;\n}\n",
+    );
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn parameter_is_not_visible_outside_its_function() {
+    let bound = bind_single_file(
+        "func first(v: Int): Int {\n    return v;\n}\nfunc second(): Int {\n    return v;\n}\n",
+    );
+    assert_eq!(bound.diagnostics().len(), 1, "{:?}", bound.diagnostics());
+    assert_eq!(
+        bound.diagnostics()[0].kind(),
+        compiler::name_resolution::ResolutionDiagnosticKind::UnresolvedName
+    );
+}
+
+#[test]
+fn for_loop_variable_is_bound_in_its_body() {
+    let bound = bind_single_file(
+        "func run(): Int {\n    var total: Int = 0;\n    for (index in 0..3) {\n        total = total + index;\n    }\n    return total;\n}\n",
+    );
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn pattern_binding_is_bound_in_its_arm_body() {
+    let bound = bind_single_file(
+        "enum Maybe { Some(Int), None }\nfunc run(m: Maybe): Int {\n    val v: Int = when (m) {\n        Maybe.Some(value) -> value;\n        Maybe.None -> 0;\n    };\n    return v;\n}\n",
+    );
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn enum_name_as_static_receiver_is_bound() {
+    let bound = bind_single_file(
+        "enum Signal { Red, Green }\nfunc run(): Int {\n    val s: Signal = Signal.Red;\n    return 1;\n}\n",
+    );
+    assert!(bound.diagnostics().is_empty(), "{:?}", bound.diagnostics());
+}
+
+#[test]
+fn all_single_file_examples_bind_without_unresolved_names() {
+    let directory = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/current");
+    let mut paths: Vec<_> = std::fs::read_dir(directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "neu"))
+        .collect();
+    paths.sort();
+    let mut failures = Vec::new();
+    for path in &paths {
+        let text = std::fs::read_to_string(path).unwrap();
+        let bound = bind_single_file(&text);
+        if !bound.diagnostics().is_empty() {
+            failures.push(format!("{}: {:?}", path.display(), bound.diagnostics()));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
 }

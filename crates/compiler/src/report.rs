@@ -245,6 +245,16 @@ fn reports_for(error: &DriverError, context: &ManifestContext) -> Vec<Report> {
             .iter()
             .map(|diagnostic| Report::kind(diagnostic.kind, span(diagnostic.span)))
             .collect(),
+        DriverError::OutOfScopeNames(names) => names
+            .iter()
+            .map(|name| {
+                Report::new(
+                    "OutOfScopeName",
+                    format!("`{}` is not in scope here", name.name),
+                    span(name.span),
+                )
+            })
+            .collect(),
         DriverError::UnknownNames(names) => names
             .iter()
             .map(|name| {

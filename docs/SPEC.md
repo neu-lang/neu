@@ -235,10 +235,23 @@ that name: no declaration, local binding, parameter, lambda parameter, field,
 class, constructor parameter, enum variant, loop variable, generic parameter,
 or built-in. Built-ins are `assert`, `await`, `cancel`, `channel`, `clone`,
 `close`, `fail`, `length`, `precondition`, `receive`, `send`, `spawn`, `super`,
-and `this`. The check is conservative: a name declared anywhere in the program
-is never reported, so scope-sensitive misuse of a declared name is not covered
-here. A qualifier whose package does not exist is an unknown name at the
+and `this`. Scope-sensitive misuse of a declared name is reported by the scope-aware check
+below (issue 85). A qualifier whose package does not exist is an unknown name at the
 qualifier.
+
+Scope-aware names on the executable path (issue 85). After the unknown-name
+check, a simple name reference is reported as `out_of_scope_name` at the name
+when it is declared somewhere in the program but no visible binding provides it
+at the reference. Visible bindings are: `val`, `var`, and `const` locals of an
+enclosing block, function parameters in their function body, lambda parameters
+in the lambda body, `for` loop variables in the loop body, and pattern bindings
+in their match arm. A name used as the receiver of a member access, such as
+`Color.Red`, names a type when no local of that name is visible.
+
+Limits, recorded here so they are not mistaken for the rule: inherited fields,
+class constructor parameters, and generic parameters are not modeled by scope.
+A reference whose name is declared as one of them anywhere in the file is not
+reported. Built-in and primitive type names are never bound, as listed above.
 
 ## ADR-0027: Type Checking Core
 

@@ -217,6 +217,7 @@ pub struct ParsedForStatement {
     pub binding: AstNodeId,
     pub binding_name: String,
     pub binding_name_span: ByteSpan,
+    pub binding_name_node: AstNodeId,
     pub start: AstNodeId,
     pub end: AstNodeId,
     pub array: Option<AstNodeId>,
@@ -361,6 +362,7 @@ pub struct ParsedFunctionType {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParsedLambdaParameter {
+    pub parameter: AstNodeId,
     pub name: String,
     pub name_span: ByteSpan,
     pub annotation: Option<AstNodeId>,
@@ -2206,6 +2208,7 @@ impl<'source> Parser<'source> {
             binding: statement,
             binding_name,
             binding_name_span: binding_token.span,
+            binding_name_node: self.arena.add_loop_binding(binding_token.span),
             start: start_expression,
             end: end_expression,
             array: is_array.then_some(start_expression),
@@ -2860,7 +2863,9 @@ impl<'source> Parser<'source> {
             } else {
                 None
             };
+            let parameter = self.arena.add_lambda_parameter(name.span);
             parameters.push(ParsedLambdaParameter {
+                parameter,
                 name: self.text[name.span.start()..name.span.end()].to_owned(),
                 name_span: name.span,
                 annotation,
