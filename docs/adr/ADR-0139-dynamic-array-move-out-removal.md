@@ -1,7 +1,8 @@
 # ADR-0139: Dynamic Array Move-Out Removal
 
-Status: Proposed. Revises ADR-0073 (`remove` returns `Unit`) and ADR-0132 (the "operations
-unchanged" clause). Depends on ADR-0110, ADR-0135, ADR-0137.
+Status: Accepted by the project owner. Revises ADR-0073 (`remove` returns `Unit`) and
+ADR-0132 (the "operations unchanged" clause). Depends on ADR-0110, ADR-0135, ADR-0137.
+Q1 and Q2 are resolved as recommended.
 
 ## Question
 
@@ -46,12 +47,10 @@ exact rule?
 
 ## Open questions
 
-- **Q1. Static out-of-range index.** ADR-0073 diagnoses a statically known invalid index
-  before lowering. Under this ADR, that index would instead produce `Err` at run time.
-  Recommended: keep the compile-time diagnostic, because a constant out-of-range index is a
-  programmer error the compiler can see. ADR-0124 covers precondition calls, not indexed
-  operations, so the owner must confirm.
-- **Q2. Discarded result.** Same as ADR-0138 Q1. Recommended: keep the diagnostic.
+- **Q1. Static out-of-range index. Resolved: keep the compile-time diagnostic.** A constant
+  out-of-range index is diagnosed before lowering, as ADR-0073 requires. It is not turned
+  into a run-time `Err`.
+- **Q2. Discarded result. Resolved: rejected**, as in ADR-0138 Q1.
 
 ## Required follow-up
 

@@ -987,7 +987,8 @@ unchanged. The old spelling is retained only in historical ADR text.
 The bootstrap scalar element set is `Bool`, `Int`, `Float`, and `Byte`.
 Mutable `var` bindings support `add`, indexed `add`, `remove`, and `size`; `val`
 rejects mutation. Dynamic arrays are move-only, opaque, compiler-managed
-values with host-linking allocation and deterministic traps. As accepted by
+values with host-linking allocation and deterministic traps, except growth and removal,
+which are revised by ADR-0138 and ADR-0139. As accepted by
 ADR-0119, an in-scope generic function type parameter may be used as the
 element type. Strings, nominal elements, nested dynamic arrays, indexing,
 slices, iterators, public layout, FFI, and user allocation APIs remain
@@ -1667,6 +1668,25 @@ because it was never allocated. This is the stated exception to ADR-0135's rule 
 concrete error object is destroyed exactly once. Immortal instances satisfy `Send` and
 `Share` by ADR-0136. Other classes, and user-defined zero-field classes, use the normal
 allocation path.
+
+## ADR-0138: Dynamic Array Growth Results
+
+`add(value)` on `T[]` returns `Result<Unit, Error>`. Growth failure returns `Err` holding
+an `AllocationFailedError` (ADR-0137), and the growth is atomic: on failure the length,
+elements, and ownership are unchanged, and the value passed in is returned to the caller.
+`add(value, index)` returns `Result<Unit, Error>` too. An index outside `0..size` returns
+`Err` holding an `IndexOutOfBoundsError`. A discarded `Result` from either form is a
+diagnostic. Unsupported target capability and ordinary object construction still trap.
+Element reads and writes are not decided here.
+
+## ADR-0139: Dynamic Array Move-Out Removal
+
+`remove(index)` on `T[]` returns `Result<T, Error>`. An index in `0..size` moves the
+element out as `Ok(element)`, shifts later elements down, and decreases `size` by one. An
+index outside `0..size` returns `Err` holding an `IndexOutOfBoundsError` and leaves the
+sequence unchanged. Removal moves the element, so no implicit copy is made. Removal does
+not allocate. A statically known out-of-range index is a compile-time diagnostic. A
+discarded `Result` is a diagnostic.
 
 ## Project Build Command
 

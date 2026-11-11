@@ -1,7 +1,8 @@
 # ADR-0138: Dynamic Array Growth Results
 
-Status: Proposed. Revises ADR-0073 (growth and allocation failure), ADR-0114 (growth
-scope), and ADR-0132 (the "operations unchanged" clause). Depends on ADR-0135, ADR-0137.
+Status: Accepted by the project owner. Revises ADR-0073 (growth and allocation failure),
+ADR-0114 (growth scope), and ADR-0132 (the "operations unchanged" clause). Depends on
+ADR-0135, ADR-0137. Q1 and Q2 are resolved as recommended. Q3 is deferred to a separate ADR.
 
 ## Question
 
@@ -50,15 +51,12 @@ atomicity rule requires?
 
 ## Open questions
 
-- **Q1. Discarded `Result` in statement position.** Decision 4 rejects it. Recommended:
-  keep. Discarding a growth failure would be the silent-loss pattern ADR-0111 rejects.
-- **Q2. `add(value, index)` bounds.** Decision 5 is an extension beyond the owner's A1
-  answer. Recommended: keep, because ADR-0110 forbids the trap. The owner must confirm
-  it.
-- **Q3. Element reads and writes.** ADR-0073 and ADR-0132 keep indexed reads and writes
-  trapping on bounds. ADR-0110 forbids that for collections. `ArrayList.get` can check the
-  bounds first, so the trap is unreachable from the library. The primitive's own rule is
-  still open and is not decided here.
+- **Q1. Discarded `Result` in statement position. Resolved: rejected.** Decision 4 stands.
+- **Q2. `add(value, index)` bounds. Resolved: `Err`, not a trap.** Decision 5 stands.
+- **Q3. Element reads and writes. Deferred** to a separate ADR. ADR-0073 and ADR-0132 keep
+  indexed reads and writes trapping on bounds, which ADR-0110 forbids for collections.
+  `ArrayList.get` can check bounds before calling the primitive, so the library never
+  reaches the trap. Until that ADR is accepted, the primitive's rule is open.
 
 ## Required follow-up
 
