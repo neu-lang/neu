@@ -335,6 +335,12 @@ copy remain deferred.
 
 ## ADR-0036: Bootstrap Borrow And Lifetime Analysis
 
+Implementation status: unfinished. `borrow.rs` implements these records, but the
+driver does not run the borrow analysis on source programs. The compiler does not
+report `borrow_conflict` or `lifetime_escape` for source code. The records are
+exercised only by tests that build them by hand, so they do not count as
+implemented source checks.
+
 The compiler uses a metadata-only bootstrap borrow model. It adds no source-level
 borrow syntax, reference types, dereference operators, function parameter
 borrowing, method receivers, member borrows, closure captures, coroutine
@@ -383,6 +389,12 @@ the type satisfies `Send`.
 
 ## ADR-0038: Bootstrap Coroutine Scope And Suspension Analysis
 
+Implementation status: unfinished. `coroutine.rs` implements these records, but
+the driver does not run them on source programs. Lexical scoping stops a task
+handle from outliving its scope, so the scope-escape check has no source input
+today. The suspended-borrow and closure-cleanup analyses are not connected to
+source compilation either.
+
 The compiler uses a metadata-only bootstrap coroutine scope and suspension model. It
 adds no source-level coroutine, `async`, `await`, task-spawn, detached-task,
 cancellation, pinned-frame, closure, channel, synchronization, or scheduler
@@ -408,8 +420,9 @@ accessed. A borrow crossing suspension is valid only when the frame is not
 concurrently accessible and the suspended-frame scope is the same scope as the
 borrowed value's lifetime scope.
 
-The compiler reports `borrow_across_suspension` when a suspended borrow may be
-concurrently accessed, may outlive the borrowed value, or both. The suspension
+The analysis reports `borrow_across_suspension` when a suspended borrow may be
+concurrently accessed, may outlive the borrowed value, or both. The compiler
+does not report it for source programs yet. The suspension
 node is primary, the borrow node is secondary, and the diagnostic identifies the
 borrowed local and rejection reason.
 
@@ -420,6 +433,11 @@ async drop are deferred. ADR-0037 remains the authority for any supplied
 thread-capability capture records.
 
 ## ADR-0039: Bootstrap Unsafe FFI Boundary Analysis
+
+Implementation status: unfinished. `unsafe_boundary.rs` implements these records,
+but the driver does not run them on source programs. No source program reaches
+the unsafe-operation checks, and the records are exercised only by hand-built
+tests.
 
 The compiler uses a metadata-only bootstrap unsafe and FFI boundary model. It adds no
 source-level unsafe block, unsafe function, extern block, foreign declaration,
