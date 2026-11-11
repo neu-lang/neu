@@ -406,7 +406,8 @@ concurrent boundary without exclusive transfer. `Bool`, `Int`, `Unit`, and
 Nullable types satisfy a capability only when their non-null base type satisfies
 that capability. Current-module nominal user-defined types, generic parameter
 types, unsupported types, unresolved types, and absent type information satisfy
-neither capability in this implementation.
+neither capability in this implementation, except that classes and enums are derived
+as revised by ADR-0136.
 
 Boundary input records contain a boundary node and ordered capture records.
 Capture records contain a capture node, captured local binding, captured type,
@@ -1640,6 +1641,32 @@ syntax for declaring these capabilities on an interface is not yet accepted.
 allocation. Callers branch on `kind()` with an exhaustive `when` over `ErrorKind`.
 Message text, error chaining, `?` propagation, and implicit error conversion are
 deferred.
+
+## ADR-0136: Interface Capability Declarations
+
+An interface may declare `Send` and `Share` after its name, using the capability-bound
+list of ADR-0023 (`interface Error: Send & Share`). Only those two names are accepted.
+Each implementing class must satisfy every declared capability, checked at its
+declaration under ADR-0066. A failure is a source-mapped constraint diagnostic.
+
+An interface value satisfies a capability only when the interface declares it.
+A class satisfies `Send` or `Share` when every field's type does; a class with no
+fields satisfies both. Enums follow the same rule over payload types, and a generic
+enum instance satisfies a capability when every type argument does. A recursive
+cycle through fields is conservative and does not satisfy a capability through the
+cycle. Per-class capability declarations and user-declared implementations remain
+deferred.
+
+## ADR-0137: Immortal Zero-Field Error Objects
+
+The stdlib error classes `IndexOutOfBoundsError` and `AllocationFailedError` have no
+fields. The compiler emits one static, immutable instance of each, in read-only data on
+the host target. Constructing such an error references that instance and performs no
+allocation, so it has no failure path. Destroying an immortal instance does nothing,
+because it was never allocated. This is the stated exception to ADR-0135's rule that a
+concrete error object is destroyed exactly once. Immortal instances satisfy `Send` and
+`Share` by ADR-0136. Other classes, and user-defined zero-field classes, use the normal
+allocation path.
 
 ## Project Build Command
 

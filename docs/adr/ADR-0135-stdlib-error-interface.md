@@ -120,8 +120,10 @@ Before implementation, add negative tests written first:
 - `AllocationFailedError` construction under simulated allocation failure (O2).
 
 - Define, in an accepted ADR, the syntax for declaring `Send` and `Share` on an interface
-  (O1). Until then, `Error`'s capability declaration cannot be written in source.
+  (O1). Drafted in ADR-0136 (Proposed). Until it is accepted, `Error`'s capability
+  declaration cannot be written in source.
 - Define the zero-allocation construction mechanism for `AllocationFailedError` (O2).
+  Drafted in ADR-0137 (Proposed), which depends on ADR-0136.
 
 `docs/SPEC.md` carries this ADR's section. Implementation may rely on it only after the
 tests above exist and fail first.
